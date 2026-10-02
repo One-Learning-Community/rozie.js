@@ -13,6 +13,22 @@
   reference without dismissing — proving the live reference reconcile. A virtual
   reference adds no inside region, so an outside click then dismisses.
 
+  Two OUTSIDE openers cover the cross-target click-outside contract (release-0.8.0
+  audit A1/A2): `open-at-point` (outside the panel and the anchor) opens at the
+  virtual point; the opening click must not self-dismiss. `external-anchor-2` uses
+  the move-or-toggle recipe: while the panel is open on the first element, clicking
+  the second one MOVES the panel there. Popover decides the outside dismissal
+  after the click's handlers ran, against the reference as it is then, so the
+  repointed reference counts as inside and the panel stays open.
+
+  Audit B coverage (buttons INSIDE the panel, so clicking them never dismisses):
+  `use-temp-target` repoints at a temporary element and `remove-temp-target`
+  removes it from the document (B2: the panel closes); `clear-reference` sets
+  `reference = null` while open (back to the built-in anchor); `place-top` flips
+  the bound placement (B3: it must survive the next scroll). `other-input` is an
+  outside focusable control (B5: clicking it dismisses without stealing focus
+  back). `id-base` gives this instance its own panel id (B1).
+
   See popover-reference.spec.ts. Behavioral-only (DOM-geometry assertions, no PNG).
 -->
 <rozie name="PopoverReferenceDemo">
@@ -27,6 +43,8 @@
 {
   panelOpen: false,
   referenceTarget: null,
+  placement: 'bottom',
+  showTemp: true,
 }
 </data>
 
@@ -48,13 +66,38 @@ const pointReference = {
   }),
 }
 
+let tempNode = null
+
 $onMount(() => {
   extBoxNode = $refs.extBox
+  extBox2Node = $refs.extBox2
+  tempNode = $refs.tempBox
 })
+
+const useTempTarget = () => { $data.referenceTarget = tempNode }
+const removeTempTarget = () => { $data.showTemp = false }
+const clearReference = () => { $data.referenceTarget = null }
+const placeTop = () => { $data.placement = 'top' }
 
 const onExternalClick = () => {
   $data.referenceTarget = extBoxNode
   $data.panelOpen = !$data.panelOpen
+}
+// Outside opener: repoint to the virtual point and open.
+const openAtPoint = () => {
+  $data.referenceTarget = pointReference
+  $data.panelOpen = true
+}
+// Move-or-toggle recipe: toggle when it is already the reference, otherwise
+// move there and (re)open.
+let extBox2Node = null
+const onExternal2Click = () => {
+  if ($data.referenceTarget === extBox2Node && $data.panelOpen) {
+    $data.panelOpen = false
+    return
+  }
+  $data.referenceTarget = extBox2Node
+  $data.panelOpen = true
 }
 const moveToPoint = () => {
   $data.referenceTarget = pointReference
@@ -68,10 +111,16 @@ const valueText = () => ($data.panelOpen ? 'open' : 'closed')
 
   <div class="controls">
     <span class="readout" data-testid="readout-value">{{ valueText() }}</span>
+    <!-- Outside openers sit ABOVE the external row so an open panel (placement
+         bottom) never covers them. -->
+    <button type="button" class="second-box" ref="extBox2" data-testid="external-anchor-2" @click="onExternal2Click()">Second target</button>
+    <button type="button" data-testid="open-at-point" @click="openAtPoint()">Open at point</button>
+    <input type="text" data-testid="other-input" aria-label="Other input" />
   </div>
 
   <div class="external-row">
     <button type="button" class="external-box" ref="extBox" data-testid="external-anchor" @click="onExternalClick()">External target</button>
+    <span class="temp-box" ref="tempBox" data-testid="temp-target" r-if="$data.showTemp">Temporary target</span>
   </div>
 
   <!-- The `anchor` slot is deliberately left EMPTY: the panel positions against
@@ -79,13 +128,18 @@ const valueText = () => ($data.panelOpen ? 'open' : 'closed')
   <Popover
     r-model:open="$data.panelOpen"
     trigger="manual"
-    placement="bottom"
+    :placement="$data.placement"
     :offset="8"
     :reference="$data.referenceTarget"
+    id-base="ref-demo"
   >
     <div class="popover-body" data-testid="popover-content">
       Floating content
       <button type="button" data-testid="move-to-point" @click="moveToPoint()">Move to point</button>
+      <button type="button" data-testid="use-temp-target" @click="useTempTarget()">Use temp target</button>
+      <button type="button" data-testid="remove-temp-target" @click="removeTempTarget()">Remove temp target</button>
+      <button type="button" data-testid="clear-reference" @click="clearReference()">Clear reference</button>
+      <button type="button" data-testid="place-top" @click="placeTop()">Place top</button>
     </div>
   </Popover>
 </div>
@@ -108,8 +162,23 @@ const valueText = () => ($data.panelOpen ? 'open' : 'closed')
   width: 160px;
   height: 48px;
 }
+.popover-reference-demo .second-box {
+  /* Room on both sides so the shift middleware never nudges the panel. */
+  margin-left: 420px;
+  width: 160px;
+}
 .popover-body {
   font-size: 0.9rem;
+}
+.popover-reference-demo .temp-box {
+  display: inline-block;
+  margin-left: 420px;
+  margin-top: 24px;
+  padding: 4px 8px;
+}
+/* Room to scroll, so the placement-survives-scroll step has a scroll event. */
+.popover-reference-demo {
+  padding-bottom: 1400px;
 }
 </style>
 

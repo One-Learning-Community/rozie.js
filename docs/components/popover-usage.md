@@ -28,8 +28,9 @@ export function Demo() {
       placement="bottom"
       offset={8}
       arrow
-      onChange={(next) => console.log('open:', next)}
-      renderAnchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      renderAnchor={({ open, toggle, panelId }) => (
+        <button onClick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
+      )}
     >
       <div>Floating content</div>
     </Popover>
@@ -46,9 +47,9 @@ const open = ref(false);
 </script>
 
 <template>
-  <Popover v-model:open="open" trigger="click" placement="bottom" :offset="8" arrow @change="(o) => console.log('open:', o)">
-    <template #anchor="{ toggle }">
-      <button @click="toggle">Menu</button>
+  <Popover v-model:open="open" trigger="click" placement="bottom" :offset="8" arrow>
+    <template #anchor="{ open, toggle, panelId }">
+      <button @click="toggle" :aria-expanded="open" :aria-controls="panelId">Menu</button>
     </template>
     <div>Floating content</div>
   </Popover>
@@ -62,9 +63,9 @@ const open = ref(false);
   let open = $state(false);
 </script>
 
-<Popover bind:open trigger="click" placement="bottom" offset={8} arrow onchange={(o) => console.log('open:', o)}>
-  {#snippet anchor({ toggle })}
-    <button onclick={toggle}>Menu</button>
+<Popover bind:open trigger="click" placement="bottom" offset={8} arrow>
+  {#snippet anchor({ open, toggle, panelId })}
+    <button onclick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
   {/snippet}
   <div>Floating content</div>
 </Popover>
@@ -79,9 +80,9 @@ import { Popover } from '@rozie-ui/popover-angular';
   standalone: true,
   imports: [Popover],
   template: `
-    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
-      <ng-template #anchor let-toggle="toggle">
-        <button (click)="toggle()">Menu</button>
+    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true">
+      <ng-template #anchor let-open="open" let-toggle="toggle" let-panelId="panelId">
+        <button (click)="toggle()" [attr.aria-expanded]="open" [attr.aria-controls]="panelId">Menu</button>
       </ng-template>
       <ng-template #defaultSlot>
         <div>Floating content</div>
@@ -91,9 +92,6 @@ import { Popover } from '@rozie-ui/popover-angular';
 })
 export class DemoComponent {
   open = false;
-  onChange(next: boolean) {
-    console.log('open:', next);
-  }
 }
 ```
 
@@ -111,8 +109,9 @@ export function Demo() {
       placement="bottom"
       offset={8}
       arrow
-      onChange={(next) => console.log('open:', next)}
-      anchorSlot={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      anchorSlot={({ open, toggle, panelId }) => (
+        <button onClick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
+      )}
     >
       <div>Floating content</div>
     </Popover>
@@ -125,9 +124,9 @@ import '@rozie-ui/popover-lit';
 import '@floating-ui/dom'; // peer engine
 
 // <rozie-popover> is a custom element. Bind `open`/`placement`/`trigger`/`offset`/
-// `arrow` as properties; listen for `change` for the new open boolean, or
-// `open-change` to drive the two-way model. Project the anchor into the `anchor`
-// slot and the content into the default slot.
+// `arrow` as properties; `open-change` carries the new open boolean (in
+// `event.detail`) and drives the two-way model. Project the anchor into the
+// `anchor` slot and the content into the default slot.
 const el = document.querySelector('rozie-popover');
 el.trigger = 'click';
 el.placement = 'bottom';
@@ -135,8 +134,6 @@ el.offset = 8;
 el.arrow = true;
 el.addEventListener('open-change', (e) => {
   el.open = e.detail;
-});
-el.addEventListener('change', (e) => {
   console.log('open:', e.detail);
 });
 ```

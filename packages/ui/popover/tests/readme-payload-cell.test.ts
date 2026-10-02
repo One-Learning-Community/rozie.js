@@ -23,8 +23,10 @@ describe('README payload cells', () => {
     const { ir } = lowerToIR(ast!, { modifierRegistry: createDefaultRegistry(), filename: resolve(HERE, '../src/Popover.rozie') });
     const parsed = parseAuthoredType("{ kind: 'a' | 'b'; nested: { deep: number; other: string } }");
     if ('error' in parsed) throw new Error(parsed.error);
-    const decl = ir!.emitDecls![0]!;
-    ir!.emitDecls![0] = { ...decl, payload: parsed.type };
+    // Popover declares no events of its own (release-0.8.0 audit B6 removed
+    // `change`), so inject a synthetic declaration to exercise the cell.
+    const decl = { name: 'probe', payload: parsed.type, docs: null, sourceLoc: { start: 0, end: 0 } };
+    ir!.emitDecls!.push(decl);
     const md: string = renderReadme('react', ir, '@rozie-ui/popover-react', handleManifest);
     const row = md.split('\n').find((l) => l.startsWith(`| \`${decl.name}\` |`));
     expect(row).toBeDefined();

@@ -1,6 +1,8 @@
 /**
  * SVELTE-POPOVER-TYPED-SURFACE — typed public surface phase 1 (Task 17).
- * svelte-checks compile(Popover.rozie): `onchange` payload is boolean, the
+ * svelte-checks compile(Popover.rozie): `bind:open` is boolean (the `open`
+ * model is the only change signal — the separate `change` emit was removed,
+ * release-0.8.0 audit B6), the
  * `anchor` snippet ctx is typed, handle verbs are typed. Negatives are pinned
  * to the specific svelte-check message.
  */
@@ -28,22 +30,24 @@ function stubInternals(code: string): string {
 const OK = `<script lang="ts">
   import Popover from './Popover.svelte';
   let inst: ReturnType<typeof Popover> | undefined = $state();
+  let isOpen = $state(false);
   inst?.show();
   inst?.hide();
   inst?.toggle();
   inst?.reposition();
 </script>
 
-<Popover bind:this={inst} onchange={(open) => { const b: boolean = open; void b; }}>
-  {#snippet anchor({ open, toggle, show, hide })}{(open satisfies boolean)}{void toggle()}{void show()}{void hide()}{/snippet}
+<Popover bind:this={inst} bind:open={isOpen}>
+  {#snippet anchor({ open, toggle, show, hide, panelId })}{(open satisfies boolean)}{(panelId satisfies string)}{void toggle()}{void show()}{void hide()}{/snippet}
 </Popover>
 `;
 
 const NEGATIVES: Array<{ name: string; markup: string; script?: string; match: RegExp }> = [
   {
-    name: 'change payload is boolean',
-    markup: `<Popover onchange={(open) => open.toFixed()} />`,
-    match: /Property 'toFixed' does not exist on type 'boolean'/,
+    name: 'bind:open is boolean, not number',
+    markup: `<Popover bind:open={count} />`,
+    script: `let count = $state(0);`,
+    match: /Type 'number' is not assignable to type 'boolean/,
   },
   {
     name: 'anchor snippet open is boolean',
@@ -78,7 +82,7 @@ function svelteCheck(files: Record<string, string>): { threw: boolean; output: s
   }
 }
 
-describe('SVELTE-POPOVER-TYPED-SURFACE — change: boolean, typed anchor ctx, typed handle', () => {
+describe('SVELTE-POPOVER-TYPED-SURFACE — bind:open: boolean, typed anchor ctx, typed handle', () => {
   const r0 = compile(SRC, { target: 'svelte', filename: 'Popover.rozie', sourceMap: false });
   const svelte = stubInternals(r0.code);
 

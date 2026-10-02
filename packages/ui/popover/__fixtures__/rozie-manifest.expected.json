@@ -108,6 +108,13 @@
       "tsType": null
     },
     {
+      "name": "idBase",
+      "isModel": false,
+      "required": false,
+      "type": "String",
+      "tsType": null
+    },
+    {
       "name": "reference",
       "isModel": false,
       "required": false,
@@ -130,13 +137,17 @@
         },
         {
           "name": "hide"
+        },
+        {
+          "name": "panelId"
         }
       ],
       "paramTypes": [
         "boolean",
         "() => void",
         "() => void",
-        "() => void"
+        "() => void",
+        "string"
       ],
       "isPortal": false,
       "isReactive": false,
@@ -151,15 +162,7 @@
       "paramTypesAuthored": false
     }
   ],
-  "emits": [
-    {
-      "name": "change",
-      "payload": "boolean",
-      "docs": {
-        "description": "Fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. The two-way `open` model is updated alongside it."
-      }
-    }
-  ],
+  "emits": [],
   "expose": [
     {
       "name": "show",

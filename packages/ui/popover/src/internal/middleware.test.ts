@@ -81,6 +81,18 @@ describe('buildMiddleware', () => {
     expect(names(mw)).toEqual(['offset', 'size', 'flip', 'shift']);
   });
 
+  // Release-0.8.0 audit B4: the size `apply` copies the reference width, but a
+  // zero-width reference (a point virtual element) has none to match.
+  it('size apply copies a positive reference width and leaves a zero-width one unset', () => {
+    const mw = buildMiddleware(factories, { ...base, matchWidth: true });
+    const apply = (mw[1] as { apply: (args: unknown) => void }).apply;
+    const floating = { style: { width: '' } } as unknown as HTMLElement;
+    apply({ rects: { reference: { width: 240 } }, elements: { floating } });
+    expect(floating.style.width).toBe('240px');
+    apply({ rects: { reference: { width: 0 } }, elements: { floating } });
+    expect(floating.style.width).toBe('');
+  });
+
   it('keeps size at index 1 even with disableFlip and disableShift both set', () => {
     const mw = buildMiddleware(factories, { ...base, matchWidth: true, disableFlip: true, disableShift: true });
     expect(names(mw)).toEqual(['offset', 'size']);

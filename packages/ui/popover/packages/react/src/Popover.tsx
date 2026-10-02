@@ -24,18 +24,19 @@ import { buildMiddleware } from './internal/middleware';
 //   `const X = $refs.X` init shape).
 //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
 //   onMount→onCleanup split (teardown is a separate closure) can still see it.
-//   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
-//   `trigger="click"` popover opened (natively the clicked trigger element itself,
-//   since a mousedown focuses a native `<button>` before its `click` fires) —
-//   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+//   lastFocusedEl (phase 72-06b; widened by release-0.8.0 audit B5) holds whatever
+//   had DOM focus at the moment a non-tooltip popover opened — through its trigger,
+//   the handle, or a controlled `open` write (natively the clicked trigger element
+//   itself, since a mousedown focuses a native `<button>` before its `click` fires)
+//   — restored on close only when focus would otherwise be lost (see restoreFocus).
 //   Same null-let convention as the others: read/written only in handlers, `any`
 //   via typeNeutralize.
 
-interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; }
+interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; }
 
-interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference' | 'onChange' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'idBase' | 'reference' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
-   * Whether the floating content is open. The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Popover writes the new state back whenever the trigger or a dismissal toggles it. Left unbound it falls back to an uncontrolled default.
+   * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
    */
   open?: boolean;
   defaultOpen?: boolean;
@@ -45,7 +46,7 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   placement?: string;
   /**
-   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded` (only a real gesture trigger claims the popup). Drives both the gesture handlers and the ARIA role (`'hover'`/`'focus'` → tooltip, `'click'` → popover dialog, `'manual'` → no anchor ARIA claim).
+   * How the anchor opens the content: `'click'` toggles on click, `'hover'` opens on pointer-enter and closes on pointer-leave (tooltip-style), `'focus'` opens on focus and closes on blur, or `'manual'` for a composing component that drives `open` itself — every built-in gesture handler no-ops. Drives both the gesture handlers and the ARIA: `'click'` sets `aria-haspopup`/`aria-expanded`/`aria-controls` on the anchor wrapper; `'hover'`/`'focus'` are tooltips (`role="tooltip"` panel, `aria-describedby` on the wrapper, no popup claim); `'manual'` makes no anchor ARIA claim. The wrapper is not focusable, so put the matching attributes on your own focusable trigger too — the `anchor` slot passes `open` and `panelId` for exactly that.
    */
   trigger?: string;
   /**
@@ -97,10 +98,13 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   disableDismiss?: boolean;
   /**
-   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded` / `aria-controls`), typically with `trigger='manual'` and a two-way-bound `open`. Pass a stable value — a new object on every render restarts tracking.
+   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   */
+  idBase?: string;
+  /**
+   * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded`, plus `aria-controls` pointing at `idBase + '-panel'`), typically with `trigger='manual'` and a two-way-bound `open`. If a referenced Element is removed from the document while open, the popover closes. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, any>) | null;
-  onChange?: (payload: boolean) => void;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -114,7 +118,7 @@ export interface PopoverHandle {
 }
 
 const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props: PopoverProps, ref): JSX.Element {
-  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'reference'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean; reference: (Element | Record<string, any>) | null } = {
+  const props: Omit<PopoverProps, 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'idBase' | 'reference'> & { placement: string; trigger: string; offset: number; disableFlip: boolean; disableShift: boolean; arrow: boolean; disabled: boolean; modal: boolean; strategy: string; bare: boolean; disablePositioning: boolean; keepMounted: boolean; matchWidth: boolean; disableDismiss: boolean; idBase: string; reference: (Element | Record<string, any>) | null } = {
     ..._props,
     placement: _props.placement ?? 'bottom',
     trigger: _props.trigger ?? 'click',
@@ -130,14 +134,16 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     keepMounted: _props.keepMounted ?? false,
     matchWidth: _props.matchWidth ?? false,
     disableDismiss: _props.disableDismiss ?? false,
+    idBase: _props.idBase ?? 'rozie-popover',
     reference: _props.reference ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, reference, defaultValue, onOpenChange, defaultOpen, onChange, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void reference; void defaultValue; void onOpenChange; void defaultOpen; void onChange;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, idBase, reference, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void idBase; void reference; void defaultValue; void onOpenChange; void defaultOpen;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
+  const liveReference = useRef<any>(null);
   const floatingNode = useRef<any>(null);
   const arrowNode = useRef<any>(null);
   const stopAutoUpdate = useRef<any>(null);
@@ -151,6 +157,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   _disabledRef.current = props.disabled;
   const _keepMountedRef = useRef(props.keepMounted);
   _keepMountedRef.current = props.keepMounted;
+  const _referenceRef = useRef(props.reference);
+  _referenceRef.current = props.reference;
   const _openRef = useRef(open);
   _openRef.current = open;
   const anchorEl = useRef<HTMLDivElement | null>(null);
@@ -163,7 +171,13 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _watch4First = useRef(true);
   const _watch5First = useRef(true);
   const _watch6First = useRef(true);
+  const _watch7First = useRef(true);
+  const _watch8First = useRef(true);
 
+  // The current `reference`, mirrored into a top-level let (release-0.8.0 audit
+  // A2). The deferred outside-click check below runs after the click's handlers
+  // and re-renders; a let is read live on every target (on React it is a ref),
+  // where a `$props` read inside that callback could be a stale render closure.
   // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
   //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
   //   $onMount/handlers, ROZ123). They are deliberately named DIFFERENTLY from the
@@ -175,10 +189,11 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   //   `const X = $refs.X` init shape).
   //   stopAutoUpdate is the autoUpdate teardown handle — a TOP-LEVEL `let` so the Solid
   //   onMount→onCleanup split (teardown is a separate closure) can still see it.
-  //   lastFocusedEl (phase 72-06b) holds whatever had DOM focus at the moment a
-  //   `trigger="click"` popover opened (natively the clicked trigger element itself,
-  //   since a mousedown focuses a native `<button>` before its `click` fires) —
-  //   restored on dismissal so Escape/click-outside don't drop focus to `<body>`.
+  //   lastFocusedEl (phase 72-06b; widened by release-0.8.0 audit B5) holds whatever
+  //   had DOM focus at the moment a non-tooltip popover opened — through its trigger,
+  //   the handle, or a controlled `open` write (natively the clicked trigger element
+  //   itself, since a mousedown focuses a native `<button>` before its `click` fires)
+  //   — restored on close only when focus would otherwise be lost (see restoreFocus).
   //   Same null-let convention as the others: read/written only in handlers, `any`
   //   via typeNeutralize.
 
@@ -200,30 +215,58 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     return el;
   }
 
-  // Drive the two-way model + emit in one place. Named `requestOpen` (NOT `setOpen`)
-  // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
-  //
-  // Focus-return (phase 72-06b, D-08 a11y finding): scoped to `trigger === 'click'`
-  // only — click-triggered popovers are genuinely interactive (a real dialog the
-  // user tabs/clicks into), so restoring focus to the trigger on dismissal matches
-  // standard disclosure-widget a11y practice. Deliberately NOT applied to
+  // Focus-return (phase 72-06b, D-08 a11y finding; widened by release-0.8.0 audit
+  // B5). Applies to every NON-tooltip trigger (`click` and `manual`, which is what a
+  // `reference` popover or a composing component uses) and to every way of opening
+  // (trigger, handle, controlled `open` write). Deliberately NOT applied to
   // `hover`/`focus` triggers (tooltip-flavored, see `isTooltip()`): those close on
   // pointerleave/blur constantly during normal mouse/keyboard traversal, and
   // forcing a focus() call on every such close would fight the user's own focus
   // movement rather than restore anything lost.
+  //
+  // Capture once per open cycle (the first of requestOpen / the open watch wins).
+  function captureReturnFocus() {
+    if (isTooltip() || lastFocusedEl.current) return;
+    lastFocusedEl.current = deepActiveElement();
+  }
+  // Composed containment: also walks slot assignment and shadow hosts. On Lit
+  // the panel's own content is SLOTTED (a light-DOM child of the popover host,
+  // projected into the panel's <slot>), which plain `contains()` never sees.
+  function composedContains(container: any, node: any) {
+    let n: any = null;
+    n = node;
+    while (n) {
+      if (n === container) return true;
+      n = n.assignedSlot || n.parentNode || n.host || null;
+    }
+    return false;
+  }
+
+  // Restore only when focus would otherwise be LOST: it sits inside the closing
+  // panel, or has already fallen back to <body> (the panel unmounted around it, or
+  // the user clicked a non-focusable spot). Focus the user moved somewhere else —
+  // e.g. a click into another input, which focuses it on mousedown before the
+  // outside-click dismissal runs — is left alone, never stolen.
+  function restoreFocus() {
+    let el: any = null;
+    el = lastFocusedEl.current;
+    lastFocusedEl.current = null;
+    if (isTooltip() || !el || !el.isConnected || typeof el.focus !== 'function') return;
+    let active: any = null;
+    active = deepActiveElement();
+    const lost = !active || active === document.body || active === document.documentElement;
+    const insidePanel = !!(floatingNode.current && active && composedContains(floatingNode.current, active));
+    if (lost || insidePanel) el.focus();
+  }
+
+  // Drive the two-way model in one place. Named `requestOpen` (NOT `setOpen`)
+  // to dodge the React generated `setOpen` setter for the `open` model (ROZ524).
   function requestOpen(next: any) {
     if (open === next) return;
-    if (next && props.trigger === 'click') {
-      lastFocusedEl.current = deepActiveElement();
-    }
+    if (next) captureReturnFocus();
     setOpen(next);
-    props.onChange && props.onChange(next);
-    if (!next && props.trigger === 'click' && lastFocusedEl.current && lastFocusedEl.current.isConnected && typeof lastFocusedEl.current.focus === 'function') {
-      lastFocusedEl.current.focus();
-    }
-    if (!next) {
-      lastFocusedEl.current = null;
-    }
+    // Restore while the panel is still mounted, so focus inside it is recognized.
+    if (!next) restoreFocus();
   }
 
   // Apply the resolved x/y (and arrow offset, when present) onto the floating element.
@@ -253,6 +296,13 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     let referenceEl: any = null;
     referenceEl = props.reference || anchorNode.current;
     if (!referenceEl || !floatingNode.current) return;
+    // A referenced Element removed from the document measures as a zero rect at
+    // the viewport origin (release-0.8.0 audit B2), e.g. a calendar event element
+    // FullCalendar re-rendered. There is nothing left to point at, so close.
+    if (referenceEl.nodeType === 1 && !referenceEl.isConnected) {
+      if (open) requestOpen(false);
+      return;
+    }
     const middleware = buildMiddleware({
       offset: offsetMiddleware,
       flip,
@@ -291,7 +341,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     computePosition(referenceEl, floatingNode.current, opts).then((result: any) => {
       applyPosition(result.x, result.y, result.middlewareData);
     });
-  }, [applyPosition, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.matchWidth, props.offset, props.placement, props.reference, props.strategy]);
+  }, [applyPosition, open, props.arrow, props.disableFlip, props.disablePositioning, props.disableShift, props.matchWidth, props.offset, props.placement, props.reference, props.strategy, requestOpen]);
   // Start autoUpdate (idempotent — stop any prior subscription first) and do an
   // initial position. Floating UI's autoUpdate keeps the position fresh on scroll/
   // resize/ancestor-layout changes and returns its own teardown.
@@ -315,6 +365,17 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       stopAutoUpdate.current = null;
     }
   }, []);
+  // ─── reconcile positioning props while open ─────────────────────────────────────
+  // Restart tracking rather than repositioning once (release-0.8.0 audit B3):
+  // autoUpdate holds the position callback it was started with, which on React is
+  // the render-time closure — a one-shot position() with the new props would be
+  // reverted by the next scroll/resize update through the old closure.
+  // startTracking() re-subscribes with the current callback and positions
+  // immediately. Closed or untracked (disablePositioning) → plain position().
+  function refresh() {
+    if (!open) return;
+    if (stopAutoUpdate.current) startTracking();else position();
+  }
   // ─── trigger gesture handlers (wired conditionally on the anchor by `trigger`) ──
   const onAnchorClick = useCallback(() => {
     if (props.disabled) return;
@@ -354,24 +415,41 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // first — it is load-bearing for shadow-DOM (Lit) consumers, where a document-level
   // listener sees the click retargeted to the outermost host. A virtual element
   // (no `nodeType`) adds no inside region.
-  const dismissOutside = useCallback((event: any) => {
+  function isInsideReference(path: any, target: any) {
     let referenceEl: any = null;
-    referenceEl = props.reference;
-    if (referenceEl && referenceEl.nodeType === 1 && event) {
-      if (typeof event.composedPath === 'function' && event.composedPath().includes(referenceEl)) return;
-      if (event.target && referenceEl.contains(event.target)) return;
-    }
-    requestOpen(false);
-  }, [props.reference, requestOpen]);
-  // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
-  // hasGestureTrigger() (D-02): whether `trigger` is one of the three REAL anchor
-  // gestures. `'manual'` (and any other unrecognized value) returns false, which
-  // gates the anchor's `aria-haspopup`/`aria-expanded` off entirely — a composing
-  // component driving `open` itself must not have its wrapper claim a popup it
-  // does not own (D-01).
-  function hasGestureTrigger() {
-    return props.trigger === 'click' || props.trigger === 'hover' || props.trigger === 'focus';
+    referenceEl = liveReference.current;
+    if (!referenceEl || referenceEl.nodeType !== 1) return false;
+    if (path && path.includes(referenceEl)) return true;
+    return !!(target && referenceEl.contains(target));
   }
+  // The decision is made one task LATER (release-0.8.0 audit A2), after the
+  // click's own handlers and the re-render they cause, against the reference as
+  // it is THEN. So a consumer handler that repoints `reference` at the element
+  // just clicked (and keeps `open` true) keeps the panel open and moves it,
+  // instead of the dismissal closing it first and the handler reopening it. That
+  // close-then-reopen round trip is not just a flicker on Angular: a parent that
+  // writes `open` back to `true` in the same tick is not re-pushed to the
+  // child's model (Angular only re-binds a CHANGED value), leaving the panel
+  // closed while the parent believes it open. The path and target are captured
+  // NOW — `composedPath()` is empty after dispatch, and the target may detach.
+  const dismissOutside = useCallback((event: any) => {
+    let path: any = null;
+    path = event && typeof event.composedPath === 'function' ? event.composedPath() : null;
+    let target: any = null;
+    target = event ? event.target : null;
+    if (isInsideReference(path, target)) return;
+    setTimeout(() => {
+      if (isInsideReference(path, target)) return;
+      requestOpen(false);
+    }, 0);
+  }, [isInsideReference, requestOpen]);
+  // ─── role helpers (plain functions; tooltip vs popover-dialog by trigger) ───────
+  // Only a `click` trigger claims a popup on the anchor (`aria-haspopup` /
+  // `aria-expanded` / `aria-controls`, see the template). `'manual'` never does
+  // (D-01/D-02: a composing component driving `open` itself must not have its
+  // wrapper claim a popup it does not own), and neither do the tooltip triggers
+  // (release-0.8.0 audit B7): a tooltip is described by its panel
+  // (`aria-describedby`), it does not expand a popup.
   // hover/focus triggers are tooltip-flavored; click is an interactive popover.
   function isTooltip() {
     return props.trigger === 'hover' || props.trigger === 'focus';
@@ -389,11 +467,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   function floatingRole() {
     return isTooltip() ? 'tooltip' : props.modal ? 'dialog' : undefined;
   }
+  // The panel id (audit B1), also handed to the anchor slot as `panelId`.
+  function panelId() {
+    return props.idBase + '-panel';
+  }
 
   // ─── imperative handle ($expose) ────────────────────────────────────────────────
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
-  // reposition verb is `reposition`. None collide with the `change` emit, the `open`
-  // model, or its React `setOpen` setter, nor with inherited HTMLElement members.
+  // reposition verb is `reposition`. None collide with the `open` model or its
+  // React `setOpen` setter, nor with inherited HTMLElement members.
   function show() {
     if (!props.disabled) requestOpen(true);
   }
@@ -416,6 +498,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     // and may be null until open (or keepMounted); startTracking re-reads via the
     // watch path.
     anchorNode.current = anchorEl.current;
+    liveReference.current = _referenceRef.current;
     if (_openRef.current && !_disabledRef.current) {
       // floatingNode is populated by its r-if having rendered; read it lazily inside
       // the watch/handlers too. Position on next tick when it exists.
@@ -440,6 +523,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     if (_watch0First.current) { _watch0First.current = false; return; }
     const isOpen = open;
     if (isOpen && !props.disabled) {
+      // A controlled `open` write (or the handle) never ran requestOpen's capture.
+      captureReturnFocus();
       queueMicrotask(() => {
         if (!open || props.disabled) return;
         floatingNode.current = floatingEl.current;
@@ -448,30 +533,47 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       });
     } else {
       stopTracking();
+      // A controlled close (the consumer wrote `open = false`); an internal close
+      // already restored in requestOpen, so this is a no-op then.
+      restoreFocus();
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
-    if (open) position();
+    refresh();
   }, [props.placement]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
-    if (open) position();
+    refresh();
   }, [props.offset]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch3First.current) { _watch3First.current = false; return; }
-    if (open) position();
+    refresh();
   }, [props.disableFlip]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
-    if (open) position();
+    refresh();
   }, [props.disableShift]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch5First.current) { _watch5First.current = false; return; }
-    if (open) position();
+    refresh();
   }, [props.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch6First.current) { _watch6First.current = false; return; }
+    const on = props.matchWidth;
+    if (!on && floatingNode.current) floatingNode.current.style.width = '';
+    refresh();
+  }, [props.matchWidth]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch7First.current) { _watch7First.current = false; return; }
+    queueMicrotask(() => {
+      arrowNode.current = arrowEl.current;
+      refresh();
+    });
+  }, [props.arrow]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch8First.current) { _watch8First.current = false; return; }
+    liveReference.current = props.reference;
     if (props.disabled) return;
     if (stopAutoUpdate.current) {
       startTracking();
@@ -505,12 +607,12 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     <div {...attrs} className={clsx("rozie-popover", (attrs.className as string | undefined))} data-rozie-s-c6cf02ea="">
 
       
-      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup={rozieAttr(hasGestureTrigger() ? 'dialog' : undefined)} aria-expanded={(hasGestureTrigger() ? !!open : undefined) ?? undefined} aria-describedby={rozieAttr(isTooltip() && open ? 'rozie-popover-floating' : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
-        {(props.renderAnchor ?? props.slots?.['anchor'])?.({ open, toggle, show, hide })}
+      <div className={"rozie-popover-anchor"} ref={anchorEl} aria-haspopup={rozieAttr(props.trigger === 'click' ? 'dialog' : undefined)} aria-expanded={(props.trigger === 'click' ? !!open : undefined) ?? undefined} aria-controls={rozieAttr(props.trigger === 'click' && open ? panelId() : undefined)} aria-describedby={rozieAttr(isTooltip() && open ? panelId() : undefined)} onClick={($event) => { props.trigger === 'click' && onAnchorClick(); }} onPointerEnter={($event) => { props.trigger === 'hover' && onAnchorPointerEnter(); }} onPointerLeave={($event) => { props.trigger === 'hover' && onAnchorPointerLeave(); }} onFocus={($event) => { props.trigger === 'focus' && onAnchorFocus(); }} onBlur={($event) => { props.trigger === 'focus' && onAnchorBlur(); }} data-rozie-s-c6cf02ea="">
+        {(props.renderAnchor ?? props.slots?.['anchor'])?.({ open, toggle, show, hide, panelId: panelId() })}
       </div>
 
       
-      {!!((open || props.keepMounted) && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare, "rozie-popover-floating--hidden": !open })} ref={floatingEl} id="rozie-popover-floating" role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {!!((open || props.keepMounted) && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare, "rozie-popover-floating--hidden": !open })} ref={floatingEl} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
         {!!(props.arrow) && <div className={"rozie-popover-arrow"} ref={arrowEl} data-rozie-s-c6cf02ea="" />}{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>}</div>
     </>

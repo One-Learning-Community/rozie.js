@@ -1,6 +1,8 @@
 /**
  * VUE-POPOVER-TYPED-SURFACE — typed public surface phase 1 (Task 17).
- * vue-tsc-checks compile(Popover.rozie): `@change` payload is boolean, the
+ * vue-tsc-checks compile(Popover.rozie): the `open` model's `@update:open`
+ * payload is boolean (the only change signal — the separate `change` emit was
+ * removed, release-0.8.0 audit B6), the
  * `anchor` slot ctx is typed, handle verbs are typed. Negatives are pinned to
  * the specific vue-tsc message (no vacuous passes).
  */
@@ -35,16 +37,16 @@ h.value?.toggle();
 h.value?.reposition();
 </script>
 <template>
-  <Popover ref="h" @change="(open) => { const b: boolean = open; void b; }">
-    <template #anchor="{ open, toggle, show, hide }">{{ (open satisfies boolean) }}{{ void toggle() }}{{ void show() }}{{ void hide() }}</template>
+  <Popover ref="h" @update:open="(open) => { const b: boolean = open; void b; }">
+    <template #anchor="{ open, toggle, show, hide, panelId }">{{ (open satisfies boolean) }}{{ (panelId satisfies string) }}{{ void toggle() }}{{ void show() }}{{ void hide() }}</template>
   </Popover>
 </template>
 `;
 
 const NEGATIVES: Array<{ name: string; script?: string; template: string; match: RegExp }> = [
   {
-    name: 'change payload is boolean, not number-like',
-    template: `<Popover @change="(open) => open.toFixed()" />`,
+    name: 'update:open payload is boolean, not number-like',
+    template: `<Popover @update:open="(open) => open.toFixed()" />`,
     match: /Property 'toFixed' does not exist on type 'boolean'/,
   },
   {
@@ -78,7 +80,7 @@ function run(files: Record<string, string>): { ok: boolean; out: string } {
   }
 }
 
-describe('VUE-POPOVER-TYPED-SURFACE — change: boolean, typed anchor ctx, typed handle', () => {
+describe('VUE-POPOVER-TYPED-SURFACE — update:open: boolean, typed anchor ctx, typed handle', () => {
   const r0 = compile(SRC, { target: 'vue', filename: 'Popover.rozie', sourceMap: false });
   const vue = stubInternals(r0.code);
 

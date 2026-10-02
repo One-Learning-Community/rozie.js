@@ -41,16 +41,16 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 </data>
 
 <template>
-  <Popover r-model:open="$data.open" trigger="click" placement="bottom" :offset="8" arrow @change="onChange">
-    <template #anchor="{ toggle }">
-      <button @click="toggle">Menu</button>
+  <Popover r-model:open="$data.open" trigger="click" placement="bottom" :offset="8" arrow>
+    <template #anchor="{ open, toggle, panelId }">
+      <button @click="toggle" :aria-expanded="open" :aria-controls="panelId">Menu</button>
     </template>
     <div class="menu">Floating content</div>
   </Popover>
 </template>
 ```
 
-`r-model:open` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Popover` a boolean, and `Popover` writes the new state back whenever the trigger or a dismissal toggles it, with no `onChange → setState` wiring. The `anchor` slot exposes `{ open, toggle, show, hide }` so you can build any trigger element.
+`r-model:open` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Popover` a boolean, and `Popover` writes the new state back whenever the trigger or a dismissal toggles it, with no `onChange → setState` wiring. The model's change event is Popover's only change signal. The `anchor` slot exposes `{ open, toggle, show, hide, panelId }` so you can build any trigger element and give it the matching ARIA.
 
 ## API
 
@@ -58,9 +58,9 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 
 | Name | Type | Default | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | --- |
-| `open` | `Boolean` | `false` | yes (via `r-model`) | Whether the floating content is open — the sole `model: true` prop. Two-way bind it; `Popover` writes the new state back on every trigger/dismissal/programmatic toggle. |
+| `open` | `Boolean` | `false` | yes (via `r-model`) | Whether the floating content is open — the sole `model: true` prop, and its change event is the only change signal `Popover` fires (see [Events](#events)). Two-way bind it; `Popover` writes the new state back on every trigger/dismissal/programmatic toggle. |
 | `placement` | `String` | `"bottom"` | yes | Floating UI placement (`top`/`right`/`bottom`/`left`, optionally `-start`/`-end`). May flip to the opposite side on overflow unless `disableFlip` is set. |
-| `trigger` | `String` | `"click"` | no | Open gesture: `'click'` (toggle, popover dialog), `'hover'` or `'focus'` (tooltip), or `'manual'` for a composing component that drives `open` itself — every gesture handler no-ops and the anchor omits `aria-haspopup`/`aria-expanded`. Also drives the floating `role`. |
+| `trigger` | `String` | `"click"` | no | Open gesture: `'click'` (toggle, popover dialog), `'hover'` or `'focus'` (tooltip), or `'manual'` for a composing component that drives `open` itself — every gesture handler no-ops. Also drives the ARIA: only `'click'` claims a popup on the anchor (`aria-haspopup`/`aria-expanded`/`aria-controls`); tooltips get `aria-describedby`; `'manual'` makes no anchor claim. See [Accessibility](#accessibility). |
 | `offset` | `Number` | `8` | yes | Gap in pixels between anchor and content (the `offset` middleware). |
 | `disableFlip` | `Boolean` | `false` | yes | Disable the `flip` middleware (keep the content pinned to `placement`). |
 | `disableShift` | `Boolean` | `false` | yes | Disable the `shift` middleware (keep the content strictly aligned to the anchor). |
@@ -73,13 +73,22 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 | `keepMounted` | `Boolean` | `false` | yes | Render the floating panel hidden instead of unmounting it while closed, so a composing component whose panel content owns scroll state (e.g. a virtualizer) keeps its DOM across a close/open cycle. A one-shot position computation runs once at mount so the hidden panel already carries correct coordinates before the first open. |
 | `matchWidth` | `Boolean` | `false` | yes | Match the floating panel's width exactly to the anchor's width, via the Floating UI `size` middleware. Writes the panel's `width` style only — never touches height. |
 | `disableDismiss` | `Boolean` | `false` | yes | Suppress Popover's own Escape-key and click-outside dismissal listeners while `true`. For a composing component that drives `open` itself and needs to temporarily veto Popover's independent dismissal — e.g. while a host sub-surface anchored to (but not nested inside) the composed control legitimately holds focus. Existing `trigger="manual"` consumers relying on real click-outside dismissal are unaffected unless they opt in. |
-| `reference` | `Element \| Object` | `null` | yes | Position the content against an external reference instead of the built-in anchor wrapper: a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element (an object with `getBoundingClientRect()` and an optional `contextElement`), e.g. to open at a pointer position. Measured and tracked with `autoUpdate` and reconciled at runtime; `null` keeps the built-in anchor. A click on a referenced Element is not an outside click; a virtual element adds no inside region. You own the trigger ARIA on your own element. Pass a stable value. See [External and virtual reference elements](#external-and-virtual-reference-elements). |
+| `idBase` | `String` | `"rozie-popover"` | yes | Id base for the floating panel, whose id is `idBase + '-panel'` — also passed to the `anchor` slot as `panelId`, so your trigger can point `aria-controls` (click) or `aria-describedby` (tooltip) at it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel is in the shadow root, so a light-DOM id reference cannot reach it. |
+| `reference` | `Element \| Object` | `null` | yes | Position the content against an external reference instead of the built-in anchor wrapper: a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element (an object with `getBoundingClientRect()` and an optional `contextElement`), e.g. to open at a pointer position. Measured and tracked with `autoUpdate` and reconciled at runtime; `null` keeps the built-in anchor. A click on a referenced Element is not an outside click; a virtual element adds no inside region. A referenced Element removed from the document while open closes the panel. You own the trigger ARIA on your own element. Pass a stable value. See [External and virtual reference elements](#external-and-virtual-reference-elements). |
 
 ### Events
 
-| Event | Description |
+`Popover` declares no events of its own. The `open` model's change event is the only change signal: it fires whenever the open state changes — a trigger gesture, an Escape / click-outside dismissal, or a programmatic `show`/`hide`/`toggle` — with the new `open` boolean.
+
+| Target | Change event |
 | --- | --- |
-| `change` | Fired whenever the open state changes — a trigger gesture, an Escape / click-outside dismissal, or a programmatic `show`/`hide`/`toggle`. Payload is the new `open` boolean. (Named `change`, not `open`, to avoid the model-prop==emit-name collapse.) |
+| Vue | `update:open` (`v-model:open`) |
+| React / Solid | `onOpenChange` (with `open`) |
+| Svelte | `bind:open` (no separate event) |
+| Angular | `openChange` (`[(open)]`) |
+| Lit | `open-change` (`CustomEvent<boolean>`, state in `event.detail`) |
+
+Until 0.3.0 there was also a `change` event carrying the same boolean. It was removed because on Angular and Lit a native `change` event from any input inside the panel bubbles to the host under the same name. Listen to the model event instead.
 
 ### Imperative handle
 
@@ -87,9 +96,9 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `show` | Open the floating content (no-op when `disabled`). Emits `change`. |
-| `hide` | Close the floating content. Emits `change`. |
-| `toggle` | Flip the open state (no-op when `disabled`). Emits `change`. |
+| `show` | Open the floating content (no-op when `disabled`). Fires the `open` model's change event. |
+| `hide` | Close the floating content. Fires the `open` model's change event. |
+| `toggle` | Flip the open state (no-op when `disabled`). Fires the `open` model's change event. |
 | `reposition` | Recompute the floating position immediately (`computePosition`). **Named `reposition`, not `update`**, because `update` is a reserved Lit `ReactiveElement` lifecycle method. |
 
 ## External and virtual reference elements
@@ -105,10 +114,15 @@ By default `Popover` positions its content against the built-in anchor wrapper, 
 </data>
 
 <script>
-// e.g. from a calendar's eventClick callback: the element the library rendered
+// e.g. from a calendar's eventClick callback: the element the library rendered.
+// Toggle when it is the current reference; otherwise move there and (re)open.
 const onEventClick = (info) => {
+  if ($data.target === info.el && $data.open) {
+    $data.open = false
+    return
+  }
   $data.target = info.el
-  $data.open = !$data.open
+  $data.open = true
 }
 </script>
 
@@ -138,6 +152,8 @@ Behavior notes:
 
 - The reference is measured and tracked with Floating UI's `autoUpdate`, and changing `reference` while open repositions the panel against the new one. Pass a **stable** value: a new object on every render restarts tracking.
 - A click on (or inside) a referenced **Element** does not count as an outside click, so a toggle on that element closes the panel instead of dismissing and reopening it. A **virtual** element adds no inside region: only the anchor wrapper and the panel count as inside, and any other click dismisses. Escape dismisses in both cases.
+- The outside-click dismissal is decided **after** your own click handlers have run, against the `reference` as it is then. So when clicking a second element while the panel is open, a handler that repoints `reference` there (keeping `open` true) moves the panel, as in the move-or-toggle example above; a click anywhere else still dismisses.
+- If a referenced Element is removed from the document while open (for example a calendar re-rendering its event elements), the panel closes: there is nothing left to point at.
 - The `anchor` slot may stay empty. The (zero-content) anchor wrapper still renders.
 - `null` (the default) restores the built-in anchor. `Popover` behaves exactly as it did before the prop existed.
 
@@ -159,6 +175,10 @@ The complete token table and the design-system bridges live on the [dedicated th
 
 ## Accessibility
 
-The floating element carries `role="tooltip"` when `trigger` is `hover`/`focus`. A `click` popover is **non-modal and role-neutral by default** — it advertises no `role` and no `aria-modal`, so the slot content owns its own ARIA role (e.g. a `role="menu"`); this keeps a dismissable, non-modal layer from falsely telling assistive tech that sibling content is inert. Opt into `modal` to make it a real modal dialog (`role="dialog"` + `aria-modal="true"`) — Popover ships **no focus trap** (it stays a minimal, headless primitive), so when you set `modal` you must supply your own focus containment for the claim to hold. The anchor carries `aria-haspopup="dialog"` and `aria-expanded` (stringified, never dropped on `false`) whenever `trigger` is a real gesture (`click`/`hover`/`focus`); under `trigger="manual"` neither attribute is rendered, since a composing component driving `open` itself owns its own ARIA claim. In tooltip mode the anchor also gains `aria-describedby` pointing at the open content. Project an interactive, focusable element (e.g. a `<button>`) into the `anchor` slot so the keyboard story works; Escape dismisses while open.
+The floating element carries `role="tooltip"` when `trigger` is `hover`/`focus`. A `click` popover is **non-modal and role-neutral by default** — it advertises no `role` and no `aria-modal`, so the slot content owns its own ARIA role (e.g. a `role="menu"`); this keeps a dismissable, non-modal layer from falsely telling assistive tech that sibling content is inert. Opt into `modal` to make it a real modal dialog (`role="dialog"` + `aria-modal="true"`) — Popover ships **no focus trap** (it stays a minimal, headless primitive), so when you set `modal` you must supply your own focus containment for the claim to hold. For `trigger="click"` the anchor wrapper carries `aria-haspopup="dialog"`, `aria-expanded` (stringified, never dropped on `false`) and, while open, `aria-controls` pointing at the panel. Tooltips (`hover`/`focus`) claim no popup; while open the wrapper gets `aria-describedby` pointing at the panel. Under `trigger="manual"` the wrapper renders none of these, since a composing component driving `open` itself owns its own ARIA claim.
 
-With `reference`, the element you position against is yours, and so is its ARIA. Under `trigger="manual"`, Popover's internal anchor wrapper claims no popup (no `aria-haspopup` / `aria-expanded`). Put `aria-haspopup`, `aria-expanded` and `aria-controls` on your own trigger element and keep them in sync with the `open` state you bind.
+The wrapper itself is not focusable, so assistive tech reads the ARIA on the focusable element you project into the `anchor` slot. The slot passes `open` and `panelId` (the panel's id, `idBase + '-panel'`) so your trigger can carry the same claim: `:aria-expanded="open"` and `:aria-controls="panelId"` for a click popover, or `:aria-describedby="open ? panelId : undefined"` for a tooltip. Give each popover on a page its own `idBase` so the ids stay unique. On Lit the panel lives in the element's shadow root, where a light-DOM id reference cannot reach it; there the wrapper's own attributes carry it. Escape dismisses while open.
+
+Focus returns to where it was when the popover opened (the trigger) whenever the popover closes and focus would otherwise be lost: Escape or a click on a non-focusable spot while focus is inside the panel. It is never pulled back from an element the user moved to, such as another input they clicked into. Tooltips never move focus.
+
+With `reference`, the element you position against is yours, and so is its ARIA. Use `trigger="manual"`, and put `aria-haspopup`, `aria-expanded` and `aria-controls` (pointing at `idBase + '-panel'`) on your own trigger element, kept in sync with the `open` state you bind.

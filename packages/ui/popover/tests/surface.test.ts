@@ -32,10 +32,13 @@ const EXPECT = {
   // via the `size` middleware). Phase 86-07 (D-24, regression fix): +
   // disableDismiss (veto Popover's own Escape/click-outside dismissal for a
   // composing component that drives `open` itself).
-  // 260929-lyc (DD-1): + reference
-  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'reference'],
+  // 260929-lyc (DD-1): + reference. Release-0.8.0 audit B1: + idBase.
+  props: ['open', 'placement', 'strategy', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'reference', 'idBase'],
   models: ['open'],
-  emits: ['change'],
+  // Release-0.8.0 audit B6: the `change` emit is removed (it collided with the
+  // native `change` bubbling out of inputs in the panel on Angular/Lit); the
+  // open model's own change event is the only change signal.
+  emits: [] as string[],
   slots: ['', 'anchor'] as string[],
   expose: ['show', 'hide', 'toggle', 'reposition'],
 } as const;
@@ -69,7 +72,7 @@ describe('Popover.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches (change — NOT open, the model-prop==emit collapse)', () => {
+  it('emits surface matches (none — the open model event is the only change signal)', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
     expect(ir.emits).not.toContain('open');
   });

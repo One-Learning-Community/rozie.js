@@ -2,8 +2,13 @@
  * POPOVER-TYPED-SURFACE — typed public surface phase 1 (Task 17, first adopter).
  *
  * `compile(Popover.rozie)` for react/solid/lit, then a strict consumer sees:
- *   - `change` payload typed `boolean` (and `.toFixed()` on it rejected),
- *   - the `anchor` slot ctx typed (`open: boolean`, verbs `() => void`),
+ *   - the `open` model's change event typed `boolean` (React/Solid
+ *     `onOpenChange`, Lit `open-change` — the only change signal since the
+ *     separate `change` emit was removed, release-0.8.0 audit B6), and
+ *     `.toFixed()` on it rejected,
+ *   - the `anchor` slot ctx typed (`open: boolean`, verbs `() => void`,
+ *     `panelId: string`),
+ *   - `reference` accepting a Floating UI `VirtualElement` and an Element,
  *   - typed handle verbs (`show()` ok, `show(1)` rejected).
  * Negatives are `@ts-expect-error` (TS2578 if one stops erroring) AND a separate
  * run of each negative WITHOUT the directive pins the specific TS error.
@@ -36,8 +41,11 @@ function compiled(target: 'react' | 'solid' | 'lit'): string {
 }
 
 const REACT_PRELUDE = `import { useRef } from 'react';
+import type { VirtualElement } from '@floating-ui/dom';
 import Popover, { type PopoverHandle } from './Popover';
 const h = useRef<PopoverHandle>(null);
+declare const point: VirtualElement;
+declare const el: HTMLElement;
 `;
 const REACT_OK = `${REACT_PRELUDE}
 h.current?.show();
@@ -47,19 +55,24 @@ h.current?.reposition();
 export const ok = (
   <Popover
     ref={h}
-    onChange={(open) => { const b: boolean = open; void b; }}
-    renderAnchor={({ open, toggle, show, hide }) => { const b: boolean = open; toggle(); show(); hide(); void b; return null; }}
+    reference={point}
+    onOpenChange={(open) => { const b: boolean = open; void b; }}
+    renderAnchor={({ open, toggle, show, hide, panelId }) => { const b: boolean = open; const id: string = panelId; toggle(); show(); hide(); void b; void id; return null; }}
   />
 );
+export const okEl = <Popover reference={el} idBase="x" />;
 `;
 const REACT_NEG = {
-  payload: { line: `export const bad = <Popover onChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
+  payload: { line: `export const bad = <Popover onOpenChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
   verb: { line: `h.current?.show(1);`, match: /TS2554: Expected 0 arguments, but got 1/ },
   slot: { line: `export const bad = <Popover renderAnchor={({ open }) => { open.toFixed(); return null; }} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
 };
 
-const SOLID_PRELUDE = `import Popover, { type PopoverHandle } from './Popover';
+const SOLID_PRELUDE = `import type { VirtualElement } from '@floating-ui/dom';
+import Popover, { type PopoverHandle } from './Popover';
 let h: PopoverHandle | undefined;
+declare const point: VirtualElement;
+declare const el: HTMLElement;
 `;
 const SOLID_OK = `${SOLID_PRELUDE}
 h?.show();
@@ -69,31 +82,38 @@ h?.reposition();
 export const ok = (
   <Popover
     ref={(x) => { h = x; }}
-    onChange={(open) => { const b: boolean = open; void b; }}
-    anchorSlot={({ open, toggle, show, hide }) => { const b: boolean = open; toggle(); show(); hide(); return <span>{String(b)}</span>; }}
+    reference={point}
+    onOpenChange={(open) => { const b: boolean = open; void b; }}
+    anchorSlot={({ open, toggle, show, hide, panelId }) => { const b: boolean = open; const id: string = panelId; toggle(); show(); hide(); return <span id={id}>{String(b)}</span>; }}
   />
 );
+export const okEl = <Popover reference={el} idBase="x" />;
 `;
 const SOLID_NEG = {
-  payload: { line: `export const bad = <Popover onChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
+  payload: { line: `export const bad = <Popover onOpenChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
   verb: { line: `h?.show(1);`, match: /TS2554: Expected 0 arguments, but got 1/ },
   slot: { line: `export const bad = <Popover anchorSlot={({ open }) => { open.toFixed(); return <span /> }} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
 };
 
-const LIT_PRELUDE = `import Popover from './Popover';
+const LIT_PRELUDE = `import type { VirtualElement } from '@floating-ui/dom';
+import Popover from './Popover';
 declare const el: Popover;
+declare const point: VirtualElement;
 `;
 const LIT_OK = `${LIT_PRELUDE}
-el.addEventListener('change', (e) => { const b: boolean = e.detail; void b; });
+el.addEventListener('open-change', (e) => { const b: boolean = e.detail; void b; });
+el.reference = point;
+el.reference = document.body;
+el.idBase = 'x';
 el.addEventListener('click', (e) => e.clientX.toFixed());
 el.show();
 el.hide();
 el.toggle();
 el.reposition();
-el.anchor = ({ open, toggle, show, hide }) => { const b: boolean = open; toggle(); show(); hide(); return String(b); };
+el.anchor = ({ open, toggle, show, hide, panelId }) => { const b: boolean = open; const id: string = panelId; toggle(); show(); hide(); return String(b) + id; };
 `;
 const LIT_NEG = {
-  payload: { line: `el.addEventListener('change', (e) => e.detail.toFixed());`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
+  payload: { line: `el.addEventListener('open-change', (e) => e.detail.toFixed());`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
   verb: { line: `el.show(1);`, match: /TS2554: Expected 0 arguments, but got 1/ },
   slot: { line: `el.anchor = ({ open }) => { open.toFixed(); return ''; };`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
 };
@@ -107,7 +127,7 @@ const CASES = [
   { target: 'lit' as const, file: 'Popover.ts', consumer: 'Consumer.ts', nm: 'packages/ui/popover/packages/lit', prelude: LIT_PRELUDE, ok: LIT_OK, neg: LIT_NEG },
 ];
 
-describe('POPOVER-TYPED-SURFACE — change: boolean, typed anchor ctx, typed handle (react/solid/lit)', () => {
+describe('POPOVER-TYPED-SURFACE — open change: boolean, typed anchor ctx, reference, typed handle (react/solid/lit)', () => {
   for (const c of CASES) {
     describe(c.target, () => {
       const code = compiled(c.target);
@@ -146,7 +166,7 @@ describe('POPOVER-TYPED-SURFACE — leaf barrel re-exports the public types', ()
   const BARREL_CONSUMERS = {
     react: `import { Popover, type PopoverHandle } from './index';\ndeclare const h: PopoverHandle;\nh.show();\nvoid Popover;\n`,
     solid: `import { Popover, type PopoverHandle } from './index';\ndeclare const h: PopoverHandle;\nh.show();\nvoid Popover;\n`,
-    lit: `import { Popover, type RoziePopoverEventMap } from './index';\nconst e: RoziePopoverEventMap['change'] = new CustomEvent('change', { detail: true });\ndeclare const el: Popover;\nel.show();\nvoid e;\n`,
+    lit: `import { Popover, type RoziePopoverEventMap } from './index';\nconst e: RoziePopoverEventMap['open-change'] = new CustomEvent('open-change', { detail: true });\ndeclare const el: Popover;\nel.show();\nvoid e;\n`,
   } as const;
   for (const c of CASES) {
     it(`${c.target}: public types importable from the barrel`, () => {

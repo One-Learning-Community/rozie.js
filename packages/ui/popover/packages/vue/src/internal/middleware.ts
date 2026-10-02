@@ -59,7 +59,10 @@ export function buildMiddleware(
             rects: { reference: { width: number } };
             elements: { floating: HTMLElement };
           };
-          elements.floating.style.width = `${rects.reference.width}px`;
+          // A zero-width reference (a point virtual element, release-0.8.0
+          // audit B4) has no width to match: leave the panel's own width.
+          elements.floating.style.width =
+            rects.reference.width > 0 ? `${rects.reference.width}px` : '';
         },
       }),
     );

@@ -17,14 +17,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * identically across all 6 targets.
  *
  * `examples/demos/PopoverBehaviorDemo.rozie` drives a click-trigger popover seeded
- * CLOSED with a two-way `r-model:open` (live `readout-value` + `@change`-fed
- * `readout-change`), an anchor button, an `r-if="open"` floating panel (so
- * presence == open), and a `set-open` direct-model-write button.
- *
- * The `@change` readout exercises the Lit-consumer CustomEvent unwrap for a BARE
- * boolean payload (project_vr_direct_model_write_null_react_solid_lit): the
- * child's `$emit('change', <boolean>)` reaches the Lit consumer as a CustomEvent
- * (boolean in `e.detail`) vs the boolean as arg0 on the other 5 targets.
+ * CLOSED with a two-way `r-model:open` (live `readout-value` + a `readout-change`
+ * fed by a $watch on the bound model), an anchor button, an `r-if="open"`
+ * floating panel (so presence == open), and a `set-open` direct-model-write
+ * button. (Popover's separate `change` emit was removed in 0.3.0, release-0.8.0
+ * audit B6; the model's own change event is what the readout follows.)
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
  * `toHaveScreenshot` (the pixel cell is PopoverScreenshot in
@@ -67,14 +64,14 @@ for (const target of TARGETS) {
     await expect(value).toHaveText('closed');
     await expect(panel).toHaveCount(0);
 
-    // ---- 2. anchor click opens: panel renders + slotted content shows, @change true ----
+    // ---- 2. anchor click opens: panel renders + slotted content shows, change readout true ----
     await anchor.click();
     await expect(panel).toBeVisible({ timeout: 10_000 });
     await expect(content).toBeVisible();
     await expect(value).toHaveText('open');
     await expect(change).toHaveText('true');
 
-    // ---- 3. Escape dismisses: panel gone, @change fires false ----
+    // ---- 3. Escape dismisses: panel gone, change readout false ----
     await page.keyboard.press('Escape');
     await expect(panel).toHaveCount(0, { timeout: 10_000 });
     await expect(value).toHaveText('closed');

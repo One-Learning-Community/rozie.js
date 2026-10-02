@@ -3,7 +3,7 @@ title: Popover — live demo
 ---
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import Popover from '@rozie-ui/popover-vue';
 
 const clickOpen = ref(false);
@@ -13,23 +13,24 @@ const lastChange = ref<boolean | string>('—');
 
 const pop = ref();
 
-function onChange(next: boolean) {
+// The `open` model's change event (`update:open`) is the only change signal.
+watch(clickOpen, (next) => {
   lastChange.value = next;
-}
+});
 </script>
 
 # Popover — live demo
 
-This is the **real `@rozie-ui/popover-vue` package** running on this page (VitePress is itself a Vue app). The same `Popover` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. Every cell below is positioned by [`@floating-ui/dom`](https://floating-ui.com) with live `autoUpdate` tracking. Click triggers toggle a `role="dialog"` popover; hover triggers open a `role="tooltip"`; Escape and click-outside dismiss.
+This is the **real `@rozie-ui/popover-vue` package** running on this page (VitePress is itself a Vue app). The same `Popover` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. Every cell below is positioned by [`@floating-ui/dom`](https://floating-ui.com) with live `autoUpdate` tracking. Click triggers toggle a non-modal popover (role-neutral unless `modal` is set); hover triggers open a `role="tooltip"`; Escape and click-outside dismiss.
 
 <ClientOnly>
 <div class="pop-live">
 
   <div class="pop-live__cell">
     <div class="pop-live__head"><strong>trigger="click"</strong> <span class="pop-live__muted">— popover dialog</span></div>
-    <Popover v-model:open="clickOpen" trigger="click" placement="bottom-start" :offset="8" arrow @change="onChange">
-      <template #anchor="{ toggle }">
-        <button @click="toggle">Open menu</button>
+    <Popover v-model:open="clickOpen" trigger="click" placement="bottom-start" :offset="8" arrow id-base="demo-menu">
+      <template #anchor="{ open, toggle, panelId }">
+        <button @click="toggle" :aria-expanded="open" :aria-controls="panelId">Open menu</button>
       </template>
       <div class="pop-live__panel">
         <p>Click outside or press Escape to dismiss.</p>
@@ -40,7 +41,7 @@ This is the **real `@rozie-ui/popover-vue` package** running on this page (ViteP
 
   <div class="pop-live__cell">
     <div class="pop-live__head"><strong>trigger="hover"</strong> <span class="pop-live__muted">— tooltip</span></div>
-    <Popover v-model:open="hoverOpen" trigger="hover" placement="top" :offset="6">
+    <Popover v-model:open="hoverOpen" trigger="hover" placement="top" :offset="6" id-base="demo-tip">
       <template #anchor>
         <button>Hover me</button>
       </template>
@@ -57,13 +58,13 @@ This is the **real `@rozie-ui/popover-vue` package** running on this page (ViteP
       <button @click="pop?.toggle()">toggle()</button>
       <button @click="pop?.reposition()">reposition()</button>
     </div>
-    <Popover ref="pop" v-model:open="arrowOpen" trigger="click" placement="right" :offset="10" arrow>
+    <Popover ref="pop" v-model:open="arrowOpen" trigger="click" placement="right" :offset="10" arrow id-base="demo-handle">
       <template #anchor="{ toggle }">
         <button @click="toggle">Anchor</button>
       </template>
       <div class="pop-live__panel">Driven by `$expose` verbs.</div>
     </Popover>
-    <code class="pop-live__readout">last @change: {{ JSON.stringify(lastChange) }}</code>
+    <code class="pop-live__readout">last menu open change: {{ JSON.stringify(lastChange) }}</code>
   </div>
 
 </div>

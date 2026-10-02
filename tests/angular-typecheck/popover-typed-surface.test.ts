@@ -1,6 +1,8 @@
 /**
  * ANGULAR-POPOVER-TYPED-SURFACE — typed public surface phase 1 (Task 17).
- * tsc-checks compile(Popover.rozie): `change` is `OutputEmitterRef<boolean>`,
+ * tsc-checks compile(Popover.rozie): the `open` model is `ModelSignal<boolean>`
+ * (its `openChange` is the only change signal — the separate `change` output was
+ * removed, release-0.8.0 audit B6),
  * the `anchor` template ctx is typed, handle verbs are typed. Negatives are
  * pinned to specific TS codes + messages.
  */
@@ -26,14 +28,14 @@ function stubInternals(code: string): string {
 }
 
 const PRELUDE = `import { Popover } from './Popover';
-import type { TemplateRef, OutputEmitterRef } from '@angular/core';
+import type { TemplateRef, ModelSignal } from '@angular/core';
 declare const c: Popover;
 type AnchorCtx = NonNullable<Popover['anchorTpl']> extends TemplateRef<infer C> ? C : never;
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
 `;
 
 const OK = `${PRELUDE}
-c.change.subscribe((open: boolean) => { const b: boolean = open; void b; });
+c.open.subscribe((open: boolean) => { const b: boolean = open; void b; });
 c.show();
 c.hide();
 c.toggle();
@@ -43,14 +45,15 @@ const o: boolean = ctx.open;
 ctx.toggle();
 ctx.show();
 ctx.hide();
-const changeIsBoolean: Equal<typeof c.change, OutputEmitterRef<boolean>> = true;
-void o; void changeIsBoolean;
+const id: string = ctx.panelId;
+const openIsBoolean: Equal<typeof c.open, ModelSignal<boolean>> = true;
+void o; void id; void openIsBoolean;
 `;
 
 const NEGATIVES: Array<{ name: string; body: string; match: RegExp }> = [
   {
-    name: 'change payload is boolean',
-    body: `c.change.subscribe((open) => open.toFixed());`,
+    name: 'open change payload is boolean',
+    body: `c.open.subscribe((open) => open.toFixed());`,
     match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/,
   },
   {
@@ -85,13 +88,14 @@ function tsc(files: Record<string, string>): { threw: boolean; output: string } 
   }
 }
 
-describe('ANGULAR-POPOVER-TYPED-SURFACE — change: output<boolean>, typed anchor ctx, typed handle', () => {
+describe('ANGULAR-POPOVER-TYPED-SURFACE — open: model<boolean>, typed anchor ctx, typed handle', () => {
   const r0 = compile(SRC, { target: 'angular', filename: 'Popover.rozie', sourceMap: false });
   const ng = stubInternals(r0.code);
 
-  it('compiles without errors and emits output<boolean>', () => {
+  it('compiles without errors; open is model<boolean> and there is no change output', () => {
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-    expect(ng).toMatch(/change = output<boolean>\(\);/);
+    expect(ng).toMatch(/open = model<boolean>\(false\);/);
+    expect(ng).not.toMatch(/\bchange = output/);
   });
 
   it('typed consumer tsc-checks clean', () => {

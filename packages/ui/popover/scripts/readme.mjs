@@ -99,8 +99,9 @@ export function Demo() {
       placement="bottom"
       offset={8}
       arrow
-      onChange={(next) => console.log('open:', next)}
-      renderAnchor={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      renderAnchor={({ open, toggle, panelId }) => (
+        <button onClick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
+      )}
     >
       <div>Floating content</div>
     </Popover>
@@ -117,9 +118,9 @@ const open = ref(false);
 </script>
 
 <template>
-  <Popover v-model:open="open" trigger="click" placement="bottom" :offset="8" arrow @change="(o) => console.log('open:', o)">
-    <template #anchor="{ toggle }">
-      <button @click="toggle">Menu</button>
+  <Popover v-model:open="open" trigger="click" placement="bottom" :offset="8" arrow>
+    <template #anchor="{ open, toggle, panelId }">
+      <button @click="toggle" :aria-expanded="open" :aria-controls="panelId">Menu</button>
     </template>
     <div>Floating content</div>
   </Popover>
@@ -133,9 +134,9 @@ const open = ref(false);
   let open = $state(false);
 </script>
 
-<Popover bind:open trigger="click" placement="bottom" offset={8} arrow onchange={(o) => console.log('open:', o)}>
-  {#snippet anchor({ toggle })}
-    <button onclick={toggle}>Menu</button>
+<Popover bind:open trigger="click" placement="bottom" offset={8} arrow>
+  {#snippet anchor({ open, toggle, panelId })}
+    <button onclick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
   {/snippet}
   <div>Floating content</div>
 </Popover>`,
@@ -150,9 +151,9 @@ import { Popover } from '@rozie-ui/popover-angular';
   standalone: true,
   imports: [Popover],
   template: \`
-    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true" (change)="onChange($event)">
-      <ng-template #anchor let-toggle="toggle">
-        <button (click)="toggle()">Menu</button>
+    <rozie-popover [(open)]="open" trigger="click" placement="bottom" [offset]="8" [arrow]="true">
+      <ng-template #anchor let-open="open" let-toggle="toggle" let-panelId="panelId">
+        <button (click)="toggle()" [attr.aria-expanded]="open" [attr.aria-controls]="panelId">Menu</button>
       </ng-template>
       <ng-template #defaultSlot>
         <div>Floating content</div>
@@ -162,9 +163,6 @@ import { Popover } from '@rozie-ui/popover-angular';
 })
 export class DemoComponent {
   open = false;
-  onChange(next: boolean) {
-    console.log('open:', next);
-  }
 }`,
   },
   solid: {
@@ -182,8 +180,9 @@ export function Demo() {
       placement="bottom"
       offset={8}
       arrow
-      onChange={(next) => console.log('open:', next)}
-      anchorSlot={({ toggle }) => <button onClick={toggle}>Menu</button>}
+      anchorSlot={({ open, toggle, panelId }) => (
+        <button onClick={toggle} aria-expanded={open} aria-controls={panelId}>Menu</button>
+      )}
     >
       <div>Floating content</div>
     </Popover>
@@ -196,9 +195,9 @@ export function Demo() {
 import '@floating-ui/dom'; // peer engine
 
 // <rozie-popover> is a custom element. Bind \`open\`/\`placement\`/\`trigger\`/\`offset\`/
-// \`arrow\` as properties; listen for \`change\` for the new open boolean, or
-// \`open-change\` to drive the two-way model. Project the anchor into the \`anchor\`
-// slot and the content into the default slot.
+// \`arrow\` as properties; \`open-change\` carries the new open boolean (in
+// \`event.detail\`) and drives the two-way model. Project the anchor into the
+// \`anchor\` slot and the content into the default slot.
 const el = document.querySelector('rozie-popover');
 el.trigger = 'click';
 el.placement = 'bottom';
@@ -206,9 +205,106 @@ el.offset = 8;
 el.arrow = true;
 el.addEventListener('open-change', (e) => {
   el.open = e.detail;
-});
-el.addEventListener('change', (e) => {
   console.log('open:', e.detail);
+});`,
+  },
+};
+
+// Per-framework `reference` usage (release-0.8.0 audit B8): position the panel
+// against an element the consumer owns, with the consumer's own trigger ARIA.
+const REFERENCE_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: `const [open, setOpen] = useState(false);
+const [target, setTarget] = useState<HTMLElement | null>(null);
+
+const onClick = (e: React.MouseEvent<HTMLButtonElement>) => { setTarget(e.currentTarget); setOpen(!open); };
+
+<button aria-expanded={open} aria-controls="details-popover-panel" onClick={onClick}>Details</button>
+<Popover open={open} onOpenChange={setOpen} trigger="manual" reference={target} idBase="details-popover">
+  <div>About this item</div>
+</Popover>`,
+  },
+  vue: {
+    lang: 'vue',
+    code: `<script setup lang="ts">
+import { ref } from 'vue';
+import Popover from '@rozie-ui/popover-vue';
+
+const open = ref(false);
+const target = ref<HTMLElement | null>(null);
+const onClick = (e: MouseEvent) => {
+  target.value = e.currentTarget as HTMLElement;
+  open.value = !open.value;
+};
+</script>
+
+<template>
+  <button :aria-expanded="open" aria-controls="details-popover-panel" @click="onClick">Details</button>
+  <Popover v-model:open="open" trigger="manual" :reference="target" id-base="details-popover">
+    <div>About this item</div>
+  </Popover>
+</template>`,
+  },
+  svelte: {
+    lang: 'svelte',
+    code: `<script lang="ts">
+  import Popover from '@rozie-ui/popover-svelte';
+
+  let open = $state(false);
+  let target: HTMLElement | null = $state(null);
+</script>
+
+<button aria-expanded={open} aria-controls="details-popover-panel" onclick={(e) => { target = e.currentTarget; open = !open; }}>Details</button>
+<Popover bind:open trigger="manual" reference={target} idBase="details-popover">
+  <div>About this item</div>
+</Popover>`,
+  },
+  angular: {
+    lang: 'ts',
+    code: `@Component({
+  selector: 'app-details',
+  standalone: true,
+  imports: [Popover],
+  template: \`
+    <button #btn [attr.aria-expanded]="open" aria-controls="details-popover-panel" (click)="target = btn; open = !open">Details</button>
+    <rozie-popover [(open)]="open" trigger="manual" [reference]="target" idBase="details-popover">
+      <ng-template #defaultSlot><div>About this item</div></ng-template>
+    </rozie-popover>
+  \`,
+})
+export class DetailsComponent {
+  open = false;
+  target: HTMLElement | null = null;
+}`,
+  },
+  solid: {
+    lang: 'tsx',
+    code: `const [open, setOpen] = createSignal(false);
+const [target, setTarget] = createSignal<HTMLElement | null>(null);
+
+const onClick = (e: MouseEvent & { currentTarget: HTMLButtonElement }) => { setTarget(e.currentTarget); setOpen(!open()); };
+
+<button aria-expanded={open()} aria-controls="details-popover-panel" onClick={onClick}>Details</button>
+<Popover open={open()} onOpenChange={setOpen} trigger="manual" reference={target()} idBase="details-popover">
+  <div>About this item</div>
+</Popover>`,
+  },
+  lit: {
+    lang: 'ts',
+    code: `// The panel lives in the element's shadow root, so an \`aria-controls\` id
+// reference from light DOM cannot resolve to it; set \`aria-expanded\` only.
+const el = document.querySelector('rozie-popover');
+const btn = document.querySelector('#details');
+el.trigger = 'manual';
+btn.addEventListener('click', () => {
+  el.reference = btn;
+  el.open = !el.open;
+  btn.setAttribute('aria-expanded', String(el.open));
+});
+el.addEventListener('open-change', (e) => {
+  el.open = e.detail;
+  btn.setAttribute('aria-expanded', String(e.detail));
 });`,
   },
 };
@@ -293,6 +389,30 @@ el.reposition();`,
 // README rendering.
 // ---------------------------------------------------------------------------
 
+// The `open` model's change event per target — Popover's only change signal
+// since the separate `change` emit was removed in 0.3.0 (release-0.8.0 audit
+// B6: it collided with the native `change` bubbling out of inputs in the panel
+// on Angular and Lit).
+const OPEN_CHANGE = {
+  react: { event: '`onOpenChange`', how: 'Pass `open` + `onOpenChange` for a controlled popover (or `defaultOpen` for an uncontrolled one).' },
+  vue: { event: '`update:open`', how: 'Bind it with `v-model:open`.' },
+  svelte: { event: '`bind:open`', how: 'Svelte 5 two-way binding; there is no separate event.' },
+  angular: { event: '`openChange`', how: 'Bind it with `[(open)]`, or listen with `(openChange)`.' },
+  solid: { event: '`onOpenChange`', how: 'Pass `open` + `onOpenChange` for a controlled popover (or `defaultOpen` for an uncontrolled one).' },
+  lit: { event: '`open-change`', how: 'A `CustomEvent<boolean>` (the state is in `event.detail`); the `open` property reflects it.' },
+};
+
+// How a consumer binds a slot on each target (the bare slot name is NOT the
+// binding on React/Solid, and a wrong name is silently ignored).
+const SLOT_BINDING = {
+  react: (n) => (n === '' ? '`children`' : `\`render${n[0].toUpperCase()}${n.slice(1)}={(params) => …}\``),
+  vue: (n) => (n === '' ? 'default slot' : `\`<template #${n}="params">\``),
+  svelte: (n) => (n === '' ? '`children`' : `\`{#snippet ${n}(params)}\``),
+  angular: (n) => (n === '' ? 'projected content' : `\`<ng-template #${n} let-open="open">\``),
+  solid: (n) => (n === '' ? '`children`' : `\`${n}Slot={(params) => …}\``),
+  lit: (n) => (n === '' ? 'default `<slot>`' : '`` el.' + n + ' = (params) => html`…` ``'),
+};
+
 export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   if (ir.emitDecls === null) {
     throw new Error('renderReadme: Popover.rozie has no <emits> block — the events table is generated from it');
@@ -353,6 +473,27 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('```');
   lines.push('');
 
+  // Positioning against an external element (`reference`).
+  const refUsage = REFERENCE_USAGE[target];
+  if (!refUsage) throw new Error(`renderReadme: no reference snippet for target "${target}"`);
+  lines.push('## Positioning against an external element');
+  lines.push('');
+  lines.push(
+    'Pass `reference` to position the panel against an element you own (or a Floating UI ' +
+      'virtual element, e.g. a pointer position) instead of the built-in anchor. Use ' +
+      "`trigger=\"manual\"`, drive `open` yourself, and put the trigger ARIA on your own " +
+      "element. `aria-controls` points at `idBase + '-panel'`. A click on the referenced " +
+      'element is not an outside click, so your toggle closes the panel. The outside-click ' +
+      'dismissal is decided after your own handlers run, so a handler that repoints ' +
+      '`reference` at another element it was clicked on (keeping `open` true) moves the ' +
+      'panel there. If the referenced element leaves the document while open, the panel closes.',
+  );
+  lines.push('');
+  lines.push('```' + refUsage.lang);
+  lines.push(refUsage.code);
+  lines.push('```');
+  lines.push('');
+
   // Theming
   lines.push('## Theming');
   lines.push('');
@@ -391,6 +532,11 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   }
   lines.push('| Event | Payload | Description |');
   lines.push('| --- | --- | --- |');
+  const openChange = OPEN_CHANGE[target];
+  if (!openChange) throw new Error(`renderReadme: no open-change binding for target "${target}"`);
+  lines.push(
+    `| ${openChange.event} | \`boolean\` | The \`open\` model's change event, and the only change signal: fired whenever the open state changes — a click/hover/focus trigger gesture, an Escape or click-outside dismissal, or a programmatic \`show\`/\`hide\`/\`toggle\`. ${openChange.how} |`,
+  );
   for (const d of ir.emitDecls) {
     const eventCol = target === 'lit' ? litEventName(d.name) : d.name;
     const payload = d.payload ? typeCodeCell(printTSType(d.payload)) : '—';
@@ -426,13 +572,15 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   // Slots
   lines.push('## Slots');
   lines.push('');
-  lines.push('| Slot | Params |');
-  lines.push('| --- | --- |');
+  const bindSlot = SLOT_BINDING[target];
+  if (!bindSlot) throw new Error(`renderReadme: no slot binding for target "${target}"`);
+  lines.push('| Slot | Params | Bind as |');
+  lines.push('| --- | --- | --- |');
   const seenSlotNames = new Set();
   for (const s of ir.slots) {
     if (seenSlotNames.has(s.name)) continue;
     seenSlotNames.add(s.name);
-    lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} |`);
+    lines.push(`| ${renderSlotName(s.name)} | ${slotParams(s)} | ${bindSlot(s.name)} |`);
   }
   lines.push('');
 
