@@ -55,7 +55,7 @@ import '@rozie-ui/listbox-svelte/themes/shadcn.css';    // or material.css, boot
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
-| `id` | `String` | `"rozie-listbox"` |  |  |
+| `id` | `String` | `''` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |

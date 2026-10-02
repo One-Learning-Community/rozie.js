@@ -162,7 +162,7 @@ interface ListboxProps extends Omit<import('solid-js').ComponentProps<'div'>, 'o
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
+   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-listbox-<n>`); set it when you need stable, predictable ids.
    */
   id?: string;
   /**
@@ -199,11 +199,12 @@ export interface ListboxHandle {
 }
 
 export default function Listbox(_props: ListboxProps): JSX.Element {
-  const _merged = mergeProps({ options: (() => [])() as any[], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: 'rozie-listbox', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }, _props);
+  const _merged = mergeProps({ options: (() => [])() as any[], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: '', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight', 'ref', 'onOpenChange', 'onChange']);
   onMount(() => { local.ref?.({ open, close, toggle, clear, focusControl }); });
 
   const [value, setValue] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'value', null);
+  const [autoId, setAutoId] = createSignal('');
   const [open$local, setOpen$local] = createSignal(false);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [query, setQuery] = createSignal('');
@@ -228,6 +229,7 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     return optionId(activeIndex());
   });
   onMount(() => {
+    if (!local.id) setAutoId('rozie-listbox-' + nextAutoId());
     syncRows();
     if (local.virtual) {
       // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
@@ -308,11 +310,13 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
   //     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
   //     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
   //     over them (in `onTypeahead`).
+  //   - `idRoot()` — the host's id base (Listbox: the `id` prop, else the per-instance id it
+  //     generates in $onMount); `optionId` below derives every option id from it.
   //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
   //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
   //     HOST functions; this partial only closes over them (it reads NO refs itself).
   //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
-  //     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+  //     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
   //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
   //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
   //     `$data.query`), NOT a discriminant prop.
@@ -333,8 +337,10 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
     return false;
   }
+  // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
+  // per-instance id) so the option ids follow the host's auto-id fallback.
   function optionId(index: any) {
-    return local.id + '-opt-' + index;
+    return idRoot() + '-opt-' + index;
   }
 
   // ---- derived state -----------------------------------------------------
@@ -1195,6 +1201,22 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
     }
   }
 
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+  // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+  // the TS script alike) so separately bundled copies of a leaf never hand out the
+  // same id. The same four lines live in Combobox, Listbox and Popover.
+  function nextAutoId() {
+    const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+    Reflect.set(globalThis, '__rozieAutoId', n);
+    return n;
+  }
+
+  // idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+  // pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
+  function idRoot() {
+    return local.id || autoId() || 'rozie-listbox';
+  }
+
   createOutsideClick(
     [() => controlElRef, () => listElRef],
     close,
@@ -1207,21 +1229,21 @@ export default function Listbox(_props: ListboxProps): JSX.Element {
 
       
       <div class={"rozie-listbox-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-b576227a="">
-        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open$local()} aria-controls={rozieAttr(local.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={rozieAttr(local.ariaLabel)} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open$local()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={rozieAttr(local.ariaLabel)} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-listbox-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(_props.selectedSlot ?? _props.slots?.['selected'])?.({ get selected() { return selectedLabel(); }, get value() { return value(); } }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{local.placeholder}</span>}><span class={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel())}</span></Show>}
           <span class={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
         </button>
       </div>
 
       
-      {<Show when={open$local() && !local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
+      {<Show when={open$local() && !local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} data-rozie-s-b576227a="">
         <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(index()); }} data-rozie-s-b576227a="">
           {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return opt; }, get index() { return index(); }, get active() { return activeIndex() === index(); }, get selected() { return isSelected(opt); }, get disabled() { return disabledOf(opt); } }) ?? rozieDisplay(labelOf(opt))}
         </div>}</For>
 
         {<Show when={visibleOptions().length === 0}><div class={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No options"}
-        </div></Show>}</div></Show>}{<Show when={local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(local.id + '-list')} aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} style={parseInlineStyle((open$local() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
+        </div></Show>}</div></Show>}{<Show when={local.virtual}><div ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} style={parseInlineStyle((open$local() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + local.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
         <div class={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
 
         <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <div data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={!!isSelected(wr().row._opt)} aria-disabled={!!disabledOf(wr().row._opt)} id={rozieAttr(optionId(wr().vi.index))} class={"rozie-listbox-option" + " " + rozieClass({ 'is-active': activeIndex() === wr().vi.index, 'is-selected': isSelected(wr().row._opt), 'is-disabled': disabledOf(wr().row._opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(wr().row._opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(wr().vi.index); }} data-rozie-s-b576227a="">

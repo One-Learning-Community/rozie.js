@@ -41,7 +41,7 @@ const probe = headlessCoreSmoke(41)
 // ── listCore.rzts (P2) — a SELECT-ONLY smoke host inlining the shared list spine ──────────────
 // A trimmed Listbox satisfying the listCore.rzts HOST CONTRACT (input-mode discriminant props,
 // the option/value/state surface, the reassigned module-`let`s typeBuffer/typeTimer, the impure
-// $refs fns focusControl/scrollActiveIntoView) that references a broad slice of the imported spine
+// $refs fns focusControl/scrollActiveIntoView, the id base idRoot) that references a broad slice of the imported spine
 // so the tree-shaker keeps the decls — proving the REAL list spine resolves + inlines + dissolves
 // cross-package ×6.
 const LISTCORE_SPECIFIER = '@rozie-ui/headless-core/listCore.rzts';
@@ -68,6 +68,7 @@ const listCoreSource = `<rozie name="ListCoreSmokeHost">
 let typeBuffer = ''
 let typeTimer = null
 import { labelOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, open, close, toggle, clear, select, onControlKeyDown, onOptionPointerMove } from '${LISTCORE_SPECIFIER}'
+const idRoot = () => $props.id
 const focusControl = () => { $refs.triggerEl?.focus() }
 const scrollActiveIntoView = () => { if ($refs.listEl) void 0 }
 $onUnmount(() => { if (typeTimer !== null) clearTimeout(typeTimer) })

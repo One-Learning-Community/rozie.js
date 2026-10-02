@@ -70,7 +70,7 @@ Pass an `options` array and two-way bind `value`:
 | `optionLabel` | `Function` | `null` | yes | `(option) => string` — resolve an object option's display label. |
 | `optionValue` | `Function` | `null` | yes | `(option) => value` — resolve an object option's committed value. |
 | `optionDisabled` | `Function` | `null` | yes | `(option) => boolean` — mark an option non-selectable. |
-| `id` | `String` | `"rozie-listbox"` | yes | Stable id base for the ARIA wiring (listbox id, per-option ids, `aria-activedescendant`). Give each instance on a page a distinct id. |
+| `id` | `String` | `''` | yes | Stable id base for the ARIA wiring (listbox id, per-option ids, `aria-activedescendant`). Empty (the default): each instance generates a unique base after mount (`rozie-listbox-<n>`). Set it when you need stable, predictable ids. |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the control when there is no visible `<label for>`. |
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed listbox. Pair with `inline` + `maxHeight`. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
@@ -136,4 +136,4 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 
 - The control carries `role="combobox"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant`; the popup is `role="listbox"` (with `aria-multiselectable` in multi-select); each option is `role="option"` with `aria-selected` / `aria-disabled`.
 - Supply an accessible name via a visible `<label for>` pointing at the control's `id`, or the `ariaLabel` prop.
-- Give each instance on a page a distinct `id` so the generated option ids and `aria-activedescendant` references stay unique.
+- Each instance generates a unique id base after mount, so several listboxes on one page never share option ids or `aria-activedescendant` references. Set `id` yourself only when you need stable ids.

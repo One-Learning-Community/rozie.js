@@ -157,14 +157,14 @@
   },
 
   // Stable id base for the ARIA wiring (listbox id + per-option ids +
-  // aria-activedescendant). Required-distinct for multiple instances on one
-  // page (the standard ARIA-widget contract).
+  // aria-activedescendant). '' (the default) → a unique per-instance base
+  // generated in $onMount (idRoot()), so instances never share ids.
   id:             {
     type: String,
-    default: 'rozie-listbox',
+    default: '',
     docs: {
       description:
-        'Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.',
+        'Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-listbox-<n>`); set it when you need stable, predictable ids.',
     },
   },
 
@@ -220,6 +220,8 @@
 
 <data>
 {
+  // The generated id base (idRoot()), set once in $onMount when `id` is empty.
+  autoId: '',
   open: false,
   // Virtual focus: index into the visible option list, or -1.
   activeIndex: -1,
@@ -507,7 +509,22 @@ const kickWindow = (attempts) => {
   }
 }
 
+// nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+// lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+// the TS script alike) so separately bundled copies of a leaf never hand out the
+// same id. The same four lines live in Combobox, Listbox and Popover.
+const nextAutoId = () => {
+  const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1
+  Reflect.set(globalThis, '__rozieAutoId', n)
+  return n
+}
+
+// idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+// pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
+const idRoot = () => $props.id || $data.autoId || 'rozie-listbox'
+
 $onMount(() => {
+  if (!$props.id) $data.autoId = 'rozie-listbox-' + nextAutoId()
   syncRows()
   if ($props.virtual) {
     // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
@@ -567,7 +584,7 @@ $expose({ open, close, toggle, clear, focusControl })
       role="combobox"
       aria-haspopup="listbox"
       :aria-expanded="$data.open"
-      :aria-controls="$props.id + '-list'"
+      :aria-controls="idRoot() + '-list'"
       :aria-activedescendant="activeDescendant"
       :aria-label="$props.ariaLabel"
       :disabled="$props.disabled"
@@ -591,7 +608,7 @@ $expose({ open, close, toggle, clear, focusControl })
     ref="listEl"
     class="rozie-listbox-list"
     role="listbox"
-    :id="$props.id + '-list'"
+    :id="idRoot() + '-list'"
     :aria-label="$props.ariaLabel"
     :aria-multiselectable="$props.multiple"
   >
@@ -635,7 +652,7 @@ $expose({ open, close, toggle, clear, focusControl })
     ref="listEl"
     class="rozie-listbox-list rozie-listbox-list--virtual"
     role="listbox"
-    :id="$props.id + '-list'"
+    :id="idRoot() + '-list'"
     :aria-label="$props.ariaLabel"
     :aria-multiselectable="$props.multiple"
     :style="($data.open ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + $props.maxHeight) : 'overflow-y:auto')"

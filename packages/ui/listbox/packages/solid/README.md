@@ -63,7 +63,7 @@ import '@rozie-ui/listbox-solid/themes/shadcn.css';    // or material.css, boots
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
-| `id` | `String` | `"rozie-listbox"` |  |  |
+| `id` | `String` | `''` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |

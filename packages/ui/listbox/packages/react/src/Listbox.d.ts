@@ -48,7 +48,7 @@ export interface ListboxProps extends Omit<import('react').ComponentPropsWithout
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
+   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-listbox-<n>`); set it when you need stable, predictable ids.
    */
   id?: string;
   /**

@@ -307,11 +307,13 @@ let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 //     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
 //     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
 //     over them (in `onTypeahead`).
+//   - `idRoot()` — the host's id base (Listbox: the `id` prop, else the per-instance id it
+//     generates in $onMount); `optionId` below derives every option id from it.
 //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
 //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
 //     HOST functions; this partial only closes over them (it reads NO refs itself).
 //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
-//     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+//     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
 //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
 //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
 //     `$data.query`), NOT a discriminant prop.
@@ -332,6 +334,7 @@ const disabledOf = (opt: any) => {
   if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
   return false;
 };
+// `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -1888,14 +1891,14 @@ const teardownVirtualizer = () => {
   gridScrollEl = null;
   windowVer = windowVer + 1;
 };
-// nextAutoId(): a page-wide counter shared by every Rozie component instance (on
-// globalThis, so separately bundled copies of a leaf never hand out the same id).
+// nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+// lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+// the TS script alike) so separately bundled copies of a leaf never hand out the
+// same id. The same four lines live in Combobox, Listbox and Popover.
 const nextAutoId = () => {
-  const g = globalThis as unknown as {
-    __rozieAutoId?: number;
-  };
-  g.__rozieAutoId = (g.__rozieAutoId || 0) + 1;
-  return g.__rozieAutoId;
+  const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+  Reflect.set(globalThis, '__rozieAutoId', n);
+  return n;
 };
 // focus() — focus the input (accepted ROZ137 Lit override). clear() — reset the
 // selection + query. seedQuery(text) — imperative-only: write the input text

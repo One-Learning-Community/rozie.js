@@ -66,7 +66,7 @@ interface ListboxProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Give each instance on a page a distinct id so these references stay unique.
+   * Stable id base for the ARIA wiring (the listbox id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-listbox-<n>`); set it when you need stable, predictable ids.
    */
   id?: string;
   /**
@@ -114,7 +114,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     optionLabel: _props.optionLabel ?? null,
     optionValue: _props.optionValue ?? null,
     optionDisabled: _props.optionDisabled ?? null,
-    id: _props.id ?? 'rozie-listbox',
+    id: _props.id ?? '',
     ariaLabel: _props.ariaLabel ?? null,
     virtual: _props.virtual ?? false,
     estimateRowHeight: _props.estimateRowHeight ?? 36,
@@ -142,8 +142,11 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     defaultValue: props.defaultValue ?? null,
     onValueChange: props.onValueChange,
   });
+  const _idRef = useRef(props.id);
+  _idRef.current = props.id;
   const _virtualRef = useRef(props.virtual);
   _virtualRef.current = props.virtual;
+  const [autoId, setAutoId] = useState('');
   const [open$local, setOpen$local] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
@@ -218,11 +221,13 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   //     reassigned from handlers → the React emitter hoists them to `useRef` (the setup-once
   //     guarantee), so per the A==B playbook rule they STAY IN THE HOST; this partial only closes
   //     over them (in `onTypeahead`).
+  //   - `idRoot()` — the host's id base (Listbox: the `id` prop, else the per-instance id it
+  //     generates in $onMount); `optionId` below derives every option id from it.
   //   - `focusControl()` / `scrollActiveIntoView()` — impure ref-reading functions (they touch the
   //     control / list ref elements, which are post-mount-only per ROZ123), so they are per-consumer
   //     HOST functions; this partial only closes over them (it reads NO refs itself).
   //   - the option set + form surface (`$props.options` / `$props.value` (model) / `$props.multiple` /
-  //     `$props.id` / `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
+  //     `$props.optionLabel` / `$props.optionValue` / `$props.optionDisabled` /
   //     `$props.closeOnSelect` / `$props.disabled`) and the reactive state (`$data.open` /
   //     `$data.activeIndex` / `$data.query`). Input-mode is by convention (the host's <input> writing
   //     `$data.query`), NOT a discriminant prop.
@@ -243,8 +248,10 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
     if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
     return false;
   }
+  // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
+  // per-instance id) so the option ids follow the host's auto-id fallback.
   function optionId(index: any) {
-    return props.id + '-opt-' + index;
+    return idRoot() + '-opt-' + index;
   }
 
   // ---- derived state -----------------------------------------------------
@@ -1084,6 +1091,20 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
     }
   }, [remeasureWindow, syncRows, virtualizerOptions, windowSource, windowedRows]);
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+  // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+  // the TS script alike) so separately bundled copies of a leaf never hand out the
+  // same id. The same four lines live in Combobox, Listbox and Popover.
+  const nextAutoId = useCallback(() => {
+    const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+    Reflect.set(globalThis, '__rozieAutoId', n);
+    return n;
+  }, []);
+  // idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+  // pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
+  function idRoot() {
+    return props.id || autoId || 'rozie-listbox';
+  }
 
   const _kickWindowRef = useRef(kickWindow);
   _kickWindowRef.current = kickWindow;
@@ -1092,6 +1113,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
   const _virtualizerOptionsRef = useRef(virtualizerOptions);
   _virtualizerOptionsRef.current = virtualizerOptions;
   useEffect(() => {
+    if (!_idRef.current) setAutoId('rozie-listbox-' + nextAutoId());
     _syncRowsRef.current();
     if (_virtualRef.current) {
       // The list renders at mount when virtual, so the .rozie-listbox-list scroll container
@@ -1104,7 +1126,7 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
       setWindowVer(prev => prev + 1);
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => _kickWindowRef.current(8));else setTimeout(() => _kickWindowRef.current(8), 0);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     return () => {
       if (typeTimer.current !== null) clearTimeout(typeTimer.current);
@@ -1140,21 +1162,21 @@ const Listbox = forwardRef<ListboxHandle, ListboxProps>(function Listbox(_props:
 
       
       <div className={"rozie-listbox-control"} ref={controlEl} data-rozie-s-b576227a="">
-        <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(props.id + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={rozieAttr(props.ariaLabel)} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
+        <button ref={triggerEl} type="button" className={"rozie-listbox-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={open$local} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(activeDescendant)} aria-label={rozieAttr(props.ariaLabel)} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onControlKeyDown($event); }} data-rozie-s-b576227a="">
           {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-listbox-selected"} data-rozie-s-b576227a="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-listbox-placeholder"} data-rozie-s-b576227a="">{props.placeholder}</span>)}
           <span className={"rozie-listbox-arrow"} aria-hidden="true" data-rozie-s-b576227a="">▾</span>
         </button>
       </div>
 
       
-      {!!(open$local && !props.virtual) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
+      {!!(open$local && !props.virtual) && <div ref={listEl} className={"rozie-listbox-list"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} data-rozie-s-b576227a="">
         {visibleOptions().map((opt, index) => <div key={optionId(index)} id={rozieAttr(optionId(index))} className={clsx("rozie-listbox-option", { "is-active": activeIndex === index, "is-selected": isSelected(opt), "is-disabled": disabledOf(opt) })} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index); }} data-rozie-s-b576227a="">
           {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) }) : (rozieDisplay(labelOf(opt)))}
         </div>)}
 
         {!!(visibleOptions().length === 0) && <div className={"rozie-listbox-empty"} role="presentation" data-rozie-s-b576227a="">
           {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
-        </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(props.id + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
+        </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-listbox-list rozie-listbox-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-listbox-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-b576227a="">
         <div className={"rozie-listbox-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-b576227a="" />
 
         {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-listbox-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row._opt), "is-disabled": disabledOf(wr.row._opt) })} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-b576227a="">
