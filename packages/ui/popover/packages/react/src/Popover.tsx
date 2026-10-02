@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { clsx, rozieAttr, useControllableState, useOutsideClick } from '@rozie/runtime-react';
 import './Popover.css';
@@ -37,7 +37,7 @@ export type PopoverPopupRole = 'dialog' | 'menu' | 'listbox' | 'tree' | 'grid';
 
 interface AnchorCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null; }
 
-interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'onChange' | 'renderAnchor' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
    */
@@ -105,13 +105,17 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   popupRole?: string;
   /**
-   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-popover-<n>`), so several popovers on one page never share a panel id; set it when you need a stable, predictable id. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded`, plus `aria-controls` pointing at `idBase + '-panel'`), typically with `trigger='manual'` and a two-way-bound `open`. If a referenced Element is removed from the document while open, the popover closes. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, any>) | null;
+  /**
+   * @deprecated Removed in 0.3.0 — use the `open` model change event (React/Solid `onOpenChange`, Svelte `bind:open`).
+   */
+  onChange?: never;
   renderAnchor?: (ctx: AnchorCtx) => ReactNode;
   children?: ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -142,7 +146,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     matchWidth: _props.matchWidth ?? false,
     disableDismiss: _props.disableDismiss ?? false,
     popupRole: _props.popupRole ?? 'dialog',
-    idBase: _props.idBase ?? 'rozie-popover',
+    idBase: _props.idBase ?? '',
     reference: _props.reference ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
@@ -163,12 +167,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   });
   const _disabledRef = useRef(props.disabled);
   _disabledRef.current = props.disabled;
+  const _idBaseRef = useRef(props.idBase);
+  _idBaseRef.current = props.idBase;
   const _keepMountedRef = useRef(props.keepMounted);
   _keepMountedRef.current = props.keepMounted;
   const _referenceRef = useRef(props.reference);
   _referenceRef.current = props.reference;
   const _openRef = useRef(open);
   _openRef.current = open;
+  const [autoId, setAutoId] = useState('');
   const anchorEl = useRef<HTMLDivElement | null>(null);
   const floatingEl = useRef<HTMLDivElement | null>(null);
   const arrowEl = useRef<HTMLDivElement | null>(null);
@@ -389,6 +396,15 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       stopAutoUpdate.current = null;
     }
   }, []);
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+  // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+  // the TS script alike) so separately bundled copies of a leaf never hand out the
+  // same id. The same four lines live in Combobox, Listbox and Popover.
+  const nextAutoId = useCallback(() => {
+    const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+    Reflect.set(globalThis, '__rozieAutoId', n);
+    return n;
+  }, []);
   // ─── reconcile positioning props while open ─────────────────────────────────────
   // Restart tracking rather than repositioning once (release-0.8.0 audit B3):
   // autoUpdate holds the position callback it was started with, which on React is
@@ -509,8 +525,14 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     return props.trigger === 'click' ? popupToken() : undefined;
   }
   // The panel id (audit B1), also handed to the anchor slot as `panelId`.
+  // idRoot(): the `idBase` prop, else the per-instance id generated in $onMount,
+  // else the pre-mount fallback. Generated after mount (not during setup) so a
+  // server render and the hydrating client agree.
+  function idRoot() {
+    return props.idBase || autoId || 'rozie-popover';
+  }
   function panelId() {
-    return props.idBase + '-panel';
+    return idRoot() + '-panel';
   }
 
   // ─── imperative handle ($expose) ────────────────────────────────────────────────
@@ -535,6 +557,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _startTrackingRef = useRef(startTracking);
   _startTrackingRef.current = startTracking;
   useEffect(() => {
+    if (!_idBaseRef.current) setAutoId('rozie-popover-' + nextAutoId());
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open (or keepMounted); startTracking re-reads via the
     // watch path.

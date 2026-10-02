@@ -18,7 +18,11 @@
   "devDependencies": {
     "@floating-ui/dom": "^1.7.2",
     "@rozie/core": "workspace:*",
+    "@vitejs/plugin-vue": "^6",
+    "happy-dom": "^15.0.0",
     "typescript": "~5.6.0",
-    "vitest": "^4.1.0"
-  }
+    "vitest": "^4.1.0",
+    "vue": "^3.5"
+  },
+  "comment:vue-mount-devdeps": "tests/*.behavior.test.ts (mount-and-drive, the combobox token-input.behavior.test.ts precedent): imports the committed leaf packages/vue/src/Popover.vue and mounts it via plain `vue` createApp/h — @vitejs/plugin-vue transforms the SFC, happy-dom supplies the DOM (opted into per file via a `// @vitest-environment happy-dom` docblock). Versions mirror @rozie-ui/combobox's devDependencies exactly."
 }

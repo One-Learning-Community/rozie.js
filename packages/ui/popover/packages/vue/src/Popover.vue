@@ -104,7 +104,7 @@ const props = withDefaults(
      */
     popupRole?: string;
     /**
-     * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+     * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-popover-<n>`), so several popovers on one page never share a panel id; set it when you need a stable, predictable id. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
      */
     idBase?: string;
     /**
@@ -112,7 +112,7 @@ const props = withDefaults(
      */
     reference?: Element | Record<string, any> | null;
   }>(),
-  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: 'rozie-popover', reference: null }
+  { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: '', reference: null }
 );
 
 /**
@@ -124,6 +124,8 @@ defineSlots<{
   anchor(props: { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null }): any;
   default(props: {  }): any;
 }>();
+
+const autoId = ref('');
 
 const anchorElRef = ref<HTMLElement>();
 const floatingElRef = ref<HTMLElement>();
@@ -336,6 +338,15 @@ const stopTracking = () => {
     stopAutoUpdate = null;
   }
 };
+// nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+// lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+// the TS script alike) so separately bundled copies of a leaf never hand out the
+// same id. The same four lines live in Combobox, Listbox and Popover.
+const nextAutoId = () => {
+  const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+  Reflect.set(globalThis, '__rozieAutoId', n);
+  return n;
+};
 // ─── reconcile positioning props while open ─────────────────────────────────────
 // Restart tracking rather than repositioning once (release-0.8.0 audit B3):
 // autoUpdate holds the position callback it was started with, which on React is
@@ -448,7 +459,11 @@ const anchorPopupRole = () => isTooltip() ? null : popupToken();
 // (not `null`) for the other triggers, for strict vue-tsc (see floatingRole).
 const anchorHaspopup = () => props.trigger === 'click' ? popupToken() : undefined;
 // The panel id (audit B1), also handed to the anchor slot as `panelId`.
-const panelId = () => props.idBase + '-panel';
+// idRoot(): the `idBase` prop, else the per-instance id generated in $onMount,
+// else the pre-mount fallback. Generated after mount (not during setup) so a
+// server render and the hydrating client agree.
+const idRoot = () => props.idBase || autoId.value || 'rozie-popover';
+const panelId = () => idRoot() + '-panel';
 // ─── imperative handle ($expose) ────────────────────────────────────────────────
 // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
 // reposition verb is `reposition`. None collide with the `open` model or its
@@ -468,6 +483,7 @@ function reposition() {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
+  if (!props.idBase) autoId.value = 'rozie-popover-' + nextAutoId();
   // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
   // and may be null until open (or keepMounted); startTracking re-reads via the
   // watch path.

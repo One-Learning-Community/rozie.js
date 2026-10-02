@@ -194,13 +194,14 @@ export class Popover {
    */
   popupRole = input<string>('dialog');
   /**
-   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-popover-<n>`), so several popovers on one page never share a panel id; set it when you need a stable, predictable id. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
-  idBase = input<string>('rozie-popover');
+  idBase = input<string>('');
   /**
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded`, plus `aria-controls` pointing at `idBase + '-panel'`), typically with `trigger='manual'` and a two-way-bound `open`. If a referenced Element is removed from the document while open, the popover closes. Pass a stable value — a new object on every render restarts tracking.
    */
   reference = input<(Element | Record<string, any>) | null>(null);
+  autoId = signal('');
   anchorEl = viewChild<ElementRef<HTMLDivElement>>('anchorEl');
   floatingEl = viewChild<ElementRef<HTMLDivElement>>('floatingEl');
   arrowEl = viewChild<ElementRef<HTMLDivElement>>('arrowEl');
@@ -300,6 +301,10 @@ export class Popover {
 
   ngAfterViewInit() {
     const __disabled = (this.disabled() || this.__rozieCvaDisabled());
+    if (!this.idBase()) this.autoId.set('rozie-popover-' + this.nextAutoId());
+    // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open (or keepMounted); startTracking re-reads via the
     // watch path.
@@ -516,6 +521,15 @@ export class Popover {
       this.stopAutoUpdate = null;
     }
   };
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+  // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+  // the TS script alike) so separately bundled copies of a leaf never hand out the
+  // same id. The same four lines live in Combobox, Listbox and Popover.
+  nextAutoId = () => {
+    const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+    Reflect.set(globalThis, '__rozieAutoId', n);
+    return n;
+  };
   // ─── reconcile positioning props while open ─────────────────────────────────────
   // Restart tracking rather than repositioning once (release-0.8.0 audit B3):
   // autoUpdate holds the position callback it was started with, which on React is
@@ -628,7 +642,11 @@ export class Popover {
   // (not `null`) for the other triggers, for strict vue-tsc (see floatingRole).
   anchorHaspopup = () => this.trigger() === 'click' ? this.popupToken() : undefined;
   // The panel id (audit B1), also handed to the anchor slot as `panelId`.
-  panelId = () => this.idBase() + '-panel';
+  // idRoot(): the `idBase` prop, else the per-instance id generated in $onMount,
+  // else the pre-mount fallback. Generated after mount (not during setup) so a
+  // server render and the hydrating client agree.
+  idRoot = () => this.idBase() || this.autoId() || 'rozie-popover';
+  panelId = () => this.idRoot() + '-panel';
   // ─── imperative handle ($expose) ────────────────────────────────────────────────
   // Verbs: show/hide/toggle/reposition. NOT `update` (reserved Lit lifecycle) → the
   // reposition verb is `reposition`. None collide with the `open` model or its

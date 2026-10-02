@@ -494,6 +494,19 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push('```');
   lines.push('');
 
+  // Layout — the root is `display: contents` (oinbox 0.8.0 follow-up F7).
+  lines.push('## Layout');
+  lines.push('');
+  lines.push(
+    'The `.rozie-popover` root is `display: contents`, so Popover adds no box of its own: the ' +
+      'anchor wrapper sits in the flow and the panel floats. A `class` or `style` you pass reaches ' +
+      'the root, which is enough for inherited properties (`color`, `font`, the `--rozie-popover-*` ' +
+      'tokens), but box properties (`margin`, `width`, `flex`, `position`, `grid-area`) have nothing ' +
+      'to act on there. To place a popover in a flex row or grid, wrap it in your own element and ' +
+      'style the wrapper.',
+  );
+  lines.push('');
+
   // Theming
   lines.push('## Theming');
   lines.push('');

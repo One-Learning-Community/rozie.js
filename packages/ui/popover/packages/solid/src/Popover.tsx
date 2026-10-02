@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { Show, children, createEffect, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Show, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, createOutsideClick, rozieAttr, rozieClass } from '@rozie/runtime-solid';
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
 // ALSO author PROP names (`offset`, `arrow`). A bare `offset`/`arrow` shorthand in
@@ -82,7 +82,7 @@ __rozieInjectStyle('Popover-c6cf02ea', `.rozie-popover[data-rozie-s-c6cf02ea] {
 
 interface AnchorSlotCtx { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null; }
 
-interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'anchorSlot' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
+interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'placement' | 'trigger' | 'offset' | 'disableFlip' | 'disableShift' | 'arrow' | 'disabled' | 'modal' | 'strategy' | 'bare' | 'disablePositioning' | 'keepMounted' | 'matchWidth' | 'disableDismiss' | 'popupRole' | 'idBase' | 'reference' | 'onChange' | 'anchorSlot' | 'children' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
    */
@@ -150,13 +150,17 @@ interface PopoverProps extends Omit<import('solid-js').ComponentProps<'div'>, 'o
    */
   popupRole?: string;
   /**
-   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Set a **distinct** value per instance when more than one popover shares a page. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the floating panel, whose id is `idBase + '-panel'` — also exposed to the `anchor` slot as `panelId`, so your trigger can set `aria-controls` (click) or `aria-describedby` (tooltip) to it. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-popover-<n>`), so several popovers on one page never share a panel id; set it when you need a stable, predictable id. On Lit the panel lives in the element's shadow root, so an id reference from light DOM, including your slotted anchor content, cannot resolve to it; there the anchor wrapper's own attributes, which sit inside the shadow root, carry the reference. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
    * Position the content against an external reference instead of the built-in anchor wrapper: either a DOM Element another component owns (e.g. a calendar event element) or a Floating UI virtual element — an object with a `getBoundingClientRect()` method and an optional `contextElement` — e.g. to open at a pointer position. The reference is measured and tracked with Floating UI's `autoUpdate` and reconciled at runtime; `null` (the default) keeps the built-in anchor. A click on a referenced Element does not count as an outside click (so a consumer toggle on it closes the panel); with a virtual element only the anchor wrapper and the panel count as inside. You own the trigger ARIA on your own element (`aria-haspopup` / `aria-expanded`, plus `aria-controls` pointing at `idBase + '-panel'`), typically with `trigger='manual'` and a two-way-bound `open`. If a referenced Element is removed from the document while open, the popover closes. Pass a stable value — a new object on every render restarts tracking.
    */
   reference?: (Element | Record<string, any>) | null;
+  /**
+   * @deprecated Removed in 0.3.0 — use the `open` model change event (React/Solid `onOpenChange`, Svelte `bind:open`).
+   */
+  onChange?: never;
   anchorSlot?: (ctx: AnchorSlotCtx) => JSX.Element;
   // D-131: default slot resolved via children() at body top
   children?: JSX.Element;
@@ -172,14 +176,16 @@ export interface PopoverHandle {
 }
 
 export default function Popover(_props: PopoverProps): JSX.Element {
-  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: 'rozie-popover', reference: null }, _props);
+  const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: '', reference: null }, _props);
   const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'popupRole', 'idBase', 'reference', 'children', 'ref']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
+  const [autoId, setAutoId] = createSignal('');
   onMount(() => {
     const _cleanup = (() => {
+    if (!local.idBase) setAutoId('rozie-popover-' + nextAutoId());
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open (or keepMounted); startTracking re-reads via the
     // watch path.
@@ -466,6 +472,16 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       stopAutoUpdate = null;
     }
   }
+
+  // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+  // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+  // the TS script alike) so separately bundled copies of a leaf never hand out the
+  // same id. The same four lines live in Combobox, Listbox and Popover.
+  function nextAutoId() {
+    const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
+    Reflect.set(globalThis, '__rozieAutoId', n);
+    return n;
+  }
   // ─── reconcile positioning props while open ─────────────────────────────────────
   // Restart tracking rather than repositioning once (release-0.8.0 audit B3):
   // autoUpdate holds the position callback it was started with, which on React is
@@ -589,8 +605,14 @@ export default function Popover(_props: PopoverProps): JSX.Element {
     return local.trigger === 'click' ? popupToken() : undefined;
   }
   // The panel id (audit B1), also handed to the anchor slot as `panelId`.
+  // idRoot(): the `idBase` prop, else the per-instance id generated in $onMount,
+  // else the pre-mount fallback. Generated after mount (not during setup) so a
+  // server render and the hydrating client agree.
+  function idRoot() {
+    return local.idBase || autoId() || 'rozie-popover';
+  }
   function panelId() {
-    return local.idBase + '-panel';
+    return idRoot() + '-panel';
   }
 
   // ─── imperative handle ($expose) ────────────────────────────────────────────────

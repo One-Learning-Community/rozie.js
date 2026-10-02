@@ -9,7 +9,9 @@
  *   - the `anchor` slot ctx typed (`open: boolean`, verbs `() => void`,
  *     `panelId: string`),
  *   - `reference` accepting a Floating UI `VirtualElement` and an Element,
- *   - typed handle verbs (`show()` ok, `show(1)` rejected).
+ *   - typed handle verbs (`show()` ok, `show(1)` rejected),
+ *   - React/Solid: the removed `change` event's `onChange` rejected (a
+ *     `never` tombstone), not accepted as the native <div> change handler.
  * Negatives are `@ts-expect-error` (TS2578 if one stops erroring) AND a separate
  * run of each negative WITHOUT the directive pins the specific TS error.
  * (vue / svelte / angular live in their own harness dirs.)
@@ -66,6 +68,9 @@ const REACT_NEG = {
   payload: { line: `export const bad = <Popover onOpenChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
   verb: { line: `h.current?.show(1);`, match: /TS2554: Expected 0 arguments, but got 1/ },
   slot: { line: `export const bad = <Popover renderAnchor={({ open }) => { open.toFixed(); return null; }} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
+  // The removed `change` event is a tombstone (`onChange?: never`): it must NOT
+  // fall into the native <div> passthrough as the DOM change handler.
+  removedChange: { line: `export const bad = <Popover onChange={() => {}} />;`, match: /TS2322: Type '\(\) => void' is not assignable to type 'never'/ },
 };
 
 const SOLID_PRELUDE = `import type { VirtualElement } from '@floating-ui/dom';
@@ -93,6 +98,7 @@ const SOLID_NEG = {
   payload: { line: `export const bad = <Popover onOpenChange={(open) => open.toFixed()} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
   verb: { line: `h?.show(1);`, match: /TS2554: Expected 0 arguments, but got 1/ },
   slot: { line: `export const bad = <Popover anchorSlot={({ open }) => { open.toFixed(); return <span /> }} />;`, match: /TS2339: Property 'toFixed' does not exist on type 'boolean'/ },
+  removedChange: { line: `export const bad = <Popover onChange={() => {}} />;`, match: /TS2322: Type '\(\) => void' is not assignable to type 'never'/ },
 };
 
 const LIT_PRELUDE = `import type { VirtualElement } from '@floating-ui/dom';
