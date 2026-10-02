@@ -18,12 +18,16 @@
 // `turbo run test` parallel CPU starvation can exceed vitest's 5s default and
 // flake only in full batteries (the captcha/cropper analog).
 import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // vue() so tests/*.behavior.test.ts can import + mount the emitted
+  // packages/vue/src/Tags.vue leaf.
+  plugins: [vue()],
   test: {
     globals: false,
     environment: 'node',

@@ -11,7 +11,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   modelValue?: any[];
   /**
-   * The keys that commit the current draft as a token (matched against the key event's `key`). Default `[',', 'Enter']`. Non-`'Enter'` entries also act as the split characters when pasting bulk text. Use e.g. `[' ', 'Enter']` for a space-delimited input.
+   * The keys that commit the current draft as a token (matched against the key event's `key`). Default `[',', 'Enter']`. Non-`'Enter'` entries also act as the split characters when pasting bulk text: a paste containing one is split and every part is added, and the parts that are rejected (by `validate` or `max`) are inserted at the caret, so the typed draft is kept. A paste with no split character is ordinary text. Use e.g. `[' ', 'Enter']` for a space-delimited input.
    */
   delimiters?: any[];
   /**
@@ -97,29 +97,81 @@ const commitTokens = (next: any) => {
   });
 };
 // ---- add / remove ------------------------------------------------------
-// Normalize → validate → dedup → cap a candidate, then commit + emit add.
-// Returns true if it was added (so the caller can clear the draft).
-const addToken = (raw: any) => {
-  if (!canEdit()) return false;
+// Normalize → validate → dedup → cap ONE candidate against the running list
+// `cur`. Returns `{ value }` to add, or `value: null` with a reason: 'duplicate' (already a
+// token — dropping it loses nothing) or 'rejected' (empty, invalid or over the
+// cap).
+const candidateFor = (raw: any, cur: any) => {
   let candidate = String(raw == null ? '' : raw).trim();
-  if (!candidate) return false;
+  if (!candidate) return {
+    value: null,
+    reject: 'rejected'
+  };
   if (typeof validate === 'function') {
-    const result = validate(candidate, tokens());
-    if (!result) return false;
+    const result = validate(candidate, cur);
+    if (!result) return {
+      value: null,
+      reject: 'rejected'
+    };
     candidate = String(result);
-    if (!candidate) return false;
+    if (!candidate) return {
+      value: null,
+      reject: 'rejected'
+    };
   }
-  const cur = tokens();
-  if (!allowDuplicates && cur.indexOf(candidate) !== -1) return false;
-  if (typeof max === 'number' && cur.length >= max) return false;
-  const next = cur.concat([candidate]);
-  commitTokens(next);
-  onadd?.({
+  if (!allowDuplicates && cur.indexOf(candidate) !== -1) return {
+    value: null,
+    reject: 'duplicate'
+  };
+  if (typeof max === 'number' && cur.length >= max) return {
+    value: null,
+    reject: 'rejected'
+  };
+  return {
     value: candidate,
-    tokens: next
-  });
-  return true;
+    reject: ''
+  };
 };
+// Add every raw candidate in order: ONE model write (commitTokens) with the
+// accumulated list, then one `add` per added token with the running list as of
+// that token. Accumulating locally matters: re-reading `tokens()` between adds
+// in one handler sees the pre-write list on React (and on Vue until the next
+// tick), so a multi-part paste used to keep only its last part. Returns the
+// added tokens and the raw candidates that were rejected (duplicates are neither).
+const addTokens = (raws: any) => {
+  if (!canEdit()) return {
+    added: [],
+    rejected: raws.slice()
+  };
+  let next = tokens();
+  const added = [];
+  const snapshots = [];
+  const rejected = [];
+  for (let i = 0; i < raws.length; i++) {
+    const r = candidateFor(raws[i], next);
+    if (r.value === null) {
+      if (r.reject === 'rejected') rejected.push(raws[i]);
+      continue;
+    }
+    next = next.concat([r.value]);
+    added.push(r.value);
+    snapshots.push(next);
+  }
+  if (added.length > 0) commitTokens(next);
+  for (let i = 0; i < added.length; i++) {
+    onadd?.({
+      value: added[i],
+      tokens: snapshots[i]
+    });
+  }
+  return {
+    added,
+    rejected
+  };
+};
+// Add one candidate. Returns true if it was added (so the caller can clear the
+// draft).
+const addToken = (raw: any) => addTokens([raw]).added.length === 1;
 // Remove the token at `idx`, commit, and emit remove.
 const removeAt = (idx: any) => {
   if (!canEdit()) return;
@@ -175,32 +227,48 @@ const onBlur = (e: any) => {
   const value = e && e.target ? e.target.value : '';
   if (value && addToken(value)) draft = '';
 };
-// Paste: split on the configured delimiter characters and bulk-add.
+// insertAtCaret(el, text): insert `text` into the input at the caret, replacing
+// the selection — what an ordinary paste does — and leave the caret after it.
+// The element is written directly too: Angular skips a `[value]` write when the
+// bound value equals the last RENDERED one.
+const insertAtCaret = (el: any, text: any) => {
+  const cur = el && typeof el.value === 'string' ? el.value : String(draft);
+  const start = el && typeof el.selectionStart === 'number' ? el.selectionStart : cur.length;
+  const end = el && typeof el.selectionEnd === 'number' ? el.selectionEnd : start;
+  const next = cur.slice(0, start) + text + cur.slice(end);
+  draft = next;
+  if (el && typeof el.value === 'string' && el.value !== next) el.value = next;
+  const caret = start + text.length;
+  if (el && typeof el.setSelectionRange === 'function') el.setSelectionRange(caret, caret);
+};
+// Paste: text containing a delimiter character is split on them and bulk-added;
+// the parts that are rejected (invalid, or over `max`) are inserted at the caret
+// as an ordinary paste would be, so the typed draft is kept. Text with no
+// delimiter is an ordinary paste into the draft (the browser handles it).
 const onPaste = (e: any) => {
   if (!canEdit()) return;
   const text = e && e.clipboardData && e.clipboardData.getData('text') || '';
   const seps = splitChars();
+  let hasSep = false;
+  for (let s = 0; s < seps.length; s++) {
+    if (text.indexOf(seps[s]) !== -1) hasSep = true;
+  }
+  if (!hasSep) return;
+  if (e) e.preventDefault();
   let parts = [text];
-  if (seps.length) {
-    // Split on every separator char in turn.
-    for (let s = 0; s < seps.length; s++) {
-      const sep = seps[s];
-      const out = [];
-      for (let p = 0; p < parts.length; p++) {
-        const pieces = String(parts[p]).split(sep);
-        for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
-      }
-      parts = out;
+  // Split on every separator char in turn.
+  for (let s = 0; s < seps.length; s++) {
+    const sep = seps[s];
+    const out = [];
+    for (let p = 0; p < parts.length; p++) {
+      const pieces = String(parts[p]).split(sep);
+      for (let q = 0; q < pieces.length; q++) out.push(pieces[q]);
     }
+    parts = out;
   }
   const trimmed = parts.map((p: any) => String(p).trim()).filter((p: any) => p.length > 0);
-  if (trimmed.length <= 1 && seps.length === 0) return; // let the input handle a plain paste
-  if (e) e.preventDefault();
-  let addedAny = false;
-  for (let i = 0; i < trimmed.length; i++) {
-    if (addToken(trimmed[i])) addedAny = true;
-  }
-  if (addedAny) draft = '';
+  const rejected = addTokens(trimmed).rejected;
+  if (rejected.length > 0) insertAtCaret(e ? e.target : null, rejected.join(seps[0] + ' '));
 };
 // ---- per-element attribute helpers -------------------------------------
 const removeLabel = (t: any) => 'Remove ' + String(t);
