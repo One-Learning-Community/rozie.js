@@ -5,13 +5,8 @@ import { createLitControllableProperty, rozieAttr, rozieListeners, rozieSpread }
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 
 // ---- native reconcile ---------------------------------------------------
-// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
-// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
-// Dialog instance sharing this leaf's module — a naive per-instance toggle
-// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
-// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
-// this instance participates (the opt-out); the shared helper decides WHEN
-// the DOM actually changes.
+// The <dialog> element, cached by sync() so $onUnmount can reach it without
+// reading $refs during teardown.
 
 @customElement('rozie-dialog')
 export default class Dialog extends SignalWatcher(LitElement) {
@@ -89,6 +84,12 @@ export default class Dialog extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-scroll-lock' }) disableScrollLock: boolean = false;
   /**
+   * What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus="input[name=title]"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.
+   * @example
+   * <rozie-dialog .open=${renameOpen} @open-change=${…} initialFocus="#label-name"></rozie-dialog>
+   */
+  @property({ type: String, attribute: 'initial-focus' }) initialFocus: string | Element | null = null;
+  /**
    * Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
@@ -142,6 +143,20 @@ private __rozieWatchInitial_0 = true;
     queueMicrotask(() => {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
+      (() => {
+        this.setScrollLock(false);
+        const el = this.dialogEl;
+        const back = this.returnFocusTo;
+        this.dialogEl = null;
+        this.returnFocusTo = null;
+        if (!el || !el.open) return;
+        if (el.isConnected) el.close();
+        if (!back) return;
+        setTimeout(() => {
+          const active = document.activeElement;
+          if (back.isConnected && (!active || active === document.body)) back.focus();
+        }, 0);
+      })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
     });
@@ -163,9 +178,49 @@ private __rozieWatchInitial_0 = true;
 `;
   }
 
-  applyScrollLock = (lock: any) => {
-  if (this.disableScrollLock) return;
+  dialogEl: HTMLDialogElement | null = null;
+
+  // Whether THIS instance currently holds one count of the shared scroll lock.
+  holdsLock = false;
+
+  // The element focused when the dialog opened, for the unmount-while-open
+  // focus return (a normal close gets the native return from close()).
+  returnFocusTo: HTMLElement | null = null;
+
+  // Lock/unlock <html> scroll for this instance. The actual lock/unlock is
+  // REF-COUNTED (./internal/scrollLock) across every Dialog instance sharing this
+  // leaf's module, because a naive per-instance toggle unlocks scrolling the
+  // moment ANY dialog closes, even while an OUTER dialog is still open. This
+  // wrapper releases only a count this instance took: a dialog that mounts closed
+  // (or closes twice) must not release a count another open dialog holds. The
+  // opt-out is read when locking only, so toggling it while open still releases.
+  setScrollLock = (lock: any) => {
+  if (lock === this.holdsLock) return;
+  if (lock && this.disableScrollLock) return;
+  this.holdsLock = lock;
   applySharedScrollLock(lock);
+};
+
+  // Focus `initialFocus` after showModal() has made its native choice. A selector
+  // is matched inside the panel and, on Lit, inside the light-DOM content
+  // assigned to the panel's <slot> (which panel.querySelector cannot see).
+  focusInitial = (panel: any) => {
+  const target: any = this.initialFocus;
+  if (!target) return;
+  let node: any = null;
+  if (typeof target === 'string') {
+    node = panel.querySelector(target);
+    const slot: any = node ? null : panel.querySelector('slot');
+    const assigned: any[] = slot && typeof slot.assignedElements === 'function' ? slot.assignedElements({
+      flatten: true
+    }) : [];
+    for (let i = 0; !node && i < assigned.length; i++) {
+      node = assigned[i].matches(target) ? assigned[i] : assigned[i].querySelector(target);
+    }
+  } else {
+    node = target;
+  }
+  if (node && typeof node.focus === 'function') node.focus();
 };
 
   // Reconcile the native <dialog> to the desired open state. Guarded on the
@@ -182,12 +237,19 @@ private __rozieWatchInitial_0 = true;
   const panel = this._refPanelEl;
   const el = (panel && panel.parentElement) as HTMLDialogElement | null;
   if (!el) return;
+  this.dialogEl = el;
   if (isOpen) {
-    if (!el.open) el.showModal();
-    this.applyScrollLock(true);
+    if (!el.open) {
+      const active = document.activeElement;
+      this.returnFocusTo = active instanceof HTMLElement ? active : null;
+      el.showModal();
+      this.focusInitial(panel);
+    }
+    this.setScrollLock(true);
   } else {
     if (el.open) el.close();
-    this.applyScrollLock(false);
+    this.returnFocusTo = null;
+    this.setScrollLock(false);
   }
 };
 
@@ -256,7 +318,7 @@ private __rozieWatchInitial_0 = true;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'open', 'disable-backdrop-close', 'disablebackdropclose', 'disable-escape-close', 'disableescapeclose', 'disable-scroll-lock', 'disablescrolllock', 'aria-label', 'arialabel', 'aria-labelledby', 'arialabelledby']);
+    const __skip = new Set<string>(['data-rozie-ref', 'open', 'disable-backdrop-close', 'disablebackdropclose', 'disable-escape-close', 'disableescapeclose', 'disable-scroll-lock', 'disablescrolllock', 'initial-focus', 'initialfocus', 'aria-label', 'arialabel', 'aria-labelledby', 'arialabelledby']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

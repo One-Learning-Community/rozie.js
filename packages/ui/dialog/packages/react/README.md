@@ -55,6 +55,7 @@ import '@rozie-ui/dialog-react/themes/shadcn.css';    // or material.css, bootst
 | `disableBackdropClose` | `Boolean` | `false` |  |  |
 | `disableEscapeClose` | `Boolean` | `false` |  |  |
 | `disableScrollLock` | `Boolean` | `false` |  |  |
+| `initialFocus` | `String | Element` | `null` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `ariaLabelledby` | `String` | `null` |  |  |
 

@@ -57,6 +57,7 @@ import '@rozie-ui/dialog-angular/themes/shadcn.css';    // or material.css, boot
 | `disableBackdropClose` | `Boolean` | `false` |  |  |
 | `disableEscapeClose` | `Boolean` | `false` |  |  |
 | `disableScrollLock` | `Boolean` | `false` |  |  |
+| `initialFocus` | `String | Element` | `null` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `ariaLabelledby` | `String` | `null` |  |  |
 

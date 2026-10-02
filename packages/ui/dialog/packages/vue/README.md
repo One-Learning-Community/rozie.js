@@ -53,6 +53,7 @@ import '@rozie-ui/dialog-vue/themes/shadcn.css';    // or material.css, bootstra
 | `disableBackdropClose` | `Boolean` | `false` |  |  |
 | `disableEscapeClose` | `Boolean` | `false` |  |  |
 | `disableScrollLock` | `Boolean` | `false` |  |  |
+| `initialFocus` | `String | Element` | `null` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `ariaLabelledby` | `String` | `null` |  |  |
 

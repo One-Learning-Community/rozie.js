@@ -18,6 +18,8 @@
 {
   open: false,
   lastReason: '',
+  removableMounted: false,
+  removableOpen: false,
 }
 </data>
 
@@ -33,6 +35,17 @@ const closeIt = () => {
 // without the native-<dialog> Escape/cancel timing flake.
 const hideViaHandle = () => {
   $refs.dlg.hide()
+}
+// The unmount-while-open case: the Dialog sits in an r-if and is removed with
+// `open` still true (a consumer's confirm dialog inside <Show>). Opening mounts
+// it already open; Remove (inside the dialog, since the page is inert) unmounts
+// it without ever writing `open = false`.
+const openRemovable = () => {
+  $data.removableOpen = true
+  $data.removableMounted = true
+}
+const removeIt = () => {
+  $data.removableMounted = false
 }
 const onClose = (e) => {
   $data.lastReason = e && e.reason != null ? e.reason : ''
@@ -58,6 +71,13 @@ const onClose = (e) => {
          $expose hide() handle (emits @close reason 'programmatic'). -->
     <button type="button" data-testid="hide-dialog" @click="hideViaHandle()">Hide</button>
     <button type="button" data-testid="close-dialog" @click="closeIt()">Close</button>
+  </Dialog>
+
+  <button type="button" data-testid="open-removable" @click="openRemovable()">Open removable</button>
+  <Dialog r-if="$data.removableMounted" r-model:open="$data.removableOpen" ariaLabel="Removable dialog" :initialFocus="'[data-testid=removable-second]'">
+    <input type="text" data-testid="removable-first" aria-label="First" />
+    <input type="text" data-testid="removable-second" aria-label="Second" />
+    <button type="button" data-testid="remove-dialog" @click="removeIt()">Remove</button>
   </Dialog>
 </div>
 </template>

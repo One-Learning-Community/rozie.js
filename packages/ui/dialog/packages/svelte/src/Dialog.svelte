@@ -2,9 +2,9 @@
 import { applyListeners } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
-import { onMount, untrack } from 'svelte';
+import { onDestroy, onMount, untrack } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialog'], 'open' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'ariaLabel' | 'ariaLabelledby' | 'children' | 'snippets' | 'onclose'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialog'], 'open' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'initialFocus' | 'ariaLabel' | 'ariaLabelledby' | 'children' | 'snippets' | 'onclose'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
    * @example
@@ -24,6 +24,12 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialo
    */
   disableScrollLock?: boolean;
   /**
+   * What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus="input[name=title]"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.
+   * @example
+   * <Dialog bind:open={renameOpen} initialFocus="#label-name" />
+   */
+  initialFocus?: (string | Element) | null;
+  /**
    * Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.
    */
   ariaLabel?: (string) | null;
@@ -41,6 +47,7 @@ let {
   disableBackdropClose = false,
   disableEscapeClose = false,
   disableScrollLock = false,
+  initialFocus = null,
   ariaLabel = null,
   ariaLabelledby = null,
   children: __childrenProp,
@@ -55,16 +62,47 @@ let panelEl = $state<HTMLElement | undefined>(undefined);
 
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 // ---- native reconcile ---------------------------------------------------
-// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
-// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
-// Dialog instance sharing this leaf's module — a naive per-instance toggle
-// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
-// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
-// this instance participates (the opt-out); the shared helper decides WHEN
-// the DOM actually changes.
-const applyScrollLock = (lock: any) => {
-  if (disableScrollLock) return;
+// The <dialog> element, cached by sync() so $onUnmount can reach it without
+// reading $refs during teardown.
+let dialogEl: HTMLDialogElement | null = null;
+// Whether THIS instance currently holds one count of the shared scroll lock.
+let holdsLock = false;
+// The element focused when the dialog opened, for the unmount-while-open
+// focus return (a normal close gets the native return from close()).
+let returnFocusTo: HTMLElement | null = null;
+// Lock/unlock <html> scroll for this instance. The actual lock/unlock is
+// REF-COUNTED (./internal/scrollLock) across every Dialog instance sharing this
+// leaf's module, because a naive per-instance toggle unlocks scrolling the
+// moment ANY dialog closes, even while an OUTER dialog is still open. This
+// wrapper releases only a count this instance took: a dialog that mounts closed
+// (or closes twice) must not release a count another open dialog holds. The
+// opt-out is read when locking only, so toggling it while open still releases.
+const setScrollLock = (lock: any) => {
+  if (lock === holdsLock) return;
+  if (lock && disableScrollLock) return;
+  holdsLock = lock;
   applySharedScrollLock(lock);
+};
+// Focus `initialFocus` after showModal() has made its native choice. A selector
+// is matched inside the panel and, on Lit, inside the light-DOM content
+// assigned to the panel's <slot> (which panel.querySelector cannot see).
+const focusInitial = (panel: any) => {
+  const target: any = initialFocus;
+  if (!target) return;
+  let node: any = null;
+  if (typeof target === 'string') {
+    node = panel.querySelector(target);
+    const slot: any = node ? null : panel.querySelector('slot');
+    const assigned: any[] = slot && typeof slot.assignedElements === 'function' ? slot.assignedElements({
+      flatten: true
+    }) : [];
+    for (let i = 0; !node && i < assigned.length; i++) {
+      node = assigned[i].matches(target) ? assigned[i] : assigned[i].querySelector(target);
+    }
+  } else {
+    node = target;
+  }
+  if (node && typeof node.focus === 'function') node.focus();
 };
 // Reconcile the native <dialog> to the desired open state. Guarded on the
 // native `el.open` flag (showModal throws if already open; close is a no-op when
@@ -80,12 +118,19 @@ const sync = (isOpen: any) => {
   const panel = panelEl;
   const el = (panel && panel.parentElement) as HTMLDialogElement | null;
   if (!el) return;
+  dialogEl = el;
   if (isOpen) {
-    if (!el.open) el.showModal();
-    applyScrollLock(true);
+    if (!el.open) {
+      const active = document.activeElement;
+      returnFocusTo = active instanceof HTMLElement ? active : null;
+      el.showModal();
+      focusInitial(panel);
+    }
+    setScrollLock(true);
   } else {
     if (el.open) el.close();
-    applyScrollLock(false);
+    returnFocusTo = null;
+    setScrollLock(false);
   }
 };
 // ---- close funnel (single $emit site) ----------------------------------
@@ -127,6 +172,20 @@ export const hide = () => {
 onMount(() => {
   sync(open);
 });
+onDestroy(() => (() => {
+  setScrollLock(false);
+  const el = dialogEl;
+  const back = returnFocusTo;
+  dialogEl = null;
+  returnFocusTo = null;
+  if (!el || !el.open) return;
+  if (el.isConnected) el.close();
+  if (!back) return;
+  setTimeout(() => {
+    const active = document.activeElement;
+    if (back.isConnected && (!active || active === document.body)) back.focus();
+  }, 0);
+})());
 
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {

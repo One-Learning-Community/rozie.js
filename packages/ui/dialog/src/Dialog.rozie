@@ -94,6 +94,18 @@
     },
   },
 
+  // What to focus once the dialog is shown (selector or element; default: the
+  // native showModal() choice).
+  initialFocus:         {
+    type: [String, Element],
+    default: null,
+    docs: {
+      description:
+        'What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus="input[name=title]"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.',
+      example: '<Dialog r-model:open="renameOpen" initialFocus="#label-name" />',
+    },
+  },
+
   // Accessible name when the dialog has no visible title to point at.
   ariaLabel:            {
     type: String,
@@ -121,16 +133,47 @@
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock'
 
 // ---- native reconcile ---------------------------------------------------
-// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
-// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
-// Dialog instance sharing this leaf's module — a naive per-instance toggle
-// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
-// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
-// this instance participates (the opt-out); the shared helper decides WHEN
-// the DOM actually changes.
-const applyScrollLock = (lock) => {
-  if ($props.disableScrollLock) return
+// The <dialog> element, cached by sync() so $onUnmount can reach it without
+// reading $refs during teardown.
+let dialogEl: HTMLDialogElement | null = null
+// Whether THIS instance currently holds one count of the shared scroll lock.
+let holdsLock = false
+// The element focused when the dialog opened, for the unmount-while-open
+// focus return (a normal close gets the native return from close()).
+let returnFocusTo: HTMLElement | null = null
+
+// Lock/unlock <html> scroll for this instance. The actual lock/unlock is
+// REF-COUNTED (./internal/scrollLock) across every Dialog instance sharing this
+// leaf's module, because a naive per-instance toggle unlocks scrolling the
+// moment ANY dialog closes, even while an OUTER dialog is still open. This
+// wrapper releases only a count this instance took: a dialog that mounts closed
+// (or closes twice) must not release a count another open dialog holds. The
+// opt-out is read when locking only, so toggling it while open still releases.
+const setScrollLock = (lock) => {
+  if (lock === holdsLock) return
+  if (lock && $props.disableScrollLock) return
+  holdsLock = lock
   applySharedScrollLock(lock)
+}
+
+// Focus `initialFocus` after showModal() has made its native choice. A selector
+// is matched inside the panel and, on Lit, inside the light-DOM content
+// assigned to the panel's <slot> (which panel.querySelector cannot see).
+const focusInitial = (panel) => {
+  const target: any = $props.initialFocus
+  if (!target) return
+  let node: any = null
+  if (typeof target === 'string') {
+    node = panel.querySelector(target)
+    const slot: any = node ? null : panel.querySelector('slot')
+    const assigned: any[] = slot && typeof slot.assignedElements === 'function' ? slot.assignedElements({ flatten: true }) : []
+    for (let i = 0; !node && i < assigned.length; i++) {
+      node = assigned[i].matches(target) ? assigned[i] : assigned[i].querySelector(target)
+    }
+  } else {
+    node = target
+  }
+  if (node && typeof node.focus === 'function') node.focus()
 }
 
 // Reconcile the native <dialog> to the desired open state. Guarded on the
@@ -147,12 +190,19 @@ const sync = (isOpen) => {
   const panel = $refs.panelEl
   const el = (panel && panel.parentElement) as HTMLDialogElement | null
   if (!el) return
+  dialogEl = el
   if (isOpen) {
-    if (!el.open) el.showModal()
-    applyScrollLock(true)
+    if (!el.open) {
+      const active = document.activeElement
+      returnFocusTo = active instanceof HTMLElement ? active : null
+      el.showModal()
+      focusInitial(panel)
+    }
+    setScrollLock(true)
   } else {
     if (el.open) el.close()
-    applyScrollLock(false)
+    returnFocusTo = null
+    setScrollLock(false)
   }
 }
 
@@ -190,6 +240,30 @@ $onMount(() => {
 // Lazy watch (never `immediate` — the engine must exist; onMount seeds initial).
 $watch(() => $props.open, (isOpen) => {
   sync(isOpen)
+})
+
+// Unmounted while open (e.g. the Dialog sits inside an `r-if` / `<Show>` that is
+// removed with `open` still true): the watch never sees `open` go false, so the
+// teardown does what that close would have done. It releases this instance's
+// scroll-lock count and returns focus to the element focused before the dialog
+// opened. While the <dialog> is still in the page, `close()` does both the
+// un-inerting and the native focus return. When the framework has already
+// removed it, focus has fallen to <body>; everything outside a modal dialog is
+// inert until it leaves the page, so the refocus waits one task, and only
+// happens if nothing else has taken focus meanwhile.
+$onUnmount(() => {
+  setScrollLock(false)
+  const el = dialogEl
+  const back = returnFocusTo
+  dialogEl = null
+  returnFocusTo = null
+  if (!el || !el.open) return
+  if (el.isConnected) el.close()
+  if (!back) return
+  setTimeout(() => {
+    const active = document.activeElement
+    if (back.isConnected && (!active || active === document.body)) back.focus()
+  }, 0)
 })
 
 // ---- imperative handle -------------------------------------------------

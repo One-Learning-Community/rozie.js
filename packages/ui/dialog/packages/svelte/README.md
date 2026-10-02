@@ -51,6 +51,7 @@ import '@rozie-ui/dialog-svelte/themes/shadcn.css';    // or material.css, boots
 | `disableBackdropClose` | `Boolean` | `false` |  |  |
 | `disableEscapeClose` | `Boolean` | `false` |  |  |
 | `disableScrollLock` | `Boolean` | `false` |  |  |
+| `initialFocus` | `String | Element` | `null` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `ariaLabelledby` | `String` | `null` |  |  |
 

@@ -28,7 +28,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Dialog',
-  props: ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'ariaLabel', 'ariaLabelledby'],
+  props: ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'initialFocus', 'ariaLabel', 'ariaLabelledby'],
   models: ['open'],
   emits: ['close'],
   slots: [''] as string[],
@@ -52,7 +52,7 @@ describe('Dialog.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches (6 props)', () => {
+  it('props surface matches (7 props)', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });

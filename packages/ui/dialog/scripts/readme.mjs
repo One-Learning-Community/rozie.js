@@ -19,6 +19,12 @@ import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 export function renderPropType(typeAnnotation) {
   if (!typeAnnotation) return 'any';
   if (typeAnnotation.kind === 'identifier') return typeAnnotation.name;
+  // A `type: [String, Element]` array decl lowers to a union: render each member
+  // joined with ` | ` (the docs table's `String \| Element` cell). Same case as
+  // popover's and sortable-list's readme.mjs.
+  if (typeAnnotation.kind === 'union' && Array.isArray(typeAnnotation.members)) {
+    return typeAnnotation.members.map(renderPropType).join(' | ');
+  }
   if (typeAnnotation.kind === 'literal') {
     return typeAnnotation.value === null ? 'any' : String(typeAnnotation.value);
   }
@@ -465,7 +471,10 @@ export function validateDocsPropsTable(ir, docsMarkdown) {
     const irType = renderPropType(p.typeAnnotation);
     const docType = stripCode(doc.type);
     const docTypeTokens = docType.split('|').map((t) => t.trim());
-    if (!docTypeTokens.includes(irType)) {
+    // The IR type may itself be a union (`String | Element`): every source member
+    // must be present in the docs cell (same subset check as popover's).
+    const irTypeTokens = irType.split('|').map((t) => t.trim());
+    if (!irTypeTokens.every((t) => docTypeTokens.includes(t))) {
       errors.push(`prop "${p.name}": type drift — source \`${irType}\`, docs \`${docType}\``);
     }
     const irDef = renderPropDefault(p.defaultValue);

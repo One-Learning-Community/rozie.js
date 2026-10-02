@@ -1,5 +1,5 @@
 ---
-surface_hash: ede21101d217
+surface_hash: 9aba49b2d019
 ---
 
 # Headless modal dialog comparison
@@ -60,7 +60,7 @@ Most modal components expose a tangle of close paths (an `onOpenChange`, an over
 - **Composable, unstyled parts.** Radix, Base UI, and Ariakit expose `Dialog.Trigger` / `Title` / `Description` / `Close` as separate primitives with wired ARIA. `@rozie-ui/dialog` is a single element with one default slot; you supply the heading and buttons yourself (and point `ariaLabelledby` at your title).
 - **Non-modal / positioned overlays.** The CDK overlay toolkit (and Floating-UI-based libraries) position popovers, tooltips, and dropdowns with flexible anchoring strategies. Rozie's dialog is specifically the modal case (`showModal()` + top layer); it is not a general overlay-positioning engine, popover, or drawer kit.
 - **Imperative "open a dialog from a service".** Angular CDK's `Dialog.open(Component)` (and vue-final-modal's `useModal()`) spawn dialogs imperatively with injected data and a result promise/ref. Rozie's dialog is declarative-first (`r-model:open` + slot content); the `show()` / `hide()` handle covers imperative open/close but not "render an arbitrary component and await its result".
-- **Stacked / nested modals & scroll-lock edge cases.** The native top layer stacks multiple open dialogs correctly, and the scroll-lock (`<html>` `overflow: hidden`) is now ref-counted across every simultaneously-open dialog — closing an inner one leaves the lock in place while an outer one is still open, and the original inline `overflow` value is restored only when the last one closes. It still does not compensate for scrollbar-gutter shift the way some mature libraries do.
+- **Stacked / nested modals & scroll-lock edge cases.** The native top layer stacks multiple open dialogs correctly, and the scroll-lock (`<html>` `overflow: hidden`) is now ref-counted across every simultaneously-open dialog — closing an inner one leaves the lock in place while an outer one is still open, and the original inline `overflow` value is restored only when the last one closes. A dialog removed while still open (an `r-if` / `<Show>` that unmounts it) releases its own lock count and returns focus too. It still does not compensate for scrollbar-gutter shift the way some mature libraries do.
 - **`@rozie-ui/dialog` is pre-1.0** and younger and less battle-tested than the established per-framework libraries; the full prop / event / handle surface is documented in the [showcase + API reference](/components/dialog). It also inherits the native `<dialog>` browser-support floor: Baseline "widely available" since March 2022 (Chrome/Edge, Firefox 98+, Safari 15.4+), so a polyfill is needed only for pre-2022 engines.
 
 ## Try it

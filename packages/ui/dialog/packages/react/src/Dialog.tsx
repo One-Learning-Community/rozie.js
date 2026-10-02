@@ -5,15 +5,10 @@ import './Dialog.css';
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 
 // ---- native reconcile ---------------------------------------------------
-// Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
-// actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
-// Dialog instance sharing this leaf's module — a naive per-instance toggle
-// unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
-// is still open (nested/stacked dialogs). This wrapper only decides WHETHER
-// this instance participates (the opt-out); the shared helper decides WHEN
-// the DOM actually changes.
+// The <dialog> element, cached by sync() so $onUnmount can reach it without
+// reading $refs during teardown.
 
-interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dialog'>, 'open' | 'defaultOpen' | 'onOpenChange' | 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'initialFocus' | 'ariaLabel' | 'ariaLabelledby' | 'onClose' | 'children' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
    * @example
@@ -35,6 +30,12 @@ interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dia
    */
   disableScrollLock?: boolean;
   /**
+   * What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus="input[name=title]"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.
+   * @example
+   * <Dialog open={renameOpen} onOpenChange={setRenameOpen} initialFocus="#label-name" />
+   */
+  initialFocus?: (string | Element) | null;
+  /**
    * Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.
    */
   ariaLabel?: (string) | null;
@@ -53,19 +54,23 @@ export interface DialogHandle {
 }
 
 const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: DialogProps, ref): JSX.Element {
-  const props: Omit<DialogProps, 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'ariaLabel' | 'ariaLabelledby'> & { disableBackdropClose: boolean; disableEscapeClose: boolean; disableScrollLock: boolean; ariaLabel: (string) | null; ariaLabelledby: (string) | null } = {
+  const props: Omit<DialogProps, 'disableBackdropClose' | 'disableEscapeClose' | 'disableScrollLock' | 'initialFocus' | 'ariaLabel' | 'ariaLabelledby'> & { disableBackdropClose: boolean; disableEscapeClose: boolean; disableScrollLock: boolean; initialFocus: (string | Element) | null; ariaLabel: (string) | null; ariaLabelledby: (string) | null } = {
     ..._props,
     disableBackdropClose: _props.disableBackdropClose ?? false,
     disableEscapeClose: _props.disableEscapeClose ?? false,
     disableScrollLock: _props.disableScrollLock ?? false,
+    initialFocus: _props.initialFocus ?? null,
     ariaLabel: _props.ariaLabel ?? null,
     ariaLabelledby: _props.ariaLabelledby ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, disableBackdropClose, disableEscapeClose, disableScrollLock, ariaLabel, ariaLabelledby, defaultValue, onOpenChange, defaultOpen, onClose, ...rest } = _props as DialogProps & Record<string, unknown>;
-    void open; void disableBackdropClose; void disableEscapeClose; void disableScrollLock; void ariaLabel; void ariaLabelledby; void defaultValue; void onOpenChange; void defaultOpen; void onClose;
+    const { open, disableBackdropClose, disableEscapeClose, disableScrollLock, initialFocus, ariaLabel, ariaLabelledby, defaultValue, onOpenChange, defaultOpen, onClose, ...rest } = _props as DialogProps & Record<string, unknown>;
+    void open; void disableBackdropClose; void disableEscapeClose; void disableScrollLock; void initialFocus; void ariaLabel; void ariaLabelledby; void defaultValue; void onOpenChange; void defaultOpen; void onClose;
     return rest;
   })();
+  const dialogEl = useRef<HTMLDialogElement | null>(null);
+  const returnFocusTo = useRef<HTMLElement | null>(null);
+  const holdsLock = useRef(false);
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultOpen ?? false,
@@ -76,17 +81,45 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   const panelEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
 
+  // The element focused when the dialog opened, for the unmount-while-open
+  // focus return (a normal close gets the native return from close()).
+  // Whether THIS instance currently holds one count of the shared scroll lock.
   // ---- native reconcile ---------------------------------------------------
-  // Lock/unlock <html> scroll (no-op when the opt-out is set or pre-DOM). The
-  // actual lock/unlock is REF-COUNTED (./internal/scrollLock) across every
-  // Dialog instance sharing this leaf's module — a naive per-instance toggle
-  // unlocks scrolling the moment ANY dialog closes, even while an OUTER dialog
-  // is still open (nested/stacked dialogs). This wrapper only decides WHETHER
-  // this instance participates (the opt-out); the shared helper decides WHEN
-  // the DOM actually changes.
-  function applyScrollLock(lock: any) {
-    if (props.disableScrollLock) return;
+  // The <dialog> element, cached by sync() so $onUnmount can reach it without
+  // reading $refs during teardown.
+  // Lock/unlock <html> scroll for this instance. The actual lock/unlock is
+  // REF-COUNTED (./internal/scrollLock) across every Dialog instance sharing this
+  // leaf's module, because a naive per-instance toggle unlocks scrolling the
+  // moment ANY dialog closes, even while an OUTER dialog is still open. This
+  // wrapper releases only a count this instance took: a dialog that mounts closed
+  // (or closes twice) must not release a count another open dialog holds. The
+  // opt-out is read when locking only, so toggling it while open still releases.
+  const setScrollLock = useCallback((lock: any) => {
+    if (lock === holdsLock.current) return;
+    if (lock && props.disableScrollLock) return;
+    holdsLock.current = lock;
     applySharedScrollLock(lock);
+  }, [props.disableScrollLock]);
+  // Focus `initialFocus` after showModal() has made its native choice. A selector
+  // is matched inside the panel and, on Lit, inside the light-DOM content
+  // assigned to the panel's <slot> (which panel.querySelector cannot see).
+  function focusInitial(panel: any) {
+    const target: any = props.initialFocus;
+    if (!target) return;
+    let node: any = null;
+    if (typeof target === 'string') {
+      node = panel.querySelector(target);
+      const slot: any = node ? null : panel.querySelector('slot');
+      const assigned: any[] = slot && typeof slot.assignedElements === 'function' ? slot.assignedElements({
+        flatten: true
+      }) : [];
+      for (let i = 0; !node && i < assigned.length; i++) {
+        node = assigned[i].matches(target) ? assigned[i] : assigned[i].querySelector(target);
+      }
+    } else {
+      node = target;
+    }
+    if (node && typeof node.focus === 'function') node.focus();
   }
 
   // Reconcile the native <dialog> to the desired open state. Guarded on the
@@ -103,14 +136,21 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     const panel = panelEl.current;
     const el = (panel && panel.parentElement) as HTMLDialogElement | null;
     if (!el) return;
+    dialogEl.current = el;
     if (isOpen) {
-      if (!el.open) el.showModal();
-      applyScrollLock(true);
+      if (!el.open) {
+        const active = document.activeElement;
+        returnFocusTo.current = active instanceof HTMLElement ? active : null;
+        el.showModal();
+        focusInitial(panel);
+      }
+      setScrollLock(true);
     } else {
       if (el.open) el.close();
-      applyScrollLock(false);
+      returnFocusTo.current = null;
+      setScrollLock(false);
     }
-  }, [applyScrollLock]);
+  }, [focusInitial, setScrollLock]);
   // ---- close funnel (single $emit site) ----------------------------------
   function closeWith(reason: any) {
     setOpen(false);
@@ -151,6 +191,22 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   _syncRef.current = sync;
   useEffect(() => {
     _syncRef.current(_openRef.current);
+  }, []);
+  useEffect(() => {
+    return () => {
+      setScrollLock(false);
+      const el = dialogEl.current;
+      const back = returnFocusTo.current;
+      dialogEl.current = null;
+      returnFocusTo.current = null;
+      if (!el || !el.open) return;
+      if (el.isConnected) el.close();
+      if (!back) return;
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (back.isConnected && (!active || active === document.body)) back.focus();
+      }, 0);
+    };
   }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }

@@ -66,6 +66,7 @@ Two-way bind `open` to a boolean and put your content in the default slot. A cli
 | `disableBackdropClose` | `Boolean` | `false` | yes | Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes with `reason: 'backdrop'`. |
 | `disableEscapeClose` | `Boolean` | `false` | yes | Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: 'escape'`; the component `preventDefault()`s it so the close always flows through the `open` model. |
 | `disableScrollLock` | `Boolean` | `false` | yes | Opt **out** of locking `<html>` scroll while open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown. |
+| `initialFocus` | `String \| Element` | `null` | yes | What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies (the first `autofocus` element, else the first focusable one). A selector that matches nothing leaves the native choice in place. |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the dialog when there is no visible title to point at (sets `aria-label`). |
 | `ariaLabelledby` | `String` | `null` | yes | `id` of the element that titles the dialog (sets `aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists. |
 
@@ -112,7 +113,7 @@ The complete token table and the design-system bridges live on the [dedicated th
 
 ## Accessibility
 
-- `showModal()` renders the dialog in the browser's **top layer** with `role="dialog"` and `aria-modal="true"` applied by the UA, a **native focus trap** (Tab cycles within the dialog), and **focus restoration** to the previously-focused element on close — none of which the component has to implement.
+- `showModal()` renders the dialog in the browser's **top layer** with `role="dialog"` and `aria-modal="true"` applied by the UA, a **native focus trap** (Tab cycles within the dialog), and **focus restoration** to the previously-focused element on close — none of which the component has to implement. The component adds the one case the platform misses: a Dialog unmounted while open (removed by an `r-if` / `<Show>` with `open` still `true`) releases its scroll lock and returns focus to the element focused before it opened.
 - Provide an accessible name with either `ariaLabelledby` (point at a visible heading — preferred) or `ariaLabel` (when there is no visible title).
 - Escape fires the native `cancel` event; the component `preventDefault()`s it and drives the close through the `open` model so the binding never desyncs. Set `disableEscapeClose` to opt out (e.g. a required confirmation).
 - The scrim is the native `::backdrop` pseudo-element. A click on the `<dialog>` element itself (outside the `.rozie-dialog-panel`) is treated as a backdrop click; set `disableBackdropClose` to require an explicit action.

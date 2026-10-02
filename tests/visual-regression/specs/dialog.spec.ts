@@ -124,4 +124,35 @@ for (const target of TARGETS) {
       })
       .toBe('false');
   });
+
+  // oinbox feedback (Dialog 0.1.3): a Dialog removed by an r-if / <Show> while
+  // `open` is still true never saw `open` go false, so it kept the <html> scroll
+  // lock and never returned focus (keyboard users landed on <body>). The
+  // removable dialog also exercises `initialFocus` (a selector into slotted
+  // content, which on Lit is light DOM the panel's querySelector cannot see).
+  runner(`dialog [${target}]: initialFocus focuses the selected field; unmounted while open, it releases the scroll lock and returns focus`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const overflow = () => page.evaluate(() => document.documentElement.style.overflow);
+    expect(await overflow()).toBe('');
+
+    const opener = page.getByTestId('open-removable');
+    await opener.click();
+    const second = page.getByTestId('removable-second');
+    await expect(second).toBeVisible({ timeout: 10_000 });
+    await expect(second).toBeFocused({ timeout: 10_000 });
+    await expect.poll(overflow, { timeout: 10_000 }).toBe('hidden');
+
+    await page.getByTestId('remove-dialog').click();
+    await expect(second).toHaveCount(0, { timeout: 10_000 });
+    await expect.poll(overflow, { timeout: 10_000 }).toBe('');
+    await expect(opener).toBeFocused({ timeout: 10_000 });
+
+    // The page is usable again: the other dialog still opens and locks.
+    await page.getByTestId('open-dialog').click();
+    await expect(page.getByTestId('dialog-body')).toBeVisible({ timeout: 10_000 });
+    await expect.poll(overflow, { timeout: 10_000 }).toBe('hidden');
+  });
 }
