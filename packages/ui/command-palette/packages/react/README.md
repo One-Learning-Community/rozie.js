@@ -12,7 +12,7 @@ Peer dependencies: `react + react-dom`. Install them alongside this package.
 
 **Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
 
-- `@rozie-ui/combobox-react` `^0.5.0 || ^0.6.0 || ^0.7.0` — required by `@rozie-ui/command-palette-react`
+- `@rozie-ui/combobox-react` `^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0` — required by `@rozie-ui/command-palette-react`
 - `@rozie-ui/popover-react` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/combobox-react`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-react`
 

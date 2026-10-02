@@ -12,7 +12,7 @@ Peer dependencies: `lit + @lit-labs/preact-signals + @preact/signals-core`. Inst
 
 **Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
 
-- `@rozie-ui/combobox-lit` `^0.5.0 || ^0.6.0 || ^0.7.0` — required by `@rozie-ui/command-palette-lit`
+- `@rozie-ui/combobox-lit` `^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0` — required by `@rozie-ui/command-palette-lit`
 - `@rozie-ui/popover-lit` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/combobox-lit`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-lit`
 
