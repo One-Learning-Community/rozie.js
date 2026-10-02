@@ -1077,7 +1077,14 @@ function runSelfTest() {
       .readdirSync(path.join(REPO_ROOT, '.changeset'))
       .filter((f) => f.endsWith('.md') && f.toLowerCase() !== 'readme.md');
     const res = checkNoMajorRelease();
-    const expectEmpty = pendingChangesets.length === 0;
+    // A pending changeset that names only `ignore`d packages (a `-held.md`
+    // twin, which survives `changeset version`) releases nothing, so the
+    // directory can be non-empty with "no pending releases" — the steady state
+    // right after a version commit. Expect the empty detail unless some pending
+    // changeset names a package that can actually release.
+    const ignored = readChangesetConfigAt('WORKTREE').ignore;
+    const releasable = [...readPendingChangesetNamesAt('WORKTREE')].filter((n) => !ignored.has(n));
+    const expectEmpty = pendingChangesets.length === 0 || releasable.length === 0;
     const detailOk = expectEmpty
       ? /no pending releases/.test(res.detail)
       : /\d+ pending release/.test(res.detail);

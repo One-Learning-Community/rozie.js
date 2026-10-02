@@ -94,7 +94,11 @@ describe('buildManifest', () => {
     // Release-0.8.0: every Combobox slot now authors `:param-types`, so the
     // undefined case is exercised by stripping them from a copy of the IR.
     const ir = loadComboboxIR();
-    const stripped = { ...ir, slots: ir.slots.map((s) => ({ ...s, paramTypes: undefined })) };
+    // Omit the key (not `paramTypes: undefined`, which exactOptionalPropertyTypes rejects).
+    const stripped = {
+      ...ir,
+      slots: ir.slots.map(({ paramTypes: _omitted, ...rest }) => rest),
+    };
     const manifest = buildManifest(stripped);
     for (const slot of manifest.slots) {
       expect(slot.paramTypes).toBeNull();

@@ -104,7 +104,19 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced by Quick task 260929-lyc to
+ * 4b). Advanced during the release-0.8.0 prep to `d75d6777df434d8c240f6c1caf2def7d1bdc9b7d`
+ * (d75d6777d), the audit commit that made Angular's `.outside` listeners
+ * capture-phase (`renderer.listen('document', 'click', handler)` →
+ * `listenTarget.addEventListener('click', handler, true)`). It re-blessed the
+ * Dropdown fixture in the same commit but did not run this suite, so 4b went
+ * red against `f22b0ee46` (Typecheck + Angular matrix on the pushed wave). The
+ * owed prohibition-5 hand-diff (performed, not deferred): `git diff
+ * f22b0ee46 d75d6777d` over the three tracked globs changes exactly
+ * `tests/dist-parity/fixtures/Dropdown.angular.ts`, the only tracked fixture
+ * whose source declares an `.outside` listener (examples/Modal.rozie mentions
+ * `.outside` only in a comment; its document listener is `@keydown.escape`).
+ * No tracked fixture changed after d75d6777d.
+ * Previously advanced by Quick task 260929-lyc to
  * `f22b0ee4686994a061ffb0ccec1d915364431159` — quick 260929-mn8's commit, which
  * re-blessed the Dropdown/Modal dist-parity fixtures for the deliberate
  * `<listeners>` handler-shape parity fix (method-ref handlers are now invoked
@@ -145,7 +157,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'f22b0ee46';
+const BASELINE_COMMIT = 'd75d6777d';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
