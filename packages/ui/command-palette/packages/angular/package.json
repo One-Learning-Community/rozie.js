@@ -43,7 +43,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "module": "./dist/fesm2022/rozie-ui-command-palette-angular.mjs",
   "types": "./dist/index.d.ts",
@@ -51,7 +52,7 @@
     "@angular/core": "^19",
     "@angular/common": "^19",
     "@angular/forms": "^19",
-    "@rozie-ui/combobox-angular": "^0.5.0 || ^0.6.0 || ^0.7.0"
+    "@rozie-ui/combobox-angular": "^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
