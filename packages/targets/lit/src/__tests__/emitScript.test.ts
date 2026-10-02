@@ -208,6 +208,43 @@ describe('emitScript — Lit class-body assembly', () => {
     expect(code).toContain('this.unlockScroll');
   });
 
+  it('standalone $onUnmount(() => {...}) runs its body on disconnect (not a dead arrow statement)', () => {
+    // Release-0.8.0 (oinbox Dialog feedback): a standalone $onUnmount keeps the
+    // whole callback as `hook.setup`, and the Lit emitter spliced that arrow in
+    // as a bare expression statement (`() => {...};`), so the teardown body
+    // never ran on Lit. It must be invoked, and as its own function, so an early
+    // `return` inside it cannot skip the `_disconnectCleanups` drain after it.
+    const code = emitFromSource(`<rozie name="UnmountProbe">
+<data>{ n: 0 }</data>
+<script>
+let held = true
+const release = () => { held = false }
+$onUnmount(() => {
+  if (!held) return
+  release()
+})
+</script>
+<template><div>{{ $data.n }}</div></template>
+</rozie>`);
+    const disconnect = code.slice(code.indexOf('disconnectedCallback(): void {'));
+    const body = disconnect.slice(0, disconnect.indexOf('\n  }\n'));
+    expect(body).not.toMatch(/^\s*\(\) => \{/m);
+    expect(body).toMatch(/\(\(\) => \{[\s\S]*this\.release\(\);[\s\S]*\}\)\(\);/);
+    expect(body.indexOf('this.release()')).toBeLessThan(body.indexOf('for (const fn of this._disconnectCleanups) fn();'));
+  });
+
+  it('standalone $onUnmount(function () {...}) is invoked with the element as `this`', () => {
+    const code = emitFromSource(`<rozie name="UnmountFnProbe">
+<script>
+const release = () => {}
+$onUnmount(function () { release() })
+</script>
+<template><div /></template>
+</rozie>`);
+    const disconnect = code.slice(code.indexOf('disconnectedCallback(): void {'));
+    expect(disconnect).toMatch(/\}\)\.call\(this\);/);
+  });
+
   it('lifecycle concise-arrow body: `$onMount(() => method())` splices the call as a statement (no double-call)', () => {
     // Regression for 2026-05-18 SortableListDemo bug: extractCleanupReturn strips
     // the arrow wrapper from `$onMount(() => reset())`, leaving the bare `reset()`

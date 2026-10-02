@@ -317,11 +317,11 @@ private __rozieWatchInitial_0 = true;
     queueMicrotask(() => {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
-      () => {
+      (() => {
         if (this.typeTimer !== null) clearTimeout(this.typeTimer);
         // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
         if (this.virtualizerCleanup) this.virtualizerCleanup();
-      };
+      })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
     });

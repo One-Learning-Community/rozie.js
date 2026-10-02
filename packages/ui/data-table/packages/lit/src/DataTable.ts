@@ -1542,7 +1542,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     queueMicrotask(() => {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
-      () => {
+      (() => {
         // B-02: drop the document click-away listener (it is attached for the instance's lifetime,
         // not per edit session — attaching it per session would freeze a stale closure on React).
         if (this.docPointerDown && typeof document !== 'undefined') {
@@ -1565,7 +1565,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         this.teardownFillDrag();
         // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
         this.teardownRangeDrag();
-      };
+      })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
     });

@@ -654,9 +654,9 @@ private __rozieFirstUpdateDone = false;
     queueMicrotask(() => {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
-      () => {
+      (() => {
         if (this.virtualizerCleanup) this.virtualizerCleanup();
-      };
+      })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
     });

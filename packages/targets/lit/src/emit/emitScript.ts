@@ -1481,11 +1481,23 @@ function lifecycleHookBody(
     // `this.reset()();` (double-call), which both fails at runtime and TDZs on
     // the inner reference because lifecycle bodies run before user arrows are
     // initialised on the class.
+    //
+    // A standalone `$onUnmount(() => {...})` keeps the WHOLE callback as
+    // `hook.setup` (only mount/update hooks are unwrapped by
+    // extractCleanupReturn), so a function literal must be INVOKED too, as its
+    // own function: spliced as a bare statement it was a dead `() => {...};`
+    // (the teardown never ran on Lit), and its body inlined directly would let
+    // an early `return` skip the `_disconnectCleanups` drain that follows it.
+    // An arrow keeps the class `this`; a `function` gets it via `.call(this)`.
     const isCallableRef = t.isIdentifier(hook.setup) || t.isMemberExpression(hook.setup);
     const cloned = t.cloneNode(hook.setup, true, false);
-    const stmt = isCallableRef
+    const stmt = isCallableRef || t.isArrowFunctionExpression(cloned)
       ? t.expressionStatement(t.callExpression(cloned, []))
-      : t.expressionStatement(cloned);
+      : t.isFunctionExpression(cloned)
+        ? t.expressionStatement(
+            t.callExpression(t.memberExpression(cloned, t.identifier('call')), [t.thisExpression()]),
+          )
+        : t.expressionStatement(cloned);
     const wrapper = t.file(t.program([stmt]));
     const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames, runtime });
     body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');

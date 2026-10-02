@@ -264,10 +264,10 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
     queueMicrotask(() => {
       if (this.isConnected || this._rozieTornDown) return;
       this._rozieTornDown = true;
-      () => {
+      (() => {
         this.unmounted = true;
         this.teardownTimers();
-      };
+      })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
     });
