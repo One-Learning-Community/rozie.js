@@ -148,8 +148,12 @@ export class Dialog {
       if (el.isConnected) el.close();
       if (!back) return;
       setTimeout(() => {
-        const active = document.activeElement;
-        if (back.isConnected && (!active || active === document.body)) back.focus();
+        // Lost: on <body>, or stranded on a shadow host whose root holds no focus
+        // and which is not focusable itself (the dialog's removed subtree was
+        // inside it).
+        const active = this.deepActiveElement();
+        const lost = !active || active === document.body || !!active.shadowRoot && active.tabIndex < 0;
+        if (back.isConnected && lost) back.focus();
       }, 0);
     });
     effect(() => { const __watchVal = (() => this.open())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
@@ -179,6 +183,14 @@ export class Dialog {
     if (lock && this.disableScrollLock()) return;
     this.holdsLock = lock;
     applySharedScrollLock(lock);
+  };
+  // The element that really has focus. `document.activeElement` stops at the
+  // outermost shadow host (on Lit the trigger lives inside a component's shadow
+  // root, so it reports that component), so walk each shadowRoot.activeElement.
+  deepActiveElement = () => {
+    let active: any = typeof document === 'undefined' ? null : document.activeElement;
+    while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
+    return active;
   };
   // Focus `initialFocus` after showModal() has made its native choice. A selector
   // is matched inside the panel and, on Lit, inside the light-DOM content
@@ -218,7 +230,7 @@ export class Dialog {
     this.dialogEl = el;
     if (isOpen) {
       if (!el.open) {
-        const active = document.activeElement;
+        const active = this.deepActiveElement();
         this.returnFocusTo = active instanceof HTMLElement ? active : null;
         el.showModal();
         this.focusInitial(panel);

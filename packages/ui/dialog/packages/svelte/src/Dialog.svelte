@@ -83,6 +83,14 @@ const setScrollLock = (lock: any) => {
   holdsLock = lock;
   applySharedScrollLock(lock);
 };
+// The element that really has focus. `document.activeElement` stops at the
+// outermost shadow host (on Lit the trigger lives inside a component's shadow
+// root, so it reports that component), so walk each shadowRoot.activeElement.
+const deepActiveElement = () => {
+  let active: any = typeof document === 'undefined' ? null : document.activeElement;
+  while (active && active.shadowRoot && active.shadowRoot.activeElement) active = active.shadowRoot.activeElement;
+  return active;
+};
 // Focus `initialFocus` after showModal() has made its native choice. A selector
 // is matched inside the panel and, on Lit, inside the light-DOM content
 // assigned to the panel's <slot> (which panel.querySelector cannot see).
@@ -121,7 +129,7 @@ const sync = (isOpen: any) => {
   dialogEl = el;
   if (isOpen) {
     if (!el.open) {
-      const active = document.activeElement;
+      const active = deepActiveElement();
       returnFocusTo = active instanceof HTMLElement ? active : null;
       el.showModal();
       focusInitial(panel);
@@ -182,8 +190,12 @@ onDestroy(() => (() => {
   if (el.isConnected) el.close();
   if (!back) return;
   setTimeout(() => {
-    const active = document.activeElement;
-    if (back.isConnected && (!active || active === document.body)) back.focus();
+    // Lost: on <body>, or stranded on a shadow host whose root holds no focus
+    // and which is not focusable itself (the dialog's removed subtree was
+    // inside it).
+    const active = deepActiveElement();
+    const lost = !active || active === document.body || !!active.shadowRoot && active.tabIndex < 0;
+    if (back.isConnected && lost) back.focus();
   }, 0);
 })());
 
