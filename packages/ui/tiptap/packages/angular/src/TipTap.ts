@@ -3,7 +3,7 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
-import { Editor, Node } from '@tiptap/core';
+import { Editor, Extension, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 // Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
@@ -515,6 +515,56 @@ export class TipTap {
     // invocation's separate `false`.
     let disposed = false;
 
+    // Escape pass-through. ProseMirror calls `preventDefault()` on EVERY Escape
+    // keydown in an editor (prosemirror-view's `captureKeyDown`), handled or not,
+    // and a default-prevented Escape never becomes a close request — so a native
+    // `<dialog>` around the editor (rozie Dialog included) would not get `cancel`
+    // while focus is in the editor. `escapePassthrough` (below) is the
+    // lowest-priority Escape shortcut: it is reached only when no extension
+    // keymap and no consumer `editorProps.handleKeyDown` consumed the key, and it
+    // marks that Escape as unhandled. The capture listener gives the event a
+    // `preventDefault` that ignores the call while that mark is set, so the
+    // browser's default goes ahead; the bubble listener clears the mark so
+    // listeners further up the tree can still prevent it. An Escape something DID
+    // handle (a suggestion popup, the link editor) is prevented as before.
+    // Escape pass-through. ProseMirror calls `preventDefault()` on EVERY Escape
+    // keydown in an editor (prosemirror-view's `captureKeyDown`), handled or not,
+    // and a default-prevented Escape never becomes a close request — so a native
+    // `<dialog>` around the editor (rozie Dialog included) would not get `cancel`
+    // while focus is in the editor. `escapePassthrough` (below) is the
+    // lowest-priority Escape shortcut: it is reached only when no extension
+    // keymap and no consumer `editorProps.handleKeyDown` consumed the key, and it
+    // marks that Escape as unhandled. The capture listener gives the event a
+    // `preventDefault` that ignores the call while that mark is set, so the
+    // browser's default goes ahead; the bubble listener clears the mark so
+    // listeners further up the tree can still prevent it. An Escape something DID
+    // handle (a suggestion popup, the link editor) is prevented as before.
+    let escapeUnhandled = false;
+    let removeEscapeListeners: any = null;
+    const escapePassthrough = Extension.create({
+      name: 'rozieEscapePassthrough',
+      priority: -1000,
+      addKeyboardShortcuts() {
+        return {
+          Escape: () => {
+            escapeUnhandled = true;
+            return false;
+          }
+        };
+      }
+    });
+    const onEscapeCapture = (e: any) => {
+      escapeUnhandled = false;
+      if (e.key !== 'Escape' || e.isComposing) return;
+      const prevent = e.preventDefault.bind(e);
+      e.preventDefault = () => {
+        if (!escapeUnhandled) prevent();
+      };
+    };
+    const onEscapeBubble = () => {
+      escapeUnhandled = false;
+    };
+
     // Which optional extensions this editor needs. Read ONCE here (setup-once, like
     // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
     // synchronously; otherwise after their import() settles. Either way `ready` fires
@@ -644,6 +694,15 @@ export class TipTap {
         handlePaste: this.handlePaste,
         handleDrop: this.handleDrop
       } : {};
+      const escapeHost = this.editorEl()?.nativeElement;
+      if (escapeHost) {
+        escapeHost.addEventListener('keydown', onEscapeCapture, true);
+        escapeHost.addEventListener('keydown', onEscapeBubble);
+        removeEscapeListeners = () => {
+          escapeHost.removeEventListener('keydown', onEscapeCapture, true);
+          escapeHost.removeEventListener('keydown', onEscapeBubble);
+        };
+      }
       this.editor = new Editor({
         element: this.editorEl()!.nativeElement,
         content: this.html(),
@@ -656,7 +715,7 @@ export class TipTap {
         // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
         // of the config-level auto-disable (D-02), which is what actually silences
         // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-        extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...__extensions]),
+        extensions: this.dedupeExtensionsByName([StarterKit.configure(this.buildStarterKitConfig(this.starterKit(), __extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...__extensions, escapePassthrough]),
         editorProps: {
           attributes: {
             'aria-label': this.ariaLabel(),
@@ -828,6 +887,8 @@ export class TipTap {
       this.linkEditorHandle = null;
       this.linkEditorEl = null;
       this.linkInputEl = null;
+      removeEscapeListeners?.();
+      removeEscapeListeners = null;
       this.editor?.destroy();
     });
     this.__rozieDestroyRef.onDestroy(() => {

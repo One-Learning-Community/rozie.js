@@ -47,7 +47,7 @@ export interface TipTapErrorPayload {
 <script setup lang="ts">
 import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
-import { Editor, Node } from '@tiptap/core';
+import { Editor, Extension, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 // Selection-anchored menu extensions (G2). SEPARATE packages (NOT in
@@ -1075,6 +1075,44 @@ onMounted(() => {
   // invocation's separate `false`.
   let disposed = false;
 
+  // Escape pass-through. ProseMirror calls `preventDefault()` on EVERY Escape
+  // keydown in an editor (prosemirror-view's `captureKeyDown`), handled or not,
+  // and a default-prevented Escape never becomes a close request — so a native
+  // `<dialog>` around the editor (rozie Dialog included) would not get `cancel`
+  // while focus is in the editor. `escapePassthrough` (below) is the
+  // lowest-priority Escape shortcut: it is reached only when no extension
+  // keymap and no consumer `editorProps.handleKeyDown` consumed the key, and it
+  // marks that Escape as unhandled. The capture listener gives the event a
+  // `preventDefault` that ignores the call while that mark is set, so the
+  // browser's default goes ahead; the bubble listener clears the mark so
+  // listeners further up the tree can still prevent it. An Escape something DID
+  // handle (a suggestion popup, the link editor) is prevented as before.
+  let escapeUnhandled = false;
+  let removeEscapeListeners: any = null;
+  const escapePassthrough = Extension.create({
+    name: 'rozieEscapePassthrough',
+    priority: -1000,
+    addKeyboardShortcuts() {
+      return {
+        Escape: () => {
+          escapeUnhandled = true;
+          return false;
+        }
+      };
+    }
+  });
+  const onEscapeCapture = (e: any) => {
+    escapeUnhandled = false;
+    if (e.key !== 'Escape' || e.isComposing) return;
+    const prevent = e.preventDefault.bind(e);
+    e.preventDefault = () => {
+      if (!escapeUnhandled) prevent();
+    };
+  };
+  const onEscapeBubble = () => {
+    escapeUnhandled = false;
+  };
+
   // Which optional extensions this editor needs. Read ONCE here (setup-once, like
   // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
   // synchronously; otherwise after their import() settles. Either way `ready` fires
@@ -1193,6 +1231,15 @@ onMounted(() => {
       handlePaste,
       handleDrop
     } : {};
+    const escapeHost = editorElRef.value;
+    if (escapeHost) {
+      escapeHost.addEventListener('keydown', onEscapeCapture, true);
+      escapeHost.addEventListener('keydown', onEscapeBubble);
+      removeEscapeListeners = () => {
+        escapeHost.removeEventListener('keydown', onEscapeCapture, true);
+        escapeHost.removeEventListener('keydown', onEscapeBubble);
+      };
+    }
     editor = new Editor({
       element: editorElRef.value!,
       content: html.value,
@@ -1205,7 +1252,7 @@ onMounted(() => {
       // name-deduped keeping the LAST occurrence as a safety net (D-03) on top
       // of the config-level auto-disable (D-02), which is what actually silences
       // StarterKit's internal same-named extension (e.g. its bundled `Link`).
-      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...props.extensions]),
+      extensions: dedupeExtensionsByName([StarterKit.configure(buildStarterKitConfig(props.starterKit, props.extensions)), ...placeholderExtensions, ...nodeViewExtensions, ...menuExtensions, ...imageExtensions, ...characterCountExtensions, ...props.extensions, escapePassthrough]),
       editorProps: {
         attributes: {
           'aria-label': props.ariaLabel,
@@ -1366,6 +1413,8 @@ onMounted(() => {
     linkEditorHandle = null;
     linkEditorEl = null;
     linkInputEl = null;
+    removeEscapeListeners?.();
+    removeEscapeListeners = null;
     editor?.destroy();
   };
 });

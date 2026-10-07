@@ -1,0 +1,80 @@
+<!--
+  TipTapInDialogDemo — behavioral cell: a TipTap editor inside a rozie Dialog.
+
+  ProseMirror prevents the default of every Escape keydown in an editor, which
+  used to keep the surrounding native <dialog> from getting `cancel` while focus
+  was in the editor. TipTap now lets an Escape nothing handled keep its default,
+  so Escape closes the dialog from inside the editor (reason 'escape').
+
+  The `guarded` editor passes `editorProps.handleKeyDown` returning true for
+  Escape — a consumer (or extension) that HANDLES the key still gets it
+  prevented, so the dialog stays open. See tiptap-in-dialog.spec.ts.
+  Behavioral-only (no pixel baseline).
+-->
+<rozie name="TipTapInDialogDemo">
+
+<components>
+{
+  Dialog: '../../packages/ui/dialog/src/Dialog.rozie',
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  open: false,
+  guardedOpen: false,
+  lastReason: '',
+  html: '<p>Body</p>',
+  guardedHtml: '<p>Guarded</p>',
+}
+</data>
+
+<script>
+const openIt = () => {
+  $data.lastReason = ''
+  $data.open = true
+}
+const openGuarded = () => {
+  $data.lastReason = ''
+  $data.guardedOpen = true
+}
+const onClose = (e) => {
+  $data.lastReason = e && e.reason != null ? e.reason : ''
+}
+// Consumes Escape inside the editor — the dialog must NOT close on it.
+const guardedProps = {
+  handleKeyDown: (_view, event) => event.key === 'Escape',
+}
+</script>
+
+<template>
+<div class="tiptap-in-dialog-demo">
+  <button type="button" data-testid="open-dialog" @click="openIt()">Open</button>
+  <button type="button" data-testid="open-guarded" @click="openGuarded()">Open guarded</button>
+  <span data-testid="readout-open">{{ String($data.open) }}</span>
+  <span data-testid="readout-guarded-open">{{ String($data.guardedOpen) }}</span>
+  <span data-testid="readout-reason">{{ $data.lastReason }}</span>
+
+  <Dialog r-model:open="$data.open" ariaLabel="Editor dialog" @close="onClose($event)">
+    <div data-testid="plain-editor">
+      <TipTap r-model:html="$data.html" ariaLabel="Plain editor" />
+    </div>
+  </Dialog>
+
+  <Dialog r-model:open="$data.guardedOpen" ariaLabel="Guarded editor dialog" @close="onClose($event)">
+    <div data-testid="guarded-editor">
+      <TipTap r-model:html="$data.guardedHtml" ariaLabel="Guarded editor" :editorProps="guardedProps" />
+    </div>
+  </Dialog>
+</div>
+</template>
+
+<style>
+.tiptap-in-dialog-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+}
+</style>
+
+</rozie>
