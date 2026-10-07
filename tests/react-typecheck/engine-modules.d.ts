@@ -15,6 +15,7 @@ declare module '@tiptap/core' {
   export type Editor = any;
   export const Node: any;
   export type Node = any;
+  export const Extension: any;
 }
 declare module '@tiptap/extensions';
 declare module '@tiptap/extension-bubble-menu';

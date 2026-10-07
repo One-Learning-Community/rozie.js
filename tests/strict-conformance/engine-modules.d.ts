@@ -17,5 +17,6 @@ declare module '@tiptap/core' {
   export type Editor = any;
   export const Node: any;
   export type Node = any;
+  export const Extension: any;
 }
 declare module 'maplibre-gl';
