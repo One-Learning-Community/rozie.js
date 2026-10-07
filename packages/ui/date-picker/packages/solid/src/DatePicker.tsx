@@ -11,6 +11,14 @@ import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isD
 type DaySettleRootEl = HTMLElement & {
   __rozieDaySettleRaf?: number;
 };
+//
+// `applyFocus` (the `focus()` expose handle only): once the cell has landed,
+// focus it directly. The r-keynav controller applies DOM focus on an
+// active-index change only when focus is already inside the component or the
+// grid has been interacted with (its strict-containment guard, 260806-lz7) —
+// which is never true for the case the handle exists for, a call made while
+// focus sits on something outside the picker. The cell's `focusin` then syncs
+// the controller to it, so arrow keys continue from the focused day.
 
 __rozieInjectStyle('DatePicker-6800c7a2', `.rozie-datepicker[data-rozie-s-6800c7a2] {
   display: inline-block;
@@ -678,7 +686,8 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // DOM or calls .focus() — the primitive's own effect keeps owning that once
   // it sees activeDay actually move; only `settleActiveDay` (called at the
   // bottom of this function) reads `$refs.root`, and only to decide WHEN to
-  // write, never to apply focus itself.
+  // write, never to apply focus itself (the `focus()` handle's `applyFocus`
+  // request excepted).
   // [77-09 fix] Resolves the CURRENT day-grid position, safe to call even
   // while a settle is mid-flight (`$data.activeDay === ROVING_DAY_NONE`).
   // `$data.activeDay` is authoritative WHENEVER it holds a real value — this
@@ -761,7 +770,15 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
   // used throughout this codebase (Angular's `__rozieKeynavRafId`,
   // virtualization.rzts's `remeasureRaf`).
   const DAY_SETTLE_MAX_FRAMES = 10;
-  function settleActiveDay(next: number, expectedIso: string | undefined, attempt: number = 0) {
+  //
+  // `applyFocus` (the `focus()` expose handle only): once the cell has landed,
+  // focus it directly. The r-keynav controller applies DOM focus on an
+  // active-index change only when focus is already inside the component or the
+  // grid has been interacted with (its strict-containment guard, 260806-lz7) —
+  // which is never true for the case the handle exists for, a call made while
+  // focus sits on something outside the picker. The cell's `focusin` then syncs
+  // the controller to it, so arrow keys continue from the focused day.
+  function settleActiveDay(next: number, expectedIso: string | undefined, attempt: number = 0, applyFocus: boolean = false) {
     const root = rootRef as DaySettleRootEl | undefined;
     if (attempt === 0 && root && root.__rozieDaySettleRaf !== undefined) {
       if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(root.__rozieDaySettleRaf);
@@ -775,13 +792,14 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     const landed = cell !== null && cell.getAttribute('data-day') === expectedIso;
     if (landed || attempt >= DAY_SETTLE_MAX_FRAMES) {
       if (root) root.__rozieDaySettleRaf = undefined;
+      if (landed && applyFocus && cell) cell.focus();
       setActiveDay(next);
       return;
     }
-    const rafId = requestAnimationFrame(() => settleActiveDay(next, expectedIso, attempt + 1));
+    const rafId = requestAnimationFrame(() => settleActiveDay(next, expectedIso, attempt + 1, applyFocus));
     if (root) root.__rozieDaySettleRaf = rafId;
   }
-  function seedActiveDay(viewIsoOverride?: string, assumeDaysView?: boolean) {
+  function seedActiveDay(viewIsoOverride?: string, assumeDaysView?: boolean, applyFocus: boolean = false) {
     const cells = allDayCells(viewIsoOverride, assumeDaysView);
     const next = resolveRovingDayIndex(cells, rovingDayInput(viewIsoOverride));
     if (next === currentActiveDay()) {
@@ -791,7 +809,7 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
     // bookkeeping, never read for DOM focus/UI, so it must always reflect the
     // latest INTENDED target the instant it's known, not one frame later.
     setActiveDayReal(next);
-    settleActiveDay(next, cells[next]?.iso);
+    settleActiveDay(next, cells[next]?.iso, 0, applyFocus);
   }
 
   // The localized month-year heading. NAMED `monthHeading`, NOT `label` — a bare
@@ -1342,15 +1360,22 @@ export default function DatePicker(_props: DatePickerProps): JSX.Element {
 
   // focus() — resolve + set $data.activeDay through the SAME roving-tabindex
   // chain the tab stop uses (seedActiveDay/resolveRovingDayIndex), so this
-  // handle can never disagree with keyboard Tab — multi-month aware. It never
-  // applies focus itself; the r-keynav grid controller lands DOM focus once the
-  // value changes (77-08). It DOES read `$refs.root` indirectly, through
-  // seedActiveDay's own settleActiveDay call (260926 fix) — only to decide WHEN
-  // to write $data.activeDay, never to call .focus()/apply anything itself; see
-  // settleActiveDay's doc comment. DELIBERATELY overrides HTMLElement.focus on
-  // Lit (ROZ137 warn, accepted).
+  // handle can never disagree with keyboard Tab — multi-month aware. Unlike
+  // every other seedActiveDay caller it asks for focus to be APPLIED
+  // (`applyFocus`): this is an explicit request, usually made while focus is
+  // outside the picker, which the r-keynav controller's containment guard would
+  // otherwise decline (see settleActiveDay's doc comment). In the months/years
+  // drill views there are no day cells, so it focuses that panel's current tab
+  // stop. `$refs.root` is read only from this consumer-called path (ROZ123-safe).
+  // DELIBERATELY overrides HTMLElement.focus on Lit (ROZ137 warn, accepted).
   function focus() {
-    seedActiveDay();
+    if (!showsDaysView()) {
+      const root = rootRef as HTMLElement | undefined;
+      const stop = root ? root.querySelector<HTMLElement>('[data-rozie-keynav-item][tabindex="0"]') : null;
+      if (stop) stop.focus();
+      return;
+    }
+    seedActiveDay(undefined, undefined, true);
   }
 
   // goToToday() — swing the view to the current month (no selection change).

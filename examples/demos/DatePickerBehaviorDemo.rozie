@@ -31,6 +31,12 @@ const onChange = (e) => {
 const applyDate = (v) => {
   $data.date = v
 }
+// Calls the picker's $expose `focus()` handle from OUTSIDE the picker — the
+// "open it in a popover, then move the keyboard in" consumer path
+// (date-picker-focus-handle.spec.ts).
+const focusPicker = () => {
+  $refs.picker?.focus()
+}
 </script>
 
 <template>
@@ -39,11 +45,13 @@ const applyDate = (v) => {
 
   <div class="controls">
     <button type="button" data-testid="set-date" @click="applyDate('2025-06-20')">Set Jun 20</button>
+    <button type="button" data-testid="focus-picker" @click="focusPicker()">Focus</button>
     <span class="readout" data-testid="readout-date">{{ $data.date }}</span>
     <span class="readout" data-testid="readout-change">{{ $data.lastChange }}</span>
   </div>
 
   <DatePicker
+    ref="picker"
     r-model:value="$data.date"
     :weekStartsOn="0"
     locale="en-US"
