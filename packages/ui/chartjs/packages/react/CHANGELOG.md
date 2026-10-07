@@ -1,5 +1,11 @@
 # @rozie-ui/chartjs-react
 
+## 0.1.6
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+
 ## 0.1.5
 
 ### Patch Changes

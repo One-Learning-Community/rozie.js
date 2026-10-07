@@ -1,5 +1,14 @@
 # @rozie-ui/toast-solid
 
+## 0.2.3
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- 3fcfea0: Toaster: the `dismissed` event handler now has a real payload type instead of `(...args: any[]) => void`. It receives `ToastDismissedPayload` (`{ toast: ToastEntry; reason: ToastDismissReason }`), and the `#toast` slot's `toast` and `dismiss` parameters are typed too (`ToastEntry` and `(id: string) => void`). `ToastEntry`, `ToastType`, `ToastAction`, `ToastDismissReason` and `ToastDismissedPayload` are exported from the package entry. A handler written against a different payload shape may now be rejected by the type checker.
+- Updated dependencies [c362398]
+  - @rozie/runtime-solid@0.9.0
+
 ## 0.2.2
 
 ### Patch Changes

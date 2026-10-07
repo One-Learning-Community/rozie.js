@@ -1,5 +1,15 @@
 # @rozie-ui/tiptap-svelte
 
+## 0.5.2
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- 9df9cd4: Escape pressed in the editor now reaches a surrounding native `<dialog>` (rozie Dialog included), which closes as it does from any other field. ProseMirror prevents the default of every Escape keydown, handled or not, and that kept the dialog from getting `cancel` while focus was in the editor. An Escape that nothing in the editor handled now keeps its default. An Escape that an extension shortcut or your own `editorProps.handleKeyDown` handles is still prevented — return `true` for Escape from `handleKeyDown` to keep the old behaviour.
+- bf8c41e: TipTap: every event handler now has a real payload type instead of `(...args: any[]) => void`. `update` receives the HTML `string`, `ready` receives the live `Editor` (from `@tiptap/core`), `error` receives `TipTapErrorPayload` (`{ extension: 'floatingMenu' | 'image' | 'count'; error: unknown }`), and `selectionUpdate`, `focus` and `blur` take no argument. `TipTapErrorPayload` is exported from the package entry. A handler written against a different payload shape may now be rejected by the type checker.
+- Updated dependencies [c362398]
+  - @rozie/runtime-svelte@0.9.0
+
 ## 0.5.1
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @rozie-ui/date-picker-vue
 
+## 0.1.10
+
+### Patch Changes
+
+- f799c83: `focus()` now moves keyboard focus into the calendar when it is called from outside the picker. It used to update the active day (the roving `tabindex="0"` and its outline) but leave DOM focus where it was, unless focus was already inside the picker — so a picker opened in a popover could not be reached from the keyboard. In the months and years views `focus()` lands on that panel's current cell; it used to do nothing there.
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- Updated dependencies [c362398]
+  - @rozie/runtime-vue@0.9.0
+
 ## 0.1.9
 
 ### Patch Changes

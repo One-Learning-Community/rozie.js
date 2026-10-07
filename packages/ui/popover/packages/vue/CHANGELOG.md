@@ -1,5 +1,20 @@
 # @rozie-ui/popover-vue
 
+## 0.3.1
+
+### Patch Changes
+
+- 36d4469: `onChange` is now typed `never` with a @deprecated note pointing at `onOpenChange`; it used to type-check as the native change handler and never fire. The `change` event was removed in 0.3.0, but `PopoverProps` extends the root `<div>`'s HTML attributes, so `<Popover onChange={…}>` still compiled as the DOM `change` handler. React and Solid now reject it with the note, and so does Svelte for `onchange` (use `bind:open`). Vue, Angular and Lit are unchanged; they get a version bump only.
+- 36d4469: `idBase` now defaults to `''`, and each popover generates a unique id base after mount (`rozie-popover-<n>`). Every popover left at the default used to get the panel id `rozie-popover-panel`, so two open popovers shared an id and the anchor's `aria-controls` / `aria-describedby` could point at the wrong panel. An explicit `idBase` is used as before, and the `anchor` slot's `panelId` follows the generated id.
+
+  The README and docs now explain that the root is `display: contents`: a `class` or `style` you pass reaches it, but only inherited properties (color, font, the `--rozie-popover-*` tokens) take effect there. To place a popover in a flex row or grid, wrap it in your own element.
+
+  Lit: a popover that re-rendered before its first open (for example after a prop change) could open unpositioned, in normal flow instead of floating at the anchor, because positioning started before the panel had rendered. Positioning now waits for the panel.
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- Updated dependencies [c362398]
+  - @rozie/runtime-vue@0.9.0
+
 ## 0.3.0
 
 ### Minor Changes

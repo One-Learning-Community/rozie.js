@@ -1,5 +1,19 @@
 # @rozie/cli
 
+## 0.9.0
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- Updated dependencies [36aea25]
+- Updated dependencies [c362398]
+  - @rozie/core@0.9.0
+  - @rozie/runtime-lit@0.9.0
+  - @rozie/runtime-react@0.9.0
+  - @rozie/runtime-solid@0.9.0
+  - @rozie/runtime-svelte@0.9.0
+  - @rozie/runtime-vue@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes

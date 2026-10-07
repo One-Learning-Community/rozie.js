@@ -1,5 +1,15 @@
 # @rozie-ui/command-palette-lit
 
+## 0.5.1
+
+### Patch Changes
+
+- e3c717c: Accept `@rozie-ui/combobox-<framework>` 0.8 as a peer dependency, alongside 0.5–0.7. Combobox 0.8 adds free-text options (`splitPaste`, `commitOnBlur`, a normalising `validate`) and the `query()` handle method; nothing command-palette uses changes. With no explicit `idBase`, the palette's inner combobox now generates a unique id base per instance.
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- 78080bf: CommandPalette: every event handler now has a real payload type instead of `(...args: any[]) => void`. `navigate` receives `CommandPaletteNavigatePayload` (`{ item, depth }`), `select` receives `CommandPaletteSelectPayload` (`{ item, path, args? }`), `action-select` receives `CommandPaletteActionSelectPayload` (`{ item, action }`), and `back` takes no argument. The `item` in each payload is a `CommandPaletteItem` (fields the palette does not read stay `any`), and `CommandPaletteAction` and `CommandPaletteArg` are exported alongside the payload types. A handler written against a different payload shape may now be rejected by the type checker.
+- Updated dependencies [c362398]
+  - @rozie/runtime-lit@0.9.0
+
 ## 0.5.0
 
 ### Minor Changes

@@ -1,5 +1,14 @@
 # @rozie-ui/listbox-solid
 
+## 0.1.5
+
+### Patch Changes
+
+- ab38cbc: `id` now defaults to `''`, and each listbox generates a unique id base after mount (`rozie-listbox-<n>`). Every listbox left at the default used to share the listbox id and the option ids (`rozie-listbox-list`, `rozie-listbox-opt-<i>`), so `aria-activedescendant` / `aria-controls` could resolve to another instance on the same page. An explicit `id` is used as before.
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- Updated dependencies [c362398]
+  - @rozie/runtime-solid@0.9.0
+
 ## 0.1.4
 
 ### Patch Changes

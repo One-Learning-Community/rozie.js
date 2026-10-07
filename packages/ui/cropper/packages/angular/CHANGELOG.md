@@ -1,5 +1,13 @@
 # @rozie-ui/cropper-angular
 
+## 0.1.10
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- Updated dependencies [c362398]
+  - @rozie/runtime-angular@0.9.0
+
 ## 0.1.9
 
 ### Patch Changes

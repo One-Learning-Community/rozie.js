@@ -1,5 +1,18 @@
 # @rozie-ui/tags-svelte
 
+## 0.2.1
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- 92d6263: Paste fixes:
+  - A paste no longer discards the text already typed. The parts of a split paste that are rejected (by `validate` or `max`) are inserted at the caret, as an ordinary paste would be; they used to vanish, and a successful paste cleared the input.
+  - A paste with no split character is ordinary text again. With the default delimiters every paste was intercepted and committed straight away as a tag, even a single word pasted into the middle of a typed one.
+  - A paste of several parts adds all of them. Only the last part used to be kept on frameworks where the model updates after the handler (React, and Vue until the next tick).
+  - A paste of several parts writes the model and fires `change` once, with one `add` per added tag.
+- Updated dependencies [c362398]
+  - @rozie/runtime-svelte@0.9.0
+
 ## 0.2.0
 
 ### Minor Changes

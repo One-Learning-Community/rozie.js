@@ -1,5 +1,20 @@
 # @rozie-ui/data-table-solid
 
+## 0.7.2
+
+### Patch Changes
+
+- c362398: The npm package now includes `CHANGELOG.md`. It was written for every release but left out of the tarball, because npm no longer adds a changelog by itself, so a behaviour change recorded there (such as the 0.7.0 combobox Ctrl/Cmd/Alt+Enter change) was invisible to anyone reading the installed package.
+- edb2ec4: DataTable: all 17 event handlers, the imperative handle and the scoped-slot parameters now have real types instead of `(...args: any[]) => void`, `(...args: any[]) => any` and `any`.
+  - Events: the state events carry the matching TanStack Table type (`sort-change` → `SortingState`, `selection-change` → `RowSelectionState`, `page-change` → `PaginationState`, and likewise `expand-change`, `group-change`, `pin-change`, `reorder-change`, `resize-change`, `visibility-change`). The rest have exported payload types: `DataTableFilterChangePayload`, `DataTableActiveCellChangePayload`, `DataTableCellEditCommitPayload`, `DataTableRowEditCommitPayload`, `DataTableRowActivatePayload`, `DataTableRangeChangePayload`, `DataTableHistoryChangePayload` and `DataTableVisibleRangeChangePayload`.
+  - Handle: every verb now has a typed signature (for example `sortColumn(colId: string, desc?: boolean)`, `getActiveCell(): DataTableActiveCell`, `getSelectedRange(): DataTableRange`, `pinColumn(colId, 'left' | 'right' | false)`). `DataTableCellPosition`, `DataTableActiveCell`, `DataTableRange` and `DataTableGroupableColumn` are exported.
+  - Slots: the `#cell`, `#editor`, `#colHeader`, `#filter`, `#selectAll`, `#selectCell`, `#groupBar`, `#placeholder` and `#detail` parameters are typed (`columnId: string`, `commit: (value: any) => void`, `column: Column<any, unknown>`, …).
+
+  Row data has no generic, so row-data positions (`row`, `value`, `oldValue`, `newValue`) stay `any`. A handler written against a different payload shape may now be rejected by the type checker.
+
+- Updated dependencies [c362398]
+  - @rozie/runtime-solid@0.9.0
+
 ## 0.7.1
 
 ### Patch Changes
