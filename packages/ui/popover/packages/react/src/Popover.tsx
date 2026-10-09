@@ -11,7 +11,7 @@ import './Popover.css';
 // (The Cropper import-name==component-name class, applied to imports vs PROP names —
 // two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
 import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
-import { buildMiddleware } from './internal/middleware';
+import { buildMiddleware, AVAILABLE_WIDTH_PROPERTY } from './internal/middleware';
 
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
 //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
@@ -45,7 +45,7 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
   defaultOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   /**
-   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content may flip to the opposite side when it would overflow the viewport. Reconciled at runtime.
+   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content flips to the opposite side when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor. Reconciled at runtime.
    */
   placement?: string;
   /**
@@ -57,11 +57,11 @@ interface PopoverProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   offset?: number;
   /**
-   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport; set this to keep it pinned to `placement` regardless.
+   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor; set this to keep it pinned to `placement` regardless.
    */
   disableFlip?: boolean;
   /**
-   * Disable the Floating UI `shift` middleware. By default the content shifts along its axis to stay within the viewport; set this to keep it strictly aligned to the anchor.
+   * Disable the Floating UI `shift` middleware. By default the content shifts to stay within the viewport (a `left`/`right` placement that fits nowhere slides back across the anchor), and its width is capped at the available width Popover measures and publishes on the panel as `--rozie-popover-available-width`; set this to keep it strictly aligned to the anchor and drop that measured cap.
    */
   disableShift?: boolean;
   /**
@@ -655,6 +655,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   }, [props.disableFlip]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
+    const off = props.disableShift;
+    if (off && floatingNode.current) floatingNode.current.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
     refresh();
   }, [props.disableShift]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

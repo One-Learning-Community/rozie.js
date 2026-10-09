@@ -10,7 +10,11 @@
   top: 0;
   z-index: var(--rozie-popover-z, var(--rpo-z, 1000));
   width: max-content;
-  max-width: var(--rozie-popover-max-width, var(--rpo-max-width, calc(100vw - 16px)));
+  /* The second min() argument is written by Popover while it tracks the anchor
+     (the width available to the panel); it is not a theming token. border-box makes
+     the cap include the padding and border. */
+  box-sizing: border-box;
+  max-width: min(var(--rozie-popover-max-width, var(--rpo-max-width, calc(100vw - 16px))), var(--rozie-popover-available-width, 100vw));
   background: var(--rozie-popover-bg, var(--rpo-bg, #fff));
   color: var(--rozie-popover-color, var(--rpo-color, inherit));
   border: var(--rozie-popover-border, var(--rpo-border, 1px solid rgba(0, 0, 0, 0.12)));

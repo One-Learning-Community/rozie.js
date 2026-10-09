@@ -16,6 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { computePosition, offset, flip, shift, arrow, size } from '@floating-ui/dom';
 import type { Middleware, Placement, Platform } from '@floating-ui/dom';
 import {
+  AVAILABLE_WIDTH_PROPERTY,
   buildMiddleware,
   isSidePlacement,
   type MiddlewareFactories,
@@ -44,9 +45,9 @@ const base: MiddlewareConfig = {
 const fakeEl = {} as Element;
 
 describe('buildMiddleware', () => {
-  it('defaults to offset → flip → shift (no arrow)', () => {
+  it('W1 defaults to offset → flip → shift → size (no arrow)', () => {
     const mw = buildMiddleware(factories, base);
-    expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'size']);
   });
 
   it('threads the offset value into the offset middleware', () => {
@@ -54,12 +55,12 @@ describe('buildMiddleware', () => {
     expect(mw[0]).toEqual({ name: 'offset', value: 24 });
   });
 
-  it('drops flip when disableFlip is set', () => {
+  it('W2 drops flip when disableFlip is set', () => {
     const mw = buildMiddleware(factories, { ...base, disableFlip: true });
-    expect(names(mw)).toEqual(['offset', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'shift', 'size']);
   });
 
-  it('drops shift when disableShift is set', () => {
+  it('W2 drops shift AND the trailing width-limit size when disableShift is set', () => {
     const mw = buildMiddleware(factories, { ...base, disableShift: true });
     expect(names(mw)).toEqual(['offset', 'flip']);
   });
@@ -69,30 +70,30 @@ describe('buildMiddleware', () => {
     expect(names(mw)).toEqual(['offset']);
   });
 
-  it('appends arrow LAST when arrow is on AND an element is present', () => {
+  it('W3 appends arrow LAST when arrow is on AND an element is present', () => {
     const mw = buildMiddleware(factories, { ...base, arrow: true, arrowEl: fakeEl });
-    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'arrow']);
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'size', 'arrow']);
     expect((mw[mw.length - 1] as { element: Element }).element).toBe(fakeEl);
   });
 
   it('omits arrow when arrow is on but no element has mounted yet', () => {
     const mw = buildMiddleware(factories, { ...base, arrow: true, arrowEl: null });
-    expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'size']);
   });
 
   it('omits arrow when an element exists but arrow is off', () => {
     const mw = buildMiddleware(factories, { ...base, arrow: false, arrowEl: fakeEl });
-    expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'size']);
   });
 
-  it('drops size when matchWidth is false', () => {
+  it('drops the matchWidth size when matchWidth is false', () => {
     const mw = buildMiddleware(factories, { ...base, matchWidth: false });
-    expect(names(mw)).toEqual(['offset', 'flip', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'flip', 'shift', 'size']);
   });
 
-  it('inserts size after offset, before flip/shift when matchWidth is true', () => {
+  it('W4 inserts size after offset, before flip/shift when matchWidth is true', () => {
     const mw = buildMiddleware(factories, { ...base, matchWidth: true });
-    expect(names(mw)).toEqual(['offset', 'size', 'flip', 'shift']);
+    expect(names(mw)).toEqual(['offset', 'size', 'flip', 'shift', 'size']);
   });
 
   // Release-0.8.0 audit B4: the size `apply` copies the reference width, but a
@@ -110,6 +111,51 @@ describe('buildMiddleware', () => {
   it('keeps size at index 1 even with disableFlip and disableShift both set', () => {
     const mw = buildMiddleware(factories, { ...base, matchWidth: true, disableFlip: true, disableShift: true });
     expect(names(mw)).toEqual(['offset', 'size']);
+  });
+});
+
+// 261008-mmt — the trailing width-limit size publishes the measured available width
+// as a custom property; it writes nothing else (D-12: width only).
+describe('buildMiddleware width-limit size', () => {
+  const widthApply = () => {
+    const mw = buildMiddleware(factories, base);
+    return (mw[mw.length - 1] as { apply: (args: unknown) => void }).apply;
+  };
+  const recordingFloating = () => {
+    const props = new Map<string, string>();
+    const writes: string[] = [];
+    const style = {
+      setProperty: (name: string, value: string) => {
+        writes.push(name);
+        props.set(name, value);
+      },
+      getPropertyValue: (name: string) => props.get(name) ?? '',
+      removeProperty: (name: string) => void props.delete(name),
+    };
+    return { floating: { style } as unknown as HTMLElement, props, writes };
+  };
+
+  it('W5 writes the floored available width under the exported property name', () => {
+    expect(AVAILABLE_WIDTH_PROPERTY).toBe('--rozie-popover-available-width');
+    const apply = widthApply();
+    const { floating, props, writes } = recordingFloating();
+    apply({ availableWidth: 389.7, elements: { floating } });
+    expect(props.get(AVAILABLE_WIDTH_PROPERTY)).toBe('389px');
+    // a second call with the same width does not write again
+    apply({ availableWidth: 389.7, elements: { floating } });
+    expect(writes).toEqual([AVAILABLE_WIDTH_PROPERTY]);
+    // only the one custom property: never width / height / max-height
+    expect([...props.keys()]).toEqual([AVAILABLE_WIDTH_PROPERTY]);
+  });
+
+  it('W5 clamps a negative width at 0px and rewrites when the width changes', () => {
+    const apply = widthApply();
+    const { floating, props, writes } = recordingFloating();
+    apply({ availableWidth: -12, elements: { floating } });
+    expect(props.get(AVAILABLE_WIDTH_PROPERTY)).toBe('0px');
+    apply({ availableWidth: 300, elements: { floating } });
+    expect(props.get(AVAILABLE_WIDTH_PROPERTY)).toBe('300px');
+    expect(writes).toHaveLength(2);
   });
 });
 
@@ -351,4 +397,54 @@ describe('buildMiddleware against the real Floating UI engine', () => {
       });
     });
   }
+});
+
+describe('width limit against the real Floating UI engine', () => {
+  it('W6 a 460px panel on the reported scene is capped to the viewport: 390px written, inside', async () => {
+    const r = await place({ ...reported, floating: { width: 460, height: 220 } }, builderStack());
+    expect(r.written).toBe('390px');
+    expect(r.width).toBe(390);
+    expect(r.left).toBeGreaterThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(390);
+  });
+
+  it('W7 the same size with a vertical placement gives the same outcome', async () => {
+    const r = await place(
+      { ...reported, floating: { width: 460, height: 220 }, placement: 'bottom' },
+      builderStack(),
+    );
+    expect(r.written).toBe('390px');
+    expect(r.width).toBe(390);
+    expect(r.left).toBeGreaterThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(390);
+  });
+
+  it('W8 with shift on the value written is the FULL clipping width, not the room beside the anchor', async () => {
+    const desktop = { width: 1280, height: 720 };
+    const side = await place(
+      {
+        viewport: desktop,
+        ref: { x: 300, y: 200, width: 120, height: 40 },
+        floating: { width: 360, height: 220 },
+        placement: 'right-start',
+      },
+      builderStack(),
+    );
+    expect(side.written).toBe('1280px');
+    const vertical = await place(
+      {
+        viewport: desktop,
+        ref: { x: 1200, y: 40, width: 40, height: 30 },
+        floating: { width: 220, height: 300 },
+        placement: 'bottom-end',
+      },
+      builderStack(),
+    );
+    expect(vertical.written).toBe('1280px');
+  });
+
+  it('W9 disableShift writes no width measurement', async () => {
+    const r = await place(reported, builderStack({ disableShift: true }));
+    expect(r.written).toBeUndefined();
+  });
 });

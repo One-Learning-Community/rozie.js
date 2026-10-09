@@ -13,7 +13,7 @@ export interface PopoverProps extends Omit<import('react').ComponentPropsWithout
   defaultOpen?: boolean;
   onOpenChange?: (next: boolean) => void;
   /**
-   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content may flip to the opposite side when it would overflow the viewport. Reconciled at runtime.
+   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content flips to the opposite side when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor. Reconciled at runtime.
    */
   placement?: string;
   /**
@@ -25,11 +25,11 @@ export interface PopoverProps extends Omit<import('react').ComponentPropsWithout
    */
   offset?: number;
   /**
-   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport; set this to keep it pinned to `placement` regardless.
+   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor; set this to keep it pinned to `placement` regardless.
    */
   disableFlip?: boolean;
   /**
-   * Disable the Floating UI `shift` middleware. By default the content shifts along its axis to stay within the viewport; set this to keep it strictly aligned to the anchor.
+   * Disable the Floating UI `shift` middleware. By default the content shifts to stay within the viewport (a `left`/`right` placement that fits nowhere slides back across the anchor), and its width is capped at the available width Popover measures and publishes on the panel as `--rozie-popover-available-width`; set this to keep it strictly aligned to the anchor and drop that measured cap.
    */
   disableShift?: boolean;
   /**

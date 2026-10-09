@@ -11,7 +11,7 @@ import { attachOutsideClickListener, createLitControllableProperty, rozieAttr, r
 // (The Cropper import-name==component-name class, applied to imports vs PROP names —
 // two collisions, not one.) computePosition/autoUpdate/flip/shift carry no clash.
 import { computePosition, autoUpdate, offset as offsetMiddleware, flip, shift, arrow as arrowMiddleware, size } from '@floating-ui/dom';
-import { buildMiddleware } from './internal/middleware';
+import { buildMiddleware, AVAILABLE_WIDTH_PROPERTY } from './internal/middleware';
 
 // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:
 //   anchorNode/floatingNode/arrowNode hold the resolved ref ELEMENTS (read ONLY in
@@ -64,7 +64,11 @@ export default class Popover extends SignalWatcher(LitElement) {
   top: 0;
   z-index: var(--rozie-popover-z, var(--rpo-z, 1000));
   width: max-content;
-  max-width: var(--rozie-popover-max-width, var(--rpo-max-width, calc(100vw - 16px)));
+  /* The second min() argument is written by Popover while it tracks the anchor
+     (the width available to the panel); it is not a theming token. border-box makes
+     the cap include the padding and border. */
+  box-sizing: border-box;
+  max-width: min(var(--rozie-popover-max-width, var(--rpo-max-width, calc(100vw - 16px))), var(--rozie-popover-available-width, 100vw));
   background: var(--rozie-popover-bg, var(--rpo-bg, #fff));
   color: var(--rozie-popover-color, var(--rpo-color, inherit));
   border: var(--rozie-popover-border, var(--rpo-border, 1px solid rgba(0, 0, 0, 0.12)));
@@ -105,7 +109,7 @@ export default class Popover extends SignalWatcher(LitElement) {
   @property({ type: Boolean, attribute: 'open' }) _open_attr: boolean = false;
   private _openControllable = createLitControllableProperty<boolean>({ host: this, eventName: 'open-change', defaultValue: false, initialControlledValue: undefined });
   /**
-   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content may flip to the opposite side when it would overflow the viewport. Reconciled at runtime.
+   * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content flips to the opposite side when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor. Reconciled at runtime.
    */
   @property({ type: String, reflect: true }) placement: string = 'bottom';
   /**
@@ -117,11 +121,11 @@ export default class Popover extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true }) offset: number = 8;
   /**
-   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport; set this to keep it pinned to `placement` regardless.
+   * Disable the Floating UI `flip` middleware. By default the content flips to the opposite side of the anchor when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor; set this to keep it pinned to `placement` regardless.
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-flip' }) disableFlip: boolean = false;
   /**
-   * Disable the Floating UI `shift` middleware. By default the content shifts along its axis to stay within the viewport; set this to keep it strictly aligned to the anchor.
+   * Disable the Floating UI `shift` middleware. By default the content shifts to stay within the viewport (a `left`/`right` placement that fits nowhere slides back across the anchor), and its width is capped at the available width Popover measures and publishes on the panel as `--rozie-popover-available-width`; set this to keep it strictly aligned to the anchor and drop that measured cap.
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-shift' }) disableShift: boolean = false;
   /**
@@ -290,7 +294,10 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('placement'))) { const __watchVal = (() => this.placement)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('offset'))) { const __watchVal = (() => this.offset)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disableFlip'))) { const __watchVal = (() => this.disableFlip)(); (() => this.refresh())(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('disableShift'))) { const __watchVal = (() => this.disableShift)(); (() => this.refresh())(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disableShift'))) { const __watchVal = (() => this.disableShift)(); ((off: any) => {
+      if (off && this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+      this.refresh();
+    })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('strategy'))) { const __watchVal = (() => this.strategy)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('matchWidth'))) { const __watchVal = (() => this.matchWidth)(); ((on: any) => {
       if (!on && this.floatingNode) this.floatingNode.style.width = '';

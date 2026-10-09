@@ -14,11 +14,14 @@
  * copy in each leaf has zero engine import of its own (the leaf's Popover.* owns
  * the single engine import).
  *
- * Floating UI ordering contract: offset → size → flip → shift → arrow. `offset`
- * first so the gap is measured before collision detection; `size` next (pure
- * width-matching, placement-independent, so its slot is readability-driven, not
- * functional — gap math, then sizing, then collision-avoidance, then decoration);
- * `arrow` last so it reads the final resolved placement.
+ * Floating UI ordering contract: offset → size (matchWidth) → flip → shift → size
+ * (width limit) → arrow. `offset` first so the gap is measured before collision
+ * detection; the matchWidth `size` next (pure width-matching, placement-independent,
+ * so its slot is readability-driven, not functional — gap math, then sizing, then
+ * collision-avoidance, then decoration); the width-limit `size` right after `shift`
+ * (with shift on, the engine then reports the FULL clipping width rather than the
+ * space left on one side of the anchor); `arrow` last so it reads the final resolved
+ * placement.
  *
  * Staying inside the viewport (261008-mmt). Field report: a `right-start` panel
  * on a 390px-wide screen ended with its right edge at 521px. The engine's DEFAULTS
@@ -36,6 +39,13 @@
  * composite (combobox `bottom-start`, data-table `bottom-end`) uses them, and a
  * dropdown must not jump beside its input in a short viewport or slide over it.
  */
+
+/**
+ * The custom property the width-limit `size` writes on the floating element. The
+ * panel's stylesheet takes `min(<max-width token>, var(<this>, 100vw))`. It is set by
+ * Popover, never by a consumer, and is deliberately NOT a theming token.
+ */
+export const AVAILABLE_WIDTH_PROPERTY = '--rozie-popover-available-width';
 
 /** The slice of the engine's middleware state the option functions read. */
 export interface PlacementState {
@@ -122,6 +132,28 @@ export function buildMiddleware(
   if (!config.disableShift) {
     mw.push(
       factories.shift((state) => ({ crossAxis: isSidePlacement(state.initialPlacement) })),
+    );
+    // Width limit: publish the width available to the panel so the stylesheet can
+    // cap it (a panel is never wider than the area it is positioned in). It rides
+    // with shift — it sits AFTER it so `availableWidth` is the full clipping width,
+    // and `disableShift` drops it. WIDTH ONLY, never a height-family property
+    // (D-12 above: a size that changes on scroll is a virtualizer re-measure loop),
+    // written only when the value changes so scrolling causes no style churn. The
+    // value is built only from the engine's number: floor, clamp at zero, `px`.
+    mw.push(
+      factories.size({
+        apply: (args: unknown) => {
+          const { availableWidth, elements } = args as {
+            availableWidth: number;
+            elements: { floating: HTMLElement };
+          };
+          const value = `${Math.max(0, Math.floor(availableWidth))}px`;
+          const style = elements.floating.style;
+          if (style.getPropertyValue(AVAILABLE_WIDTH_PROPERTY) !== value) {
+            style.setProperty(AVAILABLE_WIDTH_PROPERTY, value);
+          }
+        },
+      }),
     );
   }
   // The arrow middleware needs a real element to position; opt-in only when both
