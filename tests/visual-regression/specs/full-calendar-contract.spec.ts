@@ -21,7 +21,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   - FC-C4: `options.firstDay: 1` reaches the engine (curated `firstDay` unset);
  *   - FC-C7: `eventClick` carries `el` + `jsEvent` for a pointer click AND for
  *     Enter; `eventMouseLeave` carries `el`; `dateClick` carries `dayEl` +
- *     `jsEvent`; `eventDrop` carries `oldEvent` + a working `revert()`;
+ *     `jsEvent`; `eventDrop` carries `oldEvent`, `allDay` on both refs, and a
+ *     working `revert()`;
  *   - FC-C6: the untitled event has `aria-label="Untitled event"`;
  *   - FC-C5: runtime `height` `'600'` → 600px, `''` → the 480 default,
  *     `'auto'` → content height; a STATIC `height="600"` attribute → 600px (the
@@ -139,7 +140,7 @@ for (const target of TARGETS) {
     await page.mouse.click(dayBox.x + dayBox.width / 2, dayBox.y + dayBox.height - 6);
     await expect(log).toHaveText(/^dateClick:TD:2026-01-28:(click|mouseup|pointerup)$/);
 
-    // ---- FC-C7: eventDrop carries oldEvent + revert(); the demo reverts ----
+    // ---- FC-C7: eventDrop carries oldEvent, allDay on both refs, and revert(); the demo reverts ----
     const fromCell = main.locator('td.fc-daygrid-day[data-date="2026-01-13"]');
     const toCell = main.locator('td.fc-daygrid-day[data-date="2026-01-16"]');
     const from = await centerOf(page, dragEvent);
@@ -149,7 +150,7 @@ for (const target of TARGETS) {
     await page.mouse.move(from.x + 10, from.y + 2, { steps: 4 });
     await page.mouse.move(to.x, to.y, { steps: 12 });
     await page.mouse.up();
-    await expect(log).toHaveText('eventDrop:reverted:old=drag', { timeout: 10_000 });
+    await expect(log).toHaveText('eventDrop:reverted:old=drag:allDay=true:oldAllDay=true', { timeout: 10_000 });
     await expect(fromCell.getByText('Drag me')).toBeVisible();
     await expect(toCell.getByText('Drag me')).toHaveCount(0);
 

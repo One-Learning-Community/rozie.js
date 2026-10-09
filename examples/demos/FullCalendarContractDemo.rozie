@@ -19,7 +19,8 @@
       (C5), plus a second calendar with a STATIC `height="600"` attribute (the
       Lit attribute-converter path, end to end).
     - `el` + `jsEvent` on `eventClick` (pointer and Enter key) and
-      `eventMouseLeave`; `dayEl` on `dateClick`; `revert()` on `eventDrop` (C7).
+      `eventMouseLeave`; `dayEl` on `dateClick`; `revert()` on `eventDrop`, plus `allDay` on its
+      `event` and `oldEvent` refs (C7).
     - An untitled event carries `aria-label="Untitled event"` (C6).
     - Replacing `events` keeps the feed's events (C8).
     - After unmount the handle's `getApi()` returns null (C9).
@@ -64,7 +65,7 @@ const onDateClick = (p) => {
 const onEventDrop = (p) => {
   const reverted = typeof p?.revert === 'function'
   if (reverted) p.revert()
-  $data.log = `eventDrop:${reverted ? 'reverted' : 'no-revert'}:old=${p?.oldEvent?.id ?? '?'}`
+  $data.log = `eventDrop:${reverted ? 'reverted' : 'no-revert'}:old=${p?.oldEvent?.id ?? '?'}:allDay=${p?.event?.allDay}:oldAllDay=${p?.oldEvent?.allDay}`
 }
 
 const rerender = () => { $data.tick = $data.tick + 1 }
