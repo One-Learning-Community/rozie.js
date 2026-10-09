@@ -154,8 +154,18 @@ describe('AC-N2 Layer 1 — dynamic :name-in-r-for record-key invariants (compil
         it(`the loop iterates over local.${loopSource} directly`, () => {
           expect(code).toContain(`local.${loopSource}`);
         });
-        it(`splitProps no longer pulls 'children' into the destructure — only ${loopSource}`, () => {
-          expect(code).toContain(`splitProps(_merged, ['${loopSource}'])`);
+        it(`splitProps no longer pulls 'children' into the destructure — it carries the loop source ${loopSource} and the 'slots' record only`, () => {
+          // Invariant (not a whole-line golden): the key list holds the loop
+          // source, never 'children'. Since Quick 261008-mmu it also holds the
+          // `slots` record key (a component's own slot props are never spread
+          // onto the root DOM element).
+          const line = code.split('\n').find((l) => l.includes('splitProps('));
+          expect(line).toBeDefined();
+          const m = /splitProps\([^,]+,\s*\[([^\]]*)\]\)/.exec(line!);
+          expect(m).not.toBeNull();
+          const keys = m![1]!.split(',').map((k) => k.trim().replace(/^'|'$/g, ''));
+          expect(keys).toContain(loopSource);
+          expect(keys).not.toContain('children');
         });
         it('does NOT keep the old fixed-shape slots? record type', () => {
           expect(code).not.toContain(

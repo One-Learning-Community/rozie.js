@@ -13,7 +13,7 @@
  *
  * @experimental — shape may change before v1.0
  */
-import type { Diagnostic, IRComponent } from '@rozie/core';
+import type { Diagnostic, IRComponent, SlotDecl } from '@rozie/core';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { lowerSlotParamType } from '../../../../core/src/codegen/slotParamTypeLowering.js';
 import { solidSlotCtxName } from '../../../../core/src/codegen/generatedTypeNames.js';
@@ -33,6 +33,36 @@ export interface EmitSlotDeclResult {
  */
 export function slotFieldName(slotName: string): string {
   return slotName + 'Slot';
+}
+
+/**
+ * The ONE predicate for "this slot mints a NAMED `<name>Slot` prop field":
+ * not a dynamic-name slot (record-only), not the default slot (`children`),
+ * and a valid JS identifier name. `emitSlotDecl`'s field loop and
+ * `slotPropFieldNames` both go through it so they cannot drift.
+ */
+function mintsNamedSlotField(slot: SlotDecl): boolean {
+  return (
+    slot.dynamicNameExpr === undefined && slot.name !== '' && isSlotNameIdentifier(slot.name)
+  );
+}
+
+/**
+ * Every NAMED slot prop name the props interface declares (`row` -> `rowSlot`),
+ * first-seen order, deduped. `emitSolid.ts` adds these to the `splitProps` key
+ * list so a component's own slot props never fall into the `attrs` rest bucket
+ * that is spread onto the root DOM element (Quick 261008-mmu — a consumer's
+ * `toastSlot` render function was written to the DOM as an attribute).
+ * `children` (default slot) is handled separately via `hasDefaultSlot`.
+ */
+export function slotPropFieldNames(ir: IRComponent): string[] {
+  const names: string[] = [];
+  for (const slot of ir.slots ?? []) {
+    if (!mintsNamedSlotField(slot)) continue;
+    const field = slotFieldName(slot.name);
+    if (!names.includes(field)) names.push(field);
+  }
+  return names;
 }
 
 export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
@@ -81,7 +111,7 @@ export function emitSlotDecl(ir: IRComponent): EmitSlotDeclResult {
       } else {
         fields.push(`  children?: JSX.Element;`);
       }
-    } else if (!isSlotNameIdentifier(slot.name)) {
+    } else if (!mintsNamedSlotField(slot)) {
     } else {
       const hasCtx = slot.params && slot.params.length > 0;
       const fieldName = slotFieldName(slot.name);

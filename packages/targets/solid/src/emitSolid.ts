@@ -32,9 +32,9 @@ import {
 } from '../../../core/src/rewrite/reservedNames.js';
 import { splitBlocks } from '../../../core/src/splitter/splitBlocks.js';
 import { emitListeners } from './emit/emitListeners.js';
-import { emitPropsInterface, toPascalCase } from './emit/emitPropsInterface.js';
+import { emitPropsInterface, slotsRecordLine, toPascalCase } from './emit/emitPropsInterface.js';
 import { emitScript } from './emit/emitScript.js';
-import { emitSlotDecl } from './emit/emitSlotDecl.js';
+import { emitSlotDecl, slotPropFieldNames } from './emit/emitSlotDecl.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { emitTemplate } from './emit/emitTemplate.js';
 import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
@@ -285,6 +285,22 @@ export function emitSolid(ir: IRComponent, opts: EmitSolidOptions = {}): EmitSol
     if (eventPascal.length === 0) continue;
     const key = `'on${eventPascal}'`;
     if (!propKeys.includes(key)) propKeys.push(key);
+  }
+  // Slot props (Quick 261008-mmu) — the third member of the same class after
+  // props and emit handlers: `emitPropsInterface.ts` declares `<name>Slot?`
+  // for every named slot and the `slots?:` record for any slot at all, but
+  // this key list never learned them, so a consumer's `toastSlot` render
+  // function fell into the `attrs` rest bucket and was written to the root DOM
+  // element as a `toastslot="(...)=>..."` attribute. Names come from the same
+  // helper that names the interface fields; the `slots` gate is
+  // `slotsRecordLine`'s own result so key list and interface cannot drift.
+  // `'children'` stays on the `hasDefaultSlot` path above.
+  for (const slotKey of slotPropFieldNames(ir)) {
+    const key = `'${slotKey}'`;
+    if (!propKeys.includes(key)) propKeys.push(key);
+  }
+  if (slotsRecordLine(ir) !== undefined && !propKeys.includes("'slots'")) {
+    propKeys.push("'slots'");
   }
   const propNames = propKeys.join(', ');
   // When non-model defaults exist, emitScript emits `const _merged = mergeProps({...}, _props)`.

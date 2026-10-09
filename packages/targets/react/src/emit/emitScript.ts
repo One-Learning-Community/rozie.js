@@ -63,6 +63,7 @@ import { computeHelperBodyDeps } from './computeHelperDeps.js';
 import { emitContext } from './emitContext.js';
 import { emitPortals } from './emitPortals.js';
 import { toPascalCase } from './emitPropsInterface.js';
+import { slotPropFieldNames } from './emitSlotDecl.js';
 import { renderDepArray as renderDepArrayWithIR } from './renderDepArray.js';
 import { propsInterfaceName } from '../../../../core/src/codegen/generatedTypeNames.js';
 
@@ -3544,6 +3545,16 @@ export function emitScript(
         const eventPascal = toPascalCase(e);
         return eventPascal.length === 0 ? [] : [`on${eventPascal}`];
       }),
+      // Slot props (Quick 261008-mmu) — the third member of this class after
+      // props and emit handlers. `emitPropsInterface.ts` declares `children?`
+      // (default slot) / `render<Name>?` (named) via `emitSlotDecl`, plus the
+      // `slots?:` record whenever any slot exists; none of them were on this
+      // skip list, so they fell into the `attrs` rest bucket spread onto the
+      // root DOM element. Names come from the same helper that names the
+      // interface fields; the `slots` gate is the interface's own
+      // `ir.slots.length > 0`.
+      ...slotPropFieldNames(ir),
+      ...(ir.slots.length > 0 ? ['slots'] : []),
     ];
     const declaredNamesUnique = Array.from(new Set(declaredNames));
     if (declaredNamesUnique.length === 0) {

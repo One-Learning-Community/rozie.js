@@ -91,8 +91,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     stacked: _props.stacked ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { position, duration, max, disablePauseOnHover, ariaLabel, disableSwipe, stacked, onDismissed, ...rest } = _props as ToasterProps & Record<string, unknown>;
-    void position; void duration; void max; void disablePauseOnHover; void ariaLabel; void disableSwipe; void stacked; void onDismissed;
+    const { position, duration, max, disablePauseOnHover, ariaLabel, disableSwipe, stacked, onDismissed, renderToast, slots, ...rest } = _props as ToasterProps & Record<string, unknown>;
+    void position; void duration; void max; void disablePauseOnHover; void ariaLabel; void disableSwipe; void stacked; void onDismissed; void renderToast; void slots;
     return rest;
   })();
   const unmounted = useRef(false);
