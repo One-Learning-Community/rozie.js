@@ -49,9 +49,9 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 | --- | --- | --- |
 | `eventClick` | `FullCalendarEventClick` | Fired when a calendar event is clicked, or activated with Enter/Space (then `jsEvent` is a `KeyboardEvent`). `el` is the clicked event's DOM element (use it as the anchor for a popover or tooltip). |
 | `dateClick` | `FullCalendarDateClick` | Fired when an empty date/time cell is clicked. `dayEl` is the clicked day cell (an anchor for a popover) and `jsEvent` the click. |
-| `eventDrop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. Call `revert()` to reject the move; `oldEvent` is the event before it. |
+| `eventDrop` | `FullCalendarEventDrop` | Fired after an event is dragged to a new date/time. Call `revert()` to reject the move; `oldEvent` is the event before it. `event` and `oldEvent` both carry `allDay`, so a drop onto or off the all-day row shows as `event.allDay !== oldEvent.allDay`. |
 | `select` | `FullCalendarSelection` | Fired when a date/time range is selected by drag (requires `selectable`). |
-| `eventResize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). Call `revert()` to reject the resize; `oldEvent` is the event before it. |
+| `eventResize` | `FullCalendarEventResize` | Fired after an event is resized by dragging its edge (requires `editable`). Call `revert()` to reject the resize; `oldEvent` is the event before it. `event` and `oldEvent` both carry `allDay`. |
 | `datesSet` | `FullCalendarDatesSet` | Fired whenever the visible date range changes (navigation or view switch). `view` is the active view type string. |
 | `eventMouseEnter` | `FullCalendarEventPointer` | Fired when the pointer enters a calendar event (payload mirrors `eventClick`, with `jsEvent` always a `MouseEvent`). |
 | `eventMouseLeave` | `FullCalendarEventPointer` | Fired when the pointer leaves a calendar event (payload mirrors `eventMouseEnter`). |

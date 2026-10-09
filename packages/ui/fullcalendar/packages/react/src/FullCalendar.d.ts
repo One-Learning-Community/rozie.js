@@ -4,15 +4,17 @@ import type * as React from 'react';
 
 // The typed public surface (always TypeScript, whatever the script lang).
 // Payload interfaces describe what the wrapper ACTUALLY emits (normalized
-// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// `{ id, title, start, end, allDay }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
 import type { Calendar, DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+/** The normalized event ref every event payload carries; `allDay` mirrors FullCalendar's `EventApi.allDay` (`true` for an all-day event, `false` for a timed one). */
 export interface FullCalendarEventRef {
   id: string;
   title: string;
   start: Date | null;
   end: Date | null;
+  allDay: boolean;
 }
 /** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
 export interface FullCalendarEventClick {

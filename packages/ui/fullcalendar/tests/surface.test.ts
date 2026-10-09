@@ -166,3 +166,35 @@ describe('FullCalendar.rozie consumer-feedback contract (260929-lya)', () => {
     expect(compileFor(target)).toContain('normalizeHeight');
   });
 });
+
+describe('FullCalendar.rozie event ref carries allDay (261008-mmw)', () => {
+  const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
+  const compileResult = (target: (typeof TARGETS)[number]) =>
+    compile(source, {
+      target,
+      filename: FILENAME,
+      ...(target === 'angular' ? { angular: { cva: false } } : {}),
+    });
+  const IFACE_ALLDAY = /interface FullCalendarEventRef\s*\{[^}]*\ballDay:\s*boolean\b[^}]*\}/;
+
+  it.each(TARGETS)('compile(%s) FullCalendarEventRef declares allDay: boolean', (target) => {
+    expect(compileResult(target).code).toMatch(IFACE_ALLDAY);
+  });
+
+  it('compile(react) .d.ts sidecar declares allDay: boolean on FullCalendarEventRef', () => {
+    expect(compileResult('react').types).toMatch(IFACE_ALLDAY);
+  });
+
+  it.each(TARGETS)('compile(%s) the one shared eventRef builder sets allDay: e.allDay', (target) => {
+    const code = compileResult(target).code;
+    expect((code.match(/\ballDay:\s*e\.allDay\b/g) ?? []).length).toBe(1);
+  });
+
+  // Pins that every event-ref payload site goes through the one builder (7 direct
+  // calls plus the eventsSet map), which is what makes the field consistent across events.
+  it.each(TARGETS)('compile(%s) routes all 8 event-ref payload sites through eventRef', (target) => {
+    const code = compileResult(target).code;
+    expect((code.match(/\beventRef\(info\.(?:event|oldEvent)\)/g) ?? []).length).toBe(7);
+    expect((code.match(/events\.map\((?:this\.)?eventRef\)/g) ?? []).length).toBe(1);
+  });
+});

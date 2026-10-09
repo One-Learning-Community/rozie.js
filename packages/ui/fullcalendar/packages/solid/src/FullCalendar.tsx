@@ -9,15 +9,17 @@ import interactionPlugin from '@fullcalendar/interaction';
 
 // The typed public surface (always TypeScript, whatever the script lang).
 // Payload interfaces describe what the wrapper ACTUALLY emits (normalized
-// `{ id, title, start, end }` event refs, the view TYPE string, `{ isLoading }`),
+// `{ id, title, start, end, allDay }` event refs, the view TYPE string, `{ isLoading }`),
 // not FullCalendar's raw callback args. Engine types come from the
 // `@fullcalendar/core` peer and are re-exported so consumers can name them.
 import type { DateInput, DateRangeInput, DateSpanInput, DurationInput, Duration, EventApi, EventInput, EventSourceApi, ViewApi, EventContentArg, DayCellContentArg, DayHeaderContentArg, SlotLabelContentArg, WeekNumberContentArg, NowIndicatorContentArg, MoreLinkContentArg, AllDayContentArg, SlotLaneContentArg } from '@fullcalendar/core';
+/** The normalized event ref every event payload carries; `allDay` mirrors FullCalendar's `EventApi.allDay` (`true` for an all-day event, `false` for a timed one). */
 export interface FullCalendarEventRef {
   id: string;
   title: string;
   start: Date | null;
   end: Date | null;
+  allDay: boolean;
 }
 /** `eventClick` payload — `jsEvent` is a `KeyboardEvent` when the event is activated with Enter/Space. */
 export interface FullCalendarEventClick {
@@ -216,7 +218,7 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
   center: 'title',
   right: 'dayGridMonth,timeGridWeek,timeGridDay'
 }))() as Record<string, any>, options: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['events', 'view', 'weekends', 'editable', 'selectable', 'height', 'defaultColor', 'locale', 'firstDay', 'slotDuration', 'nowIndicator', 'headerToolbar', 'options', 'ref', 'onEventClick', 'onDateClick', 'onEventDrop', 'onSelect', 'onEventResize', 'onDatesSet', 'onEventMouseEnter', 'onEventMouseLeave', 'onUnselect', 'onLoading', 'onEventsSet']);
+  const [local, attrs] = splitProps(_merged, ['events', 'view', 'weekends', 'editable', 'selectable', 'height', 'defaultColor', 'locale', 'firstDay', 'slotDuration', 'nowIndicator', 'headerToolbar', 'options', 'ref', 'onEventClick', 'onDateClick', 'onEventDrop', 'onSelect', 'onEventResize', 'onDatesSet', 'onEventMouseEnter', 'onEventMouseLeave', 'onUnselect', 'onLoading', 'onEventsSet', 'eventSlot', 'dayCellSlot', 'dayHeaderSlot', 'slotLabelSlot', 'weekNumberSlot', 'nowIndicatorContentSlot', 'moreLinkSlot', 'allDayContentSlot', 'slotLaneContentSlot', 'noEventsContentSlot', 'slots']);
   onMount(() => { local.ref?.({ getApi, changeView, addEvent, removeEvent, today, prev, next, gotoDate, getDate, getEvents, scrollToTime, updateSize, prevYear, nextYear, selectRange, clearSelection }); });
 
   const [view, setView] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'view', 'dayGridMonth');
@@ -733,7 +735,8 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
       id: e.id,
       title: e.title,
       start: e.start,
-      end: e.end
+      end: e.end,
+      allDay: e.allDay
     };
   }
 

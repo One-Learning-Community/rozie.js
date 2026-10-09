@@ -8,7 +8,9 @@
  *     view string, `loading` boolean, `unselect` jsEvent nullable),
  *   - the `event` portal-slot `arg` typed `EventContentArg` (real
  *     `@fullcalendar/core` types, resolved from the leaf's node_modules),
- *   - typed handle verbs (`getApi()?.render()`, `gotoDate('2026-01-01')`).
+ *   - typed handle verbs (`getApi()?.render()`, `gotoDate('2026-01-01')`),
+ *   - `allDay: boolean` read on the eventDrop / eventResize event refs (`event` and
+ *     `oldEvent`) with no getApi() lookup (261008-mmw).
  * Negatives are `@ts-expect-error` (TS2578 if one stops erroring) AND a separate
  * run of each negative WITHOUT the directive pins the specific TS error.
  * (vue / svelte / angular live in their own harness dirs.)
@@ -52,6 +54,8 @@ export const ok = (
     onEventMouseEnter={(p) => { const x: number = p.jsEvent.clientX; const q: FullCalendarEventPointer = p; void x; void q; }}
     onDatesSet={(p) => { const v: string = p.view; void v; }}
     onLoading={(p) => { const b: boolean = p.isLoading; void b; }}
+    onEventDrop={(p) => { const a: boolean = p.event.allDay; const b: boolean = p.oldEvent.allDay; void a; void b; }}
+    onEventResize={(p) => { const a: boolean = p.event.allDay; const b: boolean = p.oldEvent.allDay; void a; void b; }}
     onUnselect={(p) => { p.jsEvent?.preventDefault(); }}
     renderEvent={({ arg }) => { const a: EventContentArg = arg; return arg.event.title + a.timeText; }}
   />
@@ -79,6 +83,8 @@ export const ok = (
     onEventMouseEnter={(p) => { const x: number = p.jsEvent.clientX; const q: FullCalendarEventPointer = p; void x; void q; }}
     onDatesSet={(p) => { const v: string = p.view; void v; }}
     onLoading={(p) => { const b: boolean = p.isLoading; void b; }}
+    onEventDrop={(p) => { const a: boolean = p.event.allDay; const b: boolean = p.oldEvent.allDay; void a; void b; }}
+    onEventResize={(p) => { const a: boolean = p.event.allDay; const b: boolean = p.oldEvent.allDay; void a; void b; }}
     onUnselect={(p) => { p.jsEvent?.preventDefault(); }}
     eventSlot={({ arg }) => { const a: EventContentArg = arg; return <span>{arg.event.title + a.timeText}</span>; }}
   />
@@ -100,6 +106,8 @@ el.addEventListener('event-click', (e) => { const id: string = e.detail.event.id
 el.addEventListener('event-mouse-enter', (e) => { const x: number = e.detail.jsEvent.clientX; const q: FullCalendarEventPointer = e.detail; void x; void q; });
 el.addEventListener('dates-set', (e) => { const v: string = e.detail.view; void v; });
 el.addEventListener('loading', (e) => { const b: boolean = e.detail.isLoading; void b; });
+el.addEventListener('event-drop', (e) => { const a: boolean = e.detail.event.allDay; const b: boolean = e.detail.oldEvent.allDay; void a; void b; });
+el.addEventListener('event-resize', (e) => { const a: boolean = e.detail.event.allDay; const b: boolean = e.detail.oldEvent.allDay; void a; void b; });
 el.addEventListener('unselect', (e) => { e.detail.jsEvent?.preventDefault(); });
 el.addEventListener('click', (e) => e.clientX.toFixed());
 const sel: RozieFullCalendarEventMap['select'] = new CustomEvent('select', { detail: { start: new Date(), end: new Date(), startStr: '', endStr: '', allDay: true } });
