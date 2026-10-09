@@ -301,6 +301,7 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disablePositioning'))) { const __watchVal = (() => this.disablePositioning)(); ((off: any) => {
       if (off) {
         this.stopTracking();
+        this.clearInlinePosition();
       } else if (this.open && !this.disabled) {
         this.startTracking();
       }
@@ -467,6 +468,9 @@ private __rozieFirstUpdateDone = false;
   // Apply the resolved x/y (and arrow offset, when present) onto the floating element.
   applyPosition = (x: any, y: any, middlewareData: any) => {
   if (!this.floatingNode) return;
+  // A computePosition() already in flight when positioning was switched off must not
+  // write coordinates back after clearInlinePosition() emptied them.
+  if (this.disablePositioning) return;
   this.floatingNode.style.left = x + 'px';
   this.floatingNode.style.top = y + 'px';
   if (this.arrowNode && middlewareData && middlewareData.arrow) {
@@ -562,6 +566,27 @@ private __rozieFirstUpdateDone = false;
   // disablePositioning, disableShift) never keeps a stale max-width cap.
   clearAvailableWidth = () => {
   if (this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+};
+
+  // Every inline declaration the positioning code writes on the panel (and the arrow)
+  // besides the width-limit property above: `left` / `top` (applyPosition), the inline
+  // `position: fixed` (position() with strategy="fixed") and the `matchWidth` width (the
+  // size middleware). The `--static` class resets these with CLASS specificity, which an
+  // inline declaration beats, so turning `disablePositioning` on while open must remove
+  // them or the in-flow panel stays stuck at its old floating coordinates. Only these
+  // properties are removed, never the whole style attribute (a consumer's own inline
+  // style on the panel is not ours to touch).
+  clearInlinePosition = () => {
+  if (this.floatingNode) {
+    this.floatingNode.style.removeProperty('left');
+    this.floatingNode.style.removeProperty('top');
+    this.floatingNode.style.removeProperty('position');
+    this.floatingNode.style.removeProperty('width');
+  }
+  if (this.arrowNode) {
+    this.arrowNode.style.removeProperty('left');
+    this.arrowNode.style.removeProperty('top');
+  }
 };
 
   stopTracking = () => {

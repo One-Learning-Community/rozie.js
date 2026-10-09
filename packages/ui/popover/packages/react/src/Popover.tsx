@@ -304,6 +304,9 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // Apply the resolved x/y (and arrow offset, when present) onto the floating element.
   function applyPosition(x: any, y: any, middlewareData: any) {
     if (!floatingNode.current) return;
+    // A computePosition() already in flight when positioning was switched off must not
+    // write coordinates back after clearInlinePosition() emptied them.
+    if (props.disablePositioning) return;
     floatingNode.current.style.left = x + 'px';
     floatingNode.current.style.top = y + 'px';
     if (arrowNode.current && middlewareData && middlewareData.arrow) {
@@ -397,6 +400,27 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   // disablePositioning, disableShift) never keeps a stale max-width cap.
   function clearAvailableWidth() {
     if (floatingNode.current) floatingNode.current.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  }
+
+  // Every inline declaration the positioning code writes on the panel (and the arrow)
+  // besides the width-limit property above: `left` / `top` (applyPosition), the inline
+  // `position: fixed` (position() with strategy="fixed") and the `matchWidth` width (the
+  // size middleware). The `--static` class resets these with CLASS specificity, which an
+  // inline declaration beats, so turning `disablePositioning` on while open must remove
+  // them or the in-flow panel stays stuck at its old floating coordinates. Only these
+  // properties are removed, never the whole style attribute (a consumer's own inline
+  // style on the panel is not ours to touch).
+  function clearInlinePosition() {
+    if (floatingNode.current) {
+      floatingNode.current.style.removeProperty('left');
+      floatingNode.current.style.removeProperty('top');
+      floatingNode.current.style.removeProperty('position');
+      floatingNode.current.style.removeProperty('width');
+    }
+    if (arrowNode.current) {
+      arrowNode.current.style.removeProperty('left');
+      arrowNode.current.style.removeProperty('top');
+    }
   }
   const stopTracking = useCallback(() => {
     if (stopAutoUpdate.current) {
@@ -675,6 +699,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     const off = props.disablePositioning;
     if (off) {
       stopTracking();
+      clearInlinePosition();
     } else if (open && !props.disabled) {
       startTracking();
     }

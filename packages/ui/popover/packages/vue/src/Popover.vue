@@ -246,6 +246,9 @@ const requestOpen = (next: any) => {
 // Apply the resolved x/y (and arrow offset, when present) onto the floating element.
 const applyPosition = (x: any, y: any, middlewareData: any) => {
   if (!floatingNode) return;
+  // A computePosition() already in flight when positioning was switched off must not
+  // write coordinates back after clearInlinePosition() emptied them.
+  if (props.disablePositioning) return;
   floatingNode.style.left = x + 'px';
   floatingNode.style.top = y + 'px';
   if (arrowNode && middlewareData && middlewareData.arrow) {
@@ -338,6 +341,26 @@ const startTracking = () => {
 // disablePositioning, disableShift) never keeps a stale max-width cap.
 const clearAvailableWidth = () => {
   if (floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+};
+// Every inline declaration the positioning code writes on the panel (and the arrow)
+// besides the width-limit property above: `left` / `top` (applyPosition), the inline
+// `position: fixed` (position() with strategy="fixed") and the `matchWidth` width (the
+// size middleware). The `--static` class resets these with CLASS specificity, which an
+// inline declaration beats, so turning `disablePositioning` on while open must remove
+// them or the in-flow panel stays stuck at its old floating coordinates. Only these
+// properties are removed, never the whole style attribute (a consumer's own inline
+// style on the panel is not ours to touch).
+const clearInlinePosition = () => {
+  if (floatingNode) {
+    floatingNode.style.removeProperty('left');
+    floatingNode.style.removeProperty('top');
+    floatingNode.style.removeProperty('position');
+    floatingNode.style.removeProperty('width');
+  }
+  if (arrowNode) {
+    arrowNode.style.removeProperty('left');
+    arrowNode.style.removeProperty('top');
+  }
 };
 const stopTracking = () => {
   if (stopAutoUpdate) {
@@ -585,6 +608,7 @@ watch(() => props.disableShift, (off: any) => {
 watch(() => props.disablePositioning, (off: any) => {
   if (off) {
     stopTracking();
+    clearInlinePosition();
   } else if (open.value && !props.disabled) {
     startTracking();
   }
