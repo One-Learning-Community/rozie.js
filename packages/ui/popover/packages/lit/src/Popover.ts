@@ -295,8 +295,15 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('offset'))) { const __watchVal = (() => this.offset)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disableFlip'))) { const __watchVal = (() => this.disableFlip)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disableShift'))) { const __watchVal = (() => this.disableShift)(); ((off: any) => {
-      if (off && this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+      if (off) this.clearAvailableWidth();
       this.refresh();
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disablePositioning'))) { const __watchVal = (() => this.disablePositioning)(); ((off: any) => {
+      if (off) {
+        this.stopTracking();
+      } else if (this.open && !this.disabled) {
+        this.startTracking();
+      }
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('strategy'))) { const __watchVal = (() => this.strategy)(); (() => this.refresh())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('matchWidth'))) { const __watchVal = (() => this.matchWidth)(); ((on: any) => {
@@ -549,11 +556,20 @@ private __rozieFirstUpdateDone = false;
   this.stopAutoUpdate = autoUpdate(referenceEl, this.floatingNode, this.position);
 };
 
+  // The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+  // size middleware) belongs to a live tracking session: drop it whenever positioning is
+  // torn down or goes static, so a panel that stops being measured (closed keepMounted,
+  // disablePositioning, disableShift) never keeps a stale max-width cap.
+  clearAvailableWidth = () => {
+  if (this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+};
+
   stopTracking = () => {
   if (this.stopAutoUpdate) {
     this.stopAutoUpdate();
     this.stopAutoUpdate = null;
   }
+  this.clearAvailableWidth();
 };
 
   // nextAutoId(): a page-wide counter shared by every Rozie component instance. It

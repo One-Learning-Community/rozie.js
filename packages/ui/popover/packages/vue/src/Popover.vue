@@ -332,11 +332,19 @@ const startTracking = () => {
   }
   stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position);
 };
+// The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+// size middleware) belongs to a live tracking session: drop it whenever positioning is
+// torn down or goes static, so a panel that stops being measured (closed keepMounted,
+// disablePositioning, disableShift) never keeps a stale max-width cap.
+const clearAvailableWidth = () => {
+  if (floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+};
 const stopTracking = () => {
   if (stopAutoUpdate) {
     stopAutoUpdate();
     stopAutoUpdate = null;
   }
+  clearAvailableWidth();
 };
 // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
 // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
@@ -571,8 +579,15 @@ watch(() => props.placement, () => refresh(), { flush: 'post' });
 watch(() => props.offset, () => refresh(), { flush: 'post' });
 watch(() => props.disableFlip, () => refresh(), { flush: 'post' });
 watch(() => props.disableShift, (off: any) => {
-  if (off && floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  if (off) clearAvailableWidth();
   refresh();
+}, { flush: 'post' });
+watch(() => props.disablePositioning, (off: any) => {
+  if (off) {
+    stopTracking();
+  } else if (open.value && !props.disabled) {
+    startTracking();
+  }
 }, { flush: 'post' });
 watch(() => props.strategy, () => refresh(), { flush: 'post' });
 watch(() => props.matchWidth, (on: any) => {

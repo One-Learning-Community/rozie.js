@@ -233,8 +233,15 @@ export default function Popover(_props: PopoverProps): JSX.Element {
   createEffect(on(() => (() => local.offset)(), (v) => untrack(() => (() => refresh())()), { defer: true }));
   createEffect(on(() => (() => local.disableFlip)(), (v) => untrack(() => (() => refresh())()), { defer: true }));
   createEffect(on(() => (() => local.disableShift)(), (v) => untrack(() => ((off: any) => {
-    if (off && floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+    if (off) clearAvailableWidth();
     refresh();
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.disablePositioning)(), (v) => untrack(() => ((off: any) => {
+    if (off) {
+      stopTracking();
+    } else if (open() && !local.disabled) {
+      startTracking();
+    }
   })(v)), { defer: true }));
   createEffect(on(() => (() => local.strategy)(), (v) => untrack(() => (() => refresh())()), { defer: true }));
   createEffect(on(() => (() => local.matchWidth)(), (v) => untrack(() => ((on: any) => {
@@ -468,11 +475,20 @@ export default function Popover(_props: PopoverProps): JSX.Element {
     }
     stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position);
   }
+
+  // The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+  // size middleware) belongs to a live tracking session: drop it whenever positioning is
+  // torn down or goes static, so a panel that stops being measured (closed keepMounted,
+  // disablePositioning, disableShift) never keeps a stale max-width cap.
+  function clearAvailableWidth() {
+    if (floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  }
   function stopTracking() {
     if (stopAutoUpdate) {
       stopAutoUpdate();
       stopAutoUpdate = null;
     }
+    clearAvailableWidth();
   }
 
   // nextAutoId(): a page-wide counter shared by every Rozie component instance. It

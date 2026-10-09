@@ -233,6 +233,7 @@ export class Popover {
   private __rozieWatchInitial_6 = true;
   private __rozieWatchInitial_7 = true;
   private __rozieWatchInitial_8 = true;
+  private __rozieWatchInitial_9 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -276,21 +277,28 @@ export class Popover {
     effect(() => { const __watchVal = (() => this.offset())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.refresh())(); }); });
     effect(() => { const __watchVal = (() => this.disableFlip())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => this.refresh())(); }); });
     effect(() => { const __watchVal = (() => this.disableShift())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((off: any) => {
-      if (off && this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+      if (off) this.clearAvailableWidth();
       this.refresh();
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.strategy())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => this.refresh())(); }); });
-    effect(() => { const __watchVal = (() => this.matchWidth())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((on: any) => {
+    effect(() => { const __watchVal = (() => this.disablePositioning())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((off: any) => {
+      if (off) {
+        this.stopTracking();
+      } else if (this.open() && !(this.disabled() || this.__rozieCvaDisabled())) {
+        this.startTracking();
+      }
+    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.strategy())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => this.refresh())(); }); });
+    effect(() => { const __watchVal = (() => this.matchWidth())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((on: any) => {
       if (!on && this.floatingNode) this.floatingNode.style.width = '';
       this.refresh();
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.arrow())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.arrow())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
       queueMicrotask(() => {
         this.arrowNode = this.arrowEl()?.nativeElement;
         this.refresh();
       });
     })(); }); });
-    effect(() => { const __watchVal = (() => this.reference())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.reference())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
       this.liveReference = this.reference();
       if ((this.disabled() || this.__rozieCvaDisabled())) return;
       if (this.stopAutoUpdate) {
@@ -517,11 +525,19 @@ export class Popover {
     }
     this.stopAutoUpdate = autoUpdate(referenceEl, this.floatingNode, this.position);
   };
+  // The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+  // size middleware) belongs to a live tracking session: drop it whenever positioning is
+  // torn down or goes static, so a panel that stops being measured (closed keepMounted,
+  // disablePositioning, disableShift) never keeps a stale max-width cap.
+  clearAvailableWidth = () => {
+    if (this.floatingNode) this.floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  };
   stopTracking = () => {
     if (this.stopAutoUpdate) {
       this.stopAutoUpdate();
       this.stopAutoUpdate = null;
     }
+    this.clearAvailableWidth();
   };
   // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
   // lives on globalThis (read through Reflect, which type-checks in the plain-JS and

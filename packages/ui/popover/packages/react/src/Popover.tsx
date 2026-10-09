@@ -188,6 +188,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   const _watch6First = useRef(true);
   const _watch7First = useRef(true);
   const _watch8First = useRef(true);
+  const _watch9First = useRef(true);
 
   // The current `reference`, mirrored into a top-level let (release-0.8.0 audit
   // A2). The deferred outside-click check below runs after the click's handlers
@@ -390,12 +391,20 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     }
     stopAutoUpdate.current = autoUpdate(referenceEl, floatingNode.current, position);
   }, [position, props.disablePositioning, props.reference]);
+  // The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+  // size middleware) belongs to a live tracking session: drop it whenever positioning is
+  // torn down or goes static, so a panel that stops being measured (closed keepMounted,
+  // disablePositioning, disableShift) never keeps a stale max-width cap.
+  function clearAvailableWidth() {
+    if (floatingNode.current) floatingNode.current.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  }
   const stopTracking = useCallback(() => {
     if (stopAutoUpdate.current) {
       stopAutoUpdate.current();
       stopAutoUpdate.current = null;
     }
-  }, []);
+    clearAvailableWidth();
+  }, [clearAvailableWidth]);
   // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
   // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
   // the TS script alike) so separately bundled copies of a leaf never hand out the
@@ -600,6 +609,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   _positionRef.current = position;
   const _startTrackingRef = useRef(startTracking);
   _startTrackingRef.current = startTracking;
+  const _stopTrackingRef = useRef(stopTracking);
+  _stopTrackingRef.current = stopTracking;
   useEffect(() => {
     if (!_idBaseRef.current) setAutoId('rozie-popover-' + nextAutoId());
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
@@ -624,7 +635,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       _positionRef.current();
     }
     return () => {
-      stopTracking();
+      _stopTrackingRef.current();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -656,28 +667,37 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
     const off = props.disableShift;
-    if (off && floatingNode.current) floatingNode.current.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+    if (off) clearAvailableWidth();
     refresh();
   }, [props.disableShift]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch5First.current) { _watch5First.current = false; return; }
+    const off = props.disablePositioning;
+    if (off) {
+      stopTracking();
+    } else if (open && !props.disabled) {
+      startTracking();
+    }
+  }, [props.disablePositioning]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
     refresh();
   }, [props.strategy]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const on = props.matchWidth;
     if (!on && floatingNode.current) floatingNode.current.style.width = '';
     refresh();
   }, [props.matchWidth]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     queueMicrotask(() => {
       arrowNode.current = arrowEl.current;
       refresh();
     });
   }, [props.arrow]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch8First.current) { _watch8First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     liveReference.current = props.reference;
     if (props.disabled) return;
     if (stopAutoUpdate.current) {

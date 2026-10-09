@@ -455,11 +455,20 @@ const startTracking = () => {
   stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position)
 }
 
+// The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+// size middleware) belongs to a live tracking session: drop it whenever positioning is
+// torn down or goes static, so a panel that stops being measured (closed keepMounted,
+// disablePositioning, disableShift) never keeps a stale max-width cap.
+const clearAvailableWidth = () => {
+  if (floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY)
+}
+
 const stopTracking = () => {
   if (stopAutoUpdate) {
     stopAutoUpdate()
     stopAutoUpdate = null
   }
+  clearAvailableWidth()
 }
 
 // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
@@ -575,8 +584,18 @@ $watch(() => $props.offset, () => refresh())
 $watch(() => $props.disableFlip, () => refresh())
 // Turning shift off drops the measured width cap the width-limit size middleware wrote.
 $watch(() => $props.disableShift, (off) => {
-  if (off && floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY)
+  if (off) clearAvailableWidth()
   refresh()
+})
+// Turning positioning off stops measuring: tear tracking down and drop the cap (the
+// `--static` class resets left/top/width but cannot clear a stale custom property).
+// Turning it back on while open resumes tracking.
+$watch(() => $props.disablePositioning, (off) => {
+  if (off) {
+    stopTracking()
+  } else if ($props.open && !$props.disabled) {
+    startTracking()
+  }
 })
 $watch(() => $props.strategy, () => refresh())
 // matchWidth / arrow had no reconcile before (audit B4). Turning matchWidth off

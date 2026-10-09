@@ -173,7 +173,7 @@ A `bare` popover has no chrome of its own, so its content can use the same measu
 ```
 
 - The property is set by `Popover`. It is not a theming token: do not set it yourself.
-- `disableShift` turns the measurement off, and `disablePositioning` never measures; the stylesheet then caps the panel at the viewport width.
+- `disableShift` turns the measurement off, and `disablePositioning` never measures; the stylesheet then caps the panel at the viewport width. The property is also removed from the panel whenever tracking stops (the popover closes, or one of those props turns on), so a stale measurement never lingers.
 
 ## Layout: the root has no box
 

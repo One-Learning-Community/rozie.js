@@ -335,11 +335,19 @@ const startTracking = () => {
   }
   stopAutoUpdate = autoUpdate(referenceEl, floatingNode, position);
 };
+// The measured width cap (`--rozie-popover-available-width`, written by the width-limit
+// size middleware) belongs to a live tracking session: drop it whenever positioning is
+// torn down or goes static, so a panel that stops being measured (closed keepMounted,
+// disablePositioning, disableShift) never keeps a stale max-width cap.
+const clearAvailableWidth = () => {
+  if (floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+};
 const stopTracking = () => {
   if (stopAutoUpdate) {
     stopAutoUpdate();
     stopAutoUpdate = null;
   }
+  clearAvailableWidth();
 };
 // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
 // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
@@ -581,25 +589,33 @@ let __rozieWatchInitial_3 = true;
 $effect(() => { (() => disableFlip)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => refresh())(); }); });
 let __rozieWatchInitial_4 = true;
 $effect(() => { const __watchVal = (() => disableShift)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((off: any) => {
-  if (off && floatingNode) floatingNode.style.removeProperty(AVAILABLE_WIDTH_PROPERTY);
+  if (off) clearAvailableWidth();
   refresh();
 })(__watchVal); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { (() => strategy)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => refresh())(); }); });
+$effect(() => { const __watchVal = (() => disablePositioning)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((off: any) => {
+  if (off) {
+    stopTracking();
+  } else if (open && !disabled) {
+    startTracking();
+  }
+})(__watchVal); }); });
 let __rozieWatchInitial_6 = true;
-$effect(() => { const __watchVal = (() => matchWidth)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((on: any) => {
+$effect(() => { (() => strategy)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => refresh())(); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => matchWidth)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((on: any) => {
   if (!on && floatingNode) floatingNode.style.width = '';
   refresh();
 })(__watchVal); }); });
-let __rozieWatchInitial_7 = true;
-$effect(() => { (() => arrow)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
+let __rozieWatchInitial_8 = true;
+$effect(() => { (() => arrow)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
   queueMicrotask(() => {
     arrowNode = arrowEl;
     refresh();
   });
 })(); }); });
-let __rozieWatchInitial_8 = true;
-$effect(() => { (() => reference)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
+let __rozieWatchInitial_9 = true;
+$effect(() => { (() => reference)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
   liveReference = reference;
   if (disabled) return;
   if (stopAutoUpdate) {
