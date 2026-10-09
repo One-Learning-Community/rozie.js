@@ -290,6 +290,20 @@ describe('uploadImage paste: fixes', () => {
   });
 });
 
+describe('uploadImage drop: fixes', () => {
+  sharedCases('drop');
+
+  it('D1: the caret was elsewhere; the images land at the drop position and the caret ends after them', async () => {
+    const up = makeUpload();
+    const { editor } = await mountEditor({ html: '<p>one</p><p>two</p>', uploadImage: up.fn });
+    editor.commands.setTextSelection(2);
+    fire('drop', editor, [imageFile(A)], 9);
+    await settle();
+    typeText(editor, 'mark');
+    expect(editor.getHTML()).toBe(`<p>one</p><p>two</p>${IMG_A}<p>mark</p>`);
+  });
+});
+
 describe('uploadImage paste: unchanged behaviour', () => {
   it('G1: an untouched selection is replaced by the image', async () => {
     const up = makeUpload();
@@ -331,5 +345,30 @@ describe('uploadImage paste: unchanged behaviour', () => {
     await settle();
     expect(up.calls).toEqual([]);
     expect(editor.getHTML()).toBe('<p>text pasted</p>');
+  });
+});
+
+// Source of the six-target compile for the wiring lock. The class-based
+// targets (Lit, Angular) hand ProseMirror its editor props with no receiver, so
+// the two handlers must reach editorProps as closures that keep the component
+// instance. On Lit a top-level function lowers to an unbound prototype method;
+// handed over by bare reference, `this.uploadImage` is read off `undefined`.
+const HERE = dirname(fileURLToPath(import.meta.url));
+const SOURCE = readFileSync(resolve(HERE, '..', 'src', 'TipTap.rozie'), 'utf8');
+const TARGETS = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'] as const;
+
+describe('uploadImage wiring', () => {
+  it.each(TARGETS)('W1: %s compiles with no error diagnostic', (target) => {
+    const r = compile(SOURCE, { target, filename: 'TipTap.rozie' });
+    expect(r.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+  });
+
+  it.each(['lit', 'angular'] as const)('W2: %s registers handlePaste / handleDrop as closures on this', (target) => {
+    const code = compile(SOURCE, { target, filename: 'TipTap.rozie' }).code;
+    expect(code).toMatch(/handlePaste:\s*\([^)]*\)\s*=>\s*this\.handlePaste\(/);
+    expect(code).toMatch(/handleDrop:\s*\([^)]*\)\s*=>\s*this\.handleDrop\(/);
+    // Never a bare member reference.
+    expect(code).not.toMatch(/handlePaste:\s*this\.handlePaste\s*[,}]/);
+    expect(code).not.toMatch(/handleDrop:\s*this\.handleDrop\s*[,}]/);
   });
 });
