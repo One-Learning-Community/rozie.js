@@ -241,6 +241,103 @@ describe('Toaster live regions (behavioral)', () => {
     app.unmount();
   });
 
+  describe('a toast with no message text keeps a live role on its own row', () => {
+    const row = (host: HTMLElement) => host.querySelector<HTMLElement>('.rozie-toast');
+
+    it('an error toast with no message gets role="alert" on its row, no aria-live, and no region line', async () => {
+      const { app, host, handle } = mountToaster();
+      handle().show({ data: { who: 'x' }, type: 'error', duration: 0 });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('alert');
+      expect(row(host)!.hasAttribute('aria-live')).toBe(false);
+      expect(lines(polite(host)).length).toBe(0);
+      expect(lines(assertive(host)).length).toBe(0);
+      app.unmount();
+    });
+
+    for (const type of ['info', 'success', 'warning', 'loading', undefined]) {
+      it(`${type ?? 'an omitted type'} with no message gets role="status" on its row`, async () => {
+        const { app, host, handle } = mountToaster();
+        handle().show({ duration: 0, ...(type ? { type } : {}) });
+        await nextTick();
+        expect(row(host)!.getAttribute('role')).toBe('status');
+        expect(row(host)!.hasAttribute('aria-live')).toBe(false);
+        expect(lines(polite(host)).length).toBe(0);
+        app.unmount();
+      });
+    }
+
+    it('a whitespace-only message counts as no message', async () => {
+      const { app, host, handle } = mountToaster();
+      handle().show({ message: '   ', type: 'error', duration: 0 });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('alert');
+      expect(lines(assertive(host)).length).toBe(0);
+      app.unmount();
+    });
+
+    it('a toast WITH a message keeps a role-less row (text in the standing region)', async () => {
+      const { app, host, handle } = mountToaster();
+      handle().show({ message: 'Hi', type: 'error', duration: 0 });
+      await nextTick();
+      expect(row(host)!.hasAttribute('role')).toBe(false);
+      expect(text(assertive(host))).toBe('Hi');
+      app.unmount();
+    });
+
+    it('disableAnnounce adds no role to a message-less row either', async () => {
+      const { app, host, handle } = mountToaster({ disableAnnounce: true });
+      handle().show({ type: 'error', duration: 0 });
+      await nextTick();
+      expect(row(host)!.hasAttribute('role')).toBe(false);
+      expect(host.querySelector('[role="alert"],[role="status"]')).toBeNull();
+      app.unmount();
+    });
+
+    it('patch() giving an empty toast a message moves it to the region and drops the row role; clearing it reverses', async () => {
+      const { app, host, handle } = mountToaster();
+      const id = handle().show({ type: 'info', duration: 0 });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('status');
+      handle().patch(id, { message: 'Now with text' });
+      await nextTick();
+      expect(row(host)!.hasAttribute('role')).toBe(false);
+      expect(text(polite(host))).toBe('Now with text');
+      handle().patch(id, { message: '' });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('status');
+      expect(lines(polite(host)).length).toBe(0);
+      app.unmount();
+    });
+
+    it('patch() of the type on an empty toast switches the row role between alert and status', async () => {
+      const { app, host, handle } = mountToaster();
+      const id = handle().show({ type: 'info', duration: 0 });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('status');
+      handle().patch(id, { type: 'error' });
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('alert');
+      app.unmount();
+    });
+
+    it('promise() whose success message function returns "" leaves the settled toast announced via its row', async () => {
+      const { app, host, handle } = mountToaster();
+      let resolve!: (v: unknown) => void;
+      const p = new Promise((r) => { resolve = r; });
+      handle().promise(p, { loading: 'Saving…', success: () => '', error: 'Nope' });
+      await nextTick();
+      expect(row(host)!.hasAttribute('role')).toBe(false);
+      expect(text(polite(host))).toBe('Saving…');
+      resolve(1);
+      await vi.advanceTimersByTimeAsync(0);
+      await nextTick();
+      expect(row(host)!.getAttribute('role')).toBe('status');
+      expect(lines(polite(host)).length).toBe(0);
+      app.unmount();
+    });
+  });
+
   it('disableAnnounce renders no live regions at all, so a role in the #toast slot is the only live region', async () => {
     const { app, host, handle } = mountToaster(
       { disableAnnounce: true },

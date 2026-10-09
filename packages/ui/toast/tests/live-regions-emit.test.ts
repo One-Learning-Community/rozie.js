@@ -27,6 +27,16 @@ const TARGETS: Target[] = ['react', 'vue', 'svelte', 'angular', 'solid', 'lit'];
 const COMPUTED_ARIA_LIVE =
   /\[attr\.aria-live\]|\[aria-live\]|:aria-live=|aria-live=\{|aria-live=\$\{|aria-live="\$\{|aria-live='\$\{/;
 
+/** How each target spells the row's bound `role` (null is dropped by `rozieAttr` / Vue / `[attr.*]`). */
+const ROW_ROLE_BINDING: Record<Target, RegExp> = {
+  react: /\brole=\{rozieAttr\(rowLiveRole\(t\)\)\}/,
+  vue: /:role="rowLiveRole\(t\)"/,
+  svelte: /\brole=\{rozieAttr\(rowLiveRole\(t\)\)\}/,
+  angular: /\[attr\.role\]="rozieAttr\(rowLiveRole\(t\)\)"/,
+  solid: /\brole=\{rozieAttr\(rowLiveRole\(t\(\)\)\)\}/,
+  lit: /\brole=\$\{rozieAttr\(this\.rowLiveRole\(t\)\)\}/,
+};
+
 /** The opening tag (up to the closing `>`) of the first element carrying `role="<role>"`. */
 function openingTagWithRole(code: string, role: string): string | null {
   const m = new RegExp(`<div[^>]*\\brole="${role}"[^>]*>`).exec(code);
@@ -57,6 +67,17 @@ describe('Toaster.rozie standing live regions (compile ×6)', () => {
         expect(tag, 'no <div role="alert"> region').not.toBeNull();
         expect(tag).toContain('aria-live="assertive"');
         expect(tag).toContain('aria-atomic="false"');
+      });
+
+      it('binds the fallback row role on the .rozie-toast row as an omit-when-null attribute (no static role, no aria-live)', () => {
+        // Opening of the row <div> (the one whose class list holds `rozie-toast`,
+        // not `rozie-toaster` / `rozie-toast-message`), up to its first handler.
+        const start = code.search(/<div[^>]*\brozie-toast(?![-\w])/);
+        expect(start, 'no .rozie-toast row element').toBeGreaterThan(-1);
+        const rowTag = code.slice(start, start + 500);
+        expect(rowTag).toMatch(ROW_ROLE_BINDING[target]);
+        expect(rowTag).not.toMatch(/(?<![:\w-])role="/);
+        expect(rowTag).not.toMatch(/aria-live/);
       });
 
       it('emits NO computed aria-live binding', () => {

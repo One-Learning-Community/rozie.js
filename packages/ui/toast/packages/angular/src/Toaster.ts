@@ -62,7 +62,7 @@ interface ToastCtx {
         </div>
       </div>
     }@for (t of toasts(); track t.id; let ti = $index) {
-    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [style]="toastStyle(t, ti)" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
+    <div class="rozie-toast" [ngClass]="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')" [attr.role]="rozieAttr(rowLiveRole(t))" [style]="toastStyle(t, ti)" (animationend)="t.exiting && removeToast(t.id)" (pointerdown)="onToastPointerDown(t, $event)" (pointermove)="onToastPointerMove(t, $event)" (pointerup)="onToastPointerUp(t, $event)" (pointercancel)="onToastPointerCancel(t)">
         @if ((toastTpl ?? __rozieFillMap()['toast'] ?? templates()?.['toast'])) {
     <ng-container *ngTemplateOutlet="(toastTpl ?? __rozieFillMap()['toast'] ?? templates()?.['toast']); context: { $implicit: { toast: t, dismiss: dismiss }, toast: t, dismiss: dismiss }" />
     } @else {
@@ -872,8 +872,22 @@ export class Toaster {
   // regions are explicitly aria-atomic="false" so a new toast does not re-read
   // the lines of toasts still on screen. Plain functions called with `()` — NOT
   // $computed (playbook section 8) — and no $data write: render purity.
-  politeToasts = () => this.toasts().filter((t: any) => t.message && t.type !== 'error');
-  assertiveToasts = () => this.toasts().filter((t: any) => t.message && t.type === 'error');
+  //
+  // A toast with NO message text (e.g. `show({ data, type: 'error' })` painted by a
+  // `#toast` slot, or a `promise()` whose message function returns '') has nothing
+  // to write into a region, so it must not become silent: its ROW carries the live
+  // role itself (role="alert" for 'error', role="status" otherwise — each implies
+  // its aria-live, so none is bound). `rowLiveRole` returns null for every other
+  // toast (and under `disableAnnounce`), and a `:role` bound to null is omitted on
+  // all six targets. A `patch()` that gives such a toast a message moves it to a
+  // standing region and drops the row role (and the reverse).
+  hasMessage = (t: any) => !!t.message && String(t.message).trim() !== '';
+  politeToasts = () => this.toasts().filter((t: any) => this.hasMessage(t) && t.type !== 'error');
+  assertiveToasts = () => this.toasts().filter((t: any) => this.hasMessage(t) && t.type === 'error');
+  rowLiveRole = (t: any) => {
+    if (this.disableAnnounce() || this.hasMessage(t)) return null;
+    return t.type === 'error' ? 'alert' : 'status';
+  };
 
   static ngTemplateContextGuard(
     _dir: Toaster,

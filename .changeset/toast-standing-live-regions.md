@@ -11,7 +11,7 @@ The toaster now announces through two standing live regions that are mounted wit
 
 `error` toasts are announced assertively (`role="alert"`) and every other type is polite. This changes `warning`, which was assertive before: it is now polite.
 
-Toast rows no longer carry `role` or `aria-live`, so a test or stylesheet that selects toasts by `[role="status"]` should select `.rozie-toast` instead.
+Toast rows no longer carry `role` or `aria-live`, so a test or stylesheet that selects toasts by `[role="status"]` should select `.rozie-toast` instead. The exception is a toast shown without a `message` (for example `show({ data, type: 'error' })` drawn by a `#toast` slot): it has nothing to write into a region, so its own row keeps a live role (`role="alert"` for `error`, `role="status"` otherwise) and slot-only content is still announced. A `patch()` that adds or clears the message moves the toast between the two forms.
 
 The regions carry `message`, so pass one to `show()` even when a `#toast` slot renders its own content. New `disableAnnounce` prop for a slot that supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
 

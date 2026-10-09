@@ -337,7 +337,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
     <div role="alert" aria-live="assertive" aria-atomic="false" data-rozie-s-12d4265c>
       ${repeat<any>(this.assertiveToasts(), (line, _idx) => line.id, (line, _idx) => html`<div data-rozie-s-12d4265c>${rozieDisplay(line.message)}</div>`)}
     </div>
-  </div>` : nothing}${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" style=${rozieStyle(this.toastStyle(t, ti))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
+  </div>` : nothing}${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" role=${rozieAttr(this.rowLiveRole(t))} style=${rozieStyle(this.toastStyle(t, ti))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
       ${t.type === 'loading' ? html`<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>` : nothing}<span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
       ${t.action ? html`<button class="rozie-toast-action" type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.runAction(t); }} data-rozie-s-12d4265c>${rozieDisplay(t.action.label)}</button>` : nothing}<button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
@@ -938,9 +938,25 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   // regions are explicitly aria-atomic="false" so a new toast does not re-read
   // the lines of toasts still on screen. Plain functions called with `()` — NOT
   // $computed (playbook section 8) — and no $data write: render purity.
-  politeToasts = () => this._toasts.value.filter((t: any) => t.message && t.type !== 'error');
+  //
+  // A toast with NO message text (e.g. `show({ data, type: 'error' })` painted by a
+  // `#toast` slot, or a `promise()` whose message function returns '') has nothing
+  // to write into a region, so it must not become silent: its ROW carries the live
+  // role itself (role="alert" for 'error', role="status" otherwise — each implies
+  // its aria-live, so none is bound). `rowLiveRole` returns null for every other
+  // toast (and under `disableAnnounce`), and a `:role` bound to null is omitted on
+  // all six targets. A `patch()` that gives such a toast a message moves it to a
+  // standing region and drops the row role (and the reverse).
+  hasMessage = (t: any) => !!t.message && String(t.message).trim() !== '';
 
-  assertiveToasts = () => this._toasts.value.filter((t: any) => t.message && t.type === 'error');
+  politeToasts = () => this._toasts.value.filter((t: any) => this.hasMessage(t) && t.type !== 'error');
+
+  assertiveToasts = () => this._toasts.value.filter((t: any) => this.hasMessage(t) && t.type === 'error');
+
+  rowLiveRole = (t: any) => {
+  if (this.disableAnnounce || this.hasMessage(t)) return null;
+  return t.type === 'error' ? 'alert' : 'status';
+};
 
   addEventListener<K extends keyof RozieToasterEventMap>(type: K, listener: (this: Toaster, ev: RozieToasterEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
   addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;

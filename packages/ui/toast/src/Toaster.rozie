@@ -84,9 +84,12 @@
   `assertiveToasts()` filter `$data.toasts`): no second state, no timers, no
   counters — a toast's line lives exactly as long as the toast does, a
   `patch()` that changes the message rewrites that line in place, and a change
-  to or from `error` moves it between regions. The toast ROWS carry no role and
-  no aria-live (no live region wraps a row or the `#toast` slot content), so a
-  custom `#toast` slot never nests or doubles an announcement. A consumer whose
+  to or from `error` moves it between regions. A toast WITH a message has a
+  role-less ROW (no live region wraps a row or the `#toast` slot content), so a
+  custom `#toast` slot never nests or doubles an announcement. A toast with NO
+  message text has nothing to put in a region, so its row carries the live role
+  itself (`role="alert"` for `error`, `role="status"` otherwise) and slot-only
+  content is still announced; no toast is silent by default. A consumer whose
   slot supplies its own `role` / `aria-live` sets `disableAnnounce`, and the
   toaster then renders no live regions at all.
 
@@ -755,8 +758,22 @@ const regionLabel = () => ($props.ariaLabel != null ? $props.ariaLabel : 'Notifi
 // regions are explicitly aria-atomic="false" so a new toast does not re-read
 // the lines of toasts still on screen. Plain functions called with `()` — NOT
 // $computed (playbook section 8) — and no $data write: render purity.
-const politeToasts = () => $data.toasts.filter((t) => t.message && t.type !== 'error')
-const assertiveToasts = () => $data.toasts.filter((t) => t.message && t.type === 'error')
+//
+// A toast with NO message text (e.g. `show({ data, type: 'error' })` painted by a
+// `#toast` slot, or a `promise()` whose message function returns '') has nothing
+// to write into a region, so it must not become silent: its ROW carries the live
+// role itself (role="alert" for 'error', role="status" otherwise — each implies
+// its aria-live, so none is bound). `rowLiveRole` returns null for every other
+// toast (and under `disableAnnounce`), and a `:role` bound to null is omitted on
+// all six targets. A `patch()` that gives such a toast a message moves it to a
+// standing region and drops the row role (and the reverse).
+const hasMessage = (t) => !!t.message && String(t.message).trim() !== ''
+const politeToasts = () => $data.toasts.filter((t) => hasMessage(t) && t.type !== 'error')
+const assertiveToasts = () => $data.toasts.filter((t) => hasMessage(t) && t.type === 'error')
+const rowLiveRole = (t) => {
+  if ($props.disableAnnounce || hasMessage(t)) return null
+  return t.type === 'error' ? 'alert' : 'status'
+}
 
 // ---- lifecycle + handle ------------------------------------------------
 $onUnmount(() => {
@@ -805,6 +822,7 @@ $expose({ show, dismiss, clear, patch, promise })
     r-for="t, ti in $data.toasts"
     :key="t.id"
     class="rozie-toast"
+    :role="rowLiveRole(t)"
     :class="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')"
     :style="toastStyle(t, ti)"
     @animationend="t.exiting && removeToast(t.id)"

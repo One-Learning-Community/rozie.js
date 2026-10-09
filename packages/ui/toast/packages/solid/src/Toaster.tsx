@@ -858,11 +858,27 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
   // regions are explicitly aria-atomic="false" so a new toast does not re-read
   // the lines of toasts still on screen. Plain functions called with `()` — NOT
   // $computed (playbook section 8) — and no $data write: render purity.
+  //
+  // A toast with NO message text (e.g. `show({ data, type: 'error' })` painted by a
+  // `#toast` slot, or a `promise()` whose message function returns '') has nothing
+  // to write into a region, so it must not become silent: its ROW carries the live
+  // role itself (role="alert" for 'error', role="status" otherwise — each implies
+  // its aria-live, so none is bound). `rowLiveRole` returns null for every other
+  // toast (and under `disableAnnounce`), and a `:role` bound to null is omitted on
+  // all six targets. A `patch()` that gives such a toast a message moves it to a
+  // standing region and drops the row role (and the reverse).
+  function hasMessage(t: any) {
+    return !!t.message && String(t.message).trim() !== '';
+  }
   function politeToasts() {
-    return toasts().filter((t: any) => t.message && t.type !== 'error');
+    return toasts().filter((t: any) => hasMessage(t) && t.type !== 'error');
   }
   function assertiveToasts() {
-    return toasts().filter((t: any) => t.message && t.type === 'error');
+    return toasts().filter((t: any) => hasMessage(t) && t.type === 'error');
+  }
+  function rowLiveRole(t: any) {
+    if (local.disableAnnounce || hasMessage(t)) return null;
+    return t.type === 'error' ? 'alert' : 'status';
   }
 
   // ---- lifecycle + handle ------------------------------------------------
@@ -878,7 +894,7 @@ export default function Toaster(_props: ToasterProps): JSX.Element {
         <div role="alert" aria-live="assertive" aria-atomic="false" data-rozie-s-12d4265c="">
           <Key each={assertiveToasts() as readonly any[]} by={(line) => line.id}>{(line) => <div data-rozie-s-12d4265c="">{rozieDisplay(line().message)}</div>}</Key>
         </div>
-      </div></Show>}<Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t, ti) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : '') + (t().swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t(), ti()))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerDown(t(), $event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerMove(t(), $event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerUp(t(), $event); }} onPointerCancel={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerCancel(t()); }} data-rozie-s-12d4265c="">
+      </div></Show>}<Key each={toasts() as readonly any[]} by={(t) => t.id}>{(t, ti) => <div class={"rozie-toast" + " " + rozieClass('rozie-toast--' + t().type + (t().exiting ? ' rozie-toast--exiting' : '') + (t().swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} role={rozieAttr(rowLiveRole(t()))} style={parseInlineStyle(toastStyle(t(), ti()))} onAnimationEnd={($event: AnimationEvent & { currentTarget: HTMLDivElement; target: Element }) => { t().exiting && removeToast(t().id); }} onPointerDown={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerDown(t(), $event); }} onPointerMove={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerMove(t(), $event); }} onPointerUp={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerUp(t(), $event); }} onPointerCancel={($event: PointerEvent & { currentTarget: HTMLDivElement; target: Element }) => { onToastPointerCancel(t()); }} data-rozie-s-12d4265c="">
         {(_props.toastSlot ?? _props.slots?.['toast'])?.({ get toast() { return t(); }, dismiss }) ?? <>{<Show when={t().type === 'loading'}><span class={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" /></Show>}<span class={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t().message)}</span>{<Show when={t().action}><button type="button" class={"rozie-toast-action"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { runAction(t()); }} data-rozie-s-12d4265c="">{rozieDisplay(t().action.label)}</button></Show>}<button type="button" aria-label="Dismiss" class={"rozie-toast-close"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { dismissBegin(t().id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>}</Key>
     </div>
