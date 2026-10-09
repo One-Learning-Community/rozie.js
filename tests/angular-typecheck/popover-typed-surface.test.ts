@@ -24,7 +24,7 @@ function stubInternals(code: string): string {
       /^import \{[^}]*\} from '@floating-ui\/dom';$/m,
       'const computePosition: any = undefined, autoUpdate: any = undefined, offsetMiddleware: any = undefined, flip: any = undefined, shift: any = undefined, arrowMiddleware: any = undefined, size: any = undefined;',
     )
-    .replace(/^import \{ buildMiddleware \} from '\.\/internal\/middleware';$/m, 'const buildMiddleware: any = undefined;');
+    .replace(/^import \{ buildMiddleware, AVAILABLE_WIDTH_PROPERTY \} from '\.\/internal\/middleware';$/m, "const buildMiddleware: any = undefined; const AVAILABLE_WIDTH_PROPERTY = '--rozie-popover-available-width';");
 }
 
 const PRELUDE = `import { Popover } from './Popover';
