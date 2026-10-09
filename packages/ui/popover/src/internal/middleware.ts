@@ -19,12 +19,40 @@
  * width-matching, placement-independent, so its slot is readability-driven, not
  * functional — gap math, then sizing, then collision-avoidance, then decoration);
  * `arrow` last so it reads the final resolved placement.
+ *
+ * Staying inside the viewport (261008-mmt). Field report: a `right-start` panel
+ * on a 390px-wide screen ended with its right edge at 521px. The engine's DEFAULTS
+ * cannot fix that: default `flip()` only tries placements on the same axis, so a
+ * `right-start` panel with no room on either side stays `right-start` (the one that
+ * overflows least), and default `shift()` slides a panel along its ALIGNMENT axis
+ * only, which for a `left`/`right` placement is vertical — the horizontal overflow
+ * is on shift's cross axis, which is off. So for `left*`/`right*` placements only,
+ * flip also falls back to below, then above, and shift also slides across the
+ * anchor as a last resort when nothing fits. Both are keyed on the engine's own
+ * `initialPlacement` through Floating UI's option-function form, so the call site
+ * does not change.
+ *
+ * `top*`/`bottom*` placements deliberately keep the engine defaults: every in-repo
+ * composite (combobox `bottom-start`, data-table `bottom-end`) uses them, and a
+ * dropdown must not jump beside its input in a short viewport or slide over it.
  */
+
+/** The slice of the engine's middleware state the option functions read. */
+export interface PlacementState {
+  initialPlacement: string;
+}
+export interface FlipOptionsLike {
+  crossAxis?: boolean | 'alignment';
+  fallbackAxisSideDirection?: 'none' | 'start' | 'end';
+}
+export interface ShiftOptionsLike {
+  crossAxis?: boolean;
+}
 
 export interface MiddlewareFactories {
   offset: (value: number) => unknown;
-  flip: () => unknown;
-  shift: () => unknown;
+  flip: (options?: (state: PlacementState) => FlipOptionsLike) => unknown;
+  shift: (options?: (state: PlacementState) => ShiftOptionsLike) => unknown;
   arrow: (opts: { element: Element }) => unknown;
   size: (opts: { apply: (args: unknown) => void }) => unknown;
 }
@@ -36,6 +64,18 @@ export interface MiddlewareConfig {
   arrow: boolean;
   arrowEl: Element | null;
   matchWidth: boolean;
+}
+
+/**
+ * True for a `left` / `right` placement (any alignment suffix). `placement` is a
+ * loosely typed String prop, so anything that is not a string is not a side
+ * placement.
+ */
+export function isSidePlacement(placement: unknown): boolean {
+  return (
+    typeof placement === 'string' &&
+    (placement.startsWith('left') || placement.startsWith('right'))
+  );
 }
 
 /**
@@ -67,8 +107,23 @@ export function buildMiddleware(
       }),
     );
   }
-  if (!config.disableFlip) mw.push(factories.flip());
-  if (!config.disableShift) mw.push(factories.shift());
+  if (!config.disableFlip) {
+    mw.push(
+      factories.flip((state) =>
+        isSidePlacement(state.initialPlacement)
+          ? // 'alignment': leave the horizontal axis only when every horizontal
+            // placement overflows its own side, so a tall panel that fits beside
+            // the anchor stays beside it; 'end' tries below, then above.
+            { crossAxis: 'alignment', fallbackAxisSideDirection: 'end' }
+          : {},
+      ),
+    );
+  }
+  if (!config.disableShift) {
+    mw.push(
+      factories.shift((state) => ({ crossAxis: isSidePlacement(state.initialPlacement) })),
+    );
+  }
   // The arrow middleware needs a real element to position; opt-in only when both
   // the `arrow` prop is set AND the arrow element has mounted.
   if (config.arrow && config.arrowEl) {

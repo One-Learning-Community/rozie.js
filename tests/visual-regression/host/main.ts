@@ -1264,6 +1264,8 @@ export const EXAMPLES = [
   'PopoverBehavior',
   // 260929-lyc — Popover `reference` prop cell (external Element + virtual element).
   'PopoverReference',
+  // 261008-mmt — Popover viewport-containment cell (bare right-start at 390px + width cap).
+  'PopoverViewport',
   // @rozie-ui/switch + popover SCREENSHOT cells (loaders →
   // examples/demos/{Switch,Popover}ScreenshotDemo.rozie). SwitchScreenshot renders
   // INLINE (3 fixed states: on/off/disabled) → standard mount-clipped matrix cell
@@ -1872,6 +1874,8 @@ export const LIT_TAGS: Record<Example, string> = {
   PopoverBehavior: 'rozie-popover-behavior',
   // 260929-lyc — Popover `reference` prop cell.
   PopoverReference: 'rozie-popover-reference',
+  // 261008-mmt — Popover viewport-containment cell.
+  PopoverViewport: 'rozie-popover-viewport',
   SwitchScreenshot: 'rozie-switch-screenshot',
   PopoverScreenshot: 'rozie-popover-screenshot',
   // @rozie-ui/date-picker + resizable + command-palette — '-demo' appended on Lit →
@@ -2406,6 +2410,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   PopoverBehavior: {},
   // 260929-lyc — self-contained (seeds its own open + reference state).
   PopoverReference: {},
+  // 261008-mmt — self-contained (seeds its own state).
+  PopoverViewport: {},
   SwitchScreenshot: {},
   PopoverScreenshot: {},
   // @rozie-ui/date-picker + resizable + command-palette — all six demos are

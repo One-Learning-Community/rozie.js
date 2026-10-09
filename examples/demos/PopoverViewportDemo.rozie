@@ -1,0 +1,121 @@
+<!--
+  PopoverViewportDemo — VR behavioral cell for viewport containment of the
+  @rozie-ui/popover panel (261008-mmt). Reproduces the field report: a `bare`,
+  `strategy="fixed"`, `placement="right-start"` popover positioned against an EXTERNAL
+  element near the left edge (the `event-chip`, standing in for a calendar event the
+  consumer renders). On a 390px viewport neither side of the chip has room for the
+  360px card; the panel must fall back below the chip and stay inside the viewport.
+
+  The second popover is a default-chrome panel with a long paragraph and no fixed
+  width: its border box must never exceed the viewport, and Popover publishes the
+  measured available width on it as `--rozie-popover-available-width`.
+
+  No `id-base` on the first popover on purpose: the default generated id makes Lit
+  re-render before the first open (the 261002-ekf path).
+
+  See popover-viewport.spec.ts. Behavioral-only (DOM-geometry assertions, no PNG).
+-->
+<rozie name="PopoverViewportDemo">
+
+<components>
+{
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
+}
+</components>
+
+<data>
+{
+  cardOpen: false,
+  cardReference: null,
+  notesOpen: false,
+}
+</data>
+
+<script>
+// The external element, captured in $onMount ($refs are only safe there, ROZ123).
+let chipNode = null
+
+$onMount(() => {
+  chipNode = $refs.chip
+})
+
+const onChipClick = () => {
+  $data.cardReference = chipNode
+  $data.cardOpen = !$data.cardOpen
+}
+</script>
+
+<template>
+<div class="popover-viewport-demo">
+  <h3>Popover viewport containment</h3>
+
+  <button type="button" class="event-chip" ref="chip" data-testid="event-chip" @click="onChipClick()">Event</button>
+
+  <div data-testid="event-popover">
+    <Popover
+      r-model:open="$data.cardOpen"
+      trigger="manual"
+      placement="right-start"
+      strategy="fixed"
+      :bare="true"
+      :offset="8"
+      :reference="$data.cardReference"
+    >
+      <div class="event-card">
+        <div class="event-card-title">Planning meeting</div>
+        <button type="button" class="card-action" data-testid="card-action">Edit</button>
+      </div>
+    </Popover>
+  </div>
+
+  <div data-testid="notes-popover">
+    <Popover
+      r-model:open="$data.notesOpen"
+      trigger="click"
+      placement="bottom"
+      :offset="8"
+    >
+      <template #anchor>
+        <button type="button" data-testid="notes-trigger">Notes</button>
+      </template>
+      <p class="notes-text">
+        Quarterly planning notes for the whole team. Please read the agenda before the meeting starts, bring the figures from the last two sprints, and note any blockers that need a decision from the leads. We will walk through the roadmap item by item, agree an owner for each open question, and record the outcome in the shared tracker so that nobody has to ask what was decided. If you cannot attend, send your comments ahead of time to the organiser, who will read them out during the relevant section and capture any follow-up actions for you afterwards.
+      </p>
+    </Popover>
+  </div>
+</div>
+</template>
+
+<style>
+.popover-viewport-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 300px;
+  min-height: 120px;
+  padding: 0;
+}
+.event-chip {
+  position: fixed;
+  left: 105px;
+  top: 300px;
+  width: 48px;
+  height: 60px;
+  padding: 0;
+}
+.event-card {
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 30px));
+  height: 220px;
+  padding: 12px;
+  border: 1px solid #888;
+  background: #fff;
+  position: relative;
+}
+.event-card .card-action {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+</style>
+
+</rozie>
