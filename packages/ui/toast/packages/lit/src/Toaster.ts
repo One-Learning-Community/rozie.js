@@ -4,7 +4,7 @@ import { SignalWatcher, signal } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
@@ -74,6 +74,19 @@ export default class Toaster extends SignalWatcher(LitElement) {
 }
 .rozie-toaster[data-rozie-s-12d4265c] > *[data-rozie-s-12d4265c] {
   pointer-events: auto;
+}
+.rozie-toaster[data-rozie-s-12d4265c] > .rozie-toaster-live[data-rozie-s-12d4265c] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
 }
 .rozie-toaster--top-left[data-rozie-s-12d4265c] { top: 0; left: 0; align-items: flex-start; }
 .rozie-toaster--top-right[data-rozie-s-12d4265c] { top: 0; right: 0; align-items: flex-end; }
@@ -235,7 +248,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-pause-on-hover' }) disablePauseOnHover: boolean = false;
   /**
-   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   * Accessible name for the toaster's landmark (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
@@ -246,6 +259,10 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   @property({ type: Boolean, reflect: true }) stacked: boolean = false;
+  /**
+   * Opt **out** of the toaster's own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast's `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'disable-announce' }) disableAnnounce: boolean = false;
   private _toasts = signal<any[]>([]);
   private _seq = signal(0);
   private _swipe = signal<any>(null);
@@ -313,7 +330,14 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
     return html`
 <div class="rozie-toaster ${(rozieClass('rozie-toaster--' + this.position + (this.stacked ? ' rozie-toaster--stacked' : '')))}" role="region" aria-label=${rozieAttr(this.regionLabel())} ${rozieSpread(this.$attrs)} @mouseenter=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseEnter(); }} @mouseleave=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onMouseLeave(); }} @focusin=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onFocusIn(); }} @focusout=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onFocusOut($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-12d4265c>
   
-  ${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" style=${rozieStyle(this.toastStyle(t, ti))} role="status" aria-live=${rozieAttr(this.liveFor(t.type))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
+  ${!this.disableAnnounce ? html`<div class="rozie-toaster-live" data-rozie-s-12d4265c>
+    <div role="status" aria-live="polite" aria-atomic="false" data-rozie-s-12d4265c>
+      ${repeat<any>(this.politeToasts(), (line, _idx) => line.id, (line, _idx) => html`<div data-rozie-s-12d4265c>${rozieDisplay(line.message)}</div>`)}
+    </div>
+    <div role="alert" aria-live="assertive" aria-atomic="false" data-rozie-s-12d4265c>
+      ${repeat<any>(this.assertiveToasts(), (line, _idx) => line.id, (line, _idx) => html`<div data-rozie-s-12d4265c>${rozieDisplay(line.message)}</div>`)}
+    </div>
+  </div>` : nothing}${repeat<any>(this._toasts.value, (t, ti) => t.id, (t, ti) => html`<div class="rozie-toast ${(rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')))}" style=${rozieStyle(this.toastStyle(t, ti))} @animationend=${($event: Event & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { t.exiting && this.removeToast(t.id); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerDown(t, $event); }} @pointermove=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerMove(t, $event); }} @pointerup=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerUp(t, $event); }} @pointercancel=${($event: PointerEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onToastPointerCancel(t); }} data-rozie-s-12d4265c>
     ${this.toast !== undefined ? this.toast({toast: t, dismiss: this.dismiss}) : html`<slot name="toast" data-rozie-params=${(() => { try { return JSON.stringify({toast: t}); } catch { return '{}'; } })()} @rozie-toast-dismiss=${($event: CustomEvent) => ((this.dismiss) as (...args: any[]) => any)($event.detail)}>
       ${t.type === 'loading' ? html`<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>` : nothing}<span class="rozie-toast-message" data-rozie-s-12d4265c>${rozieDisplay(t.message)}</span>
       ${t.action ? html`<button class="rozie-toast-action" type="button" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.runAction(t); }} data-rozie-s-12d4265c>${rozieDisplay(t.action.label)}</button>` : nothing}<button class="rozie-toast-close" type="button" aria-label="Dismiss" @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>
@@ -903,9 +927,20 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
   // ---- helpers -----------------------------------------------------------
   regionLabel = () => this.ariaLabel != null ? this.ariaLabel : 'Notifications';
 
-  // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
-  // error/warning interrupt (assertive); loading (like info/success) is polite.
-  liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+  // ---- live-region projection ----------------------------------------------
+  // The standing polite/assertive regions are a PURE PROJECTION of the toast
+  // queue: each region renders one keyed line per matching toast, so a line lives
+  // exactly as long as its toast (no second state, no timers, nothing to tear
+  // down). A `patch()` that changes the message rewrites that toast's line in
+  // place — that text change is what a screen reader announces — and a change to
+  // or from 'error' moves the line between regions. Only 'error' is assertive;
+  // every other type ('info' | 'success' | 'warning' | 'loading') is polite. The
+  // regions are explicitly aria-atomic="false" so a new toast does not re-read
+  // the lines of toasts still on screen. Plain functions called with `()` — NOT
+  // $computed (playbook section 8) — and no $data write: render purity.
+  politeToasts = () => this._toasts.value.filter((t: any) => t.message && t.type !== 'error');
+
+  assertiveToasts = () => this._toasts.value.filter((t: any) => t.message && t.type === 'error');
 
   addEventListener<K extends keyof RozieToasterEventMap>(type: K, listener: (this: Toaster, ev: RozieToasterEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
   addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
@@ -937,7 +972,7 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'position', 'duration', 'max', 'disable-pause-on-hover', 'disablepauseonhover', 'aria-label', 'arialabel', 'disable-swipe', 'disableswipe', 'stacked']);
+    const __skip = new Set<string>(['data-rozie-ref', 'position', 'duration', 'max', 'disable-pause-on-hover', 'disablepauseonhover', 'aria-label', 'arialabel', 'disable-swipe', 'disableswipe', 'stacked', 'disable-announce', 'disableannounce']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

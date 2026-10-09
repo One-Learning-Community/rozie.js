@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
@@ -34,7 +34,7 @@ export interface ToastDismissedPayload {
   reason: ToastDismissReason;
 }
 
-export interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+export interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'disableAnnounce' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */
@@ -52,7 +52,7 @@ export interface ToasterProps extends Omit<import('react').ComponentPropsWithout
    */
   disablePauseOnHover?: boolean;
   /**
-   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   * Accessible name for the toaster's landmark (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
   /**
@@ -63,6 +63,10 @@ export interface ToasterProps extends Omit<import('react').ComponentPropsWithout
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   stacked?: boolean;
+  /**
+   * Opt **out** of the toaster's own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast's `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
+   */
+  disableAnnounce?: boolean;
   onDismissed?: (payload: ToastDismissedPayload) => void;
   renderToast?: (params: { toast: ToastEntry; dismiss: (id: string) => void }) => ReactNode;
   slots?: Record<string, () => ReactNode>;

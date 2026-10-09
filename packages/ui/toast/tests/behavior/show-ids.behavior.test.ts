@@ -42,7 +42,7 @@ function mountToaster(props: Record<string, unknown> = {}) {
 }
 
 function statusCount(host: HTMLElement): number {
-  return host.querySelectorAll('[role="status"]').length;
+  return host.querySelectorAll('.rozie-toast').length;
 }
 
 describe('Toaster show() — distinct ids + no bulk loss (T6 contract, behavioral)', () => {

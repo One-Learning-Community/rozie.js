@@ -2,7 +2,14 @@
 
 <div :class="['rozie-toaster', 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')]" role="region" :aria-label="regionLabel()" v-bind="$attrs" @mouseenter="onMouseEnter()" @mouseleave="onMouseLeave()" @focusin="onFocusIn()" @focusout="onFocusOut($event)">
   
-  <div v-for="(t, ti) in toasts" :key="t.id" :class="['rozie-toast', 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')]" :style="toastStyle(t, ti)" role="status" :aria-live="liveFor(t.type)" @animationend="t.exiting && removeToast(t.id)" @pointerdown="onToastPointerDown(t, $event)" @pointermove="onToastPointerMove(t, $event)" @pointerup="onToastPointerUp(t, $event)" @pointercancel="onToastPointerCancel(t)">
+  <div v-if="!props.disableAnnounce" class="rozie-toaster-live">
+    <div role="status" aria-live="polite" aria-atomic="false">
+      <div v-for="line in politeToasts()" :key="line.id">{{ line.message }}</div>
+    </div>
+    <div role="alert" aria-live="assertive" aria-atomic="false">
+      <div v-for="line in assertiveToasts()" :key="line.id">{{ line.message }}</div>
+    </div>
+  </div><div v-for="(t, ti) in toasts" :key="t.id" :class="['rozie-toast', 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')]" :style="toastStyle(t, ti)" @animationend="t.exiting && removeToast(t.id)" @pointerdown="onToastPointerDown(t, $event)" @pointermove="onToastPointerMove(t, $event)" @pointerup="onToastPointerUp(t, $event)" @pointercancel="onToastPointerCancel(t)">
     <slot name="toast" :toast="t" :dismiss="dismiss">
       <span v-if="t.type === 'loading'" class="rozie-toast-spinner" aria-hidden="true"></span><span class="rozie-toast-message">{{ t.message }}</span>
       <button v-if="t.action" type="button" class="rozie-toast-action" @click="runAction(t)">{{ t.action.label }}</button><button type="button" class="rozie-toast-close" aria-label="Dismiss" @click="dismissBegin(t.id, 'close')">×</button>
@@ -13,7 +20,7 @@
 </template>
 
 <script lang="ts">
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
@@ -68,7 +75,7 @@ const props = withDefaults(
      */
     disablePauseOnHover?: boolean;
     /**
-     * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+     * Accessible name for the toaster's landmark (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
      */
     ariaLabel?: string | null;
     /**
@@ -79,8 +86,12 @@ const props = withDefaults(
      * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
      */
     stacked?: boolean;
+    /**
+     * Opt **out** of the toaster's own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast's `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
+     */
+    disableAnnounce?: boolean;
   }>(),
-  { position: 'bottom-right', duration: 4000, max: 0, disablePauseOnHover: false, ariaLabel: null, disableSwipe: false, stacked: false }
+  { position: 'bottom-right', duration: 4000, max: 0, disablePauseOnHover: false, ariaLabel: null, disableSwipe: false, stacked: false, disableAnnounce: false }
 );
 
 const emit = defineEmits<{
@@ -634,9 +645,19 @@ const onFocusOut = (event: any) => {
 };
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => props.ariaLabel != null ? props.ariaLabel : 'Notifications';
-// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
-// error/warning interrupt (assertive); loading (like info/success) is polite.
-const liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+// ---- live-region projection ----------------------------------------------
+// The standing polite/assertive regions are a PURE PROJECTION of the toast
+// queue: each region renders one keyed line per matching toast, so a line lives
+// exactly as long as its toast (no second state, no timers, nothing to tear
+// down). A `patch()` that changes the message rewrites that toast's line in
+// place — that text change is what a screen reader announces — and a change to
+// or from 'error' moves the line between regions. Only 'error' is assertive;
+// every other type ('info' | 'success' | 'warning' | 'loading') is polite. The
+// regions are explicitly aria-atomic="false" so a new toast does not re-read
+// the lines of toasts still on screen. Plain functions called with `()` — NOT
+// $computed (playbook section 8) — and no $data write: render purity.
+const politeToasts = () => toasts.value.filter((t: any) => t.message && t.type !== 'error');
+const assertiveToasts = () => toasts.value.filter((t: any) => t.message && t.type === 'error');
 
 // ---- lifecycle + handle ------------------------------------------------
 
@@ -672,6 +693,19 @@ defineExpose({ show, dismiss, clear, patch, promise });
 }
 .rozie-toaster > * {
   pointer-events: auto;
+}
+.rozie-toaster > .rozie-toaster-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
 }
 .rozie-toaster--top-left { top: 0; left: 0; align-items: flex-start; }
 .rozie-toaster--top-right { top: 0; right: 0; align-items: flex-end; }

@@ -56,6 +56,7 @@ import '@rozie-ui/toast-angular/themes/shadcn.css';    // or material.css, boots
 | `ariaLabel` | `String` | `null` |  |  |
 | `disableSwipe` | `Boolean` | `false` |  |  |
 | `stacked` | `Boolean` | `false` |  |  |
+| `disableAnnounce` | `Boolean` | `false` |  |  |
 
 ## Events
 

@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { clsx, mergeListeners, parseInlineStyle, pickListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './Toaster.css';
 
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
@@ -37,7 +37,7 @@ export interface ToastDismissedPayload {
 
 interface ToastCtx { toast: ToastEntry; dismiss: (id: string) => void; }
 
-interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'disableAnnounce' | 'onDismissed' | 'renderToast' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */
@@ -55,7 +55,7 @@ interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    */
   disablePauseOnHover?: boolean;
   /**
-   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   * Accessible name for the toaster's landmark (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
   /**
@@ -66,6 +66,10 @@ interface ToasterProps extends Omit<import('react').ComponentPropsWithoutRef<'di
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   stacked?: boolean;
+  /**
+   * Opt **out** of the toaster's own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast's `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
+   */
+  disableAnnounce?: boolean;
   onDismissed?: (payload: ToastDismissedPayload) => void;
   renderToast?: (ctx: ToastCtx) => ReactNode;
   slots?: Record<string, () => import('react').ReactNode>;
@@ -80,7 +84,7 @@ export interface ToasterHandle {
 }
 
 const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props: ToasterProps, ref): JSX.Element {
-  const props: Omit<ToasterProps, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked'> & { position: string; duration: number; max: number; disablePauseOnHover: boolean; ariaLabel: (string) | null; disableSwipe: boolean; stacked: boolean } = {
+  const props: Omit<ToasterProps, 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'disableAnnounce'> & { position: string; duration: number; max: number; disablePauseOnHover: boolean; ariaLabel: (string) | null; disableSwipe: boolean; stacked: boolean; disableAnnounce: boolean } = {
     ..._props,
     position: _props.position ?? 'bottom-right',
     duration: _props.duration ?? 4000,
@@ -89,10 +93,11 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     ariaLabel: _props.ariaLabel ?? null,
     disableSwipe: _props.disableSwipe ?? false,
     stacked: _props.stacked ?? false,
+    disableAnnounce: _props.disableAnnounce ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { position, duration, max, disablePauseOnHover, ariaLabel, disableSwipe, stacked, onDismissed, renderToast, slots, ...rest } = _props as ToasterProps & Record<string, unknown>;
-    void position; void duration; void max; void disablePauseOnHover; void ariaLabel; void disableSwipe; void stacked; void onDismissed; void renderToast; void slots;
+    const { position, duration, max, disablePauseOnHover, ariaLabel, disableSwipe, stacked, disableAnnounce, onDismissed, renderToast, slots, ...rest } = _props as ToasterProps & Record<string, unknown>;
+    void position; void duration; void max; void disablePauseOnHover; void ariaLabel; void disableSwipe; void stacked; void disableAnnounce; void onDismissed; void renderToast; void slots;
     return rest;
   })();
   const unmounted = useRef(false);
@@ -659,10 +664,23 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   function regionLabel() {
     return props.ariaLabel != null ? props.ariaLabel : 'Notifications';
   }
-  // Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
-  // error/warning interrupt (assertive); loading (like info/success) is polite.
-  function liveFor(type: any) {
-    return type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+
+  // ---- live-region projection ----------------------------------------------
+  // The standing polite/assertive regions are a PURE PROJECTION of the toast
+  // queue: each region renders one keyed line per matching toast, so a line lives
+  // exactly as long as its toast (no second state, no timers, nothing to tear
+  // down). A `patch()` that changes the message rewrites that toast's line in
+  // place — that text change is what a screen reader announces — and a change to
+  // or from 'error' moves the line between regions. Only 'error' is assertive;
+  // every other type ('info' | 'success' | 'warning' | 'loading') is polite. The
+  // regions are explicitly aria-atomic="false" so a new toast does not re-read
+  // the lines of toasts still on screen. Plain functions called with `()` — NOT
+  // $computed (playbook section 8) — and no $data write: render purity.
+  function politeToasts() {
+    return toasts.filter((t: any) => t.message && t.type !== 'error');
+  }
+  function assertiveToasts() {
+    return toasts.filter((t: any) => t.message && t.type === 'error');
   }
 
   // ---- lifecycle + handle ------------------------------------------------
@@ -682,7 +700,14 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
     <>
     <div role="region" aria-label={rozieAttr(regionLabel())} {...attrs} className={clsx(clsx("rozie-toaster", 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')), (attrs.className as string | undefined))} {...mergeListeners({ onMouseEnter: ($event) => { onMouseEnter(); }, onMouseLeave: ($event) => { onMouseLeave(); }, onFocus: ($event) => { onFocusIn(); }, onBlur: ($event) => { onFocusOut($event); } } satisfies import('react').ComponentPropsWithoutRef<'div'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-12d4265c="">
       
-      {toasts.map((t, ti) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
+      {!!(!props.disableAnnounce) && <div className={"rozie-toaster-live"} data-rozie-s-12d4265c="">
+        <div role="status" aria-live="polite" aria-atomic="false" data-rozie-s-12d4265c="">
+          {politeToasts().map((line) => <div key={line.id} data-rozie-s-12d4265c="">{rozieDisplay(line.message)}</div>)}
+        </div>
+        <div role="alert" aria-live="assertive" aria-atomic="false" data-rozie-s-12d4265c="">
+          {assertiveToasts().map((line) => <div key={line.id} data-rozie-s-12d4265c="">{rozieDisplay(line.message)}</div>)}
+        </div>
+      </div>}{toasts.map((t, ti) => <div key={t.id} className={clsx("rozie-toast", 'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))} style={parseInlineStyle(toastStyle(t, ti))} onAnimationEnd={($event) => { t.exiting && removeToast(t.id); }} onPointerDown={($event) => { onToastPointerDown(t, $event); }} onPointerMove={($event) => { onToastPointerMove(t, $event); }} onPointerUp={($event) => { onToastPointerUp(t, $event); }} onPointerCancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c="">
         {(props.renderToast ?? props.slots?.['toast']) ? ((props.renderToast ?? props.slots?.['toast']) as Function)({ toast: t, dismiss }) : <>{!!(t.type === 'loading') && <span className={"rozie-toast-spinner"} aria-hidden="true" data-rozie-s-12d4265c="" />}<span className={"rozie-toast-message"} data-rozie-s-12d4265c="">{rozieDisplay(t.message)}</span>{!!(t.action) && <button type="button" className={"rozie-toast-action"} onClick={($event) => { runAction(t); }} data-rozie-s-12d4265c="">{rozieDisplay(t.action.label)}</button>}<button type="button" className={"rozie-toast-close"} aria-label="Dismiss" onClick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c="">×</button></>}
       </div>)}
     </div>

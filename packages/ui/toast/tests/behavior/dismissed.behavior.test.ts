@@ -7,7 +7,7 @@
  * Mirrors combobox's tests/seed-query.behavior.test.ts precedent: mount the
  * REAL committed emitted packages/vue/src/Toaster.vue, obtain the `$expose`d
  * handle via a template ref, drive it, and assert on the emitted events + the
- * rendered `[role="status"]` DOM.
+ * rendered `.rozie-toast` DOM.
  *
  * RED-FIRST: run against the CURRENT (un-regenerated) leaf — it has NO emit
  * at all (`Toaster` emits nothing pre-TOAST-EVENT) — every assertion on the
@@ -64,7 +64,7 @@ function mountToaster(props: Record<string, unknown> = {}) {
 }
 
 function statusCount(host: HTMLElement): number {
-  return host.querySelectorAll('[role="status"]').length;
+  return host.querySelectorAll('.rozie-toast').length;
 }
 
 // Fast-forward past both the CSS exit animation AND the ~350ms JS failsafe

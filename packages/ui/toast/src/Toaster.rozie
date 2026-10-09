@@ -73,6 +73,23 @@
   the array = depth 0), since the collapsed grid overlay ignores
   flex-direction entirely.
 
+  Live regions: the toaster keeps TWO visually hidden live regions mounted for
+  its whole life — a polite `role="status"` and an assertive `role="alert"`,
+  both explicitly `aria-atomic="false"` — and writes each toast's `message`
+  into one of them (`error` -> the alert region, every other type, including
+  `warning` and `loading`, -> the status region). A live region that arrives
+  together with its content is often not announced (VoiceOver especially), so
+  the regions are present BEFORE any toast and the text is added to them. They
+  are a pure projection of the toast queue (`politeToasts()` /
+  `assertiveToasts()` filter `$data.toasts`): no second state, no timers, no
+  counters — a toast's line lives exactly as long as the toast does, a
+  `patch()` that changes the message rewrites that line in place, and a change
+  to or from `error` moves it between regions. The toast ROWS carry no role and
+  no aria-live (no live region wraps a row or the `#toast` slot content), so a
+  custom `#toast` slot never nests or doubles an announcement. A consumer whose
+  slot supplies its own `role` / `aria-live` sets `disableAnnounce`, and the
+  toaster then renders no live regions at all.
+
   Authoring notes (collision classes — see the authoring playbook):
     - Imperative verbs `show` / `dismiss` / `clear` are NOT inherited HTMLElement
       members (no ROZ137). The single `dismissed` event does not collide with
@@ -95,7 +112,7 @@
 <rozie name="Toaster">
 
 <types>
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading'
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api'
@@ -163,13 +180,13 @@ export interface ToastDismissedPayload { toast: ToastEntry; reason: ToastDismiss
     },
   },
 
-  // Accessible name for the live region (default 'Notifications').
+  // Accessible name for the region landmark (default 'Notifications').
   ariaLabel:            {
     type: String,
     default: null,
     docs: {
       description:
-        "Accessible name for the live region (`role=\"region\"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.",
+        "Accessible name for the toaster's landmark (`role=\"region\"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.",
     },
   },
 
@@ -191,6 +208,17 @@ export interface ToastDismissedPayload { toast: ToastEntry; reason: ToastDismiss
     docs: {
       description:
         'Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.',
+    },
+  },
+
+  // Opt OUT of the toaster's own announcement regions (default: the toaster
+  // keeps a polite and an assertive live region and writes each message there).
+  disableAnnounce:      {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt **out** of the toaster\'s own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast\'s `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.',
     },
   },
 }
@@ -715,9 +743,20 @@ const onFocusOut = (event) => {
 
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => ($props.ariaLabel != null ? $props.ariaLabel : 'Notifications')
-// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
-// error/warning interrupt (assertive); loading (like info/success) is polite.
-const liveFor = (type) => (type === 'error' || type === 'warning' ? 'assertive' : 'polite')
+
+// ---- live-region projection ----------------------------------------------
+// The standing polite/assertive regions are a PURE PROJECTION of the toast
+// queue: each region renders one keyed line per matching toast, so a line lives
+// exactly as long as its toast (no second state, no timers, nothing to tear
+// down). A `patch()` that changes the message rewrites that toast's line in
+// place — that text change is what a screen reader announces — and a change to
+// or from 'error' moves the line between regions. Only 'error' is assertive;
+// every other type ('info' | 'success' | 'warning' | 'loading') is polite. The
+// regions are explicitly aria-atomic="false" so a new toast does not re-read
+// the lines of toasts still on screen. Plain functions called with `()` — NOT
+// $computed (playbook section 8) — and no $data write: render purity.
+const politeToasts = () => $data.toasts.filter((t) => t.message && t.type !== 'error')
+const assertiveToasts = () => $data.toasts.filter((t) => t.message && t.type === 'error')
 
 // ---- lifecycle + handle ------------------------------------------------
 $onUnmount(() => {
@@ -745,6 +784,18 @@ $expose({ show, dismiss, clear, patch, promise })
   @focusin="onFocusIn()"
   @focusout="onFocusOut($event)"
 >
+  <!-- Standing live regions (see the "Live regions" paragraph in the head
+       comment): present before any toast, never re-created, fed from the queue.
+       Loop alias is `line` — NOT `toast` (the Svelte slot-name collision noted
+       below) and not a $data key. Interpolated as text only, never as HTML. -->
+  <div r-if="!$props.disableAnnounce" class="rozie-toaster-live">
+    <div role="status" aria-live="polite" aria-atomic="false">
+      <div r-for="line in politeToasts()" :key="line.id">{{ line.message }}</div>
+    </div>
+    <div role="alert" aria-live="assertive" aria-atomic="false">
+      <div r-for="line in assertiveToasts()" :key="line.id">{{ line.message }}</div>
+    </div>
+  </div>
   <!-- Loop var is `t`, NOT `toast`: a loop var named `toast` shadows the `#toast`
        slot snippet on Svelte (`{#each … as toast}` collides with the `toast`
        snippet → `{@render toast()}` renders a non-function → Svelte-only throw).
@@ -756,8 +807,6 @@ $expose({ show, dismiss, clear, patch, promise })
     class="rozie-toast"
     :class="'rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : '')"
     :style="toastStyle(t, ti)"
-    role="status"
-    :aria-live="liveFor(t.type)"
     @animationend="t.exiting && removeToast(t.id)"
     @pointerdown="onToastPointerDown(t, $event)"
     @pointermove="onToastPointerMove(t, $event)"
@@ -793,6 +842,23 @@ $expose({ show, dismiss, clear, patch, promise })
 }
 .rozie-toaster > * {
   pointer-events: auto;
+}
+/* Visually hidden but still in the accessibility tree (the standing live
+   regions). Absolutely positioned so it takes no flex/grid cell and adds no
+   gap in the column stack or the collapsed stacked overlay. Never
+   `display: none` / `visibility: hidden` — those remove it from the a11y tree. */
+.rozie-toaster > .rozie-toaster-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* corners */

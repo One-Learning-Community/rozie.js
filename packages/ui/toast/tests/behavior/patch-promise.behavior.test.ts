@@ -8,7 +8,7 @@
  * Mirrors combobox's tests/seed-query.behavior.test.ts precedent: mount the
  * REAL committed emitted packages/vue/src/Toaster.vue, obtain the `$expose`d
  * handle via a template ref, drive it, and assert on the rendered
- * `[role="status"]` DOM + the timer/settle timing.
+ * `.rozie-toast` DOM + the timer/settle timing.
  *
  * RED-FIRST: run against the CURRENT (un-regenerated) leaf — `patch`/
  * `promise` are `not a function` (not yet exposed) and the `'loading'` type
@@ -64,7 +64,7 @@ function mountToaster(props: Record<string, unknown> = {}) {
 }
 
 function statusCount(host: HTMLElement): number {
-  return host.querySelectorAll('[role="status"]').length;
+  return host.querySelectorAll('.rozie-toast').length;
 }
 
 function messageText(host: HTMLElement): string {
@@ -230,15 +230,18 @@ describe("Toaster's 'loading' type — decorative spinner (behavioral)", () => {
     handle().show({ message: 'Working…', type: 'loading', duration: 0 });
     await nextTick();
 
-    const toast = host.querySelector('[role="status"]')!;
+    const toast = host.querySelector('.rozie-toast')!;
     const spinner = toast.querySelector('.rozie-toast-spinner');
     expect(spinner).not.toBeNull();
     expect(spinner!.getAttribute('aria-hidden')).toBe('true');
     // Spinner precedes the message in DOM order.
     const message = toast.querySelector('.rozie-toast-message')!;
     expect(spinner!.compareDocumentPosition(message) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // liveFor('loading') is 'polite' (only error/warning are 'assertive').
-    expect(toast.getAttribute('aria-live')).toBe('polite');
+    // The row itself is not a live region; its message is announced politely
+    // ('loading' is not 'error') through the standing status region.
+    expect(toast.hasAttribute('aria-live')).toBe(false);
+    const statusRegion = host.querySelector('.rozie-toaster-live [role="status"]')!;
+    expect(statusRegion.textContent).toContain('Working…');
 
     app.unmount();
   });

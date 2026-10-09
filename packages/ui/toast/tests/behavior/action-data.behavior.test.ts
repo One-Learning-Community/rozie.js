@@ -68,7 +68,7 @@ describe('Toaster action + data (behavioral)', () => {
     expect(calls).toEqual([{ id, data: { threadId: 't42' } }]);
     expect(dismissed.map((d) => d.reason)).toEqual(['action']);
     expect(dismissed[0].toast.data).toEqual({ threadId: 't42' });
-    expect(host.querySelectorAll('[role="status"]').length).toBe(0);
+    expect(host.querySelectorAll('.rozie-toast').length).toBe(0);
     app.unmount();
   });
 
@@ -141,7 +141,7 @@ describe('Toaster action + data (behavioral)', () => {
     expect(observedThrow, 'onClick throw must not be silently swallowed').toBe(true);
     expect(dismissed.map((d) => d.reason)).toEqual(['action']);
     expect(dismissed[0].toast.id).toBe(id);
-    expect(host.querySelectorAll('[role="status"]').length).toBe(0);
+    expect(host.querySelectorAll('.rozie-toast').length).toBe(0);
     app.unmount();
   });
 });

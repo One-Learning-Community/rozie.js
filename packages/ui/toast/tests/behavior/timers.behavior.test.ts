@@ -8,7 +8,7 @@
  * @vitejs/plugin-vue), obtain the `$expose`d handle via a template ref, drive
  * it with `vi.useFakeTimers()` (mocks both `setTimeout` and `Date.now`, which
  * the source's `startedAt`/`remaining` bookkeeping reads), and assert on the
- * rendered `[role="status"]` toast count — the only way to catch a
+ * rendered `.rozie-toast` toast count — the only way to catch a
  * runtime-semantic regression (typechecks clean, wrong behavior) rather than
  * a text/AST assertion.
  *
@@ -67,7 +67,7 @@ function mountToaster(props: Record<string, unknown> = {}) {
 }
 
 function statusCount(host: HTMLElement): number {
-  return host.querySelectorAll('[role="status"]').length;
+  return host.querySelectorAll('.rozie-toast').length;
 }
 
 describe('Toaster hover pause — precise remaining-time (behavioral)', () => {

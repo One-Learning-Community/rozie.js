@@ -1,5 +1,5 @@
 <script module lang="ts">
-/** A toast's visual/semantic kind. `error` and `warning` announce assertively; the rest are polite. */
+/** A toast's visual/semantic kind. Only `error` is announced assertively (`role="alert"`); every other type is announced politely. */
 export type ToastType = 'info' | 'success' | 'error' | 'warning' | 'loading';
 /** Why a toast was dismissed: auto-dismiss timeout, a swipe past threshold, the built-in close button, the action button, or the `dismiss(id)` handle verb. */
 export type ToastDismissReason = 'timeout' | 'swipe' | 'close' | 'action' | 'api';
@@ -37,7 +37,7 @@ import { applyListeners, rozieAttr, rozieClass, rozieDisplay, rozieStyle } from 
 import type { Snippet } from 'svelte';
 import { onDestroy } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'toast' | 'snippets' | 'ondismissed' | 'children'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'position' | 'duration' | 'max' | 'disablePauseOnHover' | 'ariaLabel' | 'disableSwipe' | 'stacked' | 'disableAnnounce' | 'toast' | 'snippets' | 'ondismissed' | 'children'> {
   /**
    * Which corner the toast stack renders in: `'top-left'`, `'top-right'`, `'top-center'`, `'bottom-left'`, `'bottom-right'`, or `'bottom-center'`. Drives the fixed-position layout and the stack direction.
    */
@@ -55,7 +55,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   disablePauseOnHover?: boolean;
   /**
-   * Accessible name for the live region (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
+   * Accessible name for the toaster's landmark (`role="region"`), applied as its `aria-label`. Defaults to `'Notifications'` when not set, so assistive tech can navigate to the toast stack as a landmark.
    */
   ariaLabel?: (string) | null;
   /**
@@ -66,6 +66,10 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    * Opt **in** to a sonner-style collapsed stack: a single-cell grid overlay with depth-driven transforms (toasts at depth 3+ fade to invisible), newest on top. Hovering the region or moving keyboard focus into it expands to the normal flex-column stack; leaving re-collapses. `false` (default) renders the plain flex column at all times.
    */
   stacked?: boolean;
+  /**
+   * Opt **out** of the toaster's own announcements. By default the toaster keeps two visually hidden live regions mounted — a polite `role="status"` one and an assertive `role="alert"` one — and writes each toast's `message` into one of them (`error` toasts into the assertive region, every other type into the polite one). Set this when the `#toast` slot content supplies its own `role` / `aria-live`: the toaster then renders no live regions, so nothing is announced twice or nested.
+   */
+  disableAnnounce?: boolean;
   toast?: Snippet<[{ toast: ToastEntry; dismiss: (id: string) => void }]>;
   snippets?: Record<string, any>;
   ondismissed?: (payload: ToastDismissedPayload) => void;
@@ -79,6 +83,7 @@ let {
   ariaLabel = null,
   disableSwipe = false,
   stacked = false,
+  disableAnnounce = false,
   toast: __toastProp,
   snippets,
   ondismissed,
@@ -630,9 +635,19 @@ const onFocusOut = (event: any) => {
 };
 // ---- helpers -----------------------------------------------------------
 const regionLabel = () => ariaLabel != null ? ariaLabel : 'Notifications';
-// Type union: 'info' | 'success' | 'error' | 'warning' | 'loading'. Only
-// error/warning interrupt (assertive); loading (like info/success) is polite.
-const liveFor = (type: any) => type === 'error' || type === 'warning' ? 'assertive' : 'polite';
+// ---- live-region projection ----------------------------------------------
+// The standing polite/assertive regions are a PURE PROJECTION of the toast
+// queue: each region renders one keyed line per matching toast, so a line lives
+// exactly as long as its toast (no second state, no timers, nothing to tear
+// down). A `patch()` that changes the message rewrites that toast's line in
+// place — that text change is what a screen reader announces — and a change to
+// or from 'error' moves the line between regions. Only 'error' is assertive;
+// every other type ('info' | 'success' | 'warning' | 'loading') is polite. The
+// regions are explicitly aria-atomic="false" so a new toast does not re-read
+// the lines of toasts still on screen. Plain functions called with `()` — NOT
+// $computed (playbook section 8) — and no $data write: render purity.
+const politeToasts = () => toasts.filter((t: any) => t.message && t.type !== 'error');
+const assertiveToasts = () => toasts.filter((t: any) => t.message && t.type === 'error');
 
 // ---- lifecycle + handle ------------------------------------------------
 
@@ -642,7 +657,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} onfocusin={($event) => { onFocusIn(); }} onfocusout={($event) => { onFocusOut($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} role="status" aria-live={rozieAttr(liveFor(t.type))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span>{#if t.action}<button type="button" class="rozie-toast-action" onclick={($event) => { runAction(t); }} data-rozie-s-12d4265c>{rozieDisplay(t.action.label)}</button>{/if}<button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
+<div role="region" aria-label={rozieAttr(regionLabel())} {...__rozieAttrs} class={["rozie-toaster", rozieClass('rozie-toaster--' + position + (stacked ? ' rozie-toaster--stacked' : '')), (__rozieAttrs)?.class]} onmouseenter={($event) => { onMouseEnter(); }} onmouseleave={($event) => { onMouseLeave(); }} onfocusin={($event) => { onFocusIn(); }} onfocusout={($event) => { onFocusOut($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-12d4265c>{#if !disableAnnounce}<div class="rozie-toaster-live" data-rozie-s-12d4265c><div role="status" aria-live="polite" aria-atomic="false" data-rozie-s-12d4265c>{#each politeToasts() as line (line.id)}<div data-rozie-s-12d4265c>{rozieDisplay(line.message)}</div>{/each}</div><div role="alert" aria-live="assertive" aria-atomic="false" data-rozie-s-12d4265c>{#each assertiveToasts() as line (line.id)}<div data-rozie-s-12d4265c>{rozieDisplay(line.message)}</div>{/each}</div></div>{/if}{#each toasts as t, ti (t.id)}<div class={["rozie-toast", rozieClass('rozie-toast--' + t.type + (t.exiting ? ' rozie-toast--exiting' : '') + (t.swipeExitSign != null ? ' rozie-toast--swipe-exit' : ''))]} style={rozieStyle(toastStyle(t, ti))} onanimationend={($event) => { t.exiting && removeToast(t.id); }} onpointerdown={($event) => { onToastPointerDown(t, $event); }} onpointermove={($event) => { onToastPointerMove(t, $event); }} onpointerup={($event) => { onToastPointerUp(t, $event); }} onpointercancel={($event) => { onToastPointerCancel(t); }} data-rozie-s-12d4265c>{#if toast}{@render toast({ toast: t, dismiss })}{:else}{#if t.type === 'loading'}<span class="rozie-toast-spinner" aria-hidden="true" data-rozie-s-12d4265c></span>{/if}<span class="rozie-toast-message" data-rozie-s-12d4265c>{rozieDisplay(t.message)}</span>{#if t.action}<button type="button" class="rozie-toast-action" onclick={($event) => { runAction(t); }} data-rozie-s-12d4265c>{rozieDisplay(t.action.label)}</button>{/if}<button type="button" class="rozie-toast-close" aria-label="Dismiss" onclick={($event) => { dismissBegin(t.id, 'close'); }} data-rozie-s-12d4265c>×</button>{/if}</div>{/each}</div>
 
 <style>
 :global {
@@ -669,6 +684,19 @@ onDestroy(() => (() => {
   }
   .rozie-toaster[data-rozie-s-12d4265c] > *[data-rozie-s-12d4265c] {
     pointer-events: auto;
+  }
+  .rozie-toaster[data-rozie-s-12d4265c] > .rozie-toaster-live[data-rozie-s-12d4265c] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    pointer-events: none;
   }
   .rozie-toaster--top-left[data-rozie-s-12d4265c] { top: 0; left: 0; align-items: flex-start; }
   .rozie-toaster--top-right[data-rozie-s-12d4265c] { top: 0; right: 0; align-items: flex-end; }

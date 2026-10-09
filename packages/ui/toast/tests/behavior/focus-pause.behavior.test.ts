@@ -55,7 +55,7 @@ function mountToaster(props: Record<string, unknown> = {}) {
 }
 
 function statusCount(host: HTMLElement): number {
-  return host.querySelectorAll('[role="status"]').length;
+  return host.querySelectorAll('.rozie-toast').length;
 }
 
 function region(host: HTMLElement): HTMLElement {

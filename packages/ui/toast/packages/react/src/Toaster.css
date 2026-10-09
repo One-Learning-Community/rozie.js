@@ -22,6 +22,19 @@
 .rozie-toaster[data-rozie-s-12d4265c] > *[data-rozie-s-12d4265c] {
   pointer-events: auto;
 }
+.rozie-toaster[data-rozie-s-12d4265c] > .rozie-toaster-live[data-rozie-s-12d4265c] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
 .rozie-toaster--top-left[data-rozie-s-12d4265c] { top: 0; left: 0; align-items: flex-start; }
 .rozie-toaster--top-right[data-rozie-s-12d4265c] { top: 0; right: 0; align-items: flex-end; }
 .rozie-toaster--top-center[data-rozie-s-12d4265c] { top: 0; left: 50%; transform: translateX(-50%); align-items: center; }
