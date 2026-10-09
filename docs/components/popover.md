@@ -59,11 +59,11 @@ Two-way bind `open`, project a trigger into the `anchor` slot and the content in
 | Name | Type | Default | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | --- |
 | `open` | `Boolean` | `false` | yes (via `r-model`) | Whether the floating content is open — the sole `model: true` prop, and its change event is the only change signal `Popover` fires (see [Events](#events)). Two-way bind it; `Popover` writes the new state back on every trigger/dismissal/programmatic toggle. |
-| `placement` | `String` | `"bottom"` | yes | Floating UI placement (`top`/`right`/`bottom`/`left`, optionally `-start`/`-end`). May flip to the opposite side on overflow unless `disableFlip` is set. |
+| `placement` | `String` | `"bottom"` | yes | Floating UI placement (`top`/`right`/`bottom`/`left`, optionally `-start`/`-end`). Flips to the opposite side on overflow unless `disableFlip` is set; a `left`/`right` placement with no room on either side falls back to below or above the anchor. See [Staying inside the viewport](#staying-inside-the-viewport). |
 | `trigger` | `String` | `"click"` | no | Open gesture: `'click'` (toggle, popover dialog), `'hover'` or `'focus'` (tooltip), or `'manual'` for a composing component that drives `open` itself — every gesture handler no-ops. Also drives the ARIA: only `'click'` claims a popup on the anchor (`aria-haspopup`/`aria-expanded`/`aria-controls`); tooltips get `aria-describedby`; `'manual'` makes no anchor claim. See [Accessibility](#accessibility). |
 | `offset` | `Number` | `8` | yes | Gap in pixels between anchor and content (the `offset` middleware). |
-| `disableFlip` | `Boolean` | `false` | yes | Disable the `flip` middleware (keep the content pinned to `placement`). |
-| `disableShift` | `Boolean` | `false` | yes | Disable the `shift` middleware (keep the content strictly aligned to the anchor). |
+| `disableFlip` | `Boolean` | `false` | yes | Disable the `flip` middleware (keep the content pinned to `placement`, including the below/above fallback of a `left`/`right` placement). |
+| `disableShift` | `Boolean` | `false` | yes | Disable the `shift` middleware (keep the content strictly aligned to the anchor). Also drops the measured width cap (`--rozie-popover-available-width`). |
 | `arrow` | `Boolean` | `false` | yes | Opt in to a positioned arrow element + the `arrow` middleware. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control entirely: the trigger no longer opens, and open content is suppressed. |
 | `modal` | `Boolean` | `false` | yes | Opt in to modal dialog semantics for a `click` popover. Off by default: a click popover is a non-modal, click-outside-dismissable layer, rendered role-neutral (the slot content owns its ARIA role) with no `aria-modal`. Set `modal` for a true modal dialog (`role="dialog"` + `aria-modal="true"`) — Popover ships no focus trap, so supply your own focus containment. Ignored for `hover`/`focus` (always tooltip). |
@@ -157,6 +157,23 @@ Behavior notes:
 - If a referenced Element is removed from the document while open (for example a calendar re-rendering its event elements), the panel closes: there is nothing left to point at.
 - The `anchor` slot may stay empty. The (zero-content) anchor wrapper still renders.
 - `null` (the default) restores the built-in anchor. `Popover` behaves exactly as it did before the prop existed.
+
+## Staying inside the viewport
+
+By default the panel stays inside the viewport. It flips to the opposite side of the anchor when it would overflow, and a `left` / `right` placement that fits on neither side goes below the anchor, then above it, where `shift` brings it in horizontally. When nothing fits at all (a narrow *and* short viewport), `shift` slides the panel back over the anchor, so its controls stay reachable. `top` / `bottom` placements behave as they always did: a dropdown never jumps beside its trigger.
+
+The panel is also never wider than the area it is positioned in. While it tracks the anchor, `Popover` measures the width available to the panel and sets it on the panel as `--rozie-popover-available-width`. The built-in `max-width` is the smaller of that and `--rozie-popover-max-width`, and the panel is `box-sizing: border-box`, so the cap includes its padding and border.
+
+A `bare` popover has no chrome of its own, so its content can use the same measurement to cap itself:
+
+```css
+.event-card {
+  max-width: var(--rozie-popover-available-width, 100vw);
+}
+```
+
+- The property is set by `Popover`. It is not a theming token: do not set it yourself.
+- `disableShift` turns the measurement off, and `disablePositioning` never measures; the stylesheet then caps the panel at the viewport width.
 
 ## Layout: the root has no box
 
