@@ -13,8 +13,8 @@ export default function SlotConditionalNamedSlotRIf(_props: SlotConditionalNamed
     show: _props.show ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { show, ...rest } = _props as SlotConditionalNamedSlotRIfProps & Record<string, unknown>;
-    void show;
+    const { show, renderHeader, slots, ...rest } = _props as SlotConditionalNamedSlotRIfProps & Record<string, unknown>;
+    void show; void renderHeader; void slots;
     return rest;
   })();
 

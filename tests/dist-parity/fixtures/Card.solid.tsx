@@ -16,7 +16,7 @@ interface CardProps extends Omit<import('solid-js').ComponentProps<'article'>, '
 
 export default function Card(_props: CardProps): JSX.Element {
   const _merged = mergeProps({ title: '', onClose: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['title', 'onClose', 'children']);
+  const [local, attrs] = splitProps(_merged, ['title', 'onClose', 'children', 'slots']);
   const resolved = children(() => local.children);
 
   return (

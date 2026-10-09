@@ -7,7 +7,11 @@ interface PresenceCheckFixtureProps extends Omit<import('react').ComponentPropsW
 }
 
 export default function PresenceCheckFixture(props: PresenceCheckFixtureProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { renderAside, slots, ...rest } = props as PresenceCheckFixtureProps & Record<string, unknown>;
+    void renderAside; void slots;
+    return rest;
+  })();
 
   return (
     <>

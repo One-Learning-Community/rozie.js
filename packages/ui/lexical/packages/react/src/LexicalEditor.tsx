@@ -62,8 +62,8 @@ export default function LexicalEditor(_props: LexicalEditorProps): JSX.Element {
     theme: _props.theme ?? __defaultTheme,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { nodes, namespace, ariaLabel, theme, ...rest } = _props as LexicalEditorProps & Record<string, unknown>;
-    void nodes; void namespace; void ariaLabel; void theme;
+    const { nodes, namespace, ariaLabel, theme, children, slots, ...rest } = _props as LexicalEditorProps & Record<string, unknown>;
+    void nodes; void namespace; void ariaLabel; void theme; void children; void slots;
     return rest;
   })();
   const editor = useRef<any>(null);

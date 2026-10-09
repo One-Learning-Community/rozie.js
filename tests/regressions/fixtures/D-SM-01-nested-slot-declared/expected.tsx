@@ -9,7 +9,11 @@ interface NestedSlotDeclaredProps extends Omit<import('react').ComponentPropsWit
 }
 
 export default function NestedSlotDeclared(props: NestedSlotDeclaredProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { renderWrapper, renderInner, slots, ...rest } = props as NestedSlotDeclaredProps & Record<string, unknown>;
+    void renderWrapper; void renderInner; void slots;
+    return rest;
+  })();
 
   return (
     <>

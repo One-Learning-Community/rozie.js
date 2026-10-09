@@ -52,7 +52,7 @@ interface NodeTypeProps {
 
 export default function NodeType(_props: NodeTypeProps): JSX.Element {
   const _merged = mergeProps({ resizable: false, width: null, height: null, minWidth: null, minHeight: null, maxWidth: null, maxHeight: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['type', 'resizable', 'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'children']);
+  const [local, attrs] = splitProps(_merged, ['type', 'resizable', 'width', 'height', 'minWidth', 'minHeight', 'maxWidth', 'maxHeight', 'children', 'bodySlot', 'slots']);
   const resolved = () => local.children;
 
   const canvas = useContext(rozieContext("rete:canvas"));

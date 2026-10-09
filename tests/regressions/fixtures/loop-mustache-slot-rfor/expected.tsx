@@ -14,8 +14,8 @@ export default function LoopMustacheSlotRfor(_props: LoopMustacheSlotRforProps):
     items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, ...rest } = _props as LoopMustacheSlotRforProps & Record<string, unknown>;
-    void items;
+    const { items, slots, ...rest } = _props as LoopMustacheSlotRforProps & Record<string, unknown>;
+    void items; void slots;
     return rest;
   })();
 

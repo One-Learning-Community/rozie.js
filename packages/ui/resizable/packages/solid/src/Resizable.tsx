@@ -133,7 +133,7 @@ export interface ResizableHandle {
 
 export default function Resizable(_props: ResizableProps): JSX.Element {
   const _merged = mergeProps({ direction: 'horizontal', min: 10, max: 90, disabled: false, ariaLabel: 'Resize panels' }, _props);
-  const [local, attrs] = splitProps(_merged, ['size', 'direction', 'min', 'max', 'disabled', 'ariaLabel', 'ref', 'onResize']);
+  const [local, attrs] = splitProps(_merged, ['size', 'direction', 'min', 'max', 'disabled', 'ariaLabel', 'ref', 'onResize', 'startSlot', 'handleSlot', 'endSlot', 'slots']);
   onMount(() => { local.ref?.({ applySize, reset }); });
 
   const [size, setSize] = createControllableSignal<number>(_props as unknown as Record<string, unknown>, 'size', 50);

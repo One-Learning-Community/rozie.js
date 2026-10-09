@@ -20,7 +20,7 @@ interface SourceProps {
 
 export default function Source(_props: SourceProps): JSX.Element {
   const _merged = mergeProps({ spec: undefined }, _props);
-  const [local, attrs] = splitProps(_merged, ['id', 'spec', 'children']);
+  const [local, attrs] = splitProps(_merged, ['id', 'spec', 'children', 'slots']);
   const resolved = () => local.children;
 
   const sources = useContext(rozieContext("maplibre:sources"));

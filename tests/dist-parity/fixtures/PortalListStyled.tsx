@@ -21,8 +21,8 @@ export default function PortalListStyled(_props: PortalListStyledProps): JSX.Ele
     items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, ...rest } = _props as PortalListStyledProps & Record<string, unknown>;
-    void items;
+    const { items, renderItem, slots, ...rest } = _props as PortalListStyledProps & Record<string, unknown>;
+    void items; void renderItem; void slots;
     return rest;
   })();
   const _renderItemRef = useRef(props.renderItem);

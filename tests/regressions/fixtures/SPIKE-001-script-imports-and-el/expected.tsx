@@ -9,7 +9,11 @@ interface SpikeImportElProps extends Omit<import('react').ComponentPropsWithoutR
 }
 
 export default function SpikeImportEl(props: SpikeImportElProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as SpikeImportElProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
   const instance = useRef<any>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
 

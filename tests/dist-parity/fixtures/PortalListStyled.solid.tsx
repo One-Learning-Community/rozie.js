@@ -37,7 +37,7 @@ interface PortalListStyledProps extends Omit<import('solid-js').ComponentProps<'
 
 export default function PortalListStyled(_props: PortalListStyledProps): JSX.Element {
   const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['items']);
+  const [local, attrs] = splitProps(_merged, ['items', 'itemSlot', 'slots']);
 
   const portalDisposers = new Set<() => void>();
   const portals = {

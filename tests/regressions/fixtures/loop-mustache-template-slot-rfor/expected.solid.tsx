@@ -8,7 +8,7 @@ interface LoopMustacheTemplateSlotRforProps extends Omit<import('solid-js').Comp
 
 export default function LoopMustacheTemplateSlotRfor(_props: LoopMustacheTemplateSlotRforProps): JSX.Element {
   const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['items']);
+  const [local, attrs] = splitProps(_merged, ['items', 'slots']);
 
   function noop(): void {}
 

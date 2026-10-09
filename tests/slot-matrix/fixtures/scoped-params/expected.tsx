@@ -15,8 +15,8 @@ export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): J
     label: _props.label ?? 'item',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { label, ...rest } = _props as ScopedParamsFixtureProps & Record<string, unknown>;
-    void label;
+    const { label, renderItem, slots, ...rest } = _props as ScopedParamsFixtureProps & Record<string, unknown>;
+    void label; void renderItem; void slots;
     return rest;
   })();
 

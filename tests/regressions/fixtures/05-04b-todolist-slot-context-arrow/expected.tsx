@@ -15,8 +15,8 @@ interface ScopedSlotContextProps extends Omit<import('react').ComponentPropsWith
 
 export default function ScopedSlotContext(props: ScopedSlotContextProps): JSX.Element {
   const attrs: Record<string, unknown> = (() => {
-    const { items, defaultValue, onItemsChange, defaultItems, ...rest } = props as ScopedSlotContextProps & Record<string, unknown>;
-    void items; void defaultValue; void onItemsChange; void defaultItems;
+    const { items, defaultValue, onItemsChange, defaultItems, renderItem, slots, ...rest } = props as ScopedSlotContextProps & Record<string, unknown>;
+    void items; void defaultValue; void onItemsChange; void defaultItems; void renderItem; void slots;
     return rest;
   })();
   const [items, setItems] = useControllableState({

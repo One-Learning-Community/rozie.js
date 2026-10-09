@@ -17,8 +17,8 @@ export default function Card(_props: CardProps): JSX.Element {
     onClose: _props.onClose ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { title, onClose, ...rest } = _props as CardProps & Record<string, unknown>;
-    void title; void onClose;
+    const { title, onClose, children, slots, ...rest } = _props as CardProps & Record<string, unknown>;
+    void title; void onClose; void children; void slots;
     return rest;
   })();
 

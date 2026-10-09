@@ -14,7 +14,7 @@ interface PresenceSlotFallbackProps extends Omit<import('solid-js').ComponentPro
 
 export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps): JSX.Element {
   const _merged = mergeProps({ title: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['title', 'children', 'headerSlot', 'slots']);
   const resolved = children(() => local.children);
 
   return (

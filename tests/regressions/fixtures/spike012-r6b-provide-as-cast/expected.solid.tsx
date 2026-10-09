@@ -9,7 +9,7 @@ interface ProvideAsCastProps extends Omit<import('solid-js').ComponentProps<'div
 }
 
 export default function ProvideAsCast(_props: ProvideAsCastProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = () => local.children;
 
   const __ctx_theme = rozieContext("theme");

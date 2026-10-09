@@ -114,7 +114,7 @@ export interface DialogHandle {
 
 export default function Dialog(_props: DialogProps): JSX.Element {
   const _merged = mergeProps({ disableBackdropClose: false, disableEscapeClose: false, disableScrollLock: false, initialFocus: null, ariaLabel: null, ariaLabelledby: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'initialFocus', 'ariaLabel', 'ariaLabelledby', 'children', 'ref', 'onClose']);
+  const [local, attrs] = splitProps(_merged, ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'initialFocus', 'ariaLabel', 'ariaLabelledby', 'children', 'ref', 'onClose', 'slots']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide }); });
 

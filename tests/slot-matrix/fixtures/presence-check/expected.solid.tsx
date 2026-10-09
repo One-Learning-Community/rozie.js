@@ -7,7 +7,7 @@ interface PresenceCheckFixtureProps extends Omit<import('solid-js').ComponentPro
 }
 
 export default function PresenceCheckFixture(_props: PresenceCheckFixtureProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['asideSlot', 'slots']);
 
   return (
     <>

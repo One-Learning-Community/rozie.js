@@ -8,7 +8,11 @@ interface NestedSlotsFixtureProps extends Omit<import('react').ComponentPropsWit
 }
 
 export default function NestedSlotsFixture(props: NestedSlotsFixtureProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { renderWrapper, renderInner, slots, ...rest } = props as NestedSlotsFixtureProps & Record<string, unknown>;
+    void renderWrapper; void renderInner; void slots;
+    return rest;
+  })();
 
   return (
     <>

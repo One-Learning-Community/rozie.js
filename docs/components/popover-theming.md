@@ -32,6 +32,14 @@ The values listed below are exposed as `--rozie-popover-*` custom properties, ea
 | `--rozie-popover-padding` | `8px 12px` |
 | `--rozie-popover-arrow-size` | `8px` |
 
+### Defaulted where Popover reads them
+
+Public, but declared nowhere by `base.css`: the fallback below applies only while no scope sets the token, and it is resolved at the component itself — so it follows a value set on any ancestor (a token it defaults to included).
+
+| Token | Default |
+| --- | --- |
+| `--rozie-popover-available-width` | `100vw` |
+
 ## Design-system bridges
 
 Each package ships token presets that map Popover's tokens onto a known design system's published CSS variables — import `base.css` first, then a bridge:

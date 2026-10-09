@@ -11,7 +11,7 @@ interface ScopedParamsFixtureProps extends Omit<import('solid-js').ComponentProp
 
 export default function ScopedParamsFixture(_props: ScopedParamsFixtureProps): JSX.Element {
   const _merged = mergeProps({ label: 'item' }, _props);
-  const [local, attrs] = splitProps(_merged, ['label']);
+  const [local, attrs] = splitProps(_merged, ['label', 'itemSlot', 'slots']);
 
   return (
     <>

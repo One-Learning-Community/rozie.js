@@ -15,8 +15,8 @@ export default function PresenceSlotFallback(_props: PresenceSlotFallbackProps):
     title: _props.title ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { title, ...rest } = _props as PresenceSlotFallbackProps & Record<string, unknown>;
-    void title;
+    const { title, renderHeader, children, slots, ...rest } = _props as PresenceSlotFallbackProps & Record<string, unknown>;
+    void title; void renderHeader; void children; void slots;
     return rest;
   })();
 

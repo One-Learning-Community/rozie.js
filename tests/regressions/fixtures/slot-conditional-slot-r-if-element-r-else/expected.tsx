@@ -13,8 +13,8 @@ export default function SlotConditionalSlotRIfElementRElse(_props: SlotCondition
     show: _props.show ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { show, ...rest } = _props as SlotConditionalSlotRIfElementRElseProps & Record<string, unknown>;
-    void show;
+    const { show, children, slots, ...rest } = _props as SlotConditionalSlotRIfElementRElseProps & Record<string, unknown>;
+    void show; void children; void slots;
     return rest;
   })();
 

@@ -60,8 +60,8 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
     ariaLabel: _props.ariaLabel ?? 'Resize panels',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { size, direction, min, max, disabled, ariaLabel, defaultValue, onSizeChange, defaultSize, onResize, ...rest } = _props as ResizableProps & Record<string, unknown>;
-    void size; void direction; void min; void max; void disabled; void ariaLabel; void defaultValue; void onSizeChange; void defaultSize; void onResize;
+    const { size, direction, min, max, disabled, ariaLabel, defaultValue, onSizeChange, defaultSize, onResize, renderStart, renderHandle, renderEnd, slots, ...rest } = _props as ResizableProps & Record<string, unknown>;
+    void size; void direction; void min; void max; void disabled; void ariaLabel; void defaultValue; void onSizeChange; void defaultSize; void onResize; void renderStart; void renderHandle; void renderEnd; void slots;
     return rest;
   })();
   const [size, setSize] = useControllableState({

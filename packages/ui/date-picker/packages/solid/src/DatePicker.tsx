@@ -416,7 +416,7 @@ export interface DatePickerHandle {
 
 export default function DatePicker(_props: DatePickerProps): JSX.Element {
   const _merged = mergeProps({ selectionMode: 'single', min: null, max: null, disabledDates: (() => [])() as any[], weekStartsOn: 0, disabled: false, locale: 'en-US', labels: (() => ({}))() as Record<string, any>, presetRanges: (() => [])() as any[], monthYearNav: true, numberOfMonths: 1, showFooter: false, disabledDaysOfWeek: (() => [])() as any[], isDateDisabled: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['value', 'selectionMode', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale', 'labels', 'presetRanges', 'monthYearNav', 'numberOfMonths', 'showFooter', 'disabledDaysOfWeek', 'isDateDisabled', 'ref', 'onChange', 'onRangeComplete']);
+  const [local, attrs] = splitProps(_merged, ['value', 'selectionMode', 'min', 'max', 'disabledDates', 'weekStartsOn', 'disabled', 'locale', 'labels', 'presetRanges', 'monthYearNav', 'numberOfMonths', 'showFooter', 'disabledDaysOfWeek', 'isDateDisabled', 'ref', 'onChange', 'onRangeComplete', 'headerSlot', 'footerSlot', 'presetsSlot', 'slots']);
   onMount(() => { local.ref?.({ focus, goToToday, clear }); });
 
   const [value, setValue] = createControllableSignal<string | Record<string, any>>(_props as unknown as Record<string, unknown>, 'value', '');

@@ -17,8 +17,8 @@ export default function PortalOverlay(_props: PortalOverlayProps): JSX.Element {
     to: _props.to ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, to, ...rest } = _props as PortalOverlayProps & Record<string, unknown>;
-    void open; void to;
+    const { open, to, children, slots, ...rest } = _props as PortalOverlayProps & Record<string, unknown>;
+    void open; void to; void children; void slots;
     return rest;
   })();
 

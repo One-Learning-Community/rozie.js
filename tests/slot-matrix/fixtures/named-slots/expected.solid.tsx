@@ -8,7 +8,7 @@ interface NamedSlotsFixtureProps extends Omit<import('solid-js').ComponentProps<
 }
 
 export default function NamedSlotsFixture(_props: NamedSlotsFixtureProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['headerSlot', 'footerSlot', 'slots']);
 
   return (
     <>

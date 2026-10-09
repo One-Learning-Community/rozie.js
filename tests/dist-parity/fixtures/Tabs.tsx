@@ -10,7 +10,11 @@ interface TabsProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>
 
 export default function Tabs(props: TabsProps): JSX.Element {
   const __ctx_tabs = rozieContext("tabs");
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as TabsProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
   const [active, setActive] = useState(0);
 
   // NOTE: this helper is intentionally NOT named `setActive` — React

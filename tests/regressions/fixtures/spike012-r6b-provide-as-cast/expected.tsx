@@ -9,7 +9,11 @@ interface ProvideAsCastProps extends Omit<import('react').ComponentPropsWithoutR
 
 export default function ProvideAsCast(props: ProvideAsCastProps): JSX.Element {
   const __ctx_theme = rozieContext("theme");
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as ProvideAsCastProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
   const [color, setColor] = useState('red');
 
   return (

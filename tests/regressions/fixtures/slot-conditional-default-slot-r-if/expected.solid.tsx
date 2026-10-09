@@ -10,7 +10,7 @@ interface SlotConditionalDefaultSlotRIfProps extends Omit<import('solid-js').Com
 
 export default function SlotConditionalDefaultSlotRIf(_props: SlotConditionalDefaultSlotRIfProps): JSX.Element {
   const _merged = mergeProps({ show: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['show', 'children']);
+  const [local, attrs] = splitProps(_merged, ['show', 'children', 'slots']);
   const resolved = children(() => local.children);
 
   function noop(): void {}

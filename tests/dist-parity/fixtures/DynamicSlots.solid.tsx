@@ -16,7 +16,7 @@ interface DynamicSlotsProps extends Omit<import('solid-js').ComponentProps<'div'
 
 export default function DynamicSlots(_props: DynamicSlotsProps): JSX.Element {
   const _merged = mergeProps({ columns: (() => [])() as any[], row: (() => ({}))() as Record<string, any>, total: 0, heading: 'Header' }, _props);
-  const [local, attrs] = splitProps(_merged, ['columns', 'row', 'total', 'heading']);
+  const [local, attrs] = splitProps(_merged, ['columns', 'row', 'total', 'heading', 'headerCellSlot', 'slots']);
 
   const [freeSlotName, setFreeSlotName] = createSignal('freeform');
 

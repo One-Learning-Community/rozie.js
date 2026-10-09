@@ -7,7 +7,11 @@ interface DefaultSlotFixtureProps extends Omit<import('react').ComponentPropsWit
 }
 
 export default function DefaultSlotFixture(props: DefaultSlotFixtureProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as DefaultSlotFixtureProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
 
   return (
     <>

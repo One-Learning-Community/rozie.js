@@ -8,7 +8,7 @@ interface DefaultSlotFixtureProps extends Omit<import('solid-js').ComponentProps
 }
 
 export default function DefaultSlotFixture(_props: DefaultSlotFixtureProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = children(() => local.children);
 
   return (

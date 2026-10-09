@@ -16,7 +16,7 @@ interface ThemePassthroughProps extends Omit<import('solid-js').ComponentProps<'
 }
 
 export default function ThemePassthrough(_props: ThemePassthroughProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = children(() => local.children);
 
   return (

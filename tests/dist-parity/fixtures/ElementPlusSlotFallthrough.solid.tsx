@@ -19,7 +19,7 @@ interface ElementPlusSlotFallthroughProps extends Omit<import('solid-js').Compon
 
 export default function ElementPlusSlotFallthrough(_props: ElementPlusSlotFallthroughProps): JSX.Element {
   const _merged = mergeProps({ variant: 'primary' }, _props);
-  const [local, attrs] = splitProps(_merged, ['variant', 'children']);
+  const [local, attrs] = splitProps(_merged, ['variant', 'children', 'headerSlot', 'footerSlot', 'slots']);
   const resolved = children(() => local.children);
 
   return (

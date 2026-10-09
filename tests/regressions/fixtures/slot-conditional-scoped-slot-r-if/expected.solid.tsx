@@ -13,7 +13,7 @@ interface SlotConditionalScopedSlotRIfProps extends Omit<import('solid-js').Comp
 
 export default function SlotConditionalScopedSlotRIf(_props: SlotConditionalScopedSlotRIfProps): JSX.Element {
   const _merged = mergeProps({ show: false, title: '' }, _props);
-  const [local, attrs] = splitProps(_merged, ['show', 'title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['show', 'title', 'children', 'slots']);
   const resolved = children(() => local.children as JSX.Element);
 
   function noop(): void {}

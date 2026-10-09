@@ -102,7 +102,7 @@ export default function Bubble(_props: BubbleProps): JSX.Element {
   labels: [],
   datasets: []
 }))() as Record<string, any>, options: (() => ({}))() as Record<string, any>, height: 240, width: undefined, plugins: (() => [])() as any[], updateMode: undefined, redraw: false, ariaLabel: undefined, datasetIdKey: 'label', destroyDelay: 0 }, _props);
-  const [local, attrs] = splitProps(_merged, ['data', 'options', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'datasetIdKey', 'destroyDelay', 'ref', 'onClick', 'onDatasetClick', 'onHover']);
+  const [local, attrs] = splitProps(_merged, ['data', 'options', 'height', 'width', 'plugins', 'updateMode', 'redraw', 'ariaLabel', 'datasetIdKey', 'destroyDelay', 'ref', 'onClick', 'onDatasetClick', 'onHover', 'fallbackSlot', 'tooltipSlot', 'slots']);
   onMount(() => { local.ref?.({ getChart, updateChart, resizeChart, resetChart, renderChart, stopChart, clearChart, toBase64Image, setDatasetVisibility, isDatasetVisible, hideDataset, showDataset, setActiveElements, getActiveElements, getDatasetMeta }); });
 
   const portalDisposers = new Set<() => void>();

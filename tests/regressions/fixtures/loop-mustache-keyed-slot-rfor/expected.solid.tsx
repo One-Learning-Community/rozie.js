@@ -9,7 +9,7 @@ interface LoopMustacheKeyedSlotRforProps extends Omit<import('solid-js').Compone
 
 export default function LoopMustacheKeyedSlotRfor(_props: LoopMustacheKeyedSlotRforProps): JSX.Element {
   const _merged = mergeProps({ rows: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['rows']);
+  const [local, attrs] = splitProps(_merged, ['rows', 'slots']);
 
   function noop(): void {}
 

@@ -33,7 +33,7 @@ interface PortalOverlayProps {
 
 export default function PortalOverlay(_props: PortalOverlayProps): JSX.Element {
   const _merged = mergeProps({ open: false, to: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'to', 'children']);
+  const [local, attrs] = splitProps(_merged, ['open', 'to', 'children', 'slots']);
   const resolved = children(() => local.children);
 
   function resolveTo(to: any) {

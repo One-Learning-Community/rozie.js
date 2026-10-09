@@ -39,7 +39,7 @@ export interface DropdownHandle {
 
 export default function Dropdown(_props: DropdownProps): JSX.Element {
   const _merged = mergeProps({ closeOnOutsideClick: true, closeOnEscape: true }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['open', 'closeOnOutsideClick', 'closeOnEscape', 'children', 'ref', 'triggerSlot', 'slots']);
   const resolved = children(() => local.children as JSX.Element);
   onMount(() => { local.ref?.({ toggle, close }); });
 

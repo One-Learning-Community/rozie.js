@@ -13,7 +13,7 @@ interface ThemeProviderProps extends Omit<import('solid-js').ComponentProps<'div
 }
 
 export default function ThemeProvider(_props: ThemeProviderProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = () => local.children;
 
   const __ctx_theme = rozieContext("theme");

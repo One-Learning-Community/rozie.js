@@ -13,8 +13,8 @@ export default function SlotConditionalSlotInElseifChain(_props: SlotConditional
     mode: _props.mode ?? 0,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { mode, ...rest } = _props as SlotConditionalSlotInElseifChainProps & Record<string, unknown>;
-    void mode;
+    const { mode, children, slots, ...rest } = _props as SlotConditionalSlotInElseifChainProps & Record<string, unknown>;
+    void mode; void children; void slots;
     return rest;
   })();
 

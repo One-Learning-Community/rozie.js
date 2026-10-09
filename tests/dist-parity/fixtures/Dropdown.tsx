@@ -31,8 +31,8 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
     closeOnEscape: _props.closeOnEscape ?? true,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, closeOnOutsideClick, closeOnEscape, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as DropdownProps & Record<string, unknown>;
-    void open; void closeOnOutsideClick; void closeOnEscape; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, closeOnOutsideClick, closeOnEscape, defaultValue, onOpenChange, defaultOpen, renderTrigger, children, slots, ...rest } = _props as DropdownProps & Record<string, unknown>;
+    void open; void closeOnOutsideClick; void closeOnEscape; void defaultValue; void onOpenChange; void defaultOpen; void renderTrigger; void children; void slots;
     return rest;
   })();
   const [open, setOpen] = useControllableState({

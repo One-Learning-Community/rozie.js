@@ -10,7 +10,7 @@ interface SlotConditionalSlotInElseifChainProps extends Omit<import('solid-js').
 
 export default function SlotConditionalSlotInElseifChain(_props: SlotConditionalSlotInElseifChainProps): JSX.Element {
   const _merged = mergeProps({ mode: 0 }, _props);
-  const [local, attrs] = splitProps(_merged, ['mode', 'children']);
+  const [local, attrs] = splitProps(_merged, ['mode', 'children', 'slots']);
   const resolved = children(() => local.children);
 
   function noop(): void {}

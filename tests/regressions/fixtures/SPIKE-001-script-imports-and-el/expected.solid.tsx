@@ -9,7 +9,7 @@ interface SpikeImportElProps extends Omit<import('solid-js').ComponentProps<'div
 }
 
 export default function SpikeImportEl(_props: SpikeImportElProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = children(() => local.children);
 
   onMount(() => {

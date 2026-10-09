@@ -25,8 +25,8 @@ export default function Source(_props: SourceProps): JSX.Element {
     spec: _props.spec ?? undefined,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { id, spec, ...rest } = _props as SourceProps & Record<string, unknown>;
-    void id; void spec;
+    const { id, spec, children, slots, ...rest } = _props as SourceProps & Record<string, unknown>;
+    void id; void spec; void children; void slots;
     return rest;
   })();
   const reg = useRef<any>(null);

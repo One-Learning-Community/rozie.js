@@ -94,7 +94,7 @@ interface LexicalEditorProps extends Omit<import('solid-js').ComponentProps<'div
 
 export default function LexicalEditor(_props: LexicalEditorProps): JSX.Element {
   const _merged = mergeProps({ nodes: (() => [])() as any[], namespace: '', ariaLabel: null, theme: (() => ({}))() as Record<string, any> }, _props);
-  const [local, attrs] = splitProps(_merged, ['nodes', 'namespace', 'ariaLabel', 'theme', 'children']);
+  const [local, attrs] = splitProps(_merged, ['nodes', 'namespace', 'ariaLabel', 'theme', 'children', 'slots']);
   const resolved = () => local.children;
 
   const __ctx_rozie_lexical_editor = rozieContext("rozie-lexical-editor");

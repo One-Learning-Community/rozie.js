@@ -22,7 +22,7 @@ interface PartCardProps extends Omit<import('solid-js').ComponentProps<'div'>, '
 
 export default function PartCard(_props: PartCardProps): JSX.Element {
   const _merged = mergeProps({ title: 'Card' }, _props);
-  const [local, attrs] = splitProps(_merged, ['title', 'children']);
+  const [local, attrs] = splitProps(_merged, ['title', 'children', 'slots']);
   const resolved = children(() => local.children);
 
   return (

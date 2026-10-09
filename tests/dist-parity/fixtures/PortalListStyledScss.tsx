@@ -22,8 +22,8 @@ export default function PortalListStyledScss(_props: PortalListStyledScssProps):
     items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, ...rest } = _props as PortalListStyledScssProps & Record<string, unknown>;
-    void items;
+    const { items, renderItem, slots, ...rest } = _props as PortalListStyledScssProps & Record<string, unknown>;
+    void items; void renderItem; void slots;
     return rest;
   })();
   const _renderItemRef = useRef(props.renderItem);

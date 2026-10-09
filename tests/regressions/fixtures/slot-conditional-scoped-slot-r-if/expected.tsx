@@ -17,8 +17,8 @@ export default function SlotConditionalScopedSlotRIf(_props: SlotConditionalScop
     title: _props.title ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { show, title, ...rest } = _props as SlotConditionalScopedSlotRIfProps & Record<string, unknown>;
-    void show; void title;
+    const { show, title, children, slots, ...rest } = _props as SlotConditionalScopedSlotRIfProps & Record<string, unknown>;
+    void show; void title; void children; void slots;
     return rest;
   })();
 

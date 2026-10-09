@@ -19,8 +19,8 @@ export default function WrapperModal(_props: WrapperModalProps): JSX.Element {
     title: _props.title ?? 'Wrapped',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { title, open, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as WrapperModalProps & Record<string, unknown>;
-    void title; void open; void defaultValue; void onOpenChange; void defaultOpen;
+    const { title, open, defaultValue, onOpenChange, defaultOpen, renderBrand, children, renderActions, slots, ...rest } = _props as WrapperModalProps & Record<string, unknown>;
+    void title; void open; void defaultValue; void onOpenChange; void defaultOpen; void renderBrand; void children; void renderActions; void slots;
     return rest;
   })();
   const [open, setOpen] = useControllableState({

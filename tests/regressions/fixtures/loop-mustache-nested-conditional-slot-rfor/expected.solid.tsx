@@ -8,7 +8,7 @@ interface LoopMustacheNestedConditionalSlotRforProps extends Omit<import('solid-
 
 export default function LoopMustacheNestedConditionalSlotRfor(_props: LoopMustacheNestedConditionalSlotRforProps): JSX.Element {
   const _merged = mergeProps({ items: (() => [])() as any[] }, _props);
-  const [local, attrs] = splitProps(_merged, ['items']);
+  const [local, attrs] = splitProps(_merged, ['items', 'slots']);
 
   function noop(): void {}
 

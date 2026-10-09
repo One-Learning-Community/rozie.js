@@ -10,7 +10,7 @@ interface WrapperProps {
 }
 
 export default function Wrapper(_props: WrapperProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'titleSlot', 'slots']);
   const resolved = children(() => local.children);
 
   return (

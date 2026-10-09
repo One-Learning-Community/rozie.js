@@ -31,7 +31,7 @@ interface TodoListProps extends Omit<import('solid-js').ComponentProps<'div'>, '
 
 export default function TodoList(_props: TodoListProps): JSX.Element {
   const _merged = mergeProps({ title: 'Todo' }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'title', 'children', 'onAdd', 'onToggle', 'onRemove']);
+  const [local, attrs] = splitProps(_merged, ['items', 'title', 'children', 'onAdd', 'onToggle', 'onRemove', 'headerSlot', 'emptySlot', 'slots']);
   const resolved = children(() => local.children as JSX.Element);
 
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());

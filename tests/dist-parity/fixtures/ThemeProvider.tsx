@@ -10,7 +10,11 @@ interface ThemeProviderProps extends Omit<import('react').ComponentPropsWithoutR
 
 export default function ThemeProvider(props: ThemeProviderProps): JSX.Element {
   const __ctx_theme = rozieContext("theme");
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as ThemeProviderProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
   const [color, setColor] = useState('red');
 
   // The cycle order. A plain module constant — never reassigned.

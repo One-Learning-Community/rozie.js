@@ -130,8 +130,8 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
     isDateDisabled: _props.isDateDisabled ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, selectionMode, min, max, disabledDates, weekStartsOn, disabled, locale, labels, presetRanges, monthYearNav, numberOfMonths, showFooter, disabledDaysOfWeek, isDateDisabled, defaultValue, onValueChange, onChange, onRangeComplete, ...rest } = _props as DatePickerProps & Record<string, unknown>;
-    void value; void selectionMode; void min; void max; void disabledDates; void weekStartsOn; void disabled; void locale; void labels; void presetRanges; void monthYearNav; void numberOfMonths; void showFooter; void disabledDaysOfWeek; void isDateDisabled; void defaultValue; void onValueChange; void onChange; void onRangeComplete;
+    const { value, selectionMode, min, max, disabledDates, weekStartsOn, disabled, locale, labels, presetRanges, monthYearNav, numberOfMonths, showFooter, disabledDaysOfWeek, isDateDisabled, defaultValue, onValueChange, onChange, onRangeComplete, renderHeader, renderFooter, renderPresets, slots, ...rest } = _props as DatePickerProps & Record<string, unknown>;
+    void value; void selectionMode; void min; void max; void disabledDates; void weekStartsOn; void disabled; void locale; void labels; void presetRanges; void monthYearNav; void numberOfMonths; void showFooter; void disabledDaysOfWeek; void isDateDisabled; void defaultValue; void onValueChange; void onChange; void onRangeComplete; void renderHeader; void renderFooter; void renderPresets; void slots;
     return rest;
   })();
   const [value, setValue] = useControllableState({

@@ -14,8 +14,8 @@ export default function LoopMustacheNestedConditionalSlotRfor(_props: LoopMustac
     items: _props.items ?? __defaultItems,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, ...rest } = _props as LoopMustacheNestedConditionalSlotRforProps & Record<string, unknown>;
-    void items;
+    const { items, slots, ...rest } = _props as LoopMustacheNestedConditionalSlotRforProps & Record<string, unknown>;
+    void items; void slots;
     return rest;
   })();
 

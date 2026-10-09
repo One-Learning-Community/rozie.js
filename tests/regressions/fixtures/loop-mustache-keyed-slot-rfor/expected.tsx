@@ -14,8 +14,8 @@ export default function LoopMustacheKeyedSlotRfor(_props: LoopMustacheKeyedSlotR
     rows: _props.rows ?? __defaultRows,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { rows, ...rest } = _props as LoopMustacheKeyedSlotRforProps & Record<string, unknown>;
-    void rows;
+    const { rows, slots, ...rest } = _props as LoopMustacheKeyedSlotRforProps & Record<string, unknown>;
+    void rows; void slots;
     return rest;
   })();
 

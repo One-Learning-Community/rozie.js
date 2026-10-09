@@ -8,7 +8,11 @@ interface ThemePassthroughProps extends Omit<import('react').ComponentPropsWitho
 }
 
 export default function ThemePassthrough(props: ThemePassthroughProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { children, slots, ...rest } = props as ThemePassthroughProps & Record<string, unknown>;
+    void children; void slots;
+    return rest;
+  })();
 
   return (
     <>

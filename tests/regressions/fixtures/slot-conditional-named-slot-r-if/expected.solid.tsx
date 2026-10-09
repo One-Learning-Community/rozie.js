@@ -9,7 +9,7 @@ interface SlotConditionalNamedSlotRIfProps extends Omit<import('solid-js').Compo
 
 export default function SlotConditionalNamedSlotRIf(_props: SlotConditionalNamedSlotRIfProps): JSX.Element {
   const _merged = mergeProps({ show: false }, _props);
-  const [local, attrs] = splitProps(_merged, ['show']);
+  const [local, attrs] = splitProps(_merged, ['show', 'headerSlot', 'slots']);
 
   function noop(): void {}
 

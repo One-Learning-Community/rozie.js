@@ -89,8 +89,8 @@ const Slider = forwardRef<SliderHandle, SliderProps>(function Slider(_props: Sli
     showValue: _props.showValue ?? false,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { value, range, min, max, step, orientation, disabled, marks, ariaLabel, pageStep, formatValue, showValue, defaultValue, onValueChange, onChange, ...rest } = _props as SliderProps & Record<string, unknown>;
-    void value; void range; void min; void max; void step; void orientation; void disabled; void marks; void ariaLabel; void pageStep; void formatValue; void showValue; void defaultValue; void onValueChange; void onChange;
+    const { value, range, min, max, step, orientation, disabled, marks, ariaLabel, pageStep, formatValue, showValue, defaultValue, onValueChange, onChange, renderMark, renderBubble, slots, ...rest } = _props as SliderProps & Record<string, unknown>;
+    void value; void range; void min; void max; void step; void orientation; void disabled; void marks; void ariaLabel; void pageStep; void formatValue; void showValue; void defaultValue; void onValueChange; void onChange; void renderMark; void renderBubble; void slots;
     return rest;
   })();
   const [value, setValue] = useControllableState({

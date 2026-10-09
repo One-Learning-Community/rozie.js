@@ -16,8 +16,8 @@ export default function ElementPlusSlotFallthrough(_props: ElementPlusSlotFallth
     variant: _props.variant ?? 'primary',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { variant, ...rest } = _props as ElementPlusSlotFallthroughProps & Record<string, unknown>;
-    void variant;
+    const { variant, renderHeader, children, renderFooter, slots, ...rest } = _props as ElementPlusSlotFallthroughProps & Record<string, unknown>;
+    void variant; void renderHeader; void children; void renderFooter; void slots;
     return rest;
   })();
 

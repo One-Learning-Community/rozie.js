@@ -11,7 +11,7 @@ interface NestedSlotDeclaredProps extends Omit<import('solid-js').ComponentProps
 }
 
 export default function NestedSlotDeclared(_props: NestedSlotDeclaredProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['wrapperSlot', 'innerSlot', 'slots']);
 
   return (
     <>

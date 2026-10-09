@@ -8,7 +8,7 @@ interface NestedSlotsFixtureProps extends Omit<import('solid-js').ComponentProps
 }
 
 export default function NestedSlotsFixture(_props: NestedSlotsFixtureProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['wrapperSlot', 'innerSlot', 'slots']);
 
   return (
     <>

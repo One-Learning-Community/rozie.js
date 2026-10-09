@@ -8,7 +8,11 @@ interface NamedSlotsFixtureProps extends Omit<import('react').ComponentPropsWith
 }
 
 export default function NamedSlotsFixture(props: NamedSlotsFixtureProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { renderHeader, renderFooter, slots, ...rest } = props as NamedSlotsFixtureProps & Record<string, unknown>;
+    void renderHeader; void renderFooter; void slots;
+    return rest;
+  })();
 
   return (
     <>

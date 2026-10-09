@@ -24,8 +24,8 @@ export default function DynamicSlots(_props: DynamicSlotsProps): JSX.Element {
     heading: _props.heading ?? 'Header',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { columns, row, total, heading, ...rest } = _props as DynamicSlotsProps & Record<string, unknown>;
-    void columns; void row; void total; void heading;
+    const { columns, row, total, heading, renderHeaderCell, slots, ...rest } = _props as DynamicSlotsProps & Record<string, unknown>;
+    void columns; void row; void total; void heading; void renderHeaderCell; void slots;
     return rest;
   })();
   const [freeSlotName, setFreeSlotName] = useState('freeform');

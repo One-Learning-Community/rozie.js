@@ -14,8 +14,8 @@ export default function PartCard(_props: PartCardProps): JSX.Element {
     title: _props.title ?? 'Card',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { title, ...rest } = _props as PartCardProps & Record<string, unknown>;
-    void title;
+    const { title, children, slots, ...rest } = _props as PartCardProps & Record<string, unknown>;
+    void title; void children; void slots;
     return rest;
   })();
 

@@ -15,7 +15,7 @@ interface TabsProps extends Omit<import('solid-js').ComponentProps<'div'>, 'chil
 }
 
 export default function Tabs(_props: TabsProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, ['children']);
+  const [local, attrs] = splitProps(_props, ['children', 'slots']);
   const resolved = () => local.children;
 
   const __ctx_tabs = rozieContext("tabs");

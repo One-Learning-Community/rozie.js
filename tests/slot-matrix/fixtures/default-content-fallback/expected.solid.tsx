@@ -7,7 +7,7 @@ interface DefaultContentFallbackFixtureProps extends Omit<import('solid-js').Com
 }
 
 export default function DefaultContentFallbackFixture(_props: DefaultContentFallbackFixtureProps): JSX.Element {
-  const [local, attrs] = splitProps(_props, []);
+  const [local, attrs] = splitProps(_props, ['statusSlot', 'slots']);
 
   return (
     <>

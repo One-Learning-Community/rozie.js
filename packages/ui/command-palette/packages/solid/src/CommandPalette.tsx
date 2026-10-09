@@ -537,7 +537,7 @@ export interface CommandPaletteHandle {
 
 export default function CommandPalette(_props: CommandPaletteProps): JSX.Element {
   const _merged = mergeProps({ score: null, items: (() => [])() as any[], defaultItems: (() => [])() as any[], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: '', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'defaultItems', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'groupCap', 'appendTo', 'virtual', 'virtualMaxHeight', 'virtualEstimateRowHeight', 'ref', 'onNavigate', 'onBack', 'onSelect', 'onActionSelect']);
+  const [local, attrs] = splitProps(_merged, ['open', 'query', 'score', 'items', 'defaultItems', 'placeholder', 'emptyText', 'closeOnSelect', 'ariaLabel', 'idBase', 'searchDebounce', 'actionKey', 'closeOnAction', 'groupCap', 'appendTo', 'virtual', 'virtualMaxHeight', 'virtualEstimateRowHeight', 'ref', 'onNavigate', 'onBack', 'onSelect', 'onActionSelect', 'breadcrumbSlot', 'optionSlot', 'groupHeadingSlot', 'emptySlot', 'argsFieldSlot', 'loadingSlot', 'errorSlot', 'footerSlot', 'actionItemSlot', 'iconSlot', 'actionsSlot', 'trailingSlot', 'slots']);
   onMount(() => { local.ref?.({ show, close, toggle, focus, goBack, openTo }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);

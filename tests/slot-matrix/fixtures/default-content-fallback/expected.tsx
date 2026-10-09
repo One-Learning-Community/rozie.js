@@ -7,7 +7,11 @@ interface DefaultContentFallbackFixtureProps extends Omit<import('react').Compon
 }
 
 export default function DefaultContentFallbackFixture(props: DefaultContentFallbackFixtureProps): JSX.Element {
-  const attrs = props as Record<string, unknown>;
+  const attrs: Record<string, unknown> = (() => {
+    const { renderStatus, slots, ...rest } = props as DefaultContentFallbackFixtureProps & Record<string, unknown>;
+    void renderStatus; void slots;
+    return rest;
+  })();
 
   return (
     <>
