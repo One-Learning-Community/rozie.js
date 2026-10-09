@@ -1,5 +1,8 @@
 // Vitest config for @rozie-ui/tiptap.
 //
+// No `include` allowlist: vitest's default glob collects every *.test.* /
+// *.spec.* file under this package, so a test added outside tests/ is still run.
+//
 // Test surfaces:
 //   • tests/*.test.ts — compile()/lowerToIR surface gates and lazy-extension /
 //     collision / sidecar contracts. Pure @rozie/core, no DOM.
@@ -61,7 +64,6 @@ export default defineConfig({
   test: {
     globals: false,
     environment: 'node',
-    include: ['tests/**/*.test.ts'],
     root: __dirname,
     testTimeout: 30000,
   },
