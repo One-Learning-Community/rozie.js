@@ -68,6 +68,9 @@ for (const target of TARGETS) {
     await anchor.click();
     await expect(panel).toBeVisible({ timeout: 10_000 });
     await expect(content).toBeVisible();
+    // A default click popover has no dialog role, and aria-modal is only allowed on
+    // dialog roles (axe aria-allowed-attr, 261008-mms): the attribute must be absent.
+    await expect(panel).not.toHaveAttribute('aria-modal');
     await expect(value).toHaveText('open');
     await expect(change).toHaveText('true');
 
