@@ -1,5 +1,14 @@
 # @rozie-ui/fullcalendar-solid
 
+## 0.2.2
+
+### Patch Changes
+
+- 935985f: Every event ref now carries `allDay`: `FullCalendarEventRef` is `{ id, title, start, end, allDay }`. It is on `eventDrop` and `eventResize` (both `event` and `oldEvent`), and on `eventClick`, `eventMouseEnter`, `eventMouseLeave` and each `eventsSet` entry. In an `eventDrop` handler `event.allDay !== oldEvent.allDay` tells a drop onto or off the all-day row from a plain move, with no `getApi().getEventById(id)` lookup.
+
+  The field is additive. TypeScript code that builds a `FullCalendarEventRef` by hand (a test double, for instance) must now include `allDay`.
+  - @rozie/runtime-solid@0.9.1
+
 ## 0.2.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@rozie/runtime-angular",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "type": "module",
   "private": false,
   "sideEffects": false,

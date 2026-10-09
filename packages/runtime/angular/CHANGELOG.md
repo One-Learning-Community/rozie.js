@@ -1,5 +1,7 @@
 # @rozie/runtime-angular
 
+## 0.9.1
+
 ## 0.9.0
 
 ### Patch Changes

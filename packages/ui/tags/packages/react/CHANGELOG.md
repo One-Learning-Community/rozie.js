@@ -1,5 +1,12 @@
 # @rozie-ui/tags-react
 
+## 0.1.14
+
+### Patch Changes
+
+- 67902f8: React and Solid: slot props passed to the component are no longer part of the attribute pass-through spread onto its root element. On Solid a slot render function passed as `<name>Slot` (or a `slots` record) was written to the DOM as an attribute holding the function source; on React the slot members (`render<Name>`, `children`, `slots`) were left in the rest bucket. Regenerated with the compiler fix; no API change.
+  - @rozie/runtime-react@0.9.1
+
 ## 0.1.13
 
 ### Patch Changes
