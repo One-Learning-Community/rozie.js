@@ -160,7 +160,7 @@ Behavior notes:
 
 ## Staying inside the viewport
 
-By default the panel stays inside the viewport. It flips to the opposite side of the anchor when it would overflow, and a `left` / `right` placement that fits on neither side goes below the anchor, then above it, where `shift` brings it in horizontally. When nothing fits at all (a narrow *and* short viewport), `shift` slides the panel back over the anchor, so its controls stay reachable. `top` / `bottom` placements behave as they always did: a dropdown never jumps beside its trigger.
+By default the panel stays inside the viewport. It flips to the opposite side of the anchor when it would overflow, and a `left` / `right` placement that fits on neither side goes below the anchor, then above it, where `shift` brings it in horizontally. When nothing fits at all (a narrow *and* short viewport), the panel stays on the placement that overflows least; if that is still a `left` / `right` placement, `shift` slides it back over the anchor so its controls stay reachable. A panel that has fallen back below or above is never pushed back up over its anchor. `top` / `bottom` placements behave as they always did: a dropdown never jumps beside its trigger.
 
 The panel is also never wider than the area it is positioned in. While it tracks the anchor, `Popover` measures the width available to the panel and sets it on the panel as `--rozie-popover-available-width`. The built-in `max-width` is the smaller of that and `--rozie-popover-max-width`, and the panel is `box-sizing: border-box`, so the cap includes its padding and border.
 

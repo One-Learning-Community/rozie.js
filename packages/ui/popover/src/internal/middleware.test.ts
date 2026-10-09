@@ -185,14 +185,24 @@ describe('buildMiddleware flip/shift option functions', () => {
     }
   });
 
-  it('U2 shift: crossAxis is on for side placements and off for vertical ones', () => {
-    const opts = optionsOf('shift');
-    expect(typeof opts).toBe('function');
-    for (const initialPlacement of ['right-start', 'left-end', 'right', 'left']) {
-      expect(opts({ initialPlacement })).toEqual({ crossAxis: true });
+  // shift is keyed on the CURRENT (post-flip) placement, not the initial one: after
+  // flip falls a side placement back to bottom/top the cross axis is vertical and
+  // sliding across it would push the panel over its own anchor (review finding A).
+  it('U2 shift: crossAxis is on while the resolved placement is a side and off for vertical ones', () => {
+    const optsFn = optionsOf('shift') as unknown as (state: {
+      initialPlacement: string;
+      placement: string;
+    }) => unknown;
+    expect(typeof optsFn).toBe('function');
+    for (const placement of ['right-start', 'left-end', 'right', 'left']) {
+      expect(optsFn({ initialPlacement: placement, placement })).toEqual({ crossAxis: true });
     }
-    for (const initialPlacement of ['bottom', 'top-start', 'bottom-end']) {
-      expect(opts({ initialPlacement })).toEqual({ crossAxis: false });
+    for (const placement of ['bottom', 'top-start', 'bottom-end']) {
+      expect(optsFn({ initialPlacement: placement, placement })).toEqual({ crossAxis: false });
+    }
+    // flip fell back from a side placement to below/above: crossAxis goes off again
+    for (const placement of ['bottom-start', 'top-end']) {
+      expect(optsFn({ initialPlacement: 'right-start', placement })).toEqual({ crossAxis: false });
     }
   });
 
@@ -341,6 +351,28 @@ describe('buildMiddleware against the real Floating UI engine', () => {
       },
       builderStack(),
     );
+    expect(r.left).toBeGreaterThanOrEqual(0);
+    expect(r.right).toBeLessThanOrEqual(390);
+  });
+
+  // Review finding A: once flip has fallen back from a side placement to bottom/top,
+  // the cross axis is VERTICAL, so shift's crossAxis would push a panel that overflows
+  // the viewport bottom up over its own anchor. A bottom/top dropdown must not do that.
+  it('E5b S7b: narrow AND short — a side placement that falls back to bottom does not cover the anchor', async () => {
+    const scene: Scene = {
+      viewport: { width: 390, height: 300 },
+      ref: { x: 105, y: 20, width: 48, height: 40 },
+      floating: { width: 360, height: 270 },
+      placement: 'right-start',
+    };
+    const r = await place(scene, builderStack());
+    expect(r.placement.startsWith('bottom') || r.placement.startsWith('top')).toBe(true);
+    const refRight = scene.ref.x + scene.ref.width;
+    const refBottom = scene.ref.y + scene.ref.height;
+    const overlaps =
+      r.left < refRight && r.right > scene.ref.x && r.top < refBottom && r.bottom > scene.ref.y;
+    expect(overlaps).toBe(false);
+    // still contained horizontally
     expect(r.left).toBeGreaterThanOrEqual(0);
     expect(r.right).toBeLessThanOrEqual(390);
   });

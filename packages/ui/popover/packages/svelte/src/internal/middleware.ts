@@ -31,9 +31,11 @@
  * only, which for a `left`/`right` placement is vertical — the horizontal overflow
  * is on shift's cross axis, which is off. So for `left*`/`right*` placements only,
  * flip also falls back to below, then above, and shift also slides across the
- * anchor as a last resort when nothing fits. Both are keyed on the engine's own
- * `initialPlacement` through Floating UI's option-function form, so the call site
- * does not change.
+ * anchor as a last resort when nothing fits. Both are keyed on the engine's own state
+ * through Floating UI's option-function form, so the call site does not change: flip
+ * on the `initialPlacement`, shift on the CURRENT `placement` — so once flip has fallen
+ * back to below/above, shift's cross axis (now vertical) goes off again rather than
+ * pushing the panel up over its anchor.
  *
  * `top*`/`bottom*` placements deliberately keep the engine defaults: every in-repo
  * composite (combobox `bottom-start`, data-table `bottom-end`) uses them, and a
@@ -50,6 +52,8 @@ export const AVAILABLE_WIDTH_PROPERTY = '--rozie-popover-available-width';
 /** The slice of the engine's middleware state the option functions read. */
 export interface PlacementState {
   initialPlacement: string;
+  /** The placement resolved so far — flip's fallback is reflected here for shift. */
+  placement: string;
 }
 export interface FlipOptionsLike {
   crossAxis?: boolean | 'alignment';
@@ -130,8 +134,11 @@ export function buildMiddleware(
     );
   }
   if (!config.disableShift) {
+    // Keyed on the CURRENT placement (flip has already run), not the initial one: once
+    // flip has fallen back from a side placement to below/above, the cross axis is
+    // vertical and sliding across it would push the panel up over its own anchor.
     mw.push(
-      factories.shift((state) => ({ crossAxis: isSidePlacement(state.initialPlacement) })),
+      factories.shift((state) => ({ crossAxis: isSidePlacement(state.placement) })),
     );
     // Width limit: publish the width available to the panel so the stylesheet can
     // cap it (a panel is never wider than the area it is positioned in). It rides
