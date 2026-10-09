@@ -57,7 +57,7 @@ export interface TipTapProps {
    */
   nodeSpecs?: unknown[];
   /**
-   * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
+   * An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded, and the images are inserted at the caret / drop position in file order, each once its own upload and those of the files before it have settled. A failed upload is skipped. The caret is left after the last inserted image. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
    * @example
    * <TipTap uploadImage={uploadFn} />
    */

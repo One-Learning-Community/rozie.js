@@ -263,7 +263,7 @@ export default class TipTap extends SignalWatcher(LitElement) {
    */
   @property({ type: Array, attribute: 'node-specs' }) nodeSpecs: any[] = [];
   /**
-   * An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
+   * An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded, and the images are inserted at the caret / drop position in file order, each once its own upload and those of the files before it have settled. A failed upload is skipped. The caret is left after the last inserted image. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
    * @example
    * <rozie-tip-tap .uploadImage=${uploadFn}></rozie-tip-tap>
    */
@@ -711,13 +711,16 @@ private portals = {
       } : {})] : [];
 
       // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
-      // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
-      // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
-      // functions declared above (see their doc comment for why they live at the
-      // top level rather than as closures nested in this ternary).
+      // A SHALLOW gated object — `{}` (no-op) when $props.uploadImage is unset,
+      // else the top-level handlePaste/handleDrop functions declared above (see
+      // their doc comment for why they live at the top level rather than as
+      // closures nested in this ternary). Each is registered through an INLINE
+      // ARROW, not by bare reference: a top-level function is an unbound
+      // prototype method on Lit, and ProseMirror calls editor props with no
+      // receiver, so a bare reference reads `this.uploadImage` off `undefined`.
       const uploadHandlers = this.uploadImage ? {
-        handlePaste: this.handlePaste,
-        handleDrop: this.handleDrop
+        handlePaste: (view: any, event: any, slice: any) => this.handlePaste(view, event, slice),
+        handleDrop: (view: any, event: any, slice: any, moved: any) => this.handleDrop(view, event, slice, moved)
       } : {};
       const escapeHost = this._refEditorEl;
       if (escapeHost) {
@@ -1539,17 +1542,6 @@ private portals = {
   });
 });
 
-  // Shared image-file finder for the upload handlers below — the first
-  // `image/*` File in a FileList, else undefined. Guards a missing FileList.
-  findImageFile = (files: any) => {
-  if (!files) return undefined;
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i];
-    if (f && typeof f.type === 'string' && f.type.indexOf('image/') === 0) return f;
-  }
-  return undefined;
-};
-
   // uploadImage paste/drop fallbacks (ask D / D-04) — ProseMirror `editorProps`
   // handlers. TOP-LEVEL functions (siblings of `refreshActive`/the $expose
   // verbs below), NOT nested inside $onMount's ternary/object-literal — a
@@ -1560,16 +1552,150 @@ private portals = {
   // (emitter-backlog). A top-level function is only ONE level removed from the
   // promoted-`this` boundary — the same shallow depth as the `onUpdate` /
   // `$watch` callbacks elsewhere in this file, which already compile clean —
-  // so referencing `editor` here needs no repair at all. Each handler claims
-  // ONLY an image/* payload: returns `true` SYNCHRONOUSLY (claiming the
-  // paste/drop now — never awaits inside the handler) and inserts the resolved
-  // URL once the consumer's uploadImage promise settles; a rejection is
-  // swallowed (`.catch(() => {})`) so a failed upload never crashes the editor
-  // (T-e7i-01). Returns `false` for a non-image payload — or, for drop, an
-  // internal node move — so ProseMirror (or a consumer editorProps handler,
-  // which still wins via the LAST spread) processes it normally.
+  // so referencing `editor` here needs no repair at all.
+  //
+  // Each handler claims ONLY an image/* payload: it returns `true` SYNCHRONOUSLY
+  // (claiming the paste/drop now — never awaits inside the handler) and hands
+  // EVERY image file to the consumer's uploadImage at once. The images are then
+  // inserted in FILE ORDER (image i lands once upload i and every earlier upload
+  // have settled), at the caret / drop position, which is tracked through every
+  // transaction that happens while the uploads run. uploadImage may resolve to a
+  // URL string or to `{ src, alt }`. A rejected, throwing or malformed upload is
+  // skipped (T-mmv-02) and never blocks the others. After each insertion the
+  // selection is a TEXT cursor after the image, never a node selection on it —
+  // typed text replaces a node selection, which used to delete the image.
+  // Returns `false` for a non-image payload — or, for drop, an internal node
+  // move — so ProseMirror (or a consumer editorProps handler, which still wins
+  // via the LAST spread) processes it normally.
+  // Every `image/*` entry of a FileList, in list order ([] for a missing list).
+  // Array.from(...).filter(...), NOT an empty array literal pushed into: under
+  // the Lit leaf's strict tsconfig that literal infers `never[]` (the
+  // "conditional SPREAD" trap recorded elsewhere in this file).
+  collectImageFiles = (files: any) => files ? Array.from(files).filter((f: any) => f && typeof f.type === 'string' && f.type.indexOf('image/') === 0) : [];
+
+  // uploadImage result → image node attrs, or null. Only `src` and `alt` are
+  // forwarded (T-mmv-01): every other key and every non-conforming value is
+  // dropped. A plain non-empty string is the URL.
+  toImageAttrs = (result: any) => {
+  if (typeof result === 'string') return result ? {
+    src: result
+  } : null;
+  if (result && typeof result.src === 'string' && result.src) {
+    return typeof result.alt === 'string' ? {
+      src: result.src,
+      alt: result.alt
+    } : {
+      src: result.src
+    };
+  }
+  return null;
+};
+
+  // A document position at or after `pos` where a text cursor can sit: `pos`
+  // itself when it is already inside a textblock, else one past the start of the
+  // first textblock that begins at or after it, else -1.
+  textPositionAfter = (doc: any, pos: any) => {
+  if (doc.resolve(pos).parent.inlineContent) return pos;
+  let found = -1;
+  doc.nodesBetween(pos, doc.content.size, (node: any, nodePos: any) => {
+    if (found >= 0) return false;
+    if (node.isTextblock && nodePos >= pos) {
+      found = nodePos + 1;
+      return false;
+    }
+    return true;
+  });
+  return found;
+};
+
+  // Start one upload; a synchronous throw becomes a rejection.
+  startUpload = (upload: any, file: any) => {
+  try {
+    return Promise.resolve(upload(file));
+  } catch (e: any) {
+    return Promise.reject(e);
+  }
+};
+
+  // The shared upload-and-insert routine behind handlePaste and handleDrop.
+  // `from`/`to` is the range the images replace (the selection for paste, the
+  // collapsed drop position for drop). Every upload starts at once; insertion is
+  // strictly in file order through a promise queue, ONE chain (one transaction,
+  // one `update` event) per image.
+  insertUploadedImages = (ed: any, upload: any, files: any, from: any, to: any) => {
+  // Tracked insertion position + the start of the range still to be replaced.
+  // Every transaction (root and appended) maps the position (bias 1: content
+  // typed exactly at it stays BEFORE the images); a transaction that changed
+  // the document or the selection cancels the replace — only an untouched
+  // selection is replaced (T-mmv-03).
+  let insertAt = to;
+  let replaceFrom = from;
+  const onTransaction = (payload: any) => {
+    const txs = [payload.transaction].concat(payload.appendedTransactions || []);
+    for (let i = 0; i < txs.length; i++) {
+      const tr = txs[i];
+      insertAt = tr.mapping.map(insertAt, 1);
+      if (replaceFrom >= 0 && (tr.docChanged || tr.selectionSet)) replaceFrom = -1;
+    }
+  };
+  ed.on('transaction', onTransaction);
+  const insertOne = (attrs: any) => {
+    if (!attrs || ed.isDestroyed) return;
+    const target = replaceFrom >= 0 && replaceFrom < insertAt ? {
+      from: replaceFrom,
+      to: insertAt
+    } : insertAt;
+    let caret = -1;
+    ed.chain().focus().insertContentAt(target, {
+      type: 'image',
+      attrs: attrs
+    }, {
+      updateSelection: false
+    }).command((props: any) => {
+      // The end of the inserted content = the new end of the FIRST range of
+      // the insertion step's map (how TipTap computes it). NOT derived by
+      // mapping a tracked position: a block image inserted at the end of a
+      // paragraph is fitted AFTER the paragraph, so a position inside the
+      // paragraph maps to itself and would stay BEFORE the image.
+      const tr = props.tr;
+      const maps = tr.mapping.maps;
+      if (maps.length === 0) return false;
+      let end = -1;
+      maps[maps.length - 1].forEach((oldStart: any, oldEnd: any, newStart: any, newEnd: any) => {
+        if (end < 0) end = newEnd;
+      });
+      if (end < 0) return false;
+      let pos = this.textPositionAfter(tr.doc, end);
+      if (pos < 0) {
+        // A document ending in the image has no text position after it yet
+        // (StarterKit's trailing node is appended AFTER this transaction):
+        // create the paragraph here.
+        const para = tr.doc.type.schema.nodes.paragraph;
+        const endAt = tr.doc.resolve(end);
+        if (!para || !endAt.parent.canReplaceWith(endAt.index(), endAt.index(), para)) return false;
+        tr.insert(end, para.create());
+        pos = end + 1;
+      }
+      caret = pos;
+      return props.commands.setTextSelection(pos);
+    }).run();
+    // The next image goes directly after this one.
+    if (caret >= 0) insertAt = ed.state.selection.head;
+  };
+
+  // Every upload starts now, in order; each is reduced to attrs-or-null with
+  // its own rejection handler, so no promise here can reject unhandled.
+  const pending = files.map((file: any) => this.startUpload(upload, file).then((r: any) => this.toImageAttrs(r), () => null));
+  const done = pending.reduce((queue: any, p: any) => queue.then(() => p).then((attrs: any) => {
+    insertOne(attrs);
+  }).catch(() => {}), Promise.resolve());
+  done.then(() => {
+    ed.off('transaction', onTransaction);
+  });
+};
+
   handlePaste(view: any, event: any, slice: any) {
-    // Captured into a local (not repeated `$props.uploadImage` member reads) so
+    // Captured into locals (not repeated `$props.uploadImage` member reads) so
     // the null-check narrows the type on every target — including Lit, where
     // the Function prop lowers to a nullable function type and a bare
     // `$props.uploadImage(file)` call trips strict-null under bundled-leaf
@@ -1577,39 +1703,38 @@ private portals = {
     // editorProps when uploadImage is truthy (belt-and-suspenders — the D-03
     // gate already guarantees this in practice).
     const upload = this.uploadImage;
-    if (!upload) return false;
-    const file = this.findImageFile(event.clipboardData ? event.clipboardData.files : undefined);
-    if (!file) return false;
+    const ed = this.editor;
+    if (!upload || !ed) return false;
+    // The image extension is an optional lazy chunk: when it failed to load there
+    // is no `image` node, and claiming the payload would replace a selection with
+    // nothing (T-mmv-04). Leave the paste to ProseMirror.
+    if (!ed.schema.nodes.image) return false;
+    const files = this.collectImageFiles(event.clipboardData ? event.clipboardData.files : undefined);
+    if (files.length === 0) return false;
     event.preventDefault();
-    upload(file).then((url: any) => {
-      this.editor?.chain().focus().setImage({
-        src: url
-      }).run();
-    }).catch(() => {});
+    const sel = view.state.selection;
+    this.insertUploadedImages(ed, upload, files, sel.from, sel.to);
     return true;
   }
 
   handleDrop(view: any, event: any, slice: any, moved: any) {
     if (moved) return false;
-    // See handlePaste — local capture for the same cross-target null-narrowing.
+    // See handlePaste — local captures for the same cross-target null-narrowing.
     const upload = this.uploadImage;
-    if (!upload) return false;
-    const file = this.findImageFile(event.dataTransfer ? event.dataTransfer.files : undefined);
-    if (!file) return false;
+    const ed = this.editor;
+    if (!upload || !ed) return false;
+    // See handlePaste — no `image` node (extension chunk failed): not ours.
+    if (!ed.schema.nodes.image) return false;
+    const files = this.collectImageFiles(event.dataTransfer ? event.dataTransfer.files : undefined);
+    if (files.length === 0) return false;
     event.preventDefault();
-    const pos = view.posAtCoords({
+    // Drop position; with no hit-test result fall back to the caret.
+    const at = view.posAtCoords({
       left: event.clientX,
       top: event.clientY
     });
-    upload(file).then((url: any) => {
-      const insertPos = pos ? pos.pos : this.editor ? this.editor.state.selection.head : 0;
-      this.editor?.chain().focus().insertContentAt(insertPos, {
-        type: 'image',
-        attrs: {
-          src: url
-        }
-      }).run();
-    }).catch(() => {});
+    const pos = at ? at.pos : ed.state.selection.head;
+    this.insertUploadedImages(ed, upload, files, pos, pos);
     return true;
   }
 

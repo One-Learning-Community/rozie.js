@@ -164,7 +164,7 @@ export interface TipTapErrorPayload { extension: 'floatingMenu' | 'image' | 'cou
     default: null,
     docs: {
       description:
-        "An async image-upload hook, signature `(file: File) => Promise<string>` resolving to a URL. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping an image file uploads it via this function then inserts the resolved URL at the caret / drop position. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
+        "An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded, and the images are inserted at the caret / drop position in file order, each once its own upload and those of the files before it have settled. A failed upload is skipped. The caret is left after the last inserted image. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
       example: '<TipTap :upload-image="uploadFn" />',
     },
   },
@@ -754,17 +754,6 @@ const makeNodeViewExtensions = (specs) => specs.map((spec) => {
   })
 })
 
-// Shared image-file finder for the upload handlers below — the first
-// `image/*` File in a FileList, else undefined. Guards a missing FileList.
-const findImageFile = (files) => {
-  if (!files) return undefined
-  for (let i = 0; i < files.length; i++) {
-    const f = files[i]
-    if (f && typeof f.type === 'string' && f.type.indexOf('image/') === 0) return f
-  }
-  return undefined
-}
-
 // uploadImage paste/drop fallbacks (ask D / D-04) — ProseMirror `editorProps`
 // handlers. TOP-LEVEL functions (siblings of `refreshActive`/the $expose
 // verbs below), NOT nested inside $onMount's ternary/object-literal — a
@@ -887,8 +876,8 @@ const insertUploadedImages = (ed, upload, files, from, to) => {
           // (StarterKit's trailing node is appended AFTER this transaction):
           // create the paragraph here.
           const para = tr.doc.type.schema.nodes.paragraph
-          const $end = tr.doc.resolve(end)
-          if (!para || !$end.parent.canReplaceWith($end.index(), $end.index(), para)) return false
+          const endAt = tr.doc.resolve(end)
+          if (!para || !endAt.parent.canReplaceWith(endAt.index(), endAt.index(), para)) return false
           tr.insert(end, para.create())
           pos = end + 1
         }
@@ -925,6 +914,10 @@ function handlePaste(view, event, slice) {
   const upload = $props.uploadImage
   const ed = editor
   if (!upload || !ed) return false
+  // The image extension is an optional lazy chunk: when it failed to load there
+  // is no `image` node, and claiming the payload would replace a selection with
+  // nothing (T-mmv-04). Leave the paste to ProseMirror.
+  if (!ed.schema.nodes.image) return false
   const files = collectImageFiles(event.clipboardData ? event.clipboardData.files : undefined)
   if (files.length === 0) return false
   event.preventDefault()
@@ -934,19 +927,19 @@ function handlePaste(view, event, slice) {
 }
 function handleDrop(view, event, slice, moved) {
   if (moved) return false
-  // See handlePaste — local capture for the same cross-target null-narrowing.
+  // See handlePaste — local captures for the same cross-target null-narrowing.
   const upload = $props.uploadImage
-  if (!upload) return false
-  const file = findImageFile(event.dataTransfer ? event.dataTransfer.files : undefined)
-  if (!file) return false
+  const ed = editor
+  if (!upload || !ed) return false
+  // See handlePaste — no `image` node (extension chunk failed): not ours.
+  if (!ed.schema.nodes.image) return false
+  const files = collectImageFiles(event.dataTransfer ? event.dataTransfer.files : undefined)
+  if (files.length === 0) return false
   event.preventDefault()
-  const pos = view.posAtCoords({ left: event.clientX, top: event.clientY })
-  upload(file)
-    .then((url) => {
-      const insertPos = pos ? pos.pos : (editor ? editor.state.selection.head : 0)
-      editor?.chain().focus().insertContentAt(insertPos, { type: 'image', attrs: { src: url } }).run()
-    })
-    .catch(() => {})
+  // Drop position; with no hit-test result fall back to the caret.
+  const at = view.posAtCoords({ left: event.clientX, top: event.clientY })
+  const pos = at ? at.pos : ed.state.selection.head
+  insertUploadedImages(ed, upload, files, pos, pos)
   return true
 }
 
@@ -1112,11 +1105,19 @@ $onMount(() => {
       : []
 
     // uploadHandlers — ProseMirror `editorProps` paste/drop fallbacks (D-04).
-    // A SHALLOW gated reference object — `{}` (no-op) when $props.uploadImage
-    // is unset, else shorthand-referencing the top-level handlePaste/handleDrop
-    // functions declared above (see their doc comment for why they live at the
-    // top level rather than as closures nested in this ternary).
-    const uploadHandlers = $props.uploadImage ? { handlePaste, handleDrop } : {}
+    // A SHALLOW gated object — `{}` (no-op) when $props.uploadImage is unset,
+    // else the top-level handlePaste/handleDrop functions declared above (see
+    // their doc comment for why they live at the top level rather than as
+    // closures nested in this ternary). Each is registered through an INLINE
+    // ARROW, not by bare reference: a top-level function is an unbound
+    // prototype method on Lit, and ProseMirror calls editor props with no
+    // receiver, so a bare reference reads `this.uploadImage` off `undefined`.
+    const uploadHandlers = $props.uploadImage
+      ? {
+          handlePaste: (view, event, slice) => handlePaste(view, event, slice),
+          handleDrop: (view, event, slice, moved) => handleDrop(view, event, slice, moved),
+        }
+      : {}
 
     const escapeHost = $refs.editorEl
     if (escapeHost) {
