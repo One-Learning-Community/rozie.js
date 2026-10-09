@@ -150,8 +150,8 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
     reference: _props.reference ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, popupRole, idBase, reference, defaultValue, onOpenChange, defaultOpen, ...rest } = _props as PopoverProps & Record<string, unknown>;
-    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void popupRole; void idBase; void reference; void defaultValue; void onOpenChange; void defaultOpen;
+    const { open, placement, trigger, offset, disableFlip, disableShift, arrow, disabled, modal, strategy, bare, disablePositioning, keepMounted, matchWidth, disableDismiss, popupRole, idBase, reference, defaultValue, onOpenChange, defaultOpen, renderAnchor, children, slots, ...rest } = _props as PopoverProps & Record<string, unknown>;
+    void open; void placement; void trigger; void offset; void disableFlip; void disableShift; void arrow; void disabled; void modal; void strategy; void bare; void disablePositioning; void keepMounted; void matchWidth; void disableDismiss; void popupRole; void idBase; void reference; void defaultValue; void onOpenChange; void defaultOpen; void renderAnchor; void children; void slots;
     return rest;
   })();
   const anchorNode = useRef<any>(null);
@@ -715,7 +715,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
       </div>
 
       
-      {!!((open || props.keepMounted) && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare, "rozie-popover-floating--hidden": !open })} ref={floatingEl} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {!!((open || props.keepMounted) && !props.disabled) && <div className={clsx("rozie-popover-floating", { "rozie-popover-floating--static": props.disablePositioning, "rozie-popover-floating--bare": props.bare, "rozie-popover-floating--hidden": !open })} ref={floatingEl} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={(floatingRole() === 'dialog' ? 'true' : undefined) ?? undefined} data-rozie-s-c6cf02ea="">
         {!!(props.arrow) && <div className={"rozie-popover-arrow"} ref={arrowEl} data-rozie-s-c6cf02ea="" />}{(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
       </div>}</div>
     </>

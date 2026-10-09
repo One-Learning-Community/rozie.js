@@ -8,7 +8,7 @@
   </div>
 
   
-  <div v-if="(open || props.keepMounted) && !props.disabled" :class="['rozie-popover-floating', { 'rozie-popover-floating--static': props.disablePositioning, 'rozie-popover-floating--bare': props.bare, 'rozie-popover-floating--hidden': !open }]" ref="floatingElRef" :id="panelId()" :role="floatingRole()" :aria-modal="!!(floatingRole() === 'dialog')">
+  <div v-if="(open || props.keepMounted) && !props.disabled" :class="['rozie-popover-floating', { 'rozie-popover-floating--static': props.disablePositioning, 'rozie-popover-floating--bare': props.bare, 'rozie-popover-floating--hidden': !open }]" ref="floatingElRef" :id="panelId()" :role="floatingRole()" :aria-modal="(floatingRole() === 'dialog' ? 'true' : undefined) ?? undefined">
     <div v-if="props.arrow" class="rozie-popover-arrow" ref="arrowElRef"></div><slot></slot>
   </div></div>
 

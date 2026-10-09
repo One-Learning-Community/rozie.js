@@ -177,7 +177,7 @@ export interface PopoverHandle {
 
 export default function Popover(_props: PopoverProps): JSX.Element {
   const _merged = mergeProps({ placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: '', reference: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'popupRole', 'idBase', 'reference', 'children', 'ref']);
+  const [local, attrs] = splitProps(_merged, ['open', 'placement', 'trigger', 'offset', 'disableFlip', 'disableShift', 'arrow', 'disabled', 'modal', 'strategy', 'bare', 'disablePositioning', 'keepMounted', 'matchWidth', 'disableDismiss', 'popupRole', 'idBase', 'reference', 'children', 'ref', 'anchorSlot', 'slots']);
   const resolved = children(() => local.children);
   onMount(() => { local.ref?.({ show, hide, toggle, reposition }); });
 
@@ -697,7 +697,7 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       </div>
 
       
-      {<Show when={(open() || local.keepMounted) && !local.disabled}><div class={"rozie-popover-floating" + " " + rozieClass({ 'rozie-popover-floating--static': local.disablePositioning, 'rozie-popover-floating--bare': local.bare, 'rozie-popover-floating--hidden': !open() })} ref={(el) => { floatingElRef = el as HTMLElement; }} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={!!(floatingRole() === 'dialog')} data-rozie-s-c6cf02ea="">
+      {<Show when={(open() || local.keepMounted) && !local.disabled}><div class={"rozie-popover-floating" + " " + rozieClass({ 'rozie-popover-floating--static': local.disablePositioning, 'rozie-popover-floating--bare': local.bare, 'rozie-popover-floating--hidden': !open() })} ref={(el) => { floatingElRef = el as HTMLElement; }} id={rozieAttr(panelId())} role={rozieAttr(floatingRole())} aria-modal={(floatingRole() === 'dialog' ? 'true' : null) ?? undefined} data-rozie-s-c6cf02ea="">
         {<Show when={local.arrow}><div class={"rozie-popover-arrow"} ref={(el) => { arrowElRef = el as HTMLElement; }} data-rozie-s-c6cf02ea="" /></Show>}{resolved()}
       </div></Show>}</div>
     </>

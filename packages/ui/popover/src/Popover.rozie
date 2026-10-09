@@ -759,7 +759,11 @@ $expose({ show, hide, toggle, reposition }, { show: '() => void', hide: '() => v
   </div>
 
   <!-- Floating content. Mounted only while open + enabled. Floating UI writes its
-       absolute left/top here; the role is tooltip (hover/focus) or dialog (click). -->
+       absolute left/top here. The role is tooltip for hover/focus, dialog only for a
+       click popover with `modal`, otherwise none. aria-modal is bound to a nullish
+       value so the attribute is omitted unless the panel is a dialog (it is only
+       allowed on dialog roles; a `false` binding would render aria-modal="false" on
+       every target). -->
   <div
     r-if="($props.open || $props.keepMounted) && !$props.disabled"
     class="rozie-popover-floating"
@@ -767,7 +771,7 @@ $expose({ show, hide, toggle, reposition }, { show: '() => void', hide: '() => v
     ref="floatingEl"
     :id="panelId()"
     :role="floatingRole()"
-    :aria-modal="!!(floatingRole() === 'dialog')"
+    :aria-modal="floatingRole() === 'dialog' ? 'true' : null"
   >
     <div r-if="$props.arrow" class="rozie-popover-arrow" ref="arrowEl"></div>
     <slot />

@@ -63,7 +63,7 @@ interface DefaultCtx {}
 
       
       @if ((open() || keepMounted()) && !(disabled() || this.__rozieCvaDisabled())) {
-    <div class="rozie-popover-floating" [ngClass]="{ 'rozie-popover-floating--static': disablePositioning(), 'rozie-popover-floating--bare': bare(), 'rozie-popover-floating--hidden': !open() }" #floatingEl [attr.id]="rozieAttr(panelId())" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="!!(floatingRole() === 'dialog')">
+    <div class="rozie-popover-floating" [ngClass]="{ 'rozie-popover-floating--static': disablePositioning(), 'rozie-popover-floating--bare': bare(), 'rozie-popover-floating--hidden': !open() }" #floatingEl [attr.id]="rozieAttr(panelId())" [attr.role]="rozieAttr(floatingRole())" [attr.aria-modal]="rozieAttr(floatingRole() === 'dialog' ? 'true' : null)">
         @if (arrow()) {
     <div class="rozie-popover-arrow" #arrowEl></div>
     }<ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />

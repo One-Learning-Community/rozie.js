@@ -141,4 +141,30 @@ describe('Popover.rozie surface gate', () => {
     // `popupRole: 'dialog'` prop default is the aria-haspopup token, not a role.
     expect(code).not.toMatch(/(?<!popupRole): 'dialog'/);
   });
+
+  // 261008-mms: aria-modal is only allowed on dialog roles (axe aria-allowed-attr),
+  // so the panel binds it to a nullish value unless it is a dialog. The old
+  // boolean-coerced `!!(role === 'dialog')` rendered aria-modal="false" on every
+  // non-dialog panel (default click, bare, tooltip).
+  const BOOLEAN_COERCED = /aria-modal\]?=(?:"|\{|\$\{)!!/;
+  const ROLE_GATED_NULLISH = /aria-modal\]?=(?:"|\{|\$\{)[^\n]{0,80}=== 'dialog' \? 'true' : (?:null|undefined)/;
+  it.each(TARGETS)('omits aria-modal unless the panel is a dialog (%s)', (target) => {
+    const { code } = compile(source, { target, filename: FILENAME });
+    expect(code).not.toMatch(BOOLEAN_COERCED);
+    expect(code).toMatch(ROLE_GATED_NULLISH);
+  });
+
+  const LEAVES = [
+    ['react', 'packages/react/src/Popover.tsx'],
+    ['vue', 'packages/vue/src/Popover.vue'],
+    ['svelte', 'packages/svelte/src/Popover.svelte'],
+    ['angular', 'packages/angular/src/Popover.ts'],
+    ['solid', 'packages/solid/src/Popover.tsx'],
+    ['lit', 'packages/lit/src/Popover.ts'],
+  ] as const;
+  it.each(LEAVES)('committed %s leaf omits aria-modal unless the panel is a dialog (stale-codegen guard)', (_t, rel) => {
+    const leaf = readFileSync(resolve(HERE, '..', rel), 'utf8');
+    expect(leaf).not.toMatch(BOOLEAN_COERCED);
+    expect(leaf).toMatch(ROLE_GATED_NULLISH);
+  });
 });

@@ -339,7 +339,7 @@ private __rozieFirstUpdateDone = false;
   </div>
 
   
-  ${(this.open || this.keepMounted) && !this.disabled ? html`<div class="${Object.entries({ "rozie-popover-floating": true, 'rozie-popover-floating--static': this.disablePositioning, 'rozie-popover-floating--bare': this.bare, 'rozie-popover-floating--hidden': !this.open }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.panelId())} role=${rozieAttr(this.floatingRole())} aria-modal=${!!(this.floatingRole() === 'dialog')} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
+  ${(this.open || this.keepMounted) && !this.disabled ? html`<div class="${Object.entries({ "rozie-popover-floating": true, 'rozie-popover-floating--static': this.disablePositioning, 'rozie-popover-floating--bare': this.bare, 'rozie-popover-floating--hidden': !this.open }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.panelId())} role=${rozieAttr(this.floatingRole())} aria-modal=${rozieAttr(this.floatingRole() === 'dialog' ? 'true' : null)} data-rozie-ref="floatingEl" data-rozie-s-c6cf02ea>
     ${this.arrow ? html`<div class="rozie-popover-arrow" data-rozie-ref="arrowEl" data-rozie-s-c6cf02ea></div>` : nothing}<slot></slot>
   </div>` : nothing}</div>
 `;
