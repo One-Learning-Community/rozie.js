@@ -6,9 +6,11 @@
  * The component lazily `import()`s the image extension when `uploadImage` is
  * set. A file-level mock whose factory throws makes that import reject: the
  * editor still constructs, emits `error` with `{ extension: 'image' }`, emits
- * `ready`, and its schema has no `image` node. The handlers must then NOT claim
- * an image payload or call `uploadImage` — otherwise an image paste over a
- * selection would replace the selection with nothing (T-mmv-04).
+ * `ready`, and its schema has no `image` node. The handlers must then never call
+ * `uploadImage`. A paste is left to ProseMirror (claiming it would replace a
+ * selection with nothing, T-mmv-04). A drop that carries image files is
+ * swallowed: left alone, the browser's default would navigate the tab to the
+ * dropped file.
  *
  * It lives in its own file because the mock is file-level; it only intercepts
  * when this file resolves the package from the same place as the compiled
@@ -114,7 +116,7 @@ describe('uploadImage without the image extension', () => {
     expect(editor.getHTML()).toBe('<p>text pasted</p>');
   });
 
-  it('C3: an image drop is not claimed and nothing is uploaded', async () => {
+  it('C3: an image drop is swallowed (no browser file navigation) and nothing is uploaded', async () => {
     const calls: string[] = [];
     const { editor } = await mountEditor({
       html: '<p>text</p>',
@@ -129,6 +131,26 @@ describe('uploadImage without the image extension', () => {
     await settle();
     expect(calls).toEqual([]);
     expect(editor.getHTML()).toBe('<p>text</p>');
-    expect(ev.defaultPrevented).toBe(false);
+    // Nobody else prevents a files-only drop: ProseMirror parses no slice from
+    // it and returns early, so the browser would navigate the tab to the file.
+    expect(ev.defaultPrevented).toBe(true);
+  });
+
+  it('C4: a drop with no image file is still left to ProseMirror', async () => {
+    const calls: string[] = [];
+    const { editor } = await mountEditor({
+      html: '<p>text</p>',
+      uploadImage: (f: File) => {
+        calls.push(f.name);
+        return Promise.resolve('https://cdn.test/x.png');
+      },
+    });
+    editor.view.posAtCoords = () => ({ pos: 5, inside: -1 });
+    const ev = fileEvent('drop', [new File(['x'], 'note.txt', { type: 'text/plain' })], ' dropped');
+    editor.view.dom.dispatchEvent(ev);
+    await settle();
+    expect(calls).toEqual([]);
+    // ProseMirror's own text drop ran (it prevents the default itself).
+    expect(editor.getHTML()).toBe('<p>text dropped</p>');
   });
 });

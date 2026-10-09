@@ -1709,11 +1709,16 @@ export class TipTap {
     const upload = this.uploadImage();
     const ed = this.editor;
     if (!upload || !ed) return false;
-    // See handlePaste — no `image` node (extension chunk failed): not ours.
-    if (!ed.schema.nodes.image) return false;
     const files = this.collectImageFiles(event.dataTransfer ? event.dataTransfer.files : undefined);
     if (files.length === 0) return false;
+    // A drop that carries image files is ALWAYS prevented. ProseMirror parses no
+    // slice out of a files-only DataTransfer and then returns without preventing
+    // anything, so an unclaimed file drop falls through to the browser's default:
+    // navigating the tab to the dropped file, and losing the document.
     event.preventDefault();
+    // No `image` node (the extension chunk failed to load): swallow the drop,
+    // upload nothing.
+    if (!ed.schema.nodes.image) return true;
     // Drop position; with no hit-test result fall back to the caret.
     const at = view.posAtCoords({
       left: event.clientX,
