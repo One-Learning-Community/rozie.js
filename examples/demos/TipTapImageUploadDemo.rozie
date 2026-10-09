@@ -1,0 +1,66 @@
+<!--
+  TipTapImageUploadDemo — behavioral cell: a TipTap editor with `uploadImage`.
+
+  Pasting or dropping several image files uploads every one of them (the hook is
+  called once per image file, all at once), inserts them in FILE ORDER with the
+  alt text the hook returns, skips a failed upload, and leaves a text cursor
+  after the last image so the next typed key does not replace it.
+
+  `upload` makes that observable: a file whose name starts with `slow` settles
+  after 200 ms (the others after 10 ms, so file order differs from settle
+  order), a name starting with `bad` rejects, anything else resolves to
+  `{ src, alt }`. `readout-uploads` lists the names the hook received.
+  See tiptap-image-upload.spec.ts. Behavioral-only (no pixel baseline).
+-->
+<rozie name="TipTapImageUploadDemo">
+
+<components>
+{
+  TipTap: '../../packages/ui/tiptap/src/TipTap.rozie',
+}
+</components>
+
+<data>
+{
+  html: '<p>text</p>',
+  uploadLog: '',
+}
+</data>
+
+<script>
+// Plain accumulator written by member assignment — NOT reactive state. React
+// batches several same-event writes to one $data key and would keep only the
+// last, so the running list is built here and copied into $data.uploadLog.
+const received = { names: '' }
+// A 1x1 transparent PNG.
+const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+const upload = (file) => {
+  received.names = received.names ? received.names + ',' + file.name : file.name
+  $data.uploadLog = received.names
+  return new Promise((resolve, reject) => {
+    const delay = file.name.indexOf('slow') === 0 ? 200 : 10
+    setTimeout(() => {
+      if (file.name.indexOf('bad') === 0) reject(new Error('upload failed'))
+      else resolve({ src: PIXEL, alt: file.name })
+    }, delay)
+  })
+}
+</script>
+
+<template>
+<div class="tiptap-image-upload-demo">
+  <div data-testid="upload-editor">
+    <TipTap r-model:html="$data.html" ariaLabel="Upload editor" :uploadImage="upload" />
+  </div>
+  <span data-testid="readout-uploads">{{ $data.uploadLog }}</span>
+</div>
+</template>
+
+<style>
+.tiptap-image-upload-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+}
+</style>
+
+</rozie>

@@ -267,6 +267,9 @@ export const EXAMPLES = [
   // TipTap inside a rozie Dialog — Escape in the editor reaches the <dialog>
   // (behavioral-only, tiptap-in-dialog.spec.ts).
   'TipTapInDialog',
+  // TipTap `uploadImage` — paste/drop several images (behavioral-only,
+  // tiptap-image-upload.spec.ts).
+  'TipTapImageUpload',
   // 260927-a2v — TipTapDarkScreenshot is the debut OS-dark PIXEL cell (loader →
   // examples/demos/TipTapDarkScreenshotDemo.rozie), closing 2026-09-27's
   // dark-default gap. The same fixed rich-HTML doc as TipTapScreenshotDemo, with
@@ -1566,6 +1569,7 @@ export const LIT_TAGS: Record<Example, string> = {
   TipTapBehavior: 'rozie-tip-tap-behavior',
   TipTapReady: 'rozie-tip-tap-ready',
   TipTapInDialog: 'rozie-tip-tap-in-dialog',
+  TipTapImageUpload: 'rozie-tip-tap-image-upload',
   // 260927-a2v dark pixel cell — '-demo' appended by the entry →
   // 'rozie-tip-tap-dark-screenshot-demo' = kebab of TipTapDarkScreenshotDemo.
   TipTapDarkScreenshot: 'rozie-tip-tap-dark-screenshot',
@@ -2100,6 +2104,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TipTapBehavior: {},
   TipTapReady: {},
   TipTapInDialog: {},
+  TipTapImageUpload: {},
   // 260927-a2v — TipTapDarkScreenshotDemo is self-contained (hardcodes its fixed
   // rich doc in <script>, same as TipTapScreenshot). No parent props.
   TipTapDarkScreenshot: {},
