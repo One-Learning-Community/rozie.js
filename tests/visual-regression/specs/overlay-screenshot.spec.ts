@@ -112,18 +112,20 @@ for (const example of EXAMPLES) {
         });
       } else if (example === 'ToasterScreenshot') {
         // The demo's $onMount enqueues exactly one sticky (:duration="0") toast via
-        // the $refs.toaster.show() handle; each toast carries role="status". Wait
-        // for the single fixed-corner toast before the clip. role= pierces Lit's shadow.
-        await expect(page.locator('[role="status"]')).toHaveCount(1, {
+        // the $refs.toaster.show() handle. Wait for the single fixed-corner toast
+        // row before the clip. Rows are selected by class, NOT role: they carry no
+        // role (the toaster's standing live regions do, so a role count would be 1
+        // before the toast exists). The class locator pierces Lit's shadow.
+        await expect(page.locator('.rozie-toast')).toHaveCount(1, {
           timeout: 15_000,
         });
       } else if (example === 'ToasterStackedScreenshot') {
         // The demo's $onMount enqueues FOUR sticky toasts + `stacked`; the pointer
         // never hovers, so the collapsed depth-driven grid overlay paints (newest
         // on top, depth>=3 hidden — the 4th toast fades to opacity 0 but stays in
-        // the DOM). Wait for all 4 role="status" entries before the clip (the
+        // the DOM). Wait for all 4 `.rozie-toast` rows before the clip (the
         // COUNT proves the queue settled even though one is visually hidden).
-        await expect(page.locator('[role="status"]')).toHaveCount(4, {
+        await expect(page.locator('.rozie-toast')).toHaveCount(4, {
           timeout: 15_000,
         });
       } else if (example === 'PopoverScreenshot') {

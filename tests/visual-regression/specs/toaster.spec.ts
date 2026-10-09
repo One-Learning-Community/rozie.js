@@ -49,7 +49,7 @@ for (const target of TARGETS) {
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
-  runner(`toaster [${target}]: show() handle enqueues sticky toasts (role=status), close button dismisses one`, async ({
+  runner(`toaster [${target}]: show() handle enqueues sticky toasts (.rozie-toast rows), close button dismisses one`, async ({
     page,
   }) => {
     await page.goto(`/?example=ToasterBehavior&target=${target}`);
@@ -57,8 +57,9 @@ for (const target of TARGETS) {
 
     const count = page.getByTestId('readout-count');
     await expect(count).toHaveText('0');
-    // Role/CSS locators pierce Lit's open shadow root.
-    const toasts = page.locator('[role="status"]');
+    // CSS class locators pierce Lit's open shadow root. Rows are selected by
+    // `.rozie-toast` — they carry no role (the standing live regions do).
+    const toasts = page.locator('.rozie-toast');
     await expect(toasts).toHaveCount(0);
 
     // ---- 1. show() handle enqueues the first toast (sticky → stays) ----
@@ -94,8 +95,7 @@ for (const target of TARGETS) {
  * Swipe-to-dismiss (TOAST-SWIPE) — pointer drag on a toast. The demo's
  * `Toaster` sits in its default `top-right` corner (dismiss direction =
  * right), so a `show-toast`-enqueued sticky toast is the drag target;
- * `.rozie-toast` locators pierce Lit's open shadow root the same as
- * `[role="status"]` above. `dismissed-reason` mirrors the LATEST `@dismissed`
+ * `.rozie-toast` locators pierce Lit's open shadow root. `dismissed-reason` mirrors the LATEST `@dismissed`
  * payload's `reason`, and `toggle-disable-swipe` flips `disableSwipe`.
  *
  * Proven GREEN ×6 only in the ONE batched Linux Docker VR run (Task 7) — see
@@ -123,7 +123,7 @@ for (const target of TARGETS) {
 
     await expect(page.getByTestId('action-result')).toHaveText('undo t42');
     await expect(page.getByTestId('dismissed-reason')).toHaveText('action');
-    await expect(page.getByRole('status')).toHaveCount(0);
+    await expect(page.locator('.rozie-toast')).toHaveCount(0);
   });
 
   runner(`toaster [${target}]: swipe past threshold dismisses with reason 'swipe'`, async ({
@@ -152,7 +152,7 @@ for (const target of TARGETS) {
     }
     await page.mouse.up();
 
-    await expect(page.locator('[role="status"]')).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(0, { timeout: 10_000 });
     await expect(page.getByTestId('dismissed-reason')).toHaveText('swipe', { timeout: 10_000 });
   });
 
@@ -186,7 +186,7 @@ for (const target of TARGETS) {
     }
     await page.mouse.up();
 
-    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 10_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(1, { timeout: 10_000 });
     await expect(page.getByTestId('dismissed-reason')).not.toHaveText('swipe');
   });
 
@@ -215,7 +215,7 @@ for (const target of TARGETS) {
     // The toast is still present (no swipe fired from a close-button-origin
     // drag) — a plain click on the SAME button (from Task 2's suite) is the
     // only thing that dismisses it.
-    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(1, { timeout: 5_000 });
   });
 
   // quick 260926-i1f Item 2 (WCAG 2.2.1): a keyboard user tabbing to the
@@ -239,11 +239,11 @@ for (const target of TARGETS) {
     // otherwise time out well within this wait.
     await action.focus();
     await page.waitForTimeout(1_400);
-    await expect(page.getByRole('status')).toHaveCount(1);
+    await expect(page.locator('.rozie-toast')).toHaveCount(1);
 
     // Leave focus (tab away) — resumes the timer; the toast then dismisses.
     await action.blur();
-    await expect(page.getByRole('status')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(0, { timeout: 5_000 });
   });
 
   // Composition: hover-pause and focus-pause must not resume each other's
@@ -266,11 +266,11 @@ for (const target of TARGETS) {
     // focus remains inside — must NOT resume.
     await page.mouse.move(0, 0);
     await page.waitForTimeout(1_400);
-    await expect(page.getByRole('status')).toHaveCount(1);
+    await expect(page.locator('.rozie-toast')).toHaveCount(1);
 
     // NOW focus also leaves — both pause sources cleared, resumes + dismisses.
     await action.blur();
-    await expect(page.getByRole('status')).toHaveCount(0, { timeout: 5_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(0, { timeout: 5_000 });
   });
 
   runner(`toaster [${target}]: disableSwipe makes all three pointer handlers inert`, async ({
@@ -298,7 +298,7 @@ for (const target of TARGETS) {
     await page.mouse.up();
 
     // disableSwipe=true: even a full-width drag never dismisses.
-    await expect(page.locator('[role="status"]')).toHaveCount(1, { timeout: 5_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(1, { timeout: 5_000 });
   });
 }
 
@@ -328,7 +328,7 @@ for (const target of TARGETS) {
     for (let i = 0; i < 4; i++) {
       await page.getByTestId('show-toast').click();
     }
-    await expect(page.locator('[role="status"]')).toHaveCount(4, { timeout: 15_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(4, { timeout: 15_000 });
 
     // Collapsed (not hovered): the oldest (depth 3) toast is hidden.
     const oldest = page.locator('.rozie-toast').nth(0);
@@ -365,10 +365,65 @@ for (const target of TARGETS) {
     for (let i = 0; i < 4; i++) {
       await page.getByTestId('show-toast').click();
     }
-    await expect(page.locator('[role="status"]')).toHaveCount(4, { timeout: 15_000 });
+    await expect(page.locator('.rozie-toast')).toHaveCount(4, { timeout: 15_000 });
 
     // stacked is OFF (default) — every toast is visible, none hidden by depth.
     const oldest = page.locator('.rozie-toast').nth(0);
     await expect(oldest).toHaveCSS('opacity', '1');
+  });
+}
+
+/**
+ * Standing live regions (quick 261008-mmu) — the cross-target proof of the
+ * announcement contract. The toaster keeps a polite `role="status"` and an
+ * assertive `role="alert"` region mounted from the start, writes each toast's
+ * `message` into one of them (`error` -> alert, everything else -> status), and
+ * its `.rozie-toast` rows carry neither a role nor an `aria-live`. The in-package
+ * behaviour test mounts Vue only; this cell runs the same contract on all 6.
+ *
+ * Structural/behavioral assertions only — no screenshot. CSS locators pierce
+ * Lit's open shadow root.
+ */
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  runner(`toaster [${target}]: standing live regions carry the message (error -> alert, rest -> status); rows have no role`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=ToasterBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    const statusRegion = page.locator('.rozie-toaster-live [role="status"]');
+    const alertRegion = page.locator('.rozie-toaster-live [role="alert"]');
+
+    // Before any click: exactly one of each, both empty.
+    await expect(statusRegion).toHaveCount(1);
+    await expect(alertRegion).toHaveCount(1);
+    await expect(statusRegion).toHaveText('');
+    await expect(alertRegion).toHaveText('');
+
+    // A success toast -> the polite status region; the alert region stays empty.
+    await page.getByTestId('show-toast').click();
+    await expect(page.locator('.rozie-toast')).toHaveCount(1, { timeout: 15_000 });
+    await expect(statusRegion).toContainText('Saved 1');
+    await expect(alertRegion).toHaveText('');
+
+    // An error toast -> the assertive alert region; the status region does not gain it.
+    await page.getByTestId('show-error-toast').click();
+    await expect(page.locator('.rozie-toast')).toHaveCount(2, { timeout: 10_000 });
+    await expect(alertRegion).toContainText('Upload failed');
+    await expect(statusRegion).not.toContainText('Upload failed');
+
+    // The regions were never re-created, and no row is itself a live region.
+    await expect(statusRegion).toHaveCount(1);
+    await expect(alertRegion).toHaveCount(1);
+    const rows = page.locator('.rozie-toast');
+    for (let i = 0; i < 2; i++) {
+      await expect(rows.nth(i)).not.toHaveAttribute('role', /.*/);
+      await expect(rows.nth(i)).not.toHaveAttribute('aria-live', /.*/);
+    }
   });
 }

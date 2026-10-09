@@ -49,6 +49,10 @@ const showToast = () => {
   $data.count = n
   $refs.toaster.show({ message: 'Saved ' + n, type: 'success' })
 }
+// quick 261008-mmu — an ERROR toast, routed to the assertive live region.
+const showErrorToast = () => {
+  $refs.toaster.show({ message: 'Upload failed', type: 'error' })
+}
 // quick 260925-rb6 — a toast carrying an action + pass-through data.
 const showActionToast = () => {
   $refs.toaster.show({
@@ -88,6 +92,7 @@ const onDismissed = (payload) => {
     <button type="button" data-testid="toggle-disable-swipe" @click="toggleDisableSwipe()">Toggle disableSwipe</button>
     <button type="button" data-testid="toggle-stacked" @click="toggleStacked()">Toggle stacked</button>
     <span class="readout" data-testid="dismissed-reason">{{ $data.dismissedReason }}</span>
+    <button type="button" data-testid="show-error-toast" @click="showErrorToast()">Show error toast</button>
     <button type="button" data-testid="show-action-toast" @click="showActionToast()">Show action toast</button>
     <span class="readout" data-testid="action-result">{{ $data.actionResult }}</span>
     <button type="button" data-testid="show-short-action-toast" @click="showShortActionToast()">Show short action toast</button>

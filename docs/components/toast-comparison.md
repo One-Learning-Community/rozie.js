@@ -1,5 +1,5 @@
 ---
-surface_hash: 0ec66542b9de
+surface_hash: adbf2fe47fc5
 ---
 
 # Headless toast / notification comparison
@@ -45,7 +45,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Hover-to-pause timers | ✅ | ✅ | ✅ | ✅ | ⚠️ `extendedTimeOut` | ❌ | ✅ (`disablePauseOnHover` opt-out; resumes from the exact remainder, not a full restart¹) |
 | Multiple positions | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (6 corners) |
 | Custom toast render | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (`#toast` slot) |
-| Accessible ARIA live region | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (`role=region`/`status`, severity `aria-live`) |
+| Accessible ARIA live region | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ (standing polite `role=status` + assertive `role=alert` regions mounted with the host; `error` assertive, the rest polite) |
 | Promise / loading toast | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ (`promise()` verb + `'loading'` type) |
 | Swipe-to-dismiss | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ (on by default; `disableSwipe` opt-out) |
 | Animated stack / expand | ✅ | ✅ | ⚠️ | ⚠️ | ⚠️ | ❌ | ✅ enter/exit animations always; opt-in `stacked` collapsed overlay |
@@ -58,11 +58,11 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 ## Where Rozie wins today
 
 - **First-class packages everywhere**, including Lit / web components, which have no mainstream toast component at all, and Svelte / Solid, which lean on store / singleton patterns. All are categories the incumbents barely serve uniformly.
-- **The same component surface everywhere.** Where the ecosystem offers a different library per framework (six APIs, six queue models, six theming stories), `@rozie-ui/toast` is one `<Toaster>` to learn, document, and migrate: the same props (`position` / `duration` / `max` / `disablePauseOnHover` / `ariaLabel` / `disableSwipe` / `stacked`), the same `show` / `dismiss` / `clear` / `patch` / `promise` handle, the same `#toast` scoped slot, and the same `@dismissed` event.
+- **The same component surface everywhere.** Where the ecosystem offers a different library per framework (six APIs, six queue models, six theming stories), `@rozie-ui/toast` is one `<Toaster>` to learn, document, and migrate: the same props (`position` / `duration` / `max` / `disablePauseOnHover` / `ariaLabel` / `disableSwipe` / `stacked` / `disableAnnounce`), the same `show` / `dismiss` / `clear` / `patch` / `promise` handle, the same `#toast` scoped slot, and the same `@dismissed` event.
 - **No imposed global state.** The host is a normal component you `ref`, with no module-global singleton, no plugin install, and no injected service, so it keeps the dependency graph clean, is SSR-safe (every timer is `typeof window`-guarded), and is scopable to any subtree.
 - **Precise, gesture-rich dismissal, matched to the polish leaders.** Hover-to-pause resumes from the exact remainder (not a full restart); pointer swipe-to-dismiss is on by default with corner-derived direction, distance/velocity thresholds, and spring-back; every toast plays enter/exit animations, and an opt-in `stacked` mode gives you the sonner-style collapsed overlay that expands on hover/focus.
 - **`promise()` for async operations.** One call shows a loading spinner and flips to success/error at settle, with a never-resurrect guard if the toast was dismissed while pending, something not every incumbent's `toast.promise()` documents.
-- **Accessible live region out of the box.** `role="region"` landmark, per-toast `role="status"` with `aria-live` chosen by severity (`assertive` for errors / warnings, `polite` otherwise), a real `<button aria-label="Dismiss">`, a decorative (`aria-hidden`) loading spinner, and `prefers-reduced-motion` support that keeps the dismissal lifecycle intact while collapsing transforms to fades.
+- **Accessible live regions out of the box.** `role="region"` landmark, a polite `role="status"` region and an assertive `role="alert"` region that stay mounted for the host's whole life and receive each toast's message (`assertive` for `error` toasts, `polite` for everything else; the toast rows themselves carry no role), a real `<button aria-label="Dismiss">`, a decorative (`aria-hidden`) loading spinner, and `prefers-reduced-motion` support that keeps the dismissal lifecycle intact while collapsing transforms to fades.
 - **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-toast-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5, where the incumbents ship opinionated, harder-to-fully-reskin CSS.
 
 ## What Rozie defers {#what-rozie-defers}
