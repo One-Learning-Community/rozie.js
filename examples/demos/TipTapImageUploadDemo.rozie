@@ -2,14 +2,18 @@
   TipTapImageUploadDemo — behavioral cell: a TipTap editor with `uploadImage`.
 
   Pasting or dropping several image files uploads every one of them (the hook is
-  called once per image file, all at once), inserts them in FILE ORDER with the
-  alt text the hook returns, skips a failed upload, and leaves a text cursor
-  after the last image so the next typed key does not replace it.
+  called once per image file, all at once), inserts each as its own upload
+  settles, in FILE ORDER and in ONE container, with the alt text the hook
+  returns, skips a failed upload, and leaves a text cursor after the last image
+  so the next typed key does not replace it — unless the user moved the caret
+  while the upload ran, in which case the caret is left alone.
 
   `upload` makes that observable: a file whose name starts with `slow` settles
-  after 200 ms (the others after 10 ms, so file order differs from settle
-  order), a name starting with `bad` rejects, anything else resolves to
-  `{ src, alt }`. `readout-uploads` lists the names the hook received.
+  after 200 ms and one starting with `wait` after 1000 ms (the others after
+  10 ms, so file order differs from settle order), a name starting with `bad`
+  rejects, anything else resolves to `{ src, alt }`. `readout-uploads` lists the
+  names the hook received. The second editor (`upload-editor-list`) starts with
+  a two-item list, for the same-container case.
   See tiptap-image-upload.spec.ts. Behavioral-only (no pixel baseline).
 -->
 <rozie name="TipTapImageUploadDemo">
@@ -23,6 +27,7 @@
 <data>
 {
   html: '<p>text</p>',
+  listHtml: '<ul><li><p>one</p></li><li><p>two</p></li></ul>',
   uploadLog: '',
 }
 </data>
@@ -38,7 +43,7 @@ const upload = (file) => {
   received.names = received.names ? received.names + ',' + file.name : file.name
   $data.uploadLog = received.names
   return new Promise((resolve, reject) => {
-    const delay = file.name.indexOf('slow') === 0 ? 200 : 10
+    const delay = file.name.indexOf('wait') === 0 ? 1000 : file.name.indexOf('slow') === 0 ? 200 : 10
     setTimeout(() => {
       if (file.name.indexOf('bad') === 0) reject(new Error('upload failed'))
       else resolve({ src: PIXEL, alt: file.name })
@@ -51,6 +56,9 @@ const upload = (file) => {
 <div class="tiptap-image-upload-demo">
   <div data-testid="upload-editor">
     <TipTap r-model:html="$data.html" ariaLabel="Upload editor" :uploadImage="upload" />
+  </div>
+  <div data-testid="upload-editor-list">
+    <TipTap r-model:html="$data.listHtml" ariaLabel="Upload editor with a list" :uploadImage="upload" />
   </div>
   <span data-testid="readout-uploads">{{ $data.uploadLog }}</span>
 </div>

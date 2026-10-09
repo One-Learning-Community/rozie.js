@@ -9,10 +9,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * @rozie-ui/tiptap `uploadImage` — pasting or dropping several image files.
  *
- * Every image file is handed to `uploadImage` at once, the images are inserted
- * in FILE ORDER with the alt text the hook returns (although the first upload
- * is the slowest), a failed upload is skipped, and the caret is left as a text
- * cursor after the last image.
+ * Every image file is handed to `uploadImage` at once, each image is inserted
+ * as its own upload settles, in FILE ORDER with the alt text the hook returns
+ * (although the first upload is the slowest), all in the container they were
+ * pasted into, a failed upload is skipped, and the caret is left as a text
+ * cursor after the last image — unless the user moved it while the upload ran.
  *
  * BEHAVIOR-ONLY: readouts and DOM state, never a screenshot. Typing with the
  * REAL keyboard is the point: a node-selected image is replaced by the first
@@ -113,5 +114,60 @@ for (const target of TARGETS) {
     await page.keyboard.type('mark');
     await expect(editor.locator('img')).toHaveCount(2);
     await expect(editor).toContainText('mark');
+  });
+
+  runner(`tiptap-image-upload [${target}]: images pasted into a list item all stay in that item`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=TipTapImageUpload&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    const editor = mount.getByTestId('upload-editor-list').locator('[contenteditable="true"]');
+    await expect(editor).toBeVisible({ timeout: 10_000 });
+
+    // Caret at the end of the first item's text.
+    await editor.locator('li').first().locator('p').first().click();
+    await page.keyboard.press('End');
+    await dispatchImages(editor, 'paste', ['a.png', 'b.png']);
+
+    const first = editor.locator('ul > li').first();
+    const second = editor.locator('ul > li').nth(1);
+    await expect
+      .poll(() => first.locator('img').evaluateAll((els) => els.map((e) => e.getAttribute('alt'))))
+      .toEqual(['a.png', 'b.png']);
+    // Nothing leaks into the neighbouring item: no image, no extra paragraph.
+    await expect(editor.locator('ul > li')).toHaveCount(2);
+    await expect(second.locator('img')).toHaveCount(0);
+    await expect(second.locator('p')).toHaveCount(1);
+    await expect(second).toHaveText('two');
+
+    // The caret is after the last image, still inside the first item.
+    await page.keyboard.type('mark');
+    await expect(first.locator('img')).toHaveCount(2);
+    await expect(first).toContainText('mark');
+    await expect(second).toHaveText('two');
+  });
+
+  runner(`tiptap-image-upload [${target}]: a caret moved while the upload runs is left where the user put it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=TipTapImageUpload&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    const editor = mount.getByTestId('upload-editor').locator('[contenteditable="true"]');
+    await expect(editor).toBeVisible({ timeout: 10_000 });
+
+    await editor.locator('p').first().click();
+    await page.keyboard.press('End');
+    // `wait-` uploads take a second: time to move the caret before the image lands.
+    await dispatchImages(editor, 'paste', ['wait-a.png']);
+    await page.keyboard.press('Home');
+    await expect(editor.locator('img')).toHaveCount(0);
+
+    await expect.poll(imageAlts(editor)).toEqual(['wait-a.png']);
+    await expect(editor.locator('img.ProseMirror-selectednode')).toHaveCount(0);
+
+    // Typing continues at the start of the line, where the user moved the caret.
+    await page.keyboard.type('mark');
+    await expect(editor.locator('p').first()).toHaveText('marktext');
+    await expect(editor.locator('img')).toHaveCount(1);
   });
 }

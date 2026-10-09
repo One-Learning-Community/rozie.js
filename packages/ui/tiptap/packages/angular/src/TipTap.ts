@@ -318,7 +318,7 @@ export class TipTap {
    */
   nodeSpecs = input<any[]>((() => [])());
   /**
-   * An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded, and the images are inserted at the caret / drop position in file order, each once its own upload and those of the files before it have settled. A failed upload is skipped. The caret is left after the last inserted image. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
+   * An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded at once, and each image is inserted as soon as its own upload finishes: at the caret / drop position, in file order, all of them together in the same place (the same list item or blockquote). A slow or failed upload does not hold back the others; a failed one is skipped. The caret is moved after the last inserted image only if you have not moved it or typed in the meantime, and inserting an image never focuses the editor. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.
    * @example
    * <rozie-tip-tap [uploadImage]="uploadFn" />
    */
@@ -1439,14 +1439,19 @@ export class TipTap {
   //
   // Each handler claims ONLY an image/* payload: it returns `true` SYNCHRONOUSLY
   // (claiming the paste/drop now — never awaits inside the handler) and hands
-  // EVERY image file to the consumer's uploadImage at once. The images are then
-  // inserted in FILE ORDER (image i lands once upload i and every earlier upload
-  // have settled), at the caret / drop position, which is tracked through every
-  // transaction that happens while the uploads run. uploadImage may resolve to a
-  // URL string or to `{ src, alt }`. A rejected, throwing or malformed upload is
-  // skipped (T-mmv-02) and never blocks the others. After each insertion the
-  // selection is a TEXT cursor after the image, never a node selection on it —
-  // typed text replaces a node selection, which used to delete the image.
+  // EVERY image file to the consumer's uploadImage at once. Each image is
+  // inserted as soon as ITS OWN upload settles — a slow, hung or failed upload
+  // never holds back another — and still lands in FILE ORDER: directly after the
+  // nearest earlier file's image that is already in the document, otherwise
+  // directly before the nearest later one, otherwise at the caret / drop
+  // position. Every one of those positions is tracked through every transaction
+  // that happens while the uploads run. uploadImage may resolve to a URL string
+  // or to `{ src, alt }`. A rejected, throwing or malformed upload is skipped
+  // (T-mmv-02). The editor is never focused by an insertion, and the caret is
+  // put after the last image (a TEXT cursor, never a node selection on the image
+  // — typed text replaces a node selection, which used to delete the image) only
+  // while the selection is still where this routine left it; a caret the user
+  // moved, or typed with, is left alone.
   // Returns `false` for a non-image payload — or, for drop, an internal node
   // move — so ProseMirror (or a consumer editorProps handler, which still wins
   // via the LAST spread) processes it normally.
@@ -1472,22 +1477,6 @@ export class TipTap {
     }
     return null;
   };
-  // A document position at or after `pos` where a text cursor can sit: `pos`
-  // itself when it is already inside a textblock, else one past the start of the
-  // first textblock that begins at or after it, else -1.
-  textPositionAfter = (doc: any, pos: any) => {
-    if (doc.resolve(pos).parent.inlineContent) return pos;
-    let found = -1;
-    doc.nodesBetween(pos, doc.content.size, (node: any, nodePos: any) => {
-      if (found >= 0) return false;
-      if (node.isTextblock && nodePos >= pos) {
-        found = nodePos + 1;
-        return false;
-      }
-      return true;
-    });
-    return found;
-  };
   // Start one upload; a synchronous throw becomes a rejection.
   startUpload = (upload: any, file: any) => {
     try {
@@ -1498,78 +1487,196 @@ export class TipTap {
   };
   // The shared upload-and-insert routine behind handlePaste and handleDrop.
   // `from`/`to` is the range the images replace (the selection for paste, the
-  // collapsed drop position for drop). Every upload starts at once; insertion is
-  // strictly in file order through a promise queue, ONE chain (one transaction,
-  // one `update` event) per image.
+  // collapsed drop position for drop). Every upload starts at once; each image is
+  // inserted when its own upload settles, as ONE chain (one transaction, one
+  // `update` event), at its file-order slot.
   insertUploadedImages = (ed: any, upload: any, files: any, from: any, to: any) => {
-    // Tracked insertion position + the start of the range still to be replaced.
-    // Every transaction (root and appended) maps the position (bias 1: content
-    // typed exactly at it stays BEFORE the images); a transaction that changed
-    // the document or the selection cancels the replace — only an untouched
-    // selection is replaced (T-mmv-03).
-    let insertAt = to;
+    // The editor, dropped (set to null) when the batch is released, so a promise
+    // that never settles keeps this small closure alive but not the editor.
+    // Nothing below reads the `ed` parameter after this line.
+    let live = ed;
+    // The paste/drop point + the start of the range still to be replaced. Only
+    // the FIRST insertion of the batch uses them; every later one is placed
+    // relative to an image that is already in the document.
+    let anchorAt = to;
     let replaceFrom = from;
+    // Start/end of every image this batch has inserted, by file index (-1 = not
+    // inserted). Two number lists, not one list of records: a list seeded with
+    // `null` infers `null[]` under the leaves' strict tsconfig.
+    const starts = files.map(() => -1);
+    const ends = files.map(() => -1);
+    // The selection this routine last left behind (initially the paste/drop
+    // point). An insertion moves the caret only while the selection is still
+    // exactly this one.
+    let selAnchor = ed.state.selection.anchor;
+    let selHead = ed.state.selection.head;
+    // Set by `place` for the transaction it is about to dispatch: the file index
+    // and where the image ended up, in that transaction's own coordinates.
+    let fresh = -1;
+    let freshStart = -1;
+    let freshEnd = -1;
+    let freshCaret = false;
+
+    // Every transaction (root and appended) maps every tracked position:
+    //  - the paste/drop point with bias 1: content typed exactly at it stays
+    //    BEFORE the images;
+    //  - an image's start with bias 1 and its end with bias -1, so both keep
+    //    hugging the image when something is inserted right next to it;
+    //  - the remembered selection with bias -1: typing at the caret moves the
+    //    real caret past the typed text but not this copy, so a caret the user
+    //    typed with counts as moved.
+    // A transaction that changed the document or the selection cancels the
+    // replace — only an untouched selection is replaced (T-mmv-03).
     const onTransaction = (payload: any) => {
       const txs = [payload.transaction].concat(payload.appendedTransactions || []);
       for (let i = 0; i < txs.length; i++) {
         const tr = txs[i];
-        insertAt = tr.mapping.map(insertAt, 1);
+        anchorAt = tr.mapping.map(anchorAt, 1);
+        selAnchor = tr.mapping.map(selAnchor, -1);
+        selHead = tr.mapping.map(selHead, -1);
+        for (let j = 0; j < starts.length; j++) {
+          if (starts[j] >= 0) {
+            starts[j] = tr.mapping.map(starts[j], 1);
+            ends[j] = tr.mapping.map(ends[j], -1);
+          }
+        }
+        if (i === 0 && fresh >= 0) {
+          // This routine's own insertion: adopt what it recorded instead of what
+          // the mapping made of the old values.
+          starts[fresh] = freshStart;
+          ends[fresh] = freshEnd;
+          if (freshCaret) {
+            selAnchor = tr.selection.anchor;
+            selHead = tr.selection.head;
+          }
+          fresh = -1;
+        }
         if (replaceFrom >= 0 && (tr.docChanged || tr.selectionSet)) replaceFrom = -1;
       }
     };
+
+    // Stop tracking and let go of the editor: when every upload has settled, or
+    // when the editor is destroyed (the component's unmount teardown calls
+    // `editor.destroy()`, which emits `destroy`) while an upload is still out.
+    const release = () => {
+      const target = live;
+      if (!target) return;
+      live = null;
+      target.off('transaction', onTransaction);
+      target.off('destroy', onDestroy);
+    };
+    const onDestroy = () => {
+      release();
+    };
     ed.on('transaction', onTransaction);
-    const insertOne = (attrs: any) => {
-      if (!attrs || ed.isDestroyed) return;
-      const target = replaceFrom >= 0 && replaceFrom < insertAt ? {
+    ed.on('destroy', onDestroy);
+
+    // Insert file `index`'s image at its file-order slot.
+    const place = (index: any, attrs: any) => {
+      const target = live;
+      if (!attrs || !target || target.isDestroyed) return;
+      // The slot: directly after the nearest earlier file's image, else directly
+      // before the nearest later one, else the paste/drop point.
+      let at = -1;
+      for (let j = index - 1; j >= 0 && at < 0; j--) {
+        if (ends[j] >= 0) at = ends[j];
+      }
+      for (let j = index + 1; j < starts.length && at < 0; j++) {
+        if (starts[j] >= 0) at = starts[j];
+      }
+      const where = at >= 0 ? at : replaceFrom >= 0 && replaceFrom < anchorAt ? {
         from: replaceFrom,
-        to: insertAt
-      } : insertAt;
-      let caret = -1;
-      ed.chain().focus().insertContentAt(target, {
+        to: anchorAt
+      } : anchorAt;
+      // Is the selection still the one this routine left? Read BEFORE inserting:
+      // the insertion itself may map it (a replaced range collapses).
+      const current = target.state.selection;
+      const unmoved = current.anchor === selAnchor && current.head === selHead;
+      const imageType = target.schema.nodes.image;
+      // No `.focus()` in the chain: an insertion never takes focus.
+      target.chain().insertContentAt(where, {
         type: 'image',
         attrs: attrs
       }, {
         updateSelection: false
       }).command((props: any) => {
-        // The end of the inserted content = the new end of the FIRST range of
-        // the insertion step's map (how TipTap computes it). NOT derived by
-        // mapping a tracked position: a block image inserted at the end of a
-        // paragraph is fitted AFTER the paragraph, so a position inside the
-        // paragraph maps to itself and would stay BEFORE the image.
+        // Where the image went = the image node inside the new range of the
+        // insertion step's map (the FIRST range of the last map; TipTap reads
+        // the inserted end from the same place). NOT derived by mapping the
+        // slot position: a block image inserted at the end of a paragraph is
+        // fitted AFTER the paragraph, so a position inside the paragraph maps
+        // to itself and would stay BEFORE the image.
         const tr = props.tr;
         const maps = tr.mapping.maps;
         if (maps.length === 0) return false;
-        let end = -1;
+        let rangeStart = -1;
+        let rangeEnd = -1;
         maps[maps.length - 1].forEach((oldStart: any, oldEnd: any, newStart: any, newEnd: any) => {
-          if (end < 0) end = newEnd;
+          if (rangeEnd < 0) {
+            rangeStart = newStart;
+            rangeEnd = newEnd;
+          }
         });
-        if (end < 0) return false;
-        let pos = this.textPositionAfter(tr.doc, end);
-        if (pos < 0) {
-          // A document ending in the image has no text position after it yet
-          // (StarterKit's trailing node is appended AFTER this transaction):
-          // create the paragraph here.
-          const para = tr.doc.type.schema.nodes.paragraph;
-          const endAt = tr.doc.resolve(end);
-          if (!para || !endAt.parent.canReplaceWith(endAt.index(), endAt.index(), para)) return false;
-          tr.insert(end, para.create());
-          pos = end + 1;
+        if (rangeEnd < 0) return false;
+        let imageStart = -1;
+        let imageEnd = -1;
+        tr.doc.nodesBetween(rangeStart, rangeEnd, (node: any, nodePos: any) => {
+          if (imageStart >= 0) return false;
+          if (node.type === imageType && nodePos >= rangeStart) {
+            imageStart = nodePos;
+            imageEnd = nodePos + node.nodeSize;
+            return false;
+          }
+          return true;
+        });
+        if (imageStart < 0) return false;
+        fresh = index;
+        freshStart = imageStart;
+        freshEnd = imageEnd;
+        freshCaret = unmoved;
+        if (!unmoved) return true;
+        // The caret goes after the LAST image of the batch in the document —
+        // a later file's image may already be there.
+        let lastEnd = imageEnd;
+        for (let j = ends.length - 1; j > index; j--) {
+          if (ends[j] >= 0) {
+            lastEnd = tr.mapping.map(ends[j], -1);
+            break;
+          }
         }
-        caret = pos;
-        return props.commands.setTextSelection(pos);
+        const after = tr.doc.resolve(lastEnd);
+        // An inline image: the cursor sits right behind it.
+        if (after.parent.inlineContent) return props.commands.setTextSelection(lastEnd);
+        // A block image: the start of the paragraph that directly follows it
+        // in the SAME container. When none does (the container ends there, or
+        // another kind of block follows) the paragraph is created right here,
+        // rather than the caret jumping into a neighbouring list item / out of
+        // the blockquote. StarterKit's trailing node is appended only AFTER
+        // this transaction, so a document that ends in the image needs it too.
+        const next = after.nodeAfter;
+        if (!next || !next.isTextblock) {
+          const para = tr.doc.type.schema.nodes.paragraph;
+          if (!para || !after.parent.canReplaceWith(after.index(), after.index(), para)) return true;
+          tr.insert(lastEnd, para.create());
+        }
+        return props.commands.setTextSelection(lastEnd + 1);
       }).run();
-      // The next image goes directly after this one.
-      if (caret >= 0) insertAt = ed.state.selection.head;
+      // Not consumed: the chain dispatched nothing.
+      fresh = -1;
     };
 
     // Every upload starts now, in order; each is reduced to attrs-or-null with
-    // its own rejection handler, so no promise here can reject unhandled.
-    const pending = files.map((file: any) => this.startUpload(upload, file).then((r: any) => this.toImageAttrs(r), () => null));
-    const done = pending.reduce((queue: any, p: any) => queue.then(() => p).then((attrs: any) => {
-      insertOne(attrs);
-    }).catch(() => {}), Promise.resolve());
-    done.then(() => {
-      ed.off('transaction', onTransaction);
+    // its own rejection handler and inserts on its own, so no promise here can
+    // reject unhandled and none waits for another.
+    let outstanding = files.length;
+    const settled = () => {
+      outstanding -= 1;
+      if (outstanding <= 0) release();
+    };
+    files.forEach((file: any, index: any) => {
+      this.startUpload(upload, file).then((r: any) => this.toImageAttrs(r), () => null).then((attrs: any) => {
+        place(index, attrs);
+      }).then(settled, settled);
     });
   };
   handlePaste = (view: any, event: any, slice: any) => {
@@ -1583,12 +1690,14 @@ export class TipTap {
     const upload = this.uploadImage();
     const ed = this.editor;
     if (!upload || !ed) return false;
-    // The image extension is an optional lazy chunk: when it failed to load there
-    // is no `image` node, and claiming the payload would replace a selection with
-    // nothing (T-mmv-04). Leave the paste to ProseMirror.
-    if (!ed.schema.nodes.image) return false;
     const files = this.collectImageFiles(event.clipboardData ? event.clipboardData.files : undefined);
     if (files.length === 0) return false;
+    // The image extension is an optional lazy chunk: when it failed to load there
+    // is no `image` node, and claiming the payload would replace a selection with
+    // nothing (T-mmv-04). Leave the paste to ProseMirror, which pastes whatever
+    // text came with it. (Unlike a drop, an unclaimed paste has no harmful
+    // browser default, so nothing is prevented here.)
+    if (!ed.schema.nodes.image) return false;
     event.preventDefault();
     const sel = view.state.selection;
     this.insertUploadedImages(ed, upload, files, sel.from, sel.to);
@@ -1611,6 +1720,12 @@ export class TipTap {
       top: event.clientY
     });
     const pos = at ? at.pos : ed.state.selection.head;
+    // The drop is the user's own gesture on this editor: as ProseMirror does for
+    // a drop it handles itself, the caret goes to the drop point (when a text
+    // cursor can sit there) and the editor takes focus — once, here, never later
+    // when an upload settles.
+    if (ed.state.doc.resolve(pos).parent.inlineContent) ed.commands.setTextSelection(pos);
+    view.focus();
     this.insertUploadedImages(ed, upload, files, pos, pos);
     return true;
   };
