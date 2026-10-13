@@ -32,14 +32,15 @@
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
 .rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; }
-.rozie-select-control[data-rozie-s-6e3ebfa6] { position: relative; }
+.rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { position: relative; }
 .rozie-select-native[data-rozie-s-6e3ebfa6] {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: 0; margin: 0; border: 0; padding: 0; cursor: pointer;
   font-size: 16px; /* iOS zooms the page for form controls under 16px */
   appearance: none;
 }
-.rozie-select-clear[data-rozie-s-6e3ebfa6], .rozie-select-chip__remove[data-rozie-s-6e3ebfa6] { position: relative; z-index: 1; }
+.rozie-select-native[data-rozie-s-6e3ebfa6]:disabled { cursor: default; }
+.rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-clear[data-rozie-s-6e3ebfa6] { position: relative; z-index: 1; }
 .rozie-select-chip[data-rozie-s-6e3ebfa6] {
   display: inline-flex; align-items: center; max-width: 100%;
   gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));

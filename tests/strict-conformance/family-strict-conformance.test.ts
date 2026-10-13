@@ -170,13 +170,15 @@ const FAMILIES: FamilySpec[] = [
         // emitter-annotated `(b: any)` callback (+1). The same Class-6 leaf-body
         // noise combobox/react records for its `$memo` (see above); the consumer
         // surface (Select.d.ts) is untouched.
-        // 4 → 5 (select native picker): the native <select>'s `<optgroup>` rows are
-        // `blk.items.map((row) => …)` over the same `groupBlocks()` result as the
-        // grouped listbox branch above — `items` comes out of the emitter-annotated
-        // `(b: any)` callback, so `row` has no contextual type. One more site of that
-        // Class-6 leaf-body shape, not a new class; Select.d.ts only gains the
-        // `nativePicker?: boolean` prop.
-        TS7006: 5,
+        // 4 → 7 (select native picker): the native <select>'s rows come from one
+        // `$memo` (`nativeRows`, so the option blocks are computed once per
+        // option/group change instead of twice per render). A `$memo` wrapper returns
+        // `val: any`, so the three template maps over it —
+        // `nativeRows().loose.map((row) => …)`, `nativeRows().grouped.map((blk) => …)`
+        // and the inner `blk.items.map((row) => …)` — have no contextual type (+3).
+        // The same Class-6 leaf-body shape as the `orderedOptions` memo above, not a
+        // new class; Select.d.ts only gains the `nativePicker?: boolean` prop.
+        TS7006: 7,
       },
     },
   },

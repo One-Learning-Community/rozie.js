@@ -78,7 +78,7 @@ Options without a `group` come first with no heading, then the listed groups in 
 
 ## Native mobile picker
 
-On a phone the operating system's own picker (the iOS wheel, the Android dialog) is usually the better list. Set `nativePicker` and, whenever the primary pointer is coarse (`matchMedia('(pointer: coarse)')`, re-evaluated when it changes), an invisible native `<select>` is laid over the control: the control looks the same, and a tap opens the OS picker instead of the custom popup.
+On a phone the operating system's own picker (the iOS wheel, the Android dialog) is usually the better list. Set `nativePicker` on a single-select and, whenever the primary pointer is coarse (`matchMedia('(pointer: coarse)')`, re-evaluated when it changes), an invisible native `<select>` is laid over the control: the control looks the same, and a tap opens the OS picker instead of the custom popup.
 
 ```rozie
 <template>
@@ -87,11 +87,12 @@ On a phone the operating system's own picker (the iOS wheel, the Android dialog)
 ```
 
 - `value` and `change` behave as on the custom path: option values of any type (numbers, objects) come back unchanged, and `change` carries the same `{ value, option }` payload. `open-change` does not fire for the OS picker.
-- `groups` render as `<optgroup>` sections (ungrouped options first), disabled options are disabled, and `multiple` gives a native multi-select — the chips still show the selection, and their remove buttons and the clear button stay tappable. A native multi-select commits the picked values in option order (`option` is `null` in its `change` payload); values the model holds that are not in `options` are kept.
-- In single-select the `placeholder` is the first entry of the OS picker. With `clearable`, choosing it clears the value; without `clearable` it is not a choice and the selection stays as it was.
-- What the OS picker cannot do is left out: `option`, `groupHeading` and `empty` slot content is not shown there, and the keyboard model in [Keyboard](#keyboard) does not apply. Interactive content in a custom `chip` fill needs `position: relative; z-index: 1` to stay tappable above the overlay.
-- While it is active the native `<select>` carries the `ariaLabel` and takes focus; the custom trigger is `aria-hidden` and out of the tab order. The `open()` / `toggle()` handle verbs still drive the custom popup.
-- It stays off with a mouse or trackpad, and with `virtual` or `inline` — those keep the custom popup on every device. The native `<select>` has no `name`: it does not take part in form submission.
+- `groups` render as `<optgroup>` sections (ungrouped options first) and disabled options are disabled. The clear button stays tappable above the overlay.
+- The `placeholder` is the first entry of the OS picker. With `clearable`, choosing it clears the value; without `clearable` it is disabled once there is a value.
+- If your code does not accept a commit (a controlled value you keep as it was), the OS picker goes back to showing the real selection.
+- What the OS picker cannot do is left out: `option`, `groupHeading` and `empty` slot content is not shown there, and the keyboard model in [Keyboard](#keyboard) does not apply.
+- While it is active the native `<select>` carries the `ariaLabel` and takes focus; the custom trigger is `aria-hidden` and out of the tab order, and the root carries the `rozie-select--native` class. The `open()` / `toggle()` handle verbs still drive the custom popup.
+- It is single-select only: a `multiple` select always uses the custom popup. It also stays off with a mouse or trackpad, and with `virtual` or `inline`. The native `<select>` has no `name`: it does not take part in form submission.
 
 ## API
 
@@ -114,7 +115,7 @@ On a phone the operating system's own picker (the iOS wheel, the Android dialog)
 | `selectOnTab` | `Boolean` | `false` | yes | Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup). |
 | `clearable` | `Boolean` | `false` | yes | Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed. |
 | `clearLabel` | `String` | `"Clear"` | yes | Accessible name of the clear button (`aria-label`). Localise it. |
-| `nativePicker` | `Boolean` | `false` | yes | On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. In single-select the picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value, without `clearable` choosing it changes nothing. Has no effect with a mouse, with `virtual`, or with `inline`. See [Native mobile picker](#native-mobile-picker). |
+| `nativePicker` | `Boolean` | `false` | yes | Single-select only. On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. The picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value; without `clearable` it is disabled once there is a value. Has no effect with a mouse, with `multiple`, with `virtual`, or with `inline`. See [Native mobile picker](#native-mobile-picker). |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the control when there is no visible `<label for>`. |
 | `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; ungrouped options come first, and groups present on options but absent here follow in first-appearance order. Keyboard navigation and type-ahead follow that visual order. Empty (the default) renders a flat list. Ignored when `virtual` is on. |
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. Grouping is not applied while `virtual` is on. |

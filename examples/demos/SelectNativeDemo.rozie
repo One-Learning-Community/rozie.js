@@ -1,18 +1,20 @@
 <!--
   SelectNativeDemo.rozie — BEHAVIORAL consumer for the Select's opt-in `nativePicker`
   (select-native.spec.ts). The spec overrides `matchMedia('(pointer: coarse)')` so the
-  primary pointer reads as coarse. Seven selects:
+  primary pointer reads as coarse. Nine selects:
     - single: grouped + clearable + nativePicker, with change / open-change counters,
               the last change payload and an object-identity readout
     - plain:  nativePicker, NOT clearable, holds a value (placeholder snap-back)
-    - multi:  nativePicker + multiple (chips above the overlay)
+    - multi:  nativePicker + multiple (single-select only: the custom popup is kept)
+    - guarded: nativePicker with a consumer that REJECTS 'banana' (writes the old value back a task later)
+    - dyn:    nativePicker / virtual / options / groups all switched at runtime
     - off:    no nativePicker (the custom popup, used to compare change payloads)
     - virt / inl: nativePicker + `virtual` / `inline` (the custom popup is kept)
     - locked: nativePicker + disabled
 -->
 <rozie name="SelectNativeDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ value: null, plain: 'banana', multi: ['apple'], off: null, virt: null, inl: null, locked: 'apple', changes: 0, payload: '', same: '', opens: 0, plainChanges: 0, multiChanges: 0, multiPayload: '', offPayload: '' }</data>
+<data>{ value: null, plain: 'banana', multi: ['apple'], off: null, virt: null, inl: null, locked: 'apple', changes: 0, payload: '', same: '', opens: 0, plainChanges: 0, multiChanges: 0, multiPayload: '', offPayload: '', guarded: 'apple', guardedChanges: 0, rejected: 0, dyn: null, dynChanges: 0, dynOpens: 0, dynSet: 'a', dynGroupSet: 'a', dynNative: true, dynVirtual: false }</data>
 <script>
 const GROUPS = [{ id: 'fruit', label: 'Fruit' }]
 // An object-valued option: the commit must hand back this very reference.
@@ -30,6 +32,51 @@ const FLAT = [
   { label: 'Water', value: 'water', disabled: true },
   { label: 'Seven', value: 7 },
 ]
+// Two option sets / group lists for the `dyn` select: SET_B drops Apple, adds Date and
+// reorders the rest; GROUPS_B lists `veg` (unlisted in GROUPS) ahead of `fruit`.
+const SET_A = [
+  { label: 'Apple', value: 'apple', group: 'fruit' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Carrot', value: 'carrot', group: 'veg' },
+  { label: 'Water', value: 'water' },
+]
+const SET_B = [
+  { label: 'Water', value: 'water' },
+  { label: 'Carrot', value: 'carrot', group: 'veg' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Date', value: 'date', group: 'fruit' },
+]
+const GROUPS_B = [{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]
+const dynOptions = () => ($data.dynSet === 'a' ? SET_A : SET_B)
+const dynGroups = () => ($data.dynGroupSet === 'a' ? GROUPS : GROUPS_B)
+const swapOptions = () => { $data.dynSet = $data.dynSet === 'a' ? 'b' : 'a' }
+const swapGroups = () => { $data.dynGroupSet = $data.dynGroupSet === 'a' ? 'b' : 'a' }
+const toggleNative = () => { $data.dynNative = !$data.dynNative }
+const toggleVirtual = () => { $data.dynVirtual = !$data.dynVirtual }
+const onDynChange = () => { $data.dynChanges = $data.dynChanges + 1 }
+const onDynOpen = () => { $data.dynOpens = $data.dynOpens + 1 }
+// The rejecting consumer: the model write has already landed when `change` arrives, so
+// refusing 'banana' means writing the last accepted value back. The write-back is
+// deferred a task: written back synchronously, the binding never sees a different value
+// on Angular (two-way `model()`), and the Select there keeps 'banana' as its own model.
+let lastGood = 'apple'
+const onGuardedChange = (detail) => {
+  $data.guardedChanges = $data.guardedChanges + 1
+  if (detail.value === 'banana') {
+    const keep = lastGood
+    setTimeout(() => {
+      $data.guarded = keep
+      $data.rejected = $data.rejected + 1
+    }, 0)
+  } else {
+    lastGood = detail.value
+  }
+}
+// A page hook for the one step a button cannot do: switching `nativePicker` on while the
+// custom popup is open (a click on a button would dismiss the popup as an outside click).
+$onMount(() => {
+  Reflect.set(globalThis, '__selectNativeDemo', { setNative: (on) => { $data.dynNative = !!on } })
+})
 const onChange = (detail) => {
   $data.changes = $data.changes + 1
   $data.payload = JSON.stringify(detail)
@@ -70,9 +117,21 @@ const setNone = () => { $data.value = null }
   <span data-testid="readout-inl">{{ $data.inl }}</span>
   <button type="button" data-testid="set-apple" @click="setApple()">set apple</button>
   <button type="button" data-testid="set-none" @click="setNone()">set none</button>
+  <span data-testid="readout-guarded">{{ $data.guarded }}</span>
+  <span data-testid="readout-guarded-changes">{{ $data.guardedChanges }}</span>
+  <span data-testid="readout-rejected">{{ $data.rejected }}</span>
+  <span data-testid="readout-dyn">{{ $data.dyn }}</span>
+  <span data-testid="readout-dyn-changes">{{ $data.dynChanges }}</span>
+  <span data-testid="readout-dyn-opens">{{ $data.dynOpens }}</span>
+  <button type="button" data-testid="swap-options" @click="swapOptions()">swap options</button>
+  <button type="button" data-testid="swap-groups" @click="swapGroups()">swap groups</button>
+  <button type="button" data-testid="toggle-native" @click="toggleNative()">toggle native</button>
+  <button type="button" data-testid="toggle-virtual" @click="toggleVirtual()">toggle virtual</button>
   <div data-testid="single"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.value" native-picker clearable placeholder="Pick" aria-label="Drink" @change="onChange($event)" @open-change="onOpenChange()" /></div>
   <div data-testid="plain"><Select :options="FLAT" r-model:value="$data.plain" native-picker placeholder="Choose" aria-label="Plain" @change="onPlainChange()" /></div>
   <div data-testid="multi"><Select :options="FLAT" r-model:value="$data.multi" multiple native-picker aria-label="Many" @change="onMultiChange($event)" /></div>
+  <div data-testid="guarded"><Select :options="FLAT" r-model:value="$data.guarded" native-picker aria-label="Guarded" @change="onGuardedChange($event)" /></div>
+  <div data-testid="dyn"><Select :options="dynOptions()" :groups="dynGroups()" r-model:value="$data.dyn" :native-picker="$data.dynNative" :virtual="$data.dynVirtual" placeholder="Dyn" aria-label="Dynamic" @change="onDynChange()" @open-change="onDynOpen()" /></div>
   <div data-testid="off"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.off" aria-label="Custom only" @change="onOffChange($event)" /></div>
   <div data-testid="virt"><Select :options="FLAT" r-model:value="$data.virt" native-picker virtual max-height="160px" aria-label="Windowed" /></div>
   <div data-testid="locked"><Select :options="FLAT" r-model:value="$data.locked" native-picker disabled aria-label="Locked" /></div>

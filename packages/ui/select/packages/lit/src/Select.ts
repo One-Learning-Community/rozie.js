@@ -94,14 +94,15 @@ export default class Select extends SignalWatcher(LitElement) {
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
 .rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; }
-.rozie-select-control[data-rozie-s-6e3ebfa6] { position: relative; }
+.rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { position: relative; }
 .rozie-select-native[data-rozie-s-6e3ebfa6] {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: 0; margin: 0; border: 0; padding: 0; cursor: pointer;
   font-size: 16px; /* iOS zooms the page for form controls under 16px */
   appearance: none;
 }
-.rozie-select-clear[data-rozie-s-6e3ebfa6], .rozie-select-chip__remove[data-rozie-s-6e3ebfa6] { position: relative; z-index: 1; }
+.rozie-select-native[data-rozie-s-6e3ebfa6]:disabled { cursor: default; }
+.rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-clear[data-rozie-s-6e3ebfa6] { position: relative; z-index: 1; }
 .rozie-select-chip[data-rozie-s-6e3ebfa6] {
   display: inline-flex; align-items: center; max-width: 100%;
   gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
@@ -267,7 +268,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'clear-label' }) clearLabel: string = 'Clear';
   /**
-   * On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. In single-select the picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value, without `clearable` choosing it changes nothing. Interactive content in a custom `chip` fill needs `position: relative; z-index: 1` to stay tappable above the picker overlay. Has no effect with a mouse, with `virtual`, or with `inline`.
+   * Single-select only. On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. The picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value; without `clearable` it is disabled once there is a value. Has no effect with a mouse, with `multiple`, with `virtual`, or with `inline`.
    */
   @property({ type: Boolean, reflect: true, attribute: 'native-picker' }) nativePicker: boolean = false;
   /**
@@ -464,20 +465,30 @@ private __rozieFirstUpdateDone = false;
     })(); }); }));
 
     if (!this.idBase) this._autoId.value = 'rozie-select-' + this.nextAutoId();
-    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-      this.coarseQuery = window.matchMedia('(pointer: coarse)');
-      this._coarse.value = !!this.coarseQuery.matches;
-      // Only records the new state: this closure is the mount-time one, so the reaction
-      // (closing the custom popup) lives in the `$data.coarse` watcher below.
-      this.coarseListener = (e: any) => {
-        this._coarse.value = !!e.matches;
-      };
-      this.coarseQuery.addEventListener('change', this.coarseListener);
-      // The first paint of the native element. Not left to the `$data.coarse` watcher:
-      // on Svelte and Solid a write made here in $onMount lands before that watcher's
-      // (skipped) first run, so it never fires — a select mounted with a value showed
-      // the placeholder on those two.
-      this.scheduleNativeSync();
+    // The coarse-pointer probe must never throw out of $onMount (the windowing setup
+    // below runs for every Select), and older engines only have addListener().
+    // The coarse-pointer probe must never throw out of $onMount (the windowing setup
+    // below runs for every Select), and older engines only have addListener().
+    try {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        this.coarseQuery = window.matchMedia('(pointer: coarse)');
+        this._coarse.value = !!this.coarseQuery.matches;
+        // Only records the new state: this closure is the mount-time one, so the reaction
+        // (closing the custom popup) lives in the `$data.coarse` watcher below.
+        this.coarseListener = (e: any) => {
+          this._coarse.value = !!e.matches;
+        };
+        if (typeof this.coarseQuery.addEventListener === 'function') this.coarseQuery.addEventListener('change', this.coarseListener);else if (typeof this.coarseQuery.addListener === 'function') this.coarseQuery.addListener(this.coarseListener);
+        // The first paint of the native element. Not left to the `$data.coarse` watcher:
+        // on Svelte and Solid a write made here in $onMount lands before that watcher's
+        // (skipped) first run, so it never fires — a select mounted with a value showed
+        // the placeholder on those two. Not gated on nativeActive() either: on React the
+        // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
+        // no native element was rendered.
+        if (this.nativePicker && this.coarseQuery.matches) this.armNativeSync();
+      }
+    } catch (err: any) {
+      this.coarseQuery = null;
     }
     this.syncRows();
     if (this.virtual) {
@@ -516,7 +527,10 @@ private __rozieFirstUpdateDone = false;
       this._rozieTornDown = true;
       (() => {
         if (this.typeTimer !== null) clearTimeout(this.typeTimer);
-        if (this.coarseQuery && this.coarseListener) this.coarseQuery.removeEventListener('change', this.coarseListener);
+        if (this.nativeSyncTimer !== null) clearTimeout(this.nativeSyncTimer);
+        if (this.coarseQuery && this.coarseListener) {
+          if (typeof this.coarseQuery.removeEventListener === 'function') this.coarseQuery.removeEventListener('change', this.coarseListener);else if (typeof this.coarseQuery.removeListener === 'function') this.coarseQuery.removeListener(this.coarseListener);
+        }
         // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
         if (this.virtualizerCleanup) this.virtualizerCleanup();
       })();
@@ -532,7 +546,7 @@ private __rozieFirstUpdateDone = false;
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-select": true, 'rozie-select-open': this.popupVisible(), 'rozie-select-disabled': this.disabled, 'rozie-select-inline': this.inline, 'rozie-select--block': this.block }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-6e3ebfa6>
+<div class="${Object.entries({ "rozie-select": true, 'rozie-select-open': this.popupVisible(), 'rozie-select-disabled': this.disabled, 'rozie-select-inline': this.inline, 'rozie-select--block': this.block, 'rozie-select--native': this.nativeActive() }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-6e3ebfa6>
   
   <rozie-popover trigger="manual" .open=${this._panelOpen.value} @open-change=${($event: CustomEvent) => { this._panelOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} .idBase=${this.idRoot()} data-rozie-s-6e3ebfa6><div class="rozie-select-control" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onControlClick($event); }} data-rozie-ref="controlEl" data-rozie-s-6e3ebfa6 slot="anchor">
         ${this.multiple ? html`${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<span class="rozie-select-chip" data-rozie-s-6e3ebfa6>
@@ -545,9 +559,10 @@ private __rozieFirstUpdateDone = false;
             ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}` : nothing}${this.multiple && this.selectedValues().length === 0 ? html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>` : nothing}</div>
         ${this.clearable && this.hasValue() && !this.disabled ? html`<button class="rozie-select-clear" type="button" tabindex="-1" aria-label=${this.clearLabel} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.noop(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onClearClick(); }} data-rozie-s-6e3ebfa6>×</button>` : nothing}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
         
-        ${this.nativeActive() ? html`<select class="rozie-select-native" ?multiple=${!!this.multiple} ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.ariaLabel ? this.ariaLabel : null)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { $event.stopPropagation(); this.onNativeChange($event); }} data-rozie-s-6e3ebfa6>
-          ${!this.multiple ? html`<option value="" data-rozie-s-6e3ebfa6>${this.placeholder}</option>` : nothing}${repeat<any>(this.nativeLoose(), (row, _idx) => 'n-' + row.index, (row, _idx) => html`<option value=${rozieAttr(row.index)} ?disabled=${!!this.disabledOf(row.opt)} data-rozie-s-6e3ebfa6>${rozieDisplay(this.labelOf(row.opt))}</option>`)}
-          ${repeat<any>(this.nativeGrouped(), (blk, _idx) => 'ng-' + blk.group.id, (blk, _idx) => html`<optgroup label=${rozieAttr(blk.group.label)} data-rozie-s-6e3ebfa6>
+        ${this.nativeActive() ? html`<select class="rozie-select-native" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.ariaLabel ? this.ariaLabel : null)} @change=${($event: Event & { currentTarget: HTMLSelectElement; target: HTMLSelectElement }) => { $event.stopPropagation(); this.onNativeChange($event); }} data-rozie-s-6e3ebfa6>
+          <option value="" ?disabled=${!!this.nativePlaceholderDisabled()} data-rozie-s-6e3ebfa6>${this.placeholder}</option>
+          ${repeat<any>(this.nativeRows().loose, (row, _idx) => 'n-' + row.index, (row, _idx) => html`<option value=${rozieAttr(row.index)} ?disabled=${!!this.disabledOf(row.opt)} data-rozie-s-6e3ebfa6>${rozieDisplay(this.labelOf(row.opt))}</option>`)}
+          ${repeat<any>(this.nativeRows().grouped, (blk, _idx) => 'ng-' + blk.group.id, (blk, _idx) => html`<optgroup label=${rozieAttr(blk.group.label)} data-rozie-s-6e3ebfa6>
             ${repeat<any>(blk.items, (row, _idx) => 'n-' + row.index, (row, _idx) => html`<option value=${rozieAttr(row.index)} ?disabled=${!!this.disabledOf(row.opt)} data-rozie-s-6e3ebfa6>${rozieDisplay(this.labelOf(row.opt))}</option>`)}
           </optgroup>`)}
         </select>` : nothing}</div>
@@ -600,11 +615,14 @@ private __rozieFirstUpdateDone = false;
 
   typeTimer: any = null;
 
-  // The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount).
-  // Reassigned module-`let`s, initialised null per the timer-handle convention.
+  // The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount), and
+  // the pending native-element sync timer (see queueNativeSync()). Reassigned
+  // module-`let`s, initialised null per the timer-handle convention.
   coarseQuery: any = null;
 
   coarseListener: any = null;
+
+  nativeSyncTimer: any = null;
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, single+multi selection, close/clear, and the
@@ -823,25 +841,46 @@ private __rozieFirstUpdateDone = false;
 };
 
   // ── native mobile picker (`nativePicker`) ──────────────────────────────────
-  // Active only for the opt-in prop on a coarse primary pointer, and never together
-  // with `virtual` or `inline`. While active the native <select> IS the control: the
-  // custom trigger is aria-hidden and out of the tab order, and the host entry points
-  // (onControlClick / onTriggerKeyDown) never open the custom popup.
-  nativeActive = () => !!this.nativePicker && this._coarse.value && !this.virtual && !this.inline;
+  // Active only for the opt-in prop on a coarse primary pointer, in SINGLE-select, and
+  // never together with `virtual` or `inline`. (`multiple` is excluded on purpose: a
+  // native <select multiple> is an in-place list box on desktop-class touch devices, where
+  // a tap on the invisible overlay would pick whatever row is under the finger.) While
+  // active the native <select> IS the control: the custom trigger is aria-hidden and out
+  // of the tab order, and the host entry points (onControlClick / onTriggerKeyDown) never
+  // open the custom popup.
+  nativeActive = () => !!this.nativePicker && this._coarse.value && !this.multiple && !this.virtual && !this.inline;
 
-  // The <option> rows in visual order: the ungrouped options first as direct children,
-  // then one <optgroup> per listed group. Each row carries its index in visibleOptions().
-  nativeBlocks = () => this.isGrouped() ? this.groupBlocks() : [{
-  group: null,
-  items: this.visibleOptions().map((opt: any, index: any) => ({
-    opt,
-    index
-  }))
-}];
+  // The <option> rows in visual order, computed once per option/group change: `loose` are
+  // the ungrouped options (direct children, first), `grouped` one entry per <optgroup>.
+  // Each row carries its index in visibleOptions().
+  nativeRowsCache = {
+  keys: null as any[] | null,
+  val: null as any
+};
 
-  nativeGrouped = () => this.nativeBlocks().filter((b: any) => b.group);
-
-  nativeLoose = () => this.nativeBlocks().filter((b: any) => !b.group).flatMap((b: any) => b.items);
+  nativeRows = () => {
+  const __rozieMemoKey = [this.options, this.groups, this.virtual];
+  const __rozieMemoPrev = this.nativeRowsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+    return this.nativeRowsCache.val;
+  }
+  const __rozieMemoVal = (() => {
+    const blocks = this.isGrouped() ? this.groupBlocks() : [{
+      group: null,
+      items: this.visibleOptions().map((opt: any, index: any) => ({
+        opt,
+        index
+      }))
+    }];
+    return {
+      loose: blocks.filter((b: any) => !b.group).flatMap((b: any) => b.items),
+      grouped: blocks.filter((b: any) => b.group)
+    };
+  })();
+  this.nativeRowsCache.keys = __rozieMemoKey;
+  this.nativeRowsCache.val = __rozieMemoVal;
+  return __rozieMemoVal;
+};
 
   // Option values can be any type and the native element only carries strings, so each
   // <option> carries its INDEX in visibleOptions() and a commit resolves back to the option.
@@ -849,6 +888,9 @@ private __rozieFirstUpdateDone = false;
   const i = this.visibleOptions().findIndex((o: any) => this.isSelected(o));
   return i === -1 ? '' : String(i);
 };
+
+  // The placeholder entry cannot be chosen once there is a value, unless `clearable`.
+  nativePlaceholderDisabled = () => this.hasValue() && !this.clearable;
 
   // The rendered native element, or null. Looked up from the root (a ref on a
   // conditionally rendered node is null on Solid and Lit), by tag name so it is typed.
@@ -861,74 +903,65 @@ private __rozieFirstUpdateDone = false;
 };
 
   // Write the model into the native element. Imperative on purpose: a <select>'s
-  // selection is DOM state, and the declarative shape — `:value` on the <select> (null
-  // for `multiple`) plus `:selected` on each <option> — did not hold on six targets
-  // (measured: wrong first paint for `multiple` on Vue and Solid; the options stopped
-  // following the model after a user change on Svelte and Lit; and `selected` on an
-  // <option> is a dev-mode console error on React). It is also the only way to put the
-  // element back when a choice is refused (the placeholder entry without `clearable`),
-  // where nothing reactive changes.
+  // selection is DOM state, and the declarative shape — `:value` on the <select> plus
+  // `:selected` on each <option> — did not behave the same on six targets when it was
+  // tried (and `selected` on an <option> is a dev-mode console error on React). It is
+  // also the only way to put the element back when a choice is not accepted (the
+  // placeholder entry, or a consumer that keeps the old value), where nothing reactive
+  // changes.
   syncNative = () => {
   const el = this.nativeEl();
   if (!el) return;
-  if (!this.multiple) {
-    const v = this.nativeSingleValue();
-    if (el.value !== v) el.value = v;
-    return;
-  }
-  const opts = this.visibleOptions();
-  for (let i = 0; i < el.options.length; i++) {
-    const o = el.options[i];
-    const on = o.value !== '' && !!this.isSelected(opts[Number(o.value)]);
-    if (o.selected !== on) o.selected = on;
-  }
+  const v = this.nativeSingleValue();
+  if (el.value !== v) el.value = v;
+};
+
+  // One pending sync at a time, and always the LATEST caller's: on React the queued
+  // callback closes over the render it was queued from, so a newer request replaces an
+  // older one instead of being dropped in its favour.
+  queueNativeSync = () => {
+  if (this.nativeSyncTimer !== null) clearTimeout(this.nativeSyncTimer);
+  this.nativeSyncTimer = setTimeout(() => {
+    this.nativeSyncTimer = null;
+    this.syncNative();
+  }, 0);
 };
 
   // Now, and once more after the framework has rendered: on some targets the watchers
   // below run before the <select> / <option> elements are committed.
-  scheduleNativeSync = () => {
+  armNativeSync = () => {
   this.syncNative();
-  setTimeout(() => this.syncNative(), 0);
+  this.queueNativeSync();
+};
+
+  // The watchers' entry point: a Select that is not showing the native picker never
+  // queries the DOM or queues a timer.
+  scheduleNativeSync = () => {
+  if (this.nativeActive()) this.armNativeSync();
 };
 
   onNativeChange = ($event: any) => {
-  const el = $event.target;
-  const opts = this.visibleOptions();
-  if (this.multiple) {
-    // Values the model holds that no option carries cannot be shown (or deselected) in
-    // the OS picker: keep them, ahead of the picked values in visual order.
-    const known = opts.map((o: any) => this.valueOf$local(o));
-    const picked = this.selectedValues().filter((v: any) => !known.includes(v));
-    for (let i = 0; i < el.options.length; i++) {
-      const o = el.options[i];
-      if (o.selected && o.value !== '') picked.push(this.valueOf$local(opts[Number(o.value)]));
-    }
-    this._valueControllable.write(picked);
-    this.dispatchEvent(new CustomEvent("change", {
-      detail: {
-        value: picked,
-        option: null
-      },
-      bubbles: true,
-      composed: true
-    }));
-    return;
+  const v = $event.target.value;
+  if (v === '') {
+    // The placeholder entry: clears when `clearable`, otherwise it is not a choice.
+    if (this.clearable && this.hasValue()) this.clear();
+  } else {
+    const opt = this.visibleOptions()[Number(v)];
+    if (opt !== undefined) this.select(opt);
   }
-  if (el.value === '') {
-    // The placeholder entry: clears when `clearable`; otherwise it is not a choice, so
-    // the element goes back to the real selection.
-    if (this.clearable && this.hasValue()) this.clear();else this.syncNative();
-    return;
-  }
-  const opt = opts[Number(el.value)];
-  if (opt !== undefined) this.select(opt);
+  // Whatever the consumer did with the commit (accepted, refused, normalised), the
+  // element must end up showing the model. Queued, not immediate: the model write has
+  // not come back as a prop yet, and when it does not come back at all (a refusal) no
+  // watcher runs.
+  this.queueNativeSync();
 };
 
   // The native picker takes over: an open custom popup closes through the normal close()
   // path (one `open-change`), and the native element picks up the model.
   yieldToNative = () => {
-  if (this.nativeActive()) this.close();
-  this.scheduleNativeSync();
+  if (!this.nativeActive()) return;
+  this.close();
+  this.armNativeSync();
 };
 
   // ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════

@@ -1,6 +1,6 @@
 <template>
 
-<div :class="['rozie-select', { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': props.disabled, 'rozie-select-inline': props.inline, 'rozie-select--block': props.block }]" ref="__rozieRootRef" v-bind="$attrs">
+<div :class="['rozie-select', { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': props.disabled, 'rozie-select-inline': props.inline, 'rozie-select--block': props.block, 'rozie-select--native': nativeActive() }]" ref="__rozieRootRef" v-bind="$attrs">
   
   <Popover trigger="manual" v-model:open="panelOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift" :id-base="idRoot()"><template #anchor>
       
@@ -15,9 +15,10 @@
             <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot></template><span v-if="props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ props.placeholder }}</span></div>
         <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
         
-        <select v-if="nativeActive()" class="rozie-select-native" :multiple="!!props.multiple" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change.stop="onNativeChange($event)">
-          <option v-if="!props.multiple" value="">{{ props.placeholder }}</option><option v-for="row in nativeLoose()" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
-          <optgroup v-for="blk in nativeGrouped()" :key="'ng-' + blk.group.id" :label="blk.group.label">
+        <select v-if="nativeActive()" class="rozie-select-native" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change.stop="onNativeChange($event)">
+          <option value="" :disabled="!!nativePlaceholderDisabled()">{{ props.placeholder }}</option>
+          <option v-for="row in nativeRows().loose" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
+          <optgroup v-for="blk in nativeRows().grouped" :key="'ng-' + blk.group.id" :label="blk.group.label">
             <option v-for="row in blk.items" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
           </optgroup>
         </select></div>
@@ -147,7 +148,7 @@ const props = withDefaults(
      */
     clearLabel?: string;
     /**
-     * On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. In single-select the picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value, without `clearable` choosing it changes nothing. Interactive content in a custom `chip` fill needs `position: relative; z-index: 1` to stay tappable above the picker overlay. Has no effect with a mouse, with `virtual`, or with `inline`.
+     * Single-select only. On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. The picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value; without `clearable` it is disabled once there is a value. Has no effect with a mouse, with `multiple`, with `virtual`, or with `inline`.
      */
     nativePicker?: boolean;
     /**
@@ -259,10 +260,12 @@ const activeDescendant = computed(() => {
 // module-`let`s + sigils live in the host; the partial only closes over them.
 let typeBuffer = '';
 let typeTimer: any = null;
-// The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount).
-// Reassigned module-`let`s, initialised null per the timer-handle convention.
+// The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount), and
+// the pending native-element sync timer (see queueNativeSync()). Reassigned
+// module-`let`s, initialised null per the timer-handle convention.
 let coarseQuery: any = null;
 let coarseListener: any = null;
+let nativeSyncTimer: any = null;
 // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
 // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
 // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
@@ -422,28 +425,52 @@ const groupBlocks = () => {
   }));
 };
 // ── native mobile picker (`nativePicker`) ──────────────────────────────────
-// Active only for the opt-in prop on a coarse primary pointer, and never together
-// with `virtual` or `inline`. While active the native <select> IS the control: the
-// custom trigger is aria-hidden and out of the tab order, and the host entry points
-// (onControlClick / onTriggerKeyDown) never open the custom popup.
-const nativeActive = () => !!props.nativePicker && coarse.value && !props.virtual && !props.inline;
-// The <option> rows in visual order: the ungrouped options first as direct children,
-// then one <optgroup> per listed group. Each row carries its index in visibleOptions().
-const nativeBlocks = () => isGrouped() ? groupBlocks() : [{
-  group: null,
-  items: visibleOptions().map((opt: any, index: any) => ({
-    opt,
-    index
-  }))
-}];
-const nativeGrouped = () => nativeBlocks().filter((b: any) => b.group);
-const nativeLoose = () => nativeBlocks().filter((b: any) => !b.group).flatMap((b: any) => b.items);
+// Active only for the opt-in prop on a coarse primary pointer, in SINGLE-select, and
+// never together with `virtual` or `inline`. (`multiple` is excluded on purpose: a
+// native <select multiple> is an in-place list box on desktop-class touch devices, where
+// a tap on the invisible overlay would pick whatever row is under the finger.) While
+// active the native <select> IS the control: the custom trigger is aria-hidden and out
+// of the tab order, and the host entry points (onControlClick / onTriggerKeyDown) never
+// open the custom popup.
+const nativeActive = () => !!props.nativePicker && coarse.value && !props.multiple && !props.virtual && !props.inline;
+// The <option> rows in visual order, computed once per option/group change: `loose` are
+// the ungrouped options (direct children, first), `grouped` one entry per <optgroup>.
+// Each row carries its index in visibleOptions().
+const nativeRowsCache = {
+  keys: null as any[] | null,
+  val: null as any
+};
+const nativeRows = () => {
+  const __rozieMemoKey = [props.options, props.groups, props.virtual];
+  const __rozieMemoPrev = nativeRowsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+    return nativeRowsCache.val;
+  }
+  const __rozieMemoVal = (() => {
+    const blocks = isGrouped() ? groupBlocks() : [{
+      group: null,
+      items: visibleOptions().map((opt: any, index: any) => ({
+        opt,
+        index
+      }))
+    }];
+    return {
+      loose: blocks.filter((b: any) => !b.group).flatMap((b: any) => b.items),
+      grouped: blocks.filter((b: any) => b.group)
+    };
+  })();
+  nativeRowsCache.keys = __rozieMemoKey;
+  nativeRowsCache.val = __rozieMemoVal;
+  return __rozieMemoVal;
+};
 // Option values can be any type and the native element only carries strings, so each
 // <option> carries its INDEX in visibleOptions() and a commit resolves back to the option.
 const nativeSingleValue = () => {
   const i = visibleOptions().findIndex((o: any) => isSelected(o));
   return i === -1 ? '' : String(i);
 };
+// The placeholder entry cannot be chosen once there is a value, unless `clearable`.
+const nativePlaceholderDisabled = () => hasValue() && !props.clearable;
 // The rendered native element, or null. Looked up from the root (a ref on a
 // conditionally rendered node is null on Solid and Lit), by tag name so it is typed.
 const nativeEl = () => {
@@ -454,67 +481,60 @@ const nativeEl = () => {
   return null;
 };
 // Write the model into the native element. Imperative on purpose: a <select>'s
-// selection is DOM state, and the declarative shape — `:value` on the <select> (null
-// for `multiple`) plus `:selected` on each <option> — did not hold on six targets
-// (measured: wrong first paint for `multiple` on Vue and Solid; the options stopped
-// following the model after a user change on Svelte and Lit; and `selected` on an
-// <option> is a dev-mode console error on React). It is also the only way to put the
-// element back when a choice is refused (the placeholder entry without `clearable`),
-// where nothing reactive changes.
+// selection is DOM state, and the declarative shape — `:value` on the <select> plus
+// `:selected` on each <option> — did not behave the same on six targets when it was
+// tried (and `selected` on an <option> is a dev-mode console error on React). It is
+// also the only way to put the element back when a choice is not accepted (the
+// placeholder entry, or a consumer that keeps the old value), where nothing reactive
+// changes.
 const syncNative = () => {
   const el = nativeEl();
   if (!el) return;
-  if (!props.multiple) {
-    const v = nativeSingleValue();
-    if (el.value !== v) el.value = v;
-    return;
-  }
-  const opts = visibleOptions();
-  for (let i = 0; i < el.options.length; i++) {
-    const o = el.options[i];
-    const on = o.value !== '' && !!isSelected(opts[Number(o.value)]);
-    if (o.selected !== on) o.selected = on;
-  }
+  const v = nativeSingleValue();
+  if (el.value !== v) el.value = v;
+};
+// One pending sync at a time, and always the LATEST caller's: on React the queued
+// callback closes over the render it was queued from, so a newer request replaces an
+// older one instead of being dropped in its favour.
+const queueNativeSync = () => {
+  if (nativeSyncTimer !== null) clearTimeout(nativeSyncTimer);
+  nativeSyncTimer = setTimeout(() => {
+    nativeSyncTimer = null;
+    syncNative();
+  }, 0);
 };
 // Now, and once more after the framework has rendered: on some targets the watchers
 // below run before the <select> / <option> elements are committed.
-const scheduleNativeSync = () => {
+const armNativeSync = () => {
   syncNative();
-  setTimeout(() => syncNative(), 0);
+  queueNativeSync();
+};
+// The watchers' entry point: a Select that is not showing the native picker never
+// queries the DOM or queues a timer.
+const scheduleNativeSync = () => {
+  if (nativeActive()) armNativeSync();
 };
 const onNativeChange = ($event: any) => {
-  const el = $event.target;
-  const opts = visibleOptions();
-  if (props.multiple) {
-    // Values the model holds that no option carries cannot be shown (or deselected) in
-    // the OS picker: keep them, ahead of the picked values in visual order.
-    const known = opts.map((o: any) => valueOf(o));
-    const picked = selectedValues().filter((v: any) => !known.includes(v));
-    for (let i = 0; i < el.options.length; i++) {
-      const o = el.options[i];
-      if (o.selected && o.value !== '') picked.push(valueOf(opts[Number(o.value)]));
-    }
-    value.value = picked;
-    emit('change', {
-      value: picked,
-      option: null
-    });
-    return;
+  const v = $event.target.value;
+  if (v === '') {
+    // The placeholder entry: clears when `clearable`, otherwise it is not a choice.
+    if (props.clearable && hasValue()) clear();
+  } else {
+    const opt = visibleOptions()[Number(v)];
+    if (opt !== undefined) select(opt);
   }
-  if (el.value === '') {
-    // The placeholder entry: clears when `clearable`; otherwise it is not a choice, so
-    // the element goes back to the real selection.
-    if (props.clearable && hasValue()) clear();else syncNative();
-    return;
-  }
-  const opt = opts[Number(el.value)];
-  if (opt !== undefined) select(opt);
+  // Whatever the consumer did with the commit (accepted, refused, normalised), the
+  // element must end up showing the model. Queued, not immediate: the model write has
+  // not come back as a prop yet, and when it does not come back at all (a refusal) no
+  // watcher runs.
+  queueNativeSync();
 };
 // The native picker takes over: an open custom popup closes through the normal close()
 // path (one `open-change`), and the native element picks up the model.
 const yieldToNative = () => {
-  if (nativeActive()) close();
-  scheduleNativeSync();
+  if (!nativeActive()) return;
+  close();
+  armNativeSync();
 };
 // ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════
 // These ten functions are defined here instead of imported from listCore.rzts.
@@ -1440,20 +1460,28 @@ const onControlClick = ($event: any) => {
 
 onMounted(() => {
   if (!props.idBase) autoId.value = 'rozie-select-' + nextAutoId();
-  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-    coarseQuery = window.matchMedia('(pointer: coarse)');
-    coarse.value = !!coarseQuery.matches;
-    // Only records the new state: this closure is the mount-time one, so the reaction
-    // (closing the custom popup) lives in the `$data.coarse` watcher below.
-    coarseListener = (e: any) => {
-      coarse.value = !!e.matches;
-    };
-    coarseQuery.addEventListener('change', coarseListener);
-    // The first paint of the native element. Not left to the `$data.coarse` watcher:
-    // on Svelte and Solid a write made here in $onMount lands before that watcher's
-    // (skipped) first run, so it never fires — a select mounted with a value showed
-    // the placeholder on those two.
-    scheduleNativeSync();
+  // The coarse-pointer probe must never throw out of $onMount (the windowing setup
+  // below runs for every Select), and older engines only have addListener().
+  try {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      coarseQuery = window.matchMedia('(pointer: coarse)');
+      coarse.value = !!coarseQuery.matches;
+      // Only records the new state: this closure is the mount-time one, so the reaction
+      // (closing the custom popup) lives in the `$data.coarse` watcher below.
+      coarseListener = (e: any) => {
+        coarse.value = !!e.matches;
+      };
+      if (typeof coarseQuery.addEventListener === 'function') coarseQuery.addEventListener('change', coarseListener);else if (typeof coarseQuery.addListener === 'function') coarseQuery.addListener(coarseListener);
+      // The first paint of the native element. Not left to the `$data.coarse` watcher:
+      // on Svelte and Solid a write made here in $onMount lands before that watcher's
+      // (skipped) first run, so it never fires — a select mounted with a value showed
+      // the placeholder on those two. Not gated on nativeActive() either: on React the
+      // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
+      // no native element was rendered.
+      if (props.nativePicker && coarseQuery.matches) armNativeSync();
+    }
+  } catch (err: any) {
+    coarseQuery = null;
   }
   syncRows();
   if (props.virtual) {
@@ -1470,7 +1498,10 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   if (typeTimer !== null) clearTimeout(typeTimer);
-  if (coarseQuery && coarseListener) coarseQuery.removeEventListener('change', coarseListener);
+  if (nativeSyncTimer !== null) clearTimeout(nativeSyncTimer);
+  if (coarseQuery && coarseListener) {
+    if (typeof coarseQuery.removeEventListener === 'function') coarseQuery.removeEventListener('change', coarseListener);else if (typeof coarseQuery.removeListener === 'function') coarseQuery.removeListener(coarseListener);
+  }
   // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
   if (virtualizerCleanup) virtualizerCleanup();
 });
@@ -1556,14 +1587,15 @@ useOutsideClick(
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
 .rozie-select-control { flex-wrap: wrap; }
-.rozie-select-control { position: relative; }
+.rozie-select--native .rozie-select-control { position: relative; }
 .rozie-select-native {
   position: absolute; inset: 0; width: 100%; height: 100%;
   opacity: 0; margin: 0; border: 0; padding: 0; cursor: pointer;
   font-size: 16px; /* iOS zooms the page for form controls under 16px */
   appearance: none;
 }
-.rozie-select-clear, .rozie-select-chip__remove { position: relative; z-index: 1; }
+.rozie-select-native:disabled { cursor: default; }
+.rozie-select--native .rozie-select-clear { position: relative; z-index: 1; }
 .rozie-select-chip {
   display: inline-flex; align-items: center; max-width: 100%;
   gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
