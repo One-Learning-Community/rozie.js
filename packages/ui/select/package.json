@@ -4,22 +4,24 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "comment:exports": "vendorable: true (D-02). A vendorable primitive exposes its canonical .rozie source under a STABLE subpath so the D-07 <components> specifier `@rozie-ui/select/Select.rozie` resolves via ProducerResolver (enhanced-resolve, exportsFields:['exports']) for every NON-codegen consumer — the VR harness, the surface test, the IDE LSP, and any consumer that compiles the composite from raw source. Codegen itself never hits this path (it remaps the specifier to the local vendored sibling in-memory before compile); this export is the universal authoring/dev-time half of the same forward-to-Option-A contract.",
+  "comment:exports": "vendorable: true (D-02). A vendorable primitive exposes its canonical .rozie source under a STABLE subpath so the D-07 <components> specifier `@rozie-ui/select/Select.rozie` resolves via ProducerResolver (enhanced-resolve, exportsFields:['exports']) for every NON-codegen consumer \u2014 the VR harness, the surface test, the IDE LSP, and any consumer that compiles the composite from raw source. Codegen itself never hits this path (it remaps the specifier to the local vendored sibling in-memory before compile); this export is the universal authoring/dev-time half of the same forward-to-Option-A contract.",
   "exports": {
     "./Select.rozie": "./src/Select.rozie",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "node scripts/codegen.mjs",
-    "test": "echo 'no unit tests (pure-Rozie component; behaviour covered by the VR matrix)'",
-    "typecheck": "echo 'no local TS to check (pure-Rozie source); the emitted leaves typecheck individually'"
+    "check": "node scripts/compile-select-check.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
   },
-  "comment:headless-core-devdep": "Phase 64 (D-06 / P2): @rozie-ui/headless-core is a SOURCE-ONLY workspace package whose `listCore.rzts` script-partial DISSOLVES into this family's compiled leaves via inlineScriptPartials() at compile — zero runtime dependency. It is a devDependency (the cross-package bare-specifier import is resolved at compile-time via the producer exports map; the canonical add-as-devDep mechanism proven in 64-01, no tsconfig paths needed).",
-  "comment:virtual-core-dep": "Phase 64 (P4 / SC-5): @tanstack/virtual-core is the framework-agnostic windowing state machine the shared windowing.rzts math drives (the data-table precedent — NO per-framework adapter). The compiled leaves import it at runtime when `virtual` is on, so it is a peerDependency of each leaf; here it is a devDependency so the source resolves for codegen + the VR build.",
+  "comment:headless-core-devdep": "Phase 64 (D-06 / P2): @rozie-ui/headless-core is a SOURCE-ONLY workspace package whose `listCore.rzts` script-partial DISSOLVES into this family's compiled leaves via inlineScriptPartials() at compile \u2014 zero runtime dependency. It is a devDependency (the cross-package bare-specifier import is resolved at compile-time via the producer exports map; the canonical add-as-devDep mechanism proven in 64-01, no tsconfig paths needed).",
+  "comment:virtual-core-dep": "Phase 64 (P4 / SC-5): @tanstack/virtual-core is the framework-agnostic windowing state machine the shared windowing.rzts math drives (the data-table precedent \u2014 NO per-framework adapter). The compiled leaves import it at runtime when `virtual` is on, so it is a peerDependency of each leaf; here it is a devDependency so the source resolves for codegen + the VR build.",
   "devDependencies": {
-    "@rozie/core": "workspace:*",
     "@rozie-ui/headless-core": "workspace:*",
+    "@rozie/core": "workspace:*",
     "@tanstack/virtual-core": "^3",
-    "typescript": "~5.6.0"
+    "typescript": "~5.6.0",
+    "vitest": "^4.1.0"
   }
 }
