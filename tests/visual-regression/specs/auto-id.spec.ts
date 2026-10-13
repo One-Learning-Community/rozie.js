@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * Per-instance default id base (oinbox 0.8.0 follow-up F6, quick 261002-ekf) on
  * all 6 targets, driven against examples/demos/AutoIdDemo.rozie: two
- * default-configured Listboxes and two default-configured Popovers never share an
+ * default-configured Selects and two default-configured Popovers never share an
  * id (they all used to default to one fixed string). The Combobox case is covered
  * by combobox-recipient.spec.ts.
  *
@@ -23,7 +23,7 @@ for (const target of TARGETS) {
   const built = existsSync(resolve(__dirname, `../dist/${target}/host/entry.${target}.html`));
   const runner = built ? test : test.fixme;
 
-  runner(`auto-id [${target}]: default Listboxes and Popovers get distinct ids`, async ({ page }) => {
+  runner(`auto-id [${target}]: default Selects and Popovers get distinct ids`, async ({ page }) => {
     await page.goto(`/?example=AutoId&target=${target}`);
     await expect(page.getByTestId('rozie-mount')).toBeVisible();
 
@@ -32,7 +32,7 @@ for (const target of TARGETS) {
       const trigger = page.locator(`button[role="combobox"][aria-label="${label}"]`);
       await expect
         .poll(async () => (await trigger.getAttribute('aria-controls')) ?? '', POLL)
-        .toMatch(/^rozie-listbox-\d+-list$/);
+        .toMatch(/^rozie-select-\d+-list$/);
       listControls.push((await trigger.getAttribute('aria-controls')) ?? '');
     }
     expect(listControls[0]).not.toBe(listControls[1]);

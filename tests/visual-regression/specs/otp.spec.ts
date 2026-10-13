@@ -48,7 +48,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     focus()/clear() handles, and the alt-instance prop combination.
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
- * `toHaveScreenshot`. Like slider.spec.ts / listbox.spec.ts, this runs locally on
+ * `toHaveScreenshot`. Like slider.spec.ts / select.spec.ts, this runs locally on
  * macOS without a Docker baseline.
  */
 

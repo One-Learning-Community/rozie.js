@@ -19,7 +19,7 @@
     "@rozie-ui/flatpickr-solid": "workspace:*",
     "@rozie-ui/fullcalendar-solid": "workspace:*",
     "@rozie-ui/lexical-solid": "workspace:*",
-    "@rozie-ui/listbox-solid": "workspace:*",
+    "@rozie-ui/select-solid": "workspace:*",
     "@rozie-ui/maplibre-solid": "workspace:*",
     "@rozie-ui/number-field-solid": "workspace:*",
     "@rozie-ui/otp-solid": "workspace:*",

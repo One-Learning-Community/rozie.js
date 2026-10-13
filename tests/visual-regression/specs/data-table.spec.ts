@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * table (`@rozie-ui/data-table`) built on a SINGLE inline `@tanstack/table-core`
  * bridge (NO per-framework adapter — the whole point of the family).
  *
- * Like listbox.spec.ts / slider.spec.ts these are BEHAVIORAL assertions (not
+ * Like select.spec.ts / slider.spec.ts these are BEHAVIORAL assertions (not
  * pixels — `feedback_vr_linux_baselines`): aria-sort flips, filter narrows rows,
  * pagination changes the page, selection toggles + indeterminate, visibility drops
  * a column, reorder moves a column, pin sticks a column, sticky header stays. Each

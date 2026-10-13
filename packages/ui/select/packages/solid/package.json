@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/select-solid",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Solid headless select (single + multi-select, type-ahead, keyboard nav, groups, floating popup) — one accessible Rozie source compiled to Solid.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "select",
+    "combobox",
+    "select",
+    "dropdown",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "solid"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/select/packages/solid"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "solid": "./dist/source/index.jsx",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "@rozie/runtime-solid": "workspace:^",
+    "@solid-primitives/keyed": "^1.5.3"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.8",
+    "@tanstack/virtual-core": "^3"
+  },
+  "peerDependenciesMeta": {
+    "solid-js": {
+      "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/preset-typescript": "^7.28.5",
+    "babel-preset-solid": "~1.8.22"
+  }
+}

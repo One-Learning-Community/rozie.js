@@ -98,7 +98,7 @@ jobs:
       # `vue-gates` runs three gate suites the demo closure alone does not
       # reach: `@rozie/strict-conformance`, `@rozie/event-contract-conformance`
       # and the Vue-leaf gate. The load-bearing one is `@rozie/vue-typecheck`,
-      # which depends on `@rozie-ui/data-table-vue`, `@rozie-ui/listbox-vue`
+      # which depends on `@rozie-ui/data-table-vue`, `@rozie-ui/select-vue`
       # and `@rozie-ui/sortable-list-vue` — three `@rozie-ui` leaves that are
       # NOT in the consumer-demo closure. `@rozie/runtime-lit`
       # (`strict-conformance`'s dep) is likewise pulled in via its own filter
@@ -106,7 +106,7 @@ jobs:
       # other five matrix workflows and WRONG here.
       #
       # `@rozie/strict-conformance` alone reaches a further 12 `@rozie-ui`
-      # family leaves (`@rozie-ui/{combobox,slider,listbox,data-table}-
+      # family leaves (`@rozie-ui/{combobox,slider,select,data-table}-
       # {react,solid,lit}`) — not through the workflow's `--filter`, but
       # because quick 260829-t8t (validation phase) declared them as
       # `workspace:*` devDependencies of `tests/strict-conformance` after this
@@ -227,7 +227,7 @@ jobs:
       # step above (520 -> 107 tasks, -79%). The three gate-package filter
       # terms are required here because the gate steps below run all three
       # directly; the Vue-leaf gate's package is the one that pulls in
-      # `@rozie-ui/data-table-vue`, `@rozie-ui/listbox-vue` and
+      # `@rozie-ui/data-table-vue`, `@rozie-ui/select-vue` and
       # `@rozie-ui/sortable-list-vue` — dropping the
       # `@rozie-ui` leaves wholesale (correct in every other matrix workflow)
       # would be WRONG in this one. The demo filter must cover every consumer

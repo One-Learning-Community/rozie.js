@@ -4,8 +4,6 @@
 "@rozie-ui/lexical-react": patch
 "@rozie-ui/lexical-solid": patch
 "@rozie-ui/lexical-svelte": minor
-"@rozie-ui/listbox-react": patch
-"@rozie-ui/listbox-svelte": minor
 "@rozie-ui/maplibre-react": patch
 "@rozie-ui/maplibre-svelte": minor
 "@rozie-ui/number-field-react": patch

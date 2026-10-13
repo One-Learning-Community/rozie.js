@@ -1010,9 +1010,9 @@ function runSelfTest() {
   }
 
   // 3. Ignore-list control: 592096a75 replay must be zero findings for any
-  //    ignore-listed name; listbox-react/slider-react are the concrete cases.
+  //    ignore-listed name; select-react/slider-react are the concrete cases.
   {
-    const names = ['@rozie-ui/listbox-react', '@rozie-ui/slider-react'];
+    const names = ['@rozie-ui/dialog-react', '@rozie-ui/slider-react'];
     const bad = [];
     for (const name of names) {
       const r = histResults.get(name);

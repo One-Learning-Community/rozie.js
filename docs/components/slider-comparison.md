@@ -4,7 +4,7 @@ surface_hash: b3eea757a447
 
 # Headless slider / range comparison
 
-How `@rozie-ui/slider` compares to the existing slider libraries across the six frameworks. Like the listbox, the slider has no shared vanilla-JS engine, but unlike the listbox, the cross-framework slider landscape splits along a second axis: **headless-behaviour libraries** (React Aria, Radix, Kobalte, Melt, Angular CDK) that reimplement the WAI-ARIA [slider pattern](https://www.w3.org/WAI/ARIA/apg/patterns/slider/) per ecosystem, versus the **native-input wrappers** (rc-slider, MUI Slider, noUiSlider) that ship a styled, batteries-included widget. Rozie sits deliberately in a third spot: `@rozie-ui/slider` builds the behaviour on the browser's own `<input type="range">` and delivers the same `<Slider>` on all six frameworks, with the same props, events, two-way `value`, slots, and handle, installed as a pre-compiled per-framework package with no Rozie toolchain required.
+How `@rozie-ui/slider` compares to the existing slider libraries across the six frameworks. Like the select, the slider has no shared vanilla-JS engine, but unlike the select, the cross-framework slider landscape splits along a second axis: **headless-behaviour libraries** (React Aria, Radix, Kobalte, Melt, Angular CDK) that reimplement the WAI-ARIA [slider pattern](https://www.w3.org/WAI/ARIA/apg/patterns/slider/) per ecosystem, versus the **native-input wrappers** (rc-slider, MUI Slider, noUiSlider) that ship a styled, batteries-included widget. Rozie sits deliberately in a third spot: `@rozie-ui/slider` builds the behaviour on the browser's own `<input type="range">` and delivers the same `<Slider>` on all six frameworks, with the same props, events, two-way `value`, slots, and handle, installed as a pre-compiled per-framework package with no Rozie toolchain required.
 
 > Research snapshot: 2026-08-10. The headless-UI landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
 
@@ -75,4 +75,4 @@ The [`@rozie-ui/slider` showcase + API reference](/components/slider) documents 
 - [Slider — showcase & API](/components/slider) — the full `@rozie-ui/slider` surface, quick start, theming, keyboard, and accessibility reference.
 - [Slider — live demo](/components/slider-demo) — the Vue leaf's workspace build running in the page (single + range + vertical), plus the one `.rozie` source and the six generated outputs.
 - [`Slider.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/src/Slider.rozie)
-- [Listbox — headless select / combobox](/components/listbox-comparison) — the sibling no-engine headless family, contrasting the *behaviour-only* story with this *native-input* one.
+- [Select — headless select / combobox](/components/select-comparison) — the sibling no-engine headless family, contrasting the *behaviour-only* story with this *native-input* one.

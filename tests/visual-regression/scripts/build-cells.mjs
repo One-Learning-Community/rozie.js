@@ -175,15 +175,15 @@ const EMBLA_SRC = resolve(
   'embla',
   'src',
 );
-// Same packaging move for @rozie-ui/listbox: Listbox.rozie lives in the package
+// Same packaging move for @rozie-ui/select: Select.rozie lives in the package
 // src; the Angular sub-build walks it via `prebuildExtraRoots` and drops the same
-// cross-tree `.rozie.ts` + `Listbox.ts` shim artefacts that must be swept after
+// cross-tree `.rozie.ts` + `Select.ts` shim artefacts that must be swept after
 // the Angular build (see cleanupCrossTreeAngularArtifacts).
-const LISTBOX_SRC = resolve(
+const SELECT_SRC = resolve(
   REPO_ROOT,
   'packages',
   'ui',
-  'listbox',
+  'select',
   'src',
 );
 // Same packaging move for @rozie-ui/slider: Slider.rozie lives in the package
@@ -611,20 +611,20 @@ function cleanupCrossTreeAngularArtifacts() {
     // embla src always exists post-port — defensive only
   }
   rmSync(resolve(EMBLA_SRC, 'Carousel.ts'), { force: true });
-  // Same sweep for @rozie-ui/listbox's package src (ListboxBehaviorDemo composes
-  // Listbox via <components>, so the Angular sub-build emits Listbox.rozie.ts +
-  // the Listbox.ts shim here). Leftovers (the emitted .rozie.ts imports
+  // Same sweep for @rozie-ui/select's package src (SelectBehaviorDemo composes
+  // Select via <components>, so the Angular sub-build emits Select.rozie.ts +
+  // the Select.ts shim here). Leftovers (the emitted .rozie.ts imports
   // @angular/core) poison the later solid/lit builds.
   try {
-    for (const entry of readdirSync(LISTBOX_SRC)) {
+    for (const entry of readdirSync(SELECT_SRC)) {
       if (entry.endsWith('.rozie.ts')) {
-        rmSync(resolve(LISTBOX_SRC, entry), { force: true });
+        rmSync(resolve(SELECT_SRC, entry), { force: true });
       }
     }
   } catch {
-    // listbox src always exists post-port — defensive only
+    // select src always exists post-port — defensive only
   }
-  rmSync(resolve(LISTBOX_SRC, 'Listbox.ts'), { force: true });
+  rmSync(resolve(SELECT_SRC, 'Select.ts'), { force: true });
   // Same sweep for @rozie-ui/slider's package src (the Slider*Demo cells compose
   // Slider via <components>, so the Angular sub-build emits Slider.rozie.ts +
   // the Slider.ts shim here). Leftovers (the emitted .rozie.ts imports

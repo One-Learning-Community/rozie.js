@@ -94,7 +94,7 @@ function codeGroup(snippets, i = 0, slug = null) {
 /** Whether `<slug>.md` documents an `## Accessibility` section — checked so
  * the "showcase & API" link's promise below is never false. Verified (Task 6,
  * 260802-tmo): only 13 of the ~40 component docs pages actually carry this
- * heading (combobox, command-palette, data-table-grid-mode, dialog, listbox,
+ * heading (combobox, command-palette, data-table-grid-mode, dialog, select,
  * number-field, otp, popover, resizable, slider, switch, tags, toast). */
 function hasAccessibilitySection(slug) {
   const page = resolve(COMPONENTS_DIR, `${slug}.md`);

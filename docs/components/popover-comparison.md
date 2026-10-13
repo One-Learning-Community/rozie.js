@@ -31,4 +31,4 @@ Tippy.js is a popular standalone tooltip library (its v6 line is built on Popper
 - You need a full focus-trap + dismissable-layer stack on React only → `@floating-ui/react` or Radix.
 - You need a modal dialog (not a positioned floating element) → use [`@rozie-ui/dialog`](/components/dialog).
 - You need a complete menu button (roving focus, Home/End, typeahead, Tab closing the menu) → Popover can host the menu (`popupRole="menu"` announces it, on the wrapper and via the `anchor` slot on your own button), but the menu's keyboard model is yours; there is no Rozie Menu component yet.
-- You want a select/combobox listbox → use [`@rozie-ui/listbox`](/components/listbox) or [`@rozie-ui/combobox`](/components/combobox), which own their own keyboard/selection model.
+- You want a select/combobox → use [`@rozie-ui/select`](/components/select) or [`@rozie-ui/combobox`](/components/combobox), which own their own keyboard/selection model.

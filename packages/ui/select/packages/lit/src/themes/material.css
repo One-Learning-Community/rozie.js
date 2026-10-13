@@ -1,0 +1,47 @@
+/*
+ * @rozie-ui/select — Material Design 3 bridge.
+ *
+ * Maps the select tokens onto the MD3 system color roles
+ * (`--md-sys-color-*`) emitted by material-web / @material/material-color-utilities
+ * theme builders. Falls back to the baseline M3 light palette when those vars
+ * are absent, so it renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/select-lit/themes/material.css';
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rsl-x: var(--rozie-select-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-select-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-select`
+ *    and the Lit host `rozie-select`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
+ */
+:root,
+.rozie-select,
+rozie-select {
+  --rsl-bg: var(--rozie-select-bg, var(--md-sys-color-surface-container, #f3edf7));
+  --rsl-fg: var(--rozie-select-fg, var(--md-sys-color-on-surface, #1d1b20));
+  --rsl-border: var(--rozie-select-border, var(--md-sys-color-outline-variant, #cac4d0));
+  --rsl-border-width: var(--rozie-select-border-width, 1px);
+  --rsl-radius: var(--rozie-select-radius, 4px);
+  --rsl-placeholder: var(--rozie-select-placeholder, var(--md-sys-color-on-surface-variant, #49454f));
+
+  --rsl-accent: var(--rozie-select-accent, var(--md-sys-color-primary, #6750a4));
+  --rsl-ring: var(--rozie-select-ring, var(--md-sys-color-primary, #6750a4));
+
+  --rsl-popup-bg: var(--rozie-select-popup-bg, var(--md-sys-color-surface-container-high, #ece6f0));
+  --rsl-active-bg: var(--rozie-select-active-bg, var(--md-sys-color-secondary-container, #e8def8));
+  --rsl-active-fg: var(--rozie-select-active-fg, var(--md-sys-color-on-secondary-container, #1d192b));
+  --rsl-selected-bg: var(--rozie-select-selected-bg, var(--md-sys-color-secondary-container, #e8def8));
+  --rsl-selected-fg: var(--rozie-select-selected-fg, var(--md-sys-color-on-secondary-container, #1d192b));
+  --rsl-check-color: var(--rozie-select-check-color, var(--md-sys-color-primary, #6750a4));
+
+  --rsl-popup-radius: var(--rozie-select-popup-radius, 4px);
+  --rsl-shadow: var(--rozie-select-shadow, 0 2px 6px 2px rgb(0 0 0 / 0.15), 0 1px 2px rgb(0 0 0 / 0.3));
+  --rsl-empty-fg: var(--rozie-select-empty-fg, var(--md-sys-color-on-surface-variant, #49454f));
+}

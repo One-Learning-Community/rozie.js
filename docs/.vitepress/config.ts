@@ -294,14 +294,14 @@ export default defineConfig({
           ],
         },
         {
-          text: '@rozie-ui/listbox',
+          text: '@rozie-ui/select',
           collapsed: true,
           items: [
-            { text: 'Listbox — headless select / combobox', link: '/components/listbox' },
-            { text: 'Usage examples', link: '/components/listbox-usage' },
-            { text: 'Theming', link: '/components/listbox-theming' },
-            { text: 'Headless select / combobox comparison', link: '/components/listbox-comparison' },
-            { text: 'Listbox — live demo', link: '/components/listbox-demo' },
+            { text: 'Select — headless select / combobox', link: '/components/select' },
+            { text: 'Usage examples', link: '/components/select-usage' },
+            { text: 'Theming', link: '/components/select-theming' },
+            { text: 'Select comparison', link: '/components/select-comparison' },
+            { text: 'Select — live demo', link: '/components/select-demo' },
           ],
         },
         {

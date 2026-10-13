@@ -58,7 +58,7 @@ const uiPackageFiles = import.meta.glob('../../../packages/ui/*/src/*.rozie', {
 // produces, but must NEVER enter a bundle's `files` map (which would double-
 // compile them through the sibling loop as if they were components).
 //
-// The virtualized pure-Rozie families (combobox/listbox/command-palette) and
+// The virtualized pure-Rozie families (combobox/select/command-palette) and
 // HeadlessCoreSmokeDemo import cross-package partials via a BARE specifier
 // (`@rozie-ui/headless-core/windowing.rzts`). The glob captures every package's
 // partials; `PARTIAL_SOURCES` re-keys each to its `@rozie-ui/<pkg>/<name>` bare
@@ -541,7 +541,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   // smoke.rzts partial (`probe = headlessCoreSmoke(41)` → 42), so the rendered
   // cell proves the cross-package partial-inline path end-to-end with no engine.
   //
-  // Combobox / Listbox / CommandPalette compile ×6 clean, but their SIBLING
+  // Combobox / Select / CommandPalette compile ×6 clean, but their SIBLING
   // components emit an unconditional runtime `@tanstack/virtual-core` import (the
   // windowing engine) — and CommandPalette additionally emits a `./internal/
   // filterCommands` runtime helper — neither yet in the harness importmap / VFS.
@@ -563,10 +563,10 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/combobox/src/Combobox.rozie'],
   },
   {
-    key: 'bundle/ListboxVirtualDemo',
-    label: 'bundle/ListboxVirtualDemo',
-    entryGlobPath: '../../demos/ListboxVirtualDemo.rozie',
-    dependencyGlobPaths: ['../../../packages/ui/listbox/src/Listbox.rozie'],
+    key: 'bundle/SelectVirtualDemo',
+    label: 'bundle/SelectVirtualDemo',
+    entryGlobPath: '../../demos/SelectVirtualDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/select/src/Select.rozie'],
   },
   {
     // CommandPalette composes @rozie-ui/combobox/Combobox.rozie via <components>;
@@ -691,7 +691,7 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
   // These five cover the distinct capabilities — sort / columns / edit /
   // virtual / grid-nav — each importing DataTable + Column. Every emitted
   // runtime import now resolves (the @tanstack engines are in the importmaps,
-  // exactly as combobox/listbox's virtual-core render proves), so all five
+  // exactly as combobox/select's virtual-core render proves), so all five
   // LIVE-RENDER (exempted from the `DataTable` token mark via RENDERED_KEYS).
   // The remaining ~29 DataTable* picker entries are NOT given a bundle decl and
   // stay marked unsupported-with-reason (the `DataTable` token) — never a
@@ -848,7 +848,7 @@ const UNSUPPORTED: Record<string, string> = {
   //   • embla (embla-carousel[+autoplay]), codemirror (@codemirror/* + codemirror),
   //     cropper (cropperjs + the external cropper.css <link>) — every emitted
   //     runtime import now resolves → LIVE-RENDER (entries DELETED).
-  //   • combobox / listbox — their @tanstack/virtual-core windowing engine is now
+  //   • combobox / select — their @tanstack/virtual-core windowing engine is now
   //     in the importmap (their .rzts partials inlined in 68-02) → un-marked.
   //   • popover — its @floating-ui/dom engine is now in the importmap (its
   //     ./internal/middleware blob sibling wired in 68-03) → un-marked.

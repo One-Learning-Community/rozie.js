@@ -25,7 +25,7 @@
 $onMount(() => {
   const out = []
   for (let i = 1; i <= 1000; i++) {
-    // quick 260923-rrr (N-05): every THIRD option is three lines tall (see ListboxVirtualVariable).
+    // quick 260923-rrr (N-05): every THIRD option is three lines tall (see SelectVirtualVariable).
     out.push({ id: i, label: 'Option ' + i, tall: i % 3 === 0, value: 'opt-' + i })
   }
   $data.options = out

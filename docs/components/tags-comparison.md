@@ -4,7 +4,7 @@ surface_hash: 486eb31a1361
 
 # Headless tags input comparison
 
-How `@rozie-ui/tags` compares to the existing tags / token / chips-input libraries across the six frameworks. Like the OTP, slider, and listbox families, the tags input has no shared vanilla-JS engine, and the landscape is overwhelmingly per-framework: every ecosystem grew its own token input (`react-tag-input`, `@yaireo/tagify` wrappers, `vue3-tags-input`, PrimeVue `Chips` / `AutoComplete`, `ngx-chips`, Angular Material `MatChipGrid`, …) with its own props, its own paste behaviour, and its own accessibility story. Rozie ships the same `<Tags>`, built on one native `<input>` plus a row of chips, with the same props, events, two-way tokens model, and handle, to all six frameworks.
+How `@rozie-ui/tags` compares to the existing tags / token / chips-input libraries across the six frameworks. Like the OTP, slider, and select families, the tags input has no shared vanilla-JS engine, and the landscape is overwhelmingly per-framework: every ecosystem grew its own token input (`react-tag-input`, `@yaireo/tagify` wrappers, `vue3-tags-input`, PrimeVue `Chips` / `AutoComplete`, `ngx-chips`, Angular Material `MatChipGrid`, …) with its own props, its own paste behaviour, and its own accessibility story. Rozie ships the same `<Tags>`, built on one native `<input>` plus a row of chips, with the same props, events, two-way tokens model, and handle, to all six frameworks.
 
 > Research snapshot: 2026-08-10. The tags-input landscape is fragmented and fast-moving; treat the library names, framework coverage, and feature columns as of that date.
 
@@ -64,7 +64,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## What Rozie defers {#what-rozie-defers}
 
-- **Autocomplete / suggestions dropdown.** Tagify, PrimeVue `AutoComplete`, and Mantine pair the token input with a typeahead suggestion list. `@rozie-ui/tags` is a pure token input today; pair it with the [`Combobox`](/components/combobox) or [`Listbox`](/components/listbox) family for suggestions.
+- **Autocomplete / suggestions dropdown.** Tagify, PrimeVue `AutoComplete`, and Mantine pair the token input with a typeahead suggestion list. `@rozie-ui/tags` is a pure token input today; pair it with the [`Combobox`](/components/combobox) or [`Select`](/components/select) family for suggestions.
 - **Inline token editing + drag-reorder.** Tagify lets you double-click a chip to edit it and drag to reorder. Rozie models add/remove, not in-place edit or reorder.
 - **Rich token objects.** Several libraries support `{ id, label, … }` token objects with per-token color/avatar. `@rozie-ui/tags` is a `string[]` model; render richness via the `#tag` slot, but the committed value is strings.
 - **It's a single component, not a form/primitive kit.** PrimeVue/PrimeNG, Angular Material, and Mantine ship chips alongside whole families of inputs and form controls. Rozie ships `Tags` (alongside its other `@rozie-ui` components), not a unified primitive suite.

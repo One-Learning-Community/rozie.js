@@ -1,0 +1,88 @@
+{
+  "name": "@rozie-ui/select-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular headless select (single + multi-select, type-ahead, keyboard nav, groups, floating popup) — one accessible Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "select",
+    "combobox",
+    "select",
+    "dropdown",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/select/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-select-angular.mjs"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@angular/forms": "^19",
+    "@tanstack/virtual-core": "^3"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
+      "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "module": "./dist/fesm2022/rozie-ui-select-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "dependencies": {
+    "@rozie/runtime-angular": "workspace:^",
+    "tslib": "^2"
+  },
+  "devDependencies": {
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/forms": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  }
+}

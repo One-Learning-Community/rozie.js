@@ -9,7 +9,7 @@
   - data-table (MANDATORY): the heaviest leaf; its public surface references
     @tanstack/table-core peer types. If its dist .d.ts is type-broken under a
     strict consumer build, this stub fails vue-tsc (the 49-error regression class).
-  - listbox: a pure-Rozie (no-engine) leaf.
+  - select: a pure-Rozie (no-engine) leaf.
   - sortable-list: an engine-wrapper leaf (sortablejs peer).
 
   This SFC is dropped into a tmpdir alongside the strict tsconfig and typechecked
@@ -30,7 +30,7 @@ import {
   GroupBar,
   DetailPanel,
 } from '@rozie-ui/data-table-vue';
-import { Listbox } from '@rozie-ui/listbox-vue';
+import { Select } from '@rozie-ui/select-vue';
 import { SortableList } from '@rozie-ui/sortable-list-vue';
 
 // Use each import in a typed position so vue-tsc checks the component types
@@ -49,7 +49,7 @@ const filterNumberRange: typeof FilterNumberRange = FilterNumberRange;
 const filterSelect: typeof FilterSelect = FilterSelect;
 const groupBar: typeof GroupBar = GroupBar;
 const detailPanel: typeof DetailPanel = DetailPanel;
-const listbox: typeof Listbox = Listbox;
+const select: typeof Select = Select;
 const sortableList: typeof SortableList = SortableList;
 
 // Reference the bindings so they are not reported as unused.
@@ -66,7 +66,7 @@ void [
   filterSelect,
   groupBar,
   detailPanel,
-  listbox,
+  select,
   sortableList,
 ];
 </script>

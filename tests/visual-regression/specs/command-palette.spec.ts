@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * the keyword filter (`internal/filterCommands.ts`), the close policy, and the
  * `select` event re-emit. This spec is the BEHAVIORAL GREEN GATE for Phase 64 P3
  * (D-03): it captures the migration-invariant behavior the family must preserve
- * when its vendored primitive is swapped (Listbox → Combobox). It asserts the
+ * when its vendored primitive is swapped (Select → Combobox). It asserts the
  * SAME facts before and after that migration:
  *   1. opening the palette renders all 8 commands (6 leaves + 2 navigating);
  *   2. typing filters (keyword-aware, via filterCommands) and echoes the query;
@@ -79,7 +79,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * data-table-virtual.spec.ts shadow-pierce precedent.
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
- * `toHaveScreenshot`. Like listbox.spec.ts / combobox.spec.ts, this runs locally
+ * `toHaveScreenshot`. Like select.spec.ts / combobox.spec.ts, this runs locally
  * on macOS without a Docker baseline.
  */
 
@@ -425,7 +425,7 @@ for (const target of TARGETS) {
     // React/Solid render a boolean child as nothing (""), so "open" vs "closed" is
     // asserted by the OPTION COUNT (closed → 0), which is uniform across all 6
     // targets. Likewise we DON'T assert an exact arrow-nav selection: opening
-    // auto-activates the first option on the Listbox primitive but NOT on Combobox
+    // auto-activates the first option on the Select primitive but NOT on Combobox
     // (activeIndex stays -1 until input/arrow), so arrow+Enter would pick different
     // items pre- vs post-migration. The migration-INVARIANT keyboard-commit proof
     // is the deterministic "type to a single match, Enter commits it" path (the

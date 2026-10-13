@@ -4,7 +4,7 @@ surface_hash: 3dd862a7b505
 
 # Data table comparison
 
-How `@rozie-ui/data-table` compares to the existing data-table / data-grid libraries across the six frameworks. The data table is the densest, most-requested UI surface there is. Like the listbox and slider it builds on a single framework-agnostic state engine (`@tanstack/table-core`), but unlike them it does so without the per-framework adapter every other TanStack consumer ships. Rozie wires `table-core` to all six reactivity systems directly and ships the same `<DataTable>` + `<Column>` to each: the same props, two-way state slices, events, slots, and handle.
+How `@rozie-ui/data-table` compares to the existing data-table / data-grid libraries across the six frameworks. The data table is the densest, most-requested UI surface there is. Like the select and slider it builds on a single framework-agnostic state engine (`@tanstack/table-core`), but unlike them it does so without the per-framework adapter every other TanStack consumer ships. Rozie wires `table-core` to all six reactivity systems directly and ships the same `<DataTable>` + `<Column>` to each: the same props, two-way state slices, events, slots, and handle.
 
 > Research snapshot: 2026-08-10. The data-grid landscape moves quickly; treat the library names, framework coverage, and feature columns as of that date.
 
@@ -103,4 +103,4 @@ The [`@rozie-ui/data-table` overview & install](/components/data-table) document
 - [DataTable — overview & install](/components/data-table) — the package install table and the section index linking quick start, `<Column>` API, theming, and the full API reference.
 - [DataTable — live demo](/components/data-table-demo) — the real Vue package running in the page (sort + filter + paginate + select + column management), plus the one `.rozie` source and the six generated outputs.
 - [`DataTable.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/data-table/src/DataTable.rozie)
-- [Listbox — headless select / combobox](/components/listbox-comparison) and [Slider — headless slider / range](/components/slider-comparison) — the sibling no-engine headless families.
+- [Select — headless select / combobox](/components/select-comparison) and [Slider — headless slider / range](/components/slider-comparison) — the sibling no-engine headless families.

@@ -1,0 +1,809 @@
+<!--
+  Select.rozie — a headless, WAI-ARIA select-only Select (APG select-only combobox).
+
+  The first @rozie-ui family with NO third-party vanilla engine: every line of
+  behaviour — roving virtual focus (aria-activedescendant), full keyboard
+  navigation, type-ahead, single + multi select — is authored in Rozie itself.
+  (Type-to-filter is owned by the sibling @rozie-ui/combobox family — P3/D-03
+  retired Select's editable-input mode; both families share the
+  @rozie-ui/headless-core/listCore.rzts spine.) It exists to stress the *native*
+  author-side primitives the engine-wrapper families never exercise on their own:
+
+    - $computed-derived state          → the filtered + active-resolved option list
+    - parameterized @keydown modifiers → arrow/home/end/enter/escape navigation
+    - $refs-driven focus management     → input/listbox/option focus, read post-mount only
+    - two-way r-model:value            → selection is a controlled form value (Angular CVA)
+    - scoped slots                     → #option / #selected / #empty render props
+    - $expose imperative handle        → open / close / toggle / clear / focusControl
+
+  It follows the ARIA APG "Select-Only Combobox" pattern (the trigger keeps
+  role="combobox"): DOM focus stays on the control, the highlighted option is
+  tracked virtually via `aria-activedescendant`, and selection commits a fresh value.
+
+  Authoring notes (collision classes a no-engine component is the first to hit):
+    - `$data.open` collides with the `open` $expose verb — Phase 46 ITEM-5 now
+      auto-renames the INTERNAL state to `open$local` (cross-target; the exposed
+      `open()` verb stays). This file dogfoods that fix by using the natural
+      `$data.open` instead of the old `$data.expanded` workaround.
+    - A local helper named `valueOf` (an Object.prototype member) collides with
+      the inherited member when it becomes a Lit/Angular class field — Phase 46
+      ITEM-5 now auto-renames it to `valueOf$local`. This file dogfoods that fix
+      by using the natural `valueOf` instead of the old `valueOf` workaround.
+    - The focus verb is `focusControl`, not `focus` — a `focus` $expose verb is a
+      DELIBERATE override of the inherited HTMLElement.focus on the Lit custom
+      element (ROZ137 warns, does not auto-rename — the public handle is intended).
+    - `open`/`close`/`toggle` (and `select`/`clear`) each `$emit` directly in
+      `listCore.rzts` — Phase 73 item #8 removed the old "route every emit
+      through ONE wrapper fn" workaround after verifying against the current
+      emitter that the shipped Phase 46 ITEM-1 hoist-once dedupe already
+      collapses N escaping helpers sharing an emit target into a single
+      `const {onX}=props` destructure (no TS2451), regardless of how many
+      functions call `$emit` for the same event.
+
+  Consumer example (select-only):
+
+    <Select r-model:value="$data.fruit" :options="$data.fruits" placeholder="Pick a fruit…">
+      <template #option="{ option, active, selected }">
+        <span :class="{ active, selected }">{{ option.label }}</span>
+      </template>
+    </Select>
+-->
+
+<rozie name="Select" vendorable="true">
+
+<props>
+{
+  // The option set. Each entry is either a primitive (string/number) or an
+  // object; objects resolve their label/value/disabled via the option* props
+  // (falling back to `.label` / `.value` / `.disabled`).
+  options:        {
+    type: Array,
+    default: () => [],
+    docs: {
+      description:
+        'The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.',
+    },
+  },
+
+  // The selected value (two-way). Scalar in single-select; an array of values
+  // in multi-select. As the sole `model:true` prop it drives the Angular CVA —
+  // a Select IS a form control.
+  value:          {
+    type: null,
+    default: null,
+    model: true,
+    docs: {
+      description:
+        'The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).',
+      example: '<Select r-model:value="fruit" :options="fruits" />',
+    },
+  },
+
+  // Multi-select: `value` becomes an array; selecting toggles membership and
+  // keeps the popup open.
+  multiple:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit.',
+    },
+  },
+
+  // Render the results list IN FLOW (static) instead of as an absolute popup.
+  // Use when the select is embedded inside a fixed-size, overflow-clipped
+  // container (e.g. a command-palette panel) where an absolute popup would be
+  // culled. Off (default) keeps the standalone dropdown behavior unchanged.
+  inline:         {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the select inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).',
+    },
+  },
+
+  disabled:       {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Disable the control entirely. Also sets the Angular `ControlValueAccessor` disabled state.',
+    },
+  },
+  placeholder:    {
+    type: String,
+    default: '',
+    docs: {
+      description: 'Placeholder text shown in the empty control.',
+    },
+  },
+
+  // Close the popup after a selection. Defaults true; multi-select callers
+  // usually want it open — pass :closeOnSelect="false".
+  closeOnSelect:  {
+    type: Boolean,
+    default: true,
+    docs: {
+      description:
+        'Close the popup after a single-select commit. Defaults `true`; multi-select keeps the popup open regardless of this setting.',
+    },
+  },
+
+  // Resolver overrides for object options.
+  optionLabel:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property.",
+    },
+  },
+  optionValue:    {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        "Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.",
+    },
+  },
+  optionDisabled: {
+    type: Function,
+    default: null,
+    docs: {
+      description:
+        'Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option\'s `.disabled` property.',
+    },
+  },
+
+  // Stable id base for the ARIA wiring (listbox id + per-option ids +
+  // aria-activedescendant). '' (the default) → a unique per-instance base
+  // generated in $onMount (idRoot()), so instances never share ids.
+  id:             {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        'Stable id base for the ARIA wiring (the select id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`); set it when you need stable, predictable ids.',
+    },
+  },
+
+  // Accessible name for the control when there is no visible <label for>.
+  ariaLabel:      {
+    type: String,
+    default: null,
+    docs: {
+      description:
+        'Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).',
+    },
+  },
+
+  // ── Vertical option windowing (Phase 64 P4, SC-5) ──────────────────────
+  // Opt-in long-list windowing. When `true`, only the visible slice of options
+  // renders inside the bounded, scrolling list (with leading/trailing spacer
+  // rows preserving total scroll height), windowing over the FILTERED option set
+  // via the shared @rozie-ui/headless-core/windowing.rzts math (the same
+  // virtual-core bridge data-table uses, wired here per-consumer with a no-op pin
+  // hook). Default `false` is byte-identical to a non-windowed select.
+  virtual:        {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.',
+    },
+  },
+
+  // Estimated option row height (px) seeding the windowing engine before
+  // measureElement refines actual heights. Only consulted when `virtual` is on.
+  estimateRowHeight: {
+    type: Number,
+    default: 36,
+    docs: {
+      description:
+        'Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on.',
+    },
+  },
+
+  // A CSS length string bounding the list scroll container when `virtual` is on
+  // (e.g. '320px'). Mirrored to the --rozie-select-max-height token.
+  maxHeight:      {
+    type: String,
+    default: '',
+    docs: {
+      description:
+        "A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.",
+    },
+  },
+}
+</props>
+
+<data>
+{
+  // The generated id base (idRoot()), set once in $onMount when `id` is empty.
+  autoId: '',
+  open: false,
+  // Virtual focus: index into the visible option list, or -1.
+  activeIndex: -1,
+  // Kept at '' for select-only: the shared spine's `visibleOptions` reads it (the
+  // identity path when empty) and the `#empty` slot exposes it. No <input> writes
+  // it now that the editable-input mode is retired (P3/D-03).
+  query: '',
+  // ── Windowing host state (Phase 64 P4) — the windowing.rzts host contract ──
+  // `rows` is the indexable full model the windowing math maps the slice over
+  // (kept === windowSource() / visibleOptions()); windowVer/editVer are the
+  // window/edit version reactivity bumps (editVer is inert here — the no-op pin
+  // hook never bumps it — but the shared math reads it, so it must exist).
+  rows: [],
+  windowVer: 0,
+  editVer: 0,
+}
+</data>
+
+<script>
+// Type-ahead buffer for the select-only trigger. Module-scope
+// `let`s reassigned from handlers → the React emitter hoists them to `useRef`
+// so they persist across renders (the setup-once guarantee); no-op elsewhere.
+// They STAY in this host (not the shared spine) per the A==B rule: reassigned
+// module-`let`s + sigils live in the host; the partial only closes over them.
+let typeBuffer = ''
+let typeTimer = null
+
+// ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
+// The option resolvers, client filter, enabled-index navigation, the keyboard
+// reducer, type-ahead, single+multi selection, open/close state, and
+// activeDescendant derivation now live in the shared, focus-/input-mode
+// parameterized list spine. It is a compile-time `.rzts` script-partial: it
+// dissolves into this leaf via inlineScriptPartials() before IR lowering (zero
+// runtime dep). Select consumes it in focus-model `activedescendant` +
+// input-mode `select-only` + multi + type-ahead. The spine closes over this
+// host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
+// (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
+import { labelOf, valueOf, disabledOf, optionId, visibleOptions, selectedLabel, activeDescendant, isSelected, resolveInitialActive, open, close, toggle, select, clear, nextEnabled, move, moveEdge, commitActive, onTypeahead, onControlKeyDown, onOptionPointerMove } from '@rozie-ui/headless-core/listCore.rzts'
+
+// ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
+// The PURE windowing math (the windowed slice + spacer geometry) is the SAME
+// virtual-core bridge data-table consumes. It is a compile-time `.rzts` partial:
+// the imported symbols DISSOLVE into this leaf via inlineScriptPartials() before
+// IR lowering (zero runtime dep). The math closes over this host's pieces BY
+// CONVENTION (D-04/D-05): windowSource(), the virtualizer instance + gridScrollEl +
+// the virtual-core fns, scheduleRemeasure(), $data.windowVer/$data.editVer, and the
+// no-op pin hook pinnedEditIndex()/pinnedMeasurement() defined below. The impure
+// DOM/refs pieces stay HERE per-consumer (ROZ123). NB the pin hooks are defined in
+// THIS host (not the shared partial) so data-table's A==B byte-identity is untouched.
+import { virtualItemKey, virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow } from '@rozie-ui/headless-core/windowing.rzts'
+
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally
+// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
+// `virtualizer` guard so the non-virtual emitted path executes none of it
+// (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core'
+
+// Windowing instance state (the `let table` precedent — React hoists reassigned
+// module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
+// when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
+// virtualizer observes; remeasurePending dedupes the deferred sweep.
+let virtualizer = null
+let virtualizerCleanup = null
+let gridScrollEl = null
+let remeasurePending = false
+// Scroll-end pin state (see recordScrollEnd()): whether the USER left the view at the end,
+// the option count at that moment, and the last scrollTop already accounted for.
+let scrollEndPinned = false
+let scrollEndPinnedCount = -1
+let scrollEndPinnedTop = -1
+
+// windowSource(): the windowing.rzts host-contract row source — the FILTERED option
+// set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
+// (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+// wr.row.id). A raw Select option is a primitive or a bare { label, value, disabled }
+// — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
+// every framework :key (and every virtual-core measurement key) to `undefined`, which
+// recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
+// row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
+// value, `_opt` the original option (read via wr.row._opt in the windowed template),
+// `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
+// the same wrapped row the count windows over.
+//
+// $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
+// FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
+// would never hit while filtering). The key covers everything the map reads:
+// options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
+// resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+// Same reference-stability contract the sibling Combobox's filteredOptions carries —
+// virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
+// unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
+const windowSource = $memo(
+  () => visibleOptions().map((o, i) => ({ id: valueOf(o), _opt: o, _i: i })),
+  () => [$props.options, $data.query, $props.optionValue, $props.optionLabel],
+)
+
+// D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
+// A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
+// pinnedMeasurement() UNGUARDED by convention; a select has no edit-pinning, so these
+// reduce the pin union (-1 → never unioned) and the spacer subtraction (null → identity)
+// to a no-op. They MUST exist or the by-convention call ReferenceErrors at mount.
+const pinnedEditIndex = () => -1
+const pinnedMeasurement = (pin) => null
+
+// D-05 windowing.rzts host-contract one-liner (Phase 87 87-02). rowsWindowed() preserves
+// today's EXACT truthiness (byte-behavior-identical) — it is the REQUIRED symbol
+// windowing.rzts calls in place of a bare `$props.virtual` read. NOT type-annotated — this
+// `<script>` block has no `lang="ts"` (unlike windowing.rzts / Combobox.rozie), so the
+// pinMeasurement() explicit-return-type trick (windowing.rzts:65-74) does not apply here; nothing
+// in this plan calls these through a type-narrowing wrapper.
+//
+// GAP-CLOSURE 87-16 (WR-02): the column-axis host-contract symbols (`colVirtualizer`,
+// `colsWindowed()`, `columnCount()`, `columnSize()`, `forcedColumns()`) that 87-02 added
+// alongside this were REMOVED here — they were dead code shipped on a mistaken premise
+// about the compiler's tree-shaking BFS. Select imports only `{ virtualItemKey,
+// virtualizerOptions, windowedRows, padTop, padBottom, pmIndexInWindow, rowIsOutsideWindow }`
+// from windowing.rzts; none of those functions' bodies reference the column-axis symbols
+// (only `columnVirtualizerOptions()`/`windowedColIndices()`/`colPadLeft()`/`colPadRight()`/
+// `colIsOutsideWindow()` do, and Select never imports any of those), so
+// `inlineScriptPartials()`'s BFS never needed them to exist. See 87-REVIEW.md WR-02 /
+// 87-16-SUMMARY.md for the verification trail.
+const rowsWindowed = () => !!$props.virtual
+// autoMeasureOn() (Phase 87 87-07, D-18/D-20): the content-driven-estimate host-contract
+// gate. Select never lights this branch — a permanent `false` keeps windowing.rzts's
+// estimateRowSize()/refineRowEstimate() accumulator dead code here. RETAINED (unlike the
+// column-axis symbols above): `virtualizerOptions()` — which Select DOES import and call
+// — wires `estimateSize: (i) => estimateRowSize(i)`, and `estimateRowSize()` calls
+// `autoMeasureOn()` as its first line. This one IS reachable through the import graph.
+const autoMeasureOn = () => false
+
+// Keep $data.rows === windowSource() so the windowing math indexes the live option set.
+const syncRows = () => { $data.rows = windowSource() }
+
+// SCROLL-END PIN (the data-table D-19 twin): keep a user who scrolled to the END of a
+// variable-height list at the end while the options in view measure taller than their
+// estimate. The view is judged on the DOM, and only at a move the USER made — a move is
+// virtual-core's own when it still holds an unreconciled scroll adjustment
+// (scrollAdjustments !== 0): its above-viewport compensation writes an ABSOLUTE scrollTop
+// computed from its last-observed (stale) offset, so it pulls the view back up from the end
+// and must neither clear the pin nor be mistaken for the user leaving the end. That position
+// is remembered so the scroll event that later reports it is not read as a user move either.
+// (Judging on virtual-core's MODEL, as the data-table host does, fails here: its total grows
+// with every option measured in the ResizeObserver batch while its offset stays at the stale
+// value, so the pin was cleared mid-batch — every target ended 10-126px short, measured.)
+const recordScrollEnd = () => {
+  if (!virtualizer || !gridScrollEl || virtualizer.scrollState) return
+  const top = gridScrollEl.scrollTop
+  if (top === scrollEndPinnedTop) return
+  scrollEndPinnedTop = top
+  if (virtualizer.scrollAdjustments !== 0) return
+  // Only a list that actually overflows has an end to hold: while the window has not painted
+  // yet (or the list is closed), scrollHeight <= clientHeight reads as "at the end" and a pin
+  // recorded then would jump the freshly opened list to the bottom.
+  const sh = gridScrollEl.scrollHeight
+  const ch = gridScrollEl.clientHeight
+  scrollEndPinned = ch > 0 && sh - ch > 1 && sh - top - ch <= 1
+  scrollEndPinnedCount = windowSource().length
+}
+
+// Re-apply the pin after the framework has committed the window (called from the rAF pass):
+// the real maximum is known only then. Not while a programmatic scroll (scrollToIndex) is in
+// flight, and not when the option count changed since the user reached the end (a new filter
+// or appended options must not be auto-followed).
+const keepScrollEnd = () => {
+  if (!scrollEndPinned || !virtualizer || !gridScrollEl || virtualizer.scrollState) return
+  if (windowSource().length !== scrollEndPinnedCount) return
+  const maxTop = gridScrollEl.scrollHeight - gridScrollEl.clientHeight
+  if (maxTop - gridScrollEl.scrollTop > 1) {
+    gridScrollEl.scrollTop = maxTop
+    scrollEndPinnedTop = gridScrollEl.scrollTop
+  }
+}
+
+// Defer remeasureWindow() until AFTER the framework commits the recycled window
+// (onChange fires BEFORE React/Solid commit). TWO deferred passes (microtask THEN rAF)
+// behind one in-flight flag (the data-table virtualization.rzts:46-56 pattern, copied
+// per-consumer per D-04/D-09): the microtask catches Solid's <For> / Svelte's {#each}
+// SYNCHRONOUS commit (the Phase 63 Solid under-convergence hazard — D-09 rAF-defer
+// budget), the rAF catches React's async commit. measureElement is idempotent on an
+// already-observed node, so running both is cheap and loop-free.
+const scheduleRemeasure = () => {
+  recordScrollEnd()
+  if (remeasurePending) return
+  remeasurePending = true
+  let ranMicro = false
+  const microPass = () => { remeasureWindow() }
+  // N-05 (quick 260923-rrr): key the rAF pass on the OUTCOME. React and Angular commit the
+  // recycled window AFTER the first rAF, so one pass measured the OLD options and the new ones
+  // waited for virtual-core's 150ms scrolling-ended tick — with variable-height options the late
+  // above-viewport adjustment then moved the whole list (measured). Re-run next frame until the
+  // committed options cover the virtualizer's window, bounded (the data-table host twin).
+  let rafAttempts = 0
+  const rafPass = () => {
+    const covered = remeasureWindow()
+    rafAttempts = rafAttempts + 1
+    if (!covered && rafAttempts < 10 && typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(rafPass)
+      return
+    }
+    keepScrollEnd()
+    remeasurePending = false
+  }
+  if (typeof queueMicrotask !== 'undefined') { ranMicro = true; queueMicrotask(microPass) }
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(rafPass)
+  else if (ranMicro) remeasurePending = false
+  else setTimeout(rafPass, 0)
+}
+
+// measureElement sweep: hand every rendered windowed option to the virtualizer so its
+// true (variable) height is observed (virtual-core measures ONLY nodes passed to
+// measureElement, keyed by the data-index attribute). Bails during a programmatic
+// scroll (scrollToIndex) so a measure can't starve the scroll target.
+const remeasureWindow = () => {
+  if (!virtualizer || !gridScrollEl) return true
+  if (virtualizer.scrollState) return true
+  const els = gridScrollEl.querySelectorAll('.rozie-select-option[data-index]')
+  const rendered = new Set()
+  for (const el of els) {
+    virtualizer.measureElement(el)
+    rendered.add(el.getAttribute('data-index'))
+  }
+  // N-05: false while the framework has not yet committed the recycled window.
+  const items = virtualizer.getVirtualItems()
+  for (let i = 0; i < items.length; i++) {
+    if (!rendered.has(String(items[i].index))) return false
+  }
+  return true
+}
+
+// ---- focus / scroll helpers (post-mount $refs only) --------------------
+// Impure ($refs) → per the ROZ123 + A==B rules they stay in the host (the spine
+// only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
+// verb would override the inherited HTMLElement.focus method on the Lit element.
+const focusControl = () => {
+  $refs.triggerEl?.focus()
+}
+
+// Keep the active option visible inside the scrolling listbox. Reads $refs in
+// a post-mount callback only (never eagerly — ROZ123). When windowing, route through
+// the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
+// scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
+const scrollActiveIntoView = () => {
+  if ($data.activeIndex < 0) return
+  if ($props.virtual && virtualizer) {
+    // 'center' (not 'auto'): keep the active option well inside the rendered slice as the
+    // window scrolls — 'auto' lands it at the viewport edge where the overscan band can
+    // leave it just-unrendered for a frame on the fine-grained targets (Solid).
+    virtualizer.scrollToIndex($data.activeIndex, { align: 'center' })
+    scheduleRemeasure()
+    return
+  }
+  if (!$refs.listEl) return
+  const el = $refs.listEl.querySelector('#' + CSS.escape(optionId($data.activeIndex)))
+  el?.scrollIntoView({ block: 'nearest' })
+}
+
+// ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
+// kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
+// re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
+// (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
+// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
+// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
+// (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
+// scrollElement stale), and (c) the consumer often seeds options AFTER the select mounts
+// (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
+// paints (or attempts run out) — idempotent + loop-free.
+const kickWindow = (attempts) => {
+  if (!virtualizer) return
+  gridScrollEl = $el ? $el.querySelector('.rozie-select-list') : gridScrollEl
+  // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
+  // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
+  // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
+  // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
+  if (windowSource().length > 0) {
+    syncRows()
+    virtualizer.setOptions(virtualizerOptions())
+  }
+  virtualizer._willUpdate()
+  $data.windowVer = $data.windowVer + 1
+  remeasureWindow()
+  if (windowedRows().length === 0 && attempts > 0) {
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1))
+    else setTimeout(() => kickWindow(attempts - 1), 16)
+  }
+}
+
+// nextAutoId(): a page-wide counter shared by every Rozie component instance. It
+// lives on globalThis (read through Reflect, which type-checks in the plain-JS and
+// the TS script alike) so separately bundled copies of a leaf never hand out the
+// same id. The same four lines live in Combobox, Select and Popover.
+const nextAutoId = () => {
+  const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1
+  Reflect.set(globalThis, '__rozieAutoId', n)
+  return n
+}
+
+// idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+// pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
+const idRoot = () => $props.id || $data.autoId || 'rozie-select'
+
+$onMount(() => {
+  if (!$props.id) $data.autoId = 'rozie-select-' + nextAutoId()
+  syncRows()
+  if ($props.virtual) {
+    // The list renders at mount when virtual, so the .rozie-select-list scroll container
+    // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
+    // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
+    // Solid/Lit, which leaves the virtualizer with no scroll element.
+    gridScrollEl = $el ? $el.querySelector('.rozie-select-list') : null
+    virtualizer = new Virtualizer(virtualizerOptions())
+    virtualizerCleanup = virtualizer._didMount()
+    $data.windowVer = $data.windowVer + 1
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8))
+    else setTimeout(() => kickWindow(8), 0)
+  }
+})
+
+// Reactive re-feed: when the option set (or the query filter) changes, re-sync the
+// indexable rows + push fresh options into the virtualizer and re-pull the window
+// (the data-table setOptions+_willUpdate re-feed precedent). Watch a derived primitive
+// (length + query), never a freshly-built array (the stale-array Pitfall).
+$watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.query), () => {
+  syncRows()
+  if ($props.virtual && virtualizer) {
+    gridScrollEl = $el ? $el.querySelector('.rozie-select-list') : gridScrollEl
+    virtualizer.setOptions(virtualizerOptions())
+    virtualizer._willUpdate()
+    $data.windowVer = $data.windowVer + 1
+    scheduleRemeasure()
+  }
+})
+
+$onUnmount(() => {
+  if (typeTimer !== null) clearTimeout(typeTimer)
+  // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
+  if (virtualizerCleanup) virtualizerCleanup()
+})
+
+// Imperative handle. Shorthand keys (aliased `{ open: fn }` keys are dropped by
+// the React emitter) — every function is named exactly as its verb.
+$expose({ open, close, toggle, clear, focusControl })
+</script>
+
+<listeners>
+  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.open" />
+</listeners>
+
+<template>
+<div class="rozie-select" :class="{ 'rozie-select-open': $data.open, 'rozie-select-disabled': $props.disabled, 'rozie-select-inline': $props.inline }">
+
+  <!-- Control: the select-only trigger button. It carries role="combobox" per the
+       ARIA APG "Select-Only Combobox" pattern (DOM focus stays here; the active
+       option is tracked virtually via aria-activedescendant). -->
+  <div class="rozie-select-control" ref="controlEl">
+    <button
+      ref="triggerEl"
+      type="button"
+      class="rozie-select-trigger"
+      role="combobox"
+      aria-haspopup="listbox"
+      :aria-expanded="$data.open"
+      :aria-controls="idRoot() + '-list'"
+      :aria-activedescendant="activeDescendant"
+      :aria-label="$props.ariaLabel"
+      :disabled="$props.disabled"
+      @click="toggle"
+      @keydown="onControlKeyDown($event)"
+    >
+      <slot name="selected" :selected="selectedLabel" :value="$props.value">
+        <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
+        <span r-else class="rozie-select-placeholder">{{ $props.placeholder }}</span>
+      </slot>
+      <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+    </button>
+  </div>
+
+  <!-- Popup listbox (NON-VIRTUAL). aria-activedescendant on the control points at the
+       highlighted option id; DOM focus never leaves the control. Byte-identical to the
+       pre-windowing render — the `&& !$props.virtual` only routes virtual usage to the
+       windowed branch below; with virtual off this is exactly the prior behavior. -->
+  <div
+    r-if="$data.open && !$props.virtual"
+    ref="listEl"
+    class="rozie-select-list"
+    role="listbox"
+    :id="idRoot() + '-list'"
+    :aria-label="$props.ariaLabel"
+    :aria-multiselectable="$props.multiple"
+  >
+    <div
+      r-for="opt, index in visibleOptions()"
+      :key="optionId(index)"
+      :id="optionId(index)"
+      class="rozie-select-option"
+      :class="{ 'is-active': $data.activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }"
+      role="option"
+      :aria-selected="!!isSelected(opt)"
+      :aria-disabled="!!disabledOf(opt)"
+      @click="select(opt)"
+      @mousemove="onOptionPointerMove(index)"
+    >
+      <slot name="option" :option="opt" :index="index" :active="$data.activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
+        {{ labelOf(opt) }}
+      </slot>
+    </div>
+
+    <div r-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
+      <slot name="empty" :query="$data.query">No options</slot>
+    </div>
+  </div>
+
+  <!-- ══ WINDOWED listbox (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
+       Stays MOUNTED whenever virtual (so the .rozie-select-list scroll container exists at
+       mount for the virtualizer — ROZ123-safe) but is HIDDEN via display:none whenever the
+       listbox is closed (CR-01): unmounting would drop the virtualizer's scroll element, so
+       we hide-not-unmount to keep its scrollTop + measurements while still honoring
+       toggle()/Escape/outside-click close semantics (the non-virtual branch is gated on
+       $data.open; this branch mirrors that via the :style display toggle). display:none also
+       drops the role="listbox" from the a11y tree when collapsed, so :aria-expanded on the
+       control stays consistent. Renders a leading spacer, the windowed { vi, row } slice
+       keyed on the wrapper id (CR-02: windowSource() wraps each option into an id-bearing
+       row), and a trailing spacer; the option's full-model index is wr.vi.index. The
+       container is bounded/scrolling via the base .rozie-select-list CSS (max-height from
+       the --rozie-select-max-height token, mirrored from the maxHeight prop). -->
+  <div
+    r-if="$props.virtual"
+    ref="listEl"
+    class="rozie-select-list rozie-select-list--virtual"
+    role="listbox"
+    :id="idRoot() + '-list'"
+    :aria-label="$props.ariaLabel"
+    :aria-multiselectable="$props.multiple"
+    :style="($data.open ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
+  >
+    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
+
+    <div
+      r-for="wr in windowedRows()"
+      :key="wr.row.id"
+      :id="optionId(wr.vi.index)"
+      :data-index="wr.vi.index"
+      class="rozie-select-option"
+      :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }"
+      role="option"
+      :aria-selected="!!isSelected(wr.row._opt)"
+      :aria-disabled="!!disabledOf(wr.row._opt)"
+      @click="select(wr.row._opt)"
+      @mousemove="onOptionPointerMove(wr.vi.index)"
+    >
+      <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
+        {{ labelOf(wr.row._opt) }}
+      </slot>
+    </div>
+
+    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
+
+    <div r-if="windowSource().length === 0" class="rozie-select-empty" role="presentation">
+      <slot name="empty" :query="$data.query">No options</slot>
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+/*
+  Fully token-driven. EVERY value is a `var(--rozie-select-*, <fallback>)`, so
+  the component renders with zero configuration yet is completely re-skinnable
+  by setting tokens at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+  `.rozie-select` element itself). The shipped `themes/*.css` presets do exactly
+  that — mapping these tokens onto shadcn/Radix, Material 3, and Bootstrap 5.
+  Nested var() fallbacks let one token derive from another (ring ← accent,
+  popup-bg ← bg) while staying independently overridable.
+*/
+.rozie-select {
+  position: relative;
+  display: inline-block;
+  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
+  font: var(--rozie-select-font, inherit);
+}
+.rozie-select-control { display: block; }
+
+.rozie-select-input,
+.rozie-select-trigger {
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-select-gap, var(--rsl-gap, 0.5rem));
+  padding: var(--rozie-select-control-padding, var(--rsl-control-padding, 0.5rem 0.75rem));
+  font: inherit;
+  text-align: left;
+  background: var(--rozie-select-bg, var(--rsl-bg, #fff));
+  color: var(--rozie-select-fg, var(--rsl-fg, #1a1a1a));
+  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-border, var(--rsl-border, rgba(0, 0, 0, 0.2)));
+  border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
+  cursor: pointer;
+}
+.rozie-select-input { cursor: text; }
+.rozie-select-input:focus-visible,
+.rozie-select-input:focus,
+.rozie-select-trigger:focus-visible,
+.rozie-select-trigger:focus {
+  outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
+  outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+}
+.rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
+.rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+.rozie-select-arrow {
+  font-size: 0.75em;
+  color: var(--rozie-select-arrow-color, var(--rsl-arrow-color, currentColor));
+  opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
+}
+
+.rozie-select-list {
+  position: absolute;
+  z-index: var(--rozie-select-z, var(--rsl-z, 1000));
+  top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
+  max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
+  overflow-y: auto;
+  list-style: none;
+  background: var(--rozie-select-popup-bg, var(--rozie-select-bg, var(--rsl-popup-bg, var(--rsl-bg, #fff))));
+  color: var(--rozie-select-fg, var(--rsl-fg, #1a1a1a));
+  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-popup-border, var(--rozie-select-border, var(--rsl-popup-border, var(--rsl-border, rgba(0, 0, 0, 0.15)))));
+  border-radius: var(--rozie-select-popup-radius, var(--rozie-select-radius, var(--rsl-popup-radius, var(--rsl-radius, 6px))));
+  box-shadow: var(--rozie-select-shadow, var(--rsl-shadow, 0 6px 24px rgba(0, 0, 0, 0.12)));
+}
+
+/* Inline mode: the root fills its container (so the control + list span the full
+   width even when a host wrapper — lit custom element / angular host — sits
+   between it and a stretching flex parent), and the list renders IN FLOW so an
+   overflow-clipped ancestor (e.g. a command-palette panel) can't cull it. */
+.rozie-select-inline {
+  display: block;
+  width: 100%;
+}
+.rozie-select-inline .rozie-select-list {
+  position: static;
+  margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+.rozie-select-option {
+  padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));
+  border-radius: var(--rozie-select-option-radius, var(--rsl-option-radius, 4px));
+  color: var(--rozie-select-option-fg, inherit);
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rozie-select-gap, var(--rsl-gap, 0.5rem));
+}
+.rozie-select-option.is-active {
+  background: var(--rozie-select-active-bg, var(--rsl-active-bg, rgba(0, 102, 204, 0.12)));
+  color: var(--rozie-select-active-fg, var(--rsl-active-fg, inherit));
+}
+.rozie-select-option.is-selected {
+  background: var(--rozie-select-selected-bg, var(--rsl-selected-bg, transparent));
+  color: var(--rozie-select-selected-fg, var(--rsl-selected-fg, inherit));
+  font-weight: var(--rozie-select-selected-weight, var(--rsl-selected-weight, 600));
+}
+.rozie-select-option.is-selected::after {
+  content: var(--rozie-select-check, var(--rsl-check, '✓'));
+  color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
+}
+.rozie-select-option.is-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+.rozie-select-empty { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
+/* Windowing spacer rows (Phase 64 P4): zero-chrome blocks whose inline height keeps the
+   total scroll height === virtual-core getTotalSize() (the windowed slice sits between). */
+.rozie-select-spacer { margin: 0; padding: 0; border: 0; flex: none; }
+/* The windowing engine compensates for options above the viewport changing height itself.
+   Browser scroll anchoring moved the view again when the leading spacer changed height, and
+   that move was indistinguishable from the user scrolling away from the end (measured: the
+   scroll-end pin was cleared at a 38px-short position). */
+.rozie-select-list--virtual { overflow-anchor: none; }
+</style>
+
+</rozie>

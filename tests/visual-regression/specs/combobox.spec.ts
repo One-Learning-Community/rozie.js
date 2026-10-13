@@ -23,7 +23,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * button (→ 'cherry').
  *
  * The behavioral smoke above is structural/behavioral only — no `toHaveScreenshot`
- * (per `feedback_vr_linux_baselines`, like listbox.spec.ts, runs locally on macOS
+ * (per `feedback_vr_linux_baselines`, like select.spec.ts, runs locally on macOS
  * without a Docker baseline).
  *
  * The SECOND block below (Phase 86 R2, plan 86-03) IS a pixel cell: the

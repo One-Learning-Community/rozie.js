@@ -18,7 +18,7 @@
  *   pnpm turbo run build --filter "@rozie-ui/*-vue"
  * In CI this is covered by the preceding `pnpm turbo run build` step (Layer 3).
  *
- * Sample = data-table (MANDATORY) + listbox (pure-Rozie) + sortable-list (engine-wrapper).
+ * Sample = data-table (MANDATORY) + select (pure-Rozie) + sortable-list (engine-wrapper).
  */
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
@@ -35,7 +35,7 @@ const ROOT = resolve(HERE, '../..');
 // false green) rather than silently resolving nothing.
 const SAMPLED_DIST = [
   'packages/ui/data-table/packages/vue/dist/index.d.ts',
-  'packages/ui/listbox/packages/vue/dist/index.d.ts',
+  'packages/ui/select/packages/vue/dist/index.d.ts',
   'packages/ui/sortable-list/packages/vue/dist/index.d.ts',
 ];
 

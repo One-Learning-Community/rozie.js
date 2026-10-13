@@ -139,17 +139,17 @@ const FAMILIES: FamilySpec[] = [
     },
   },
   {
-    name: 'listbox',
-    leaf: 'packages/ui/listbox/packages/vue',
+    name: 'select',
+    leaf: 'packages/ui/select/packages/vue',
     baseline: {
-      'Listbox.vue': {
+      'Select.vue': {
         // Phase 67 (SC-2) cleared the `:aria-activedescendant="activeDescendant"`
         // TS2322 (4 → 3): a `string|null` bound to the `string|undefined` slot, now
         // emitted as `(activeDescendant) ?? undefined` by the shape heuristic.
         //
         // The residual 3 are all `:aria-label="props.ariaLabel"` (`string|null` →
         // `string|undefined` slot) at L7/L15/L24. These are NOT shape-fixable, and
-        // this is the empirical revision of 67-RESEARCH's optimistic "listbox → 0":
+        // this is the empirical revision of 67-RESEARCH's optimistic "select → 0":
         // `aria-label` is overwhelmingly bound to provably-NON-null expressions across
         // the family set — `props.columnId` (string), string-literal concats
         // (`'Pin ' + …`), non-null ternaries (`rowIsExpanded(row) ? 'Collapse' :

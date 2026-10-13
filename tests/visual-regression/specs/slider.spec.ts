@@ -40,7 +40,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *     velocity/momentum snap.
  *
  * Per `feedback_vr_linux_baselines`: structural/behavioral assertions only — no
- * pixel-baseline snapshots. Like listbox.spec.ts / embla-carousel.spec.ts, this
+ * pixel-baseline snapshots. Like select.spec.ts / embla-carousel.spec.ts, this
  * runs locally on macOS without a Docker baseline.
  */
 
@@ -54,7 +54,7 @@ const KNOWN_FAILING: ReadonlySet<(typeof TARGETS)[number]> = new Set<
 // mount (their <components> import resolves to a missing file), so EVERY cell
 // must `test.fixme`-skip — the failing behavioral contract is STAGED but green.
 // We cannot rely solely on the per-target `entry.${target}.html` guard the way
-// listbox.spec.ts does: those host bundles already exist from prior (non-slider)
+// select.spec.ts does: those host bundles already exist from prior (non-slider)
 // builds, so they are present-but-slider-unaware. Gate additionally on the slider
 // SOURCE existing — the precise Wave-0 → execution boundary (Nyquist).
 const SLIDER_SOURCE = resolve(

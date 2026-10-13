@@ -48,17 +48,17 @@ Pure windowing math lifted verbatim from DataTable's Phase 53/63 baseline. Holds
 | `autoMeasureOn(): boolean` | **required** (Phase 87 87-07, D-18) — is content-driven row-size estimation on. DataTable's real body reads `$props.autoMeasure === true`; listbox/combobox/command-palette return `false` (D-20), keeping `estimateRowSize()`'s running-mean accumulator dead code for them. |
 | `afterRowRemeasure` | **optional** (Phase 87 87-07, D-15) — a host-owned mutable `let` (defaults to a no-op), assigned to `refineRowEstimate()` (exported below). The DataTable host's DOM-measurement sweep calls it after every `measureElement` pass so the fold + hysteresis re-feed run on each window commit — routed through a mutable `let` (never a direct cross-partial call) to avoid a forward-reference TDZ on React; see `refineRowEstimate()`'s own comment in `windowing.rzts`. |
 
-> **`windowSource()` rows need a stable `.id`.** Combobox/Listbox wrap raw options into id-bearing rows (`{ id: valueOf(o), _opt, _i }`) so `virtualItemKey` keys correctly across recycling. Returning raw options with no `.id` yields `undefined` keys and node-recycling drift (Phase 64 CR-02).
+> **`windowSource()` rows need a stable `.id`.** Combobox/Select wrap raw options into id-bearing rows (`{ id: valueOf(o), _opt, _i }`) so `virtualItemKey` keys correctly across recycling. Returning raw options with no `.id` yields `undefined` keys and node-recycling drift (Phase 64 CR-02).
 
 ### `listCore.rzts` — the headless list spine
 
-Pure list logic lifted from Listbox's monolithic `<script>`: option resolvers, client-side filter, enabled-index navigation, the full keyboard reducer (arrow/home/end/enter/escape/space/tab), type-ahead, single + multi selection, open/close state, and activeDescendant derivation.
+Pure list logic lifted from Select's monolithic `<script>`: option resolvers, client-side filter, enabled-index navigation, the full keyboard reducer (arrow/home/end/enter/escape/space/tab), type-ahead, single + multi selection, open/close state, and activeDescendant derivation.
 
 **Exports:** `labelOf`, `valueOf`, `disabledOf`, `optionId`, `visibleOptions`, `selectedLabel`, `activeDescendant`, `isSelected`, `resolveInitialActive`, `applyExpanded`, `open`, `close`, `toggle`, `fireChange`, `select`, `clear`, `nextEnabled`, `move`, `moveEdge`, `commitActive`, `onTypeahead`, `onControlKeyDown`, `fireSearch`, `onInput`, `onOptionPointerMove`.
 
 **Parameterized by host convention** along two axes (no discriminant props):
 - **focus-model:** `activedescendant` (both list families today — highlight tracked virtually, DOM focus stays on the control) vs `roving` (supported-but-unused; a roving host supplies its own focus mover).
-- **input-mode:** `select-only` (Listbox — button trigger + type-ahead; never writes `$data.query`) vs `filter-input` (Combobox — a text `<input>` writes `$data.query`, so `visibleOptions` substring-filters).
+- **input-mode:** `select-only` (Select — button trigger + type-ahead; never writes `$data.query`) vs `filter-input` (Combobox — a text `<input>` writes `$data.query`, so `visibleOptions` substring-filters).
 
 **Host contract:** the host owns the type-ahead scratch `let`s (`typeBuffer` / `typeTimer` — they reassign from handlers, so the React emitter hoists them to `useRef`; per the A==B playbook they stay in the host), the impure ref-readers `focusControl()` / `scrollActiveIntoView()`, plus the option set + form surface (`$props.options` / `value` (model) / `multiple` / `id` / `optionLabel` / `optionValue` / `optionDisabled` / `closeOnSelect` / `disabled`) and reactive state (`$data.open` / `$data.activeIndex` / `$data.query`).
 
@@ -71,7 +71,7 @@ The P0 boundary-proof partial — exercises the cross-package bare-specifier res
 | Consumer | `windowing.rzts` | `listCore.rzts` |
 |---|---|---|
 | `@rozie-ui/data-table` | ✅ (via its own `virtualization.rzts` host) | — |
-| `@rozie-ui/listbox` | ✅ | ✅ |
+| `@rozie-ui/select` | ✅ | ✅ |
 | `@rozie-ui/combobox` | ✅ | ✅ |
 | `@rozie-ui/command-palette` | ✅ (vendored Combobox copy) | ✅ (vendored Combobox copy) |
 

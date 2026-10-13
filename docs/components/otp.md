@@ -77,7 +77,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the first empty cell (clamped to the last cell when the code is full). Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider precedent; listbox took the other branch (`focusControl`). |
+| `focus` | Move DOM focus to the first empty cell (clamped to the last cell when the code is full). Deliberately named `focus`, overriding the inherited `HTMLElement.focus` on the Lit custom element; the override is intentional, and the compiler accepts it with a warning. This mirrors the slider precedent; select took the other branch (`focusControl`). |
 | `clear` | Reset the code to the empty string (emits `change` with `{ value: "" }`) and move focus to the first cell. Collision-safe — not a host-element member. |
 
 ### Slots

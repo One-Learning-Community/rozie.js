@@ -8,7 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * Quick 260923-rrr — N-05's twin on the Combobox host. RED-first.
  *
- * Combobox (like Listbox) carries their own copy of the data-table host's remeasure sweep: a
+ * Combobox (like Select) carries their own copy of the data-table host's remeasure sweep: a
  * microtask + ONE rAF handing each rendered option to virtual-core's measureElement. React and
  * Angular commit the recycled window after that rAF, so the new options were only measured when
  * virtual-core's 150ms scrolling-ended tick fired — and with variable-height options the

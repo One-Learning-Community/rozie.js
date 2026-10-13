@@ -2,7 +2,6 @@
 "@rozie-ui/dialog-react": patch
 "@rozie-ui/lexical-react": patch
 "@rozie-ui/lexical-solid": patch
-"@rozie-ui/listbox-react": patch
 "@rozie-ui/maplibre-react": patch
 "@rozie-ui/pagination-react": patch
 "@rozie-ui/resizable-react": patch

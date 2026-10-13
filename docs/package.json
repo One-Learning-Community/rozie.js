@@ -45,7 +45,7 @@
     "@rozie-ui/flatpickr-vue": "workspace:*",
     "@rozie-ui/fullcalendar-vue": "workspace:*",
     "@rozie-ui/lexical-vue": "workspace:*",
-    "@rozie-ui/listbox-vue": "workspace:*",
+    "@rozie-ui/select-vue": "workspace:*",
     "@rozie-ui/maplibre-vue": "workspace:*",
     "@rozie-ui/number-field-vue": "workspace:*",
     "@rozie-ui/otp-vue": "workspace:*",

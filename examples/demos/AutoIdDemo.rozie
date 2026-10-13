@@ -1,6 +1,6 @@
 <!--
   AutoIdDemo.rozie — BEHAVIORAL cell for the per-instance default id base (oinbox
-  0.8.0 follow-up F6, quick 261002-ekf): two default-configured Listboxes and two
+  0.8.0 follow-up F6, quick 261002-ekf): two default-configured Selectes and two
   default-configured Popovers (keepMounted, so both panels render without a
   gesture) must never share an id. Driven by
   tests/visual-regression/specs/auto-id.spec.ts on all 6 targets.
@@ -11,7 +11,7 @@
 
 <components>
 {
-  Listbox: '../../packages/ui/listbox/src/Listbox.rozie',
+  Select: '../../packages/ui/select/src/Select.rozie',
   Popover: '../../packages/ui/popover/src/Popover.rozie',
 }
 </components>
@@ -29,8 +29,8 @@ const OPTIONS = ['One', 'Two']
 
 <template>
 <div class="auto-id-demo">
-  <Listbox r-model:value="$data.a" :options="OPTIONS" ariaLabel="List A" />
-  <Listbox r-model:value="$data.b" :options="OPTIONS" ariaLabel="List B" />
+  <Select r-model:value="$data.a" :options="OPTIONS" ariaLabel="List A" />
+  <Select r-model:value="$data.b" :options="OPTIONS" ariaLabel="List B" />
   <Popover keepMounted>
     <template #anchor><button type="button">Popover A</button></template>
     <p>Panel A</p>

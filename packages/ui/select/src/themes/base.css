@@ -1,0 +1,76 @@
+/*
+ * @rozie-ui/select — base token reference.
+ *
+ * Every visual value the component renders is a `--rozie-select-*` custom
+ * property. The component ships with inline `var(token, fallback)` defaults, so
+ * importing this file is OPTIONAL — it simply makes the full token surface
+ * explicit in one place so you can copy/override exactly what you need.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-select` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rsl-x: var(--rozie-select-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-select-x, var(--rsl-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
+ * A token whose default is ANOTHER token is not declared here at all: the component reads it
+ * as `var(<token>, var(<source>, …))`, so it follows the source as resolved AT the component —
+ * declared at the root it would be computed once, against the root's value.
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-select` and the Lit host `rozie-select`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rsl-*` names are internal: not a stable API.
+ */
+:where(:root) {
+  /* layout / typography */
+  --rsl-min-width: var(--rozie-select-min-width, 12rem);
+  --rozie-select-font: inherit;
+  --rsl-gap: var(--rozie-select-gap, 0.5rem);
+  --rsl-control-padding: var(--rozie-select-control-padding, 0.5rem 0.75rem);
+
+  /* control + popup surface */
+  --rsl-bg: var(--rozie-select-bg, #fff);
+  --rsl-fg: var(--rozie-select-fg, #1a1a1a);
+  --rsl-border: var(--rozie-select-border, rgba(0, 0, 0, 0.2));
+  --rsl-border-width: var(--rozie-select-border-width, 1px);
+  --rsl-radius: var(--rozie-select-radius, 6px);
+  --rsl-placeholder: var(--rozie-select-placeholder, rgba(0, 0, 0, 0.45));
+  --rsl-disabled-opacity: var(--rozie-select-disabled-opacity, 0.6);
+
+  /* focus ring (defaults to accent) */
+  --rsl-accent: var(--rozie-select-accent, #0066cc);
+  --rsl-ring-width: var(--rozie-select-ring-width, 2px);
+  --rsl-ring-offset: var(--rozie-select-ring-offset, 1px);
+
+  /* trailing arrow (select-only trigger) */
+  --rsl-arrow-color: var(--rozie-select-arrow-color, currentColor);
+  --rsl-arrow-opacity: var(--rozie-select-arrow-opacity, 0.7);
+
+  /* popup */
+  --rsl-popup-padding: var(--rozie-select-popup-padding, 0.25rem);
+  --rsl-popup-offset: var(--rozie-select-popup-offset, 4px);
+  --rsl-shadow: var(--rozie-select-shadow, 0 6px 24px rgba(0, 0, 0, 0.12));
+  --rsl-z: var(--rozie-select-z, 1000);
+  --rsl-max-height: var(--rozie-select-max-height, 16rem);
+
+  /* options */
+  --rsl-option-padding: var(--rozie-select-option-padding, 0.4rem 0.6rem);
+  --rsl-option-radius: var(--rozie-select-option-radius, 4px);
+  --rozie-select-option-fg: inherit;
+  --rsl-active-bg: var(--rozie-select-active-bg, rgba(0, 102, 204, 0.12));
+  --rozie-select-active-fg: inherit;
+  --rsl-selected-bg: var(--rozie-select-selected-bg, transparent);
+  --rozie-select-selected-fg: inherit;
+  --rsl-selected-weight: var(--rozie-select-selected-weight, 600);
+  --rsl-check: var(--rozie-select-check, '✓');
+  --rsl-empty-fg: var(--rozie-select-empty-fg, rgba(0, 0, 0, 0.5));
+}

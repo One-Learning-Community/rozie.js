@@ -12,7 +12,7 @@ import * as L9 from '@rozie-ui/embla-solid';
 import * as L10 from '@rozie-ui/flatpickr-solid';
 import * as L11 from '@rozie-ui/fullcalendar-solid';
 import * as L12 from '@rozie-ui/lexical-solid';
-import * as L13 from '@rozie-ui/listbox-solid';
+import * as L13 from '@rozie-ui/select-solid';
 import * as L14 from '@rozie-ui/maplibre-solid';
 import * as L15 from '@rozie-ui/number-field-solid';
 import * as L16 from '@rozie-ui/otp-solid';

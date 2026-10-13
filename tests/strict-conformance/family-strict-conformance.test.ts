@@ -12,17 +12,17 @@
  *
  * ── WHY EVERY LEAF CARRIES A BASELINE (none enforced-clean YET) ───────────────
  * The empirical post-65-01/02 state (captured 2026-06-29) is that NO react/solid/
- * lit leaf — including the combobox/slider/listbox "canaries" — is fully strict-
+ * lit leaf — including the combobox/slider/select "canaries" — is fully strict-
  * clean. 65-01 (Class 1: nullable-prop→attr) and 65-02 (Class 2/5: narrow signal/
  * `<data>` defaults) ARE fixed and their dedicated witnesses stay GREEN — but the
  * leaf bodies still carry INHERENT residual that this phase explicitly does NOT
  * fix (65-CONTEXT scope fence):
  *   - Class 3 (TS2339 `Property … does not exist on type 'never'`) — was the shared
  *     `windowing.rzts` `return null`→`never`-narrowed helper, dominant in combobox +
- *     listbox (8 each × 3 targets). CLEARED by Plan 04 (the `pinMeasurement` typed
+ *     select (8 each × 3 targets). CLEARED by Plan 04 (the `pinMeasurement` typed
  *     wrapper retype in headless-core/windowing.rzts gives the host pin-hook read a
  *     real object-or-null shape, so `pm && pm.start` keeps the object branch). The
- *     TS2339 counts have been removed from the baselines below; listbox/lit reached
+ *     TS2339 counts have been removed from the baselines below; select/lit reached
  *     zero and is now ENFORCED CLEAN ({}).
  *   - Class 4 (TS2531 / TS18047 / TS18046 / the `… not assignable to 'null'`
  *     TS2322/TS2345 from member-mutated body consts like `const foCache = {…null}`)
@@ -152,34 +152,34 @@ const FAMILIES: FamilySpec[] = [
     },
   },
 
-  // ── listbox ── Was almost entirely Class-3 windowing (TS2339 ×8/target);
+  // ── select ── Was almost entirely Class-3 windowing (TS2339 ×8/target);
   // Plan 04 (windowing.rzts pinMeasurement retype) CLEARED it. react keeps a
   // single Class-6 tail (TS7006); solid a single TS2349; lit is now ENFORCED
   // CLEAN ({}) — the first leaf to reach zero.
   {
-    name: 'listbox',
+    name: 'select',
     target: 'react',
-    leaf: 'packages/ui/listbox/packages/react',
+    leaf: 'packages/ui/select/packages/react',
     baseline: {
-      'Listbox.tsx': {
+      'Select.tsx': {
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
         TS7006: 1,
       },
     },
   },
   {
-    name: 'listbox',
+    name: 'select',
     target: 'solid',
-    leaf: 'packages/ui/listbox/packages/solid',
+    leaf: 'packages/ui/select/packages/solid',
     // ENFORCED CLEAN: TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04; the
     // remaining TS2349 cleared 260712-a09 (Pattern F object/array-prop
     // default cast). Empty baseline ({}) — ANY strict error now fails this leaf.
     baseline: {},
   },
   {
-    name: 'listbox',
+    name: 'select',
     target: 'lit',
-    leaf: 'packages/ui/listbox/packages/lit',
+    leaf: 'packages/ui/select/packages/lit',
     // ENFORCED CLEAN: Plan 04 cleared the only residual (TS2339 ×8 Class-3
     // windowing). Empty baseline ({}) — ANY strict error now fails this leaf.
     baseline: {},

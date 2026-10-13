@@ -122,7 +122,7 @@ Most families wrap a battle-tested vanilla-JS engine whose framework bindings ar
 | [CommandPalette](https://one-learning-community.github.io/rozie.js/components/command-palette) | cmdk-style command menu | ✅ |
 | [DatePicker](https://one-learning-community.github.io/rozie.js/components/date-picker) | calendar (single + range modes) | ✅ |
 | [Dialog](https://one-learning-community.github.io/rozie.js/components/dialog) | modal dialog (native `<dialog>`) | pending |
-| [Listbox](https://one-learning-community.github.io/rozie.js/components/listbox) | WAI-ARIA listbox | pending |
+| [Select](https://one-learning-community.github.io/rozie.js/components/select) | WAI-ARIA select | pending |
 | [NumberField](https://one-learning-community.github.io/rozie.js/components/number-field) | number field / stepper | pending |
 | [Otp](https://one-learning-community.github.io/rozie.js/components/otp) | one-time-code / PIN input | ✅ |
 | [Pagination](https://one-learning-community.github.io/rozie.js/components/pagination) | pagination | pending |

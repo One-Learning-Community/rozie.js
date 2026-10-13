@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/select-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte headless select (single + multi-select, type-ahead, keyboard nav, groups, floating popup) — one accessible Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "select",
+    "combobox",
+    "select",
+    "dropdown",
+    "headless",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/select/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/Select.svelte",
+      "types": "./dist/Select.svelte.d.ts",
+      "default": "./dist/Select.svelte"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "svelte": "./src/Select.svelte",
+      "default": "./src/Select.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5",
+    "@tanstack/virtual-core": "^3"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    },
+    "@tanstack/virtual-core": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}

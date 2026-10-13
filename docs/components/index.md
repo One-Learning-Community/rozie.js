@@ -1,6 +1,6 @@
 # Components
 
-The `@rozie-ui` families are pre-compiled component packages for React, Vue, Svelte, Angular, Solid, and Lit: the same component, with the same API, in whichever of the six frameworks you use. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or entirely missing; thirteen families (**Listbox**, **Slider**, **Combobox**, **CommandPalette**, and friends) are headless, fully-accessible components with no engine at all.
+The `@rozie-ui` families are pre-compiled component packages for React, Vue, Svelte, Angular, Solid, and Lit: the same component, with the same API, in whichever of the six frameworks you use. Most wrap a battle-tested vanilla-JS engine whose existing framework wrappers are uneven, partial, or entirely missing; thirteen families (**Select**, **Slider**, **Combobox**, **CommandPalette**, and friends) are headless, fully-accessible components with no engine at all.
 
 Install only the package for your framework. There is no build step and no Rozie toolchain to add — just the compiled output for the framework you already use, plus a small [tree-shaken `@rozie/runtime-*` helper package](/guide/output-and-runtime) that most (not all) builds pull in.
 
@@ -67,7 +67,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 
 | Family | Wraps | Showcase |
 | --- | --- | --- |
-| **Listbox** | *(no engine)* headless WAI-ARIA listbox / combobox | [/components/listbox](/components/listbox) |
+| **Select** | *(no engine)* headless WAI-ARIA select / combobox | [/components/select](/components/select) |
 | **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 | **Otp** | *(no engine)* headless accessible one-time-code / PIN input | [/components/otp](/components/otp) |
 | **Combobox** | *(no engine)* headless WAI-ARIA combobox / autocomplete | [/components/combobox](/components/combobox) |

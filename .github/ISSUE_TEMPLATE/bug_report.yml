@@ -53,7 +53,7 @@ body:
         - embla
         - flatpickr
         - fullcalendar
-        - listbox
+        - select
         - maplibre
         - pdf
         - rete

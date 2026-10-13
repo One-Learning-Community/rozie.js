@@ -80,7 +80,7 @@ name: Release (early subset)
 #     (all six aligned at 0.1.0 — the FIRST all-targets combobox release line). react/solid/
 #     lit/vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
 #     `workspace:` at publish; live on npm); angular carries no @rozie dep (tslib only).
-#     Self-contained — no @rozie-ui workspace dep (vendors the listbox spine at authoring time).
+#     Self-contained — no @rozie-ui workspace dep (vendors the select spine at authoring time).
 #     Hard PREREQUISITE of the command-palette debut below; published first, built first.
 #   - 6 @rozie-ui command-palette leaves: command-palette-{react,vue,solid,lit,svelte,angular}
 #     (all six aligned at 0.1.0 — the DEBUT all-targets command-palette release line). The
@@ -247,7 +247,7 @@ name: Release (early subset)
 #     JSX kept only under the `solid` export condition — the vite-plugin-solid `.mjs` workaround
 #     is no longer needed on any of them).
 #   - 8 @rozie-ui NEW Solid-only leaves DEBUT at a patch (first publish):
-#     dialog-solid, listbox-solid, maplibre-solid, number-field-solid,
+#     dialog-solid, select-solid, maplibre-solid, number-field-solid,
 #     pagination-solid, resizable-solid, slider-solid, switch-solid. Each gets its OWN
 #     "Build debut Solid leaves" / "Publish debut Solid leaves" step pair below (all eight
 #     carry @rozie/runtime-solid as a workspace dep, so they build after the toolchain step;
@@ -285,7 +285,7 @@ name: Release (early subset)
 #     skipped by `pnpm publish` as already-published; no filter-list edit is needed for that case.
 #   - Scope stays exactly the 16 families + 4 toolchain packages already wired above (D3) — the
 #     13 additional unpublished families whose content also moved in this same seam batch
-#     (chartjs, codemirror, dialog, lexical, listbox, maplibre, number-field, pagination,
+#     (chartjs, codemirror, dialog, lexical, select, maplibre, number-field, pagination,
 #     resizable, rete, slider, switch, wavesurfer) are NOT added; their regenerated content ships
 #     whenever they eventually debut.
 #     (SUPERSEDED for rete, 2026-08-04: rete is now release-verified and wired above.
@@ -354,7 +354,7 @@ name: Release (early subset)
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
 # above is not release-verified. As of the 2026-09-26 wave, that includes the 40 remaining
 # targets (React/Vue/Svelte/Lit/Angular) of the 8 families whose SOLID leaf debuted above
-# (dialog, listbox, maplibre, number-field, pagination, resizable, slider, switch), PLUS all
+# (dialog, select, maplibre, number-field, pagination, resizable, slider, switch), PLUS all
 # 6 targets of `lexical` (its Solid leaf does NOT debut this wave — no content read/write API
 # yet, so it is fully held back alongside its siblings) — 46 packages total — held back until
 # they get their own dogfooding pass, exactly like uppy and every other not-yet-verified
@@ -818,7 +818,7 @@ jobs:
       # so this sits AFTER the toolchain build, same rationale as every other non-vue leaf step
       # above. None carries an @rozie-ui workspace peer, so there is NO ordering coupling to any
       # other leaf family — this step can run anywhere after the toolchain build. The OTHER five
-      # targets of these same 8 families (dialog, listbox, maplibre, number-field,
+      # targets of these same 8 families (dialog, select, maplibre, number-field,
       # pagination, resizable, slider, switch) remain out of scope and are NOT built here — see
       # the dated header note above. `lexical` is NOT in this step at all (fully held back, all
       # six targets — no content read/write API yet).
@@ -826,7 +826,7 @@ jobs:
         run: >
           pnpm
           --filter=@rozie-ui/dialog-solid
-          --filter=@rozie-ui/listbox-solid
+          --filter=@rozie-ui/select-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
           --filter=@rozie-ui/pagination-solid
@@ -881,7 +881,7 @@ jobs:
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
       # dist exists for the react/solid/lit/svelte/vue leaf type resolution (angular = tslib
-      # only). Self-contained: no @rozie-ui workspace dep (it vendors the listbox spine at
+      # only). Self-contained: no @rozie-ui workspace dep (it vendors the select spine at
       # authoring time). MUST run BEFORE the command-palette build below — command-palette's
       # composition imports `@rozie-ui/combobox-<target>` (a required peer, workspace-linked via
       # auto-install-peers), so command-palette's declaration emit reads combobox's built dist.
@@ -1067,7 +1067,7 @@ jobs:
           --filter @rozie-ui/wavesurfer-svelte
           --filter @rozie-ui/wavesurfer-angular
           --filter @rozie-ui/dialog-solid
-          --filter @rozie-ui/listbox-solid
+          --filter @rozie-ui/select-solid
           --filter @rozie-ui/maplibre-solid
           --filter @rozie-ui/number-field-solid
           --filter @rozie-ui/pagination-solid
@@ -1558,7 +1558,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # The 8 DEBUT Solid-only leaves (2026-09-26 wave — dialog, listbox, maplibre,
+      # The 8 DEBUT Solid-only leaves (2026-09-26 wave — dialog, select, maplibre,
       # number-field, pagination, resizable, slider, switch; verified 0/8 on npm via a direct
       # registry GET, since `npm view` lags on first-ever names). pnpm rewrites each leaf's
       # `@rozie/runtime-solid` workspace dep to the concrete published version in the tarball —
@@ -1576,7 +1576,7 @@ jobs:
         run: >
           pnpm
           --filter=@rozie-ui/dialog-solid
-          --filter=@rozie-ui/listbox-solid
+          --filter=@rozie-ui/select-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
           --filter=@rozie-ui/pagination-solid

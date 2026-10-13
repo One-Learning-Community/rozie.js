@@ -466,19 +466,19 @@ export default defineConfig(async () => {
     'embla',
     'src',
   );
-  // Same move for @rozie-ui/listbox: Listbox.rozie lives in the package src, so
-  // the Angular sub-build must walk it too (ListboxBehaviorDemo's
-  // `imports: [Listbox]` would otherwise collapse to `any[]` → empty mount +
-  // "JIT compiler unavailable"). Lockstep with build-cells.mjs `LISTBOX_SRC`
+  // Same move for @rozie-ui/select: Select.rozie lives in the package src, so
+  // the Angular sub-build must walk it too (SelectBehaviorDemo's
+  // `imports: [Select]` would otherwise collapse to `any[]` → empty mount +
+  // "JIT compiler unavailable"). Lockstep with build-cells.mjs `SELECT_SRC`
   // sweep + tsconfig.app.json `include`. NO ESM-interop alias needed — the
-  // listbox component is pure-Rozie with no third-party engine deps.
-  const listboxSrc = resolve(
+  // select component is pure-Rozie with no third-party engine deps.
+  const selectSrc = resolve(
     __dirname,
     '..',
     '..',
     'packages',
     'ui',
-    'listbox',
+    'select',
     'src',
   );
   // Same move for @rozie-ui/slider: Slider.rozie lives in the package src, so the
@@ -779,7 +779,7 @@ export default defineConfig(async () => {
     // The other targets' `.rozie.ts/.tsx` virtual modules go through Vite's
     // own resolver, which honors `browser` via vite-plugin-solid's
     // `configEnvironment` hook (and the equivalent for other plugins).
-    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc])] : []),
+    ...(TARGET === 'angular' ? [resolveCrossTreeBareImports([examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, selectSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc])] : []),
     // Redirect the lexical shell's stable `./mountDecorators` source import to the
     // target-matched hand-written bridge (all 5 v1.0 targets), or a harmless no-op
     // for the Lit sub-build (no Lit bridge until v1.1, D-10; no Lit CELL is tested,
@@ -788,7 +788,7 @@ export default defineConfig(async () => {
     resolveLexicalDecoratorBridge(TARGET, lexicalSrc),
     Rozie({
       target: TARGET,
-      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, listboxSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc] } : {}),
+      ...(TARGET === 'angular' ? { prebuildExtraRoots: [examplesRoot, sortableListSrc, flatpickrSrc, fullCalendarSrc, codeMirrorSrc, chartSrc, tipTapSrc, mapLibreSrc, cropperSrc, wavesurferSrc, pdfSrc, reteSrc, emblaSrc, selectSrc, sliderSrc, dataTableSrc, otpSrc, dialogSrc, comboboxSrc, toastSrc, tagsSrc, numberFieldSrc, paginationSrc, switchSrc, popoverSrc, datePickerSrc, resizableSrc, commandPaletteSrc, headlessCoreSrc, lexicalSrc] } : {}),
     }),
     ...(await frameworkPlugins(TARGET)),
     ...(TARGET === 'lit' ? [lowerLitDecoratorsWithEsbuild()] : []),

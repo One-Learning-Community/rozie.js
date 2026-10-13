@@ -683,30 +683,30 @@ export const EXAMPLES = [
   // default slot. Not a screenshot cell — deliberately NOT in matrix.spec.ts
   // EXAMPLES. See embla-carousel.spec.ts, `embla-carousel-declarative`.
   'CarouselDeclarative',
-  // @rozie-ui/listbox (pure-Rozie WAI-ARIA listbox/combobox, NO engine) — the
-  // BEHAVIORAL cell (loader → examples/demos/ListboxBehaviorDemo.rozie, which
-  // imports ../../packages/ui/listbox/src/Listbox.rozie). It drives single-select
+  // @rozie-ui/select (pure-Rozie WAI-ARIA select/combobox, NO engine) — the
+  // BEHAVIORAL cell (loader → examples/demos/SelectBehaviorDemo.rozie, which
+  // imports ../../packages/ui/select/src/Select.rozie). It drives single-select
   // with a two-way r-model:value (live readout), keyboard navigation
   // (ArrowDown/Enter/Escape), and a `set-value` direct-model-write button — see
-  // listbox.spec.ts. Built for all 6 targets but NOT a screenshot cell —
+  // select.spec.ts. Built for all 6 targets but NOT a screenshot cell —
   // deliberately NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
-  'ListboxBehavior',
-  // (P3/D-03: Listbox's editable combobox mode was retired — type-to-filter now
-  // lives in @rozie-ui/combobox; the former ListboxCombobox cell is removed.)
+  'SelectBehavior',
+  // (P3/D-03: Select's editable combobox mode was retired — type-to-filter now
+  // lives in @rozie-ui/combobox; the former SelectCombobox cell is removed.)
   // Phase 64 P4 (headless windowing, SC-5) — the WINDOWED long-list cells (loaders →
-  // examples/demos/{Listbox,Combobox}VirtualDemo.rozie, importing
-  // packages/ui/{listbox,combobox}/src/<Component>.rozie). Each feeds a 1,000-option
+  // examples/demos/{Select,Combobox}VirtualDemo.rozie, importing
+  // packages/ui/{select,combobox}/src/<Component>.rozie). Each feeds a 1,000-option
   // list with :virtual (inline, bounded) so ONLY a small windowed [role="option"]
   // slice renders — backed by @rozie-ui/headless-core/windowing.rzts (the shared
   // virtual-core bridge, wired per-consumer with a no-op pin hook). Behavioral-only
   // (DOM assert, NOT in matrix.spec.ts — no pixel baseline); they live under
   // examples/demos/ so no Angular 3-file registration is needed (prebuildExtraRoots
   // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos
-  // sweep already cover them, importing the listbox/combobox source pkgs + the
+  // sweep already cover them, importing the select/combobox source pkgs + the
   // headless-core src root already registered for Angular cross-tree AOT).
-  'ListboxVirtual',
+  'SelectVirtual',
   // quick 260923-rrr (N-05): variable-height options (every 3rd is 3 lines tall).
-  'ListboxVirtualVariable',
+  'SelectVirtualVariable',
   'ComboboxVirtual',
   // quick 260923-rrr (N-05): variable-height options.
   'ComboboxVirtualVariable',
@@ -804,7 +804,7 @@ export const EXAMPLES = [
   // matrix.spec.ts EXAMPLES.
   'ComboboxRecipient',
   // per-instance default id base (quick 261002-ekf F6) — the BEHAVIORAL cell
-  // (loader → examples/demos/AutoIdDemo.rozie): default Listboxes/Popovers never
+  // (loader → examples/demos/AutoIdDemo.rozie): default Selects/Popovers never
   // share ids. See auto-id.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'AutoId',
   // combobox-group-cap — the BEHAVIORAL cell (loader → examples/demos/
@@ -1686,14 +1686,14 @@ export const LIT_TAGS: Record<Example, string> = {
   // (customElements.define target in the built CarouselDeclarativeDemo.rozie
   // chunk).
   CarouselDeclarative: 'rozie-carousel-declarative',
-  // @rozie-ui/listbox — '-demo' appended → tag 'rozie-listbox-behavior-demo' =
-  // kebab of ListboxBehaviorDemo (the wrapper component is name="Listbox" →
-  // 'rozie-listbox'). Behavioral-only, no screenshot cell.
-  ListboxBehavior: 'rozie-listbox-behavior',
-  // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-listbox-virtual-demo'
-  // / 'rozie-combobox-virtual-demo' = kebab of {Listbox,Combobox}VirtualDemo.
-  ListboxVirtual: 'rozie-listbox-virtual',
-  ListboxVirtualVariable: 'rozie-listbox-virtual-variable',
+  // @rozie-ui/select — '-demo' appended → tag 'rozie-select-behavior-demo' =
+  // kebab of SelectBehaviorDemo (the wrapper component is name="Select" →
+  // 'rozie-select'). Behavioral-only, no screenshot cell.
+  SelectBehavior: 'rozie-select-behavior',
+  // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-select-virtual-demo'
+  // / 'rozie-combobox-virtual-demo' = kebab of {Select,Combobox}VirtualDemo.
+  SelectVirtual: 'rozie-select-virtual',
+  SelectVirtualVariable: 'rozie-select-virtual-variable',
   ComboboxVirtual: 'rozie-combobox-virtual',
   ComboboxVirtualVariable: 'rozie-combobox-virtual-variable',
   // combobox-virtual-reactivity phase — '-demo' appended on Lit → tag
@@ -2249,15 +2249,15 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // CarouselDeclarativeDemo is self-contained: seeds idx:0 in <data>, SLIDES in
   // <script>, binds r-model:selectedIndex internally. No parent props.
   CarouselDeclarative: {},
-  // @rozie-ui/listbox — ListboxBehaviorDemo is self-contained: it seeds OPTIONS in
+  // @rozie-ui/select — SelectBehaviorDemo is self-contained: it seeds OPTIONS in
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
-  ListboxBehavior: {},
+  SelectBehavior: {},
   // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
   // 1,000-option list in $onMount and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
-  ListboxVirtual: {},
-  ListboxVirtualVariable: {},
+  SelectVirtual: {},
+  SelectVirtualVariable: {},
   ComboboxVirtual: {},
   ComboboxVirtualVariable: {},
   // combobox-virtual-reactivity phase — ComboboxVirtualFlipDemo is self-contained: it

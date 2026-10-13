@@ -59,7 +59,7 @@ Two-way bind `value` and set the `min` / `max` / `step` scale to get a single-th
 | Name | Type | Default | Runtime-updatable? | Description |
 | --- | --- | --- | :---: | --- |
 | `value` | `unknown` | `null` | yes (via `r-model`) | The current value. `model: true` — a scalar number in single mode, a sorted `[lo, hi]` array in `range` mode. The sole model prop, so Angular emits a `ControlValueAccessor`. |
-| `range` | `Boolean` | `false` | yes | Range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping thumbs. The exact analog of listbox's `multiple` (scalar↔array). |
+| `range` | `Boolean` | `false` | yes | Range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping thumbs. The exact analog of select's `multiple` (scalar↔array). |
 | `min` | `Number` | `0` | yes | The lower bound of the scale. Forwarded to the native input as the `min` attribute. |
 | `max` | `Number` | `100` | yes | The upper bound of the scale. Forwarded to the native input as the `max` attribute. |
 | `step` | `Number` | `1` | yes | The granularity. Forwarded as the native `step` attribute; every write-back is quantized to it. |
@@ -83,7 +83,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Method | Description |
 | --- | --- |
-| `focus` | Move DOM focus to the slider thumb (the native range input — in range mode, the `lo` thumb). **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended. (This *inverts* listbox's choice, which named its verb `focusControl` to avoid the override.) |
+| `focus` | Move DOM focus to the slider thumb (the native range input — in range mode, the `lo` thumb). **Deliberately named `focus`**, which overrides the inherited `HTMLElement.focus` on the Lit custom element — the public `focus()` handle is intended. (This *inverts* select's choice, which named its verb `focusControl` to avoid the override.) |
 | `increment` | Increase a thumb by one `step`, clamped to `[min, max]`. Accepts an optional `thumb` argument (`'lo'` \| `'hi'`, default `'lo'`) in range mode. |
 | `decrement` | Decrease a thumb by one `step`, clamped to `[min, max]`. Accepts the same optional `thumb` argument in range mode. |
 

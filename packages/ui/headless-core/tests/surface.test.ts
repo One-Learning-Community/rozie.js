@@ -39,7 +39,7 @@ const probe = headlessCoreSmoke(41)
 `;
 
 // ── listCore.rzts (P2) — a SELECT-ONLY smoke host inlining the shared list spine ──────────────
-// A trimmed Listbox satisfying the listCore.rzts HOST CONTRACT (input-mode discriminant props,
+// A trimmed Select satisfying the listCore.rzts HOST CONTRACT (input-mode discriminant props,
 // the option/value/state surface, the reassigned module-`let`s typeBuffer/typeTimer, the impure
 // $refs fns focusControl/scrollActiveIntoView, the id base idRoot) that references a broad slice of the imported spine
 // so the tree-shaker keeps the decls — proving the REAL list spine resolves + inlines + dissolves

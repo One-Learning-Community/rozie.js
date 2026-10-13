@@ -44,7 +44,7 @@
   ("a RELATIVE non-overlap assertion (not exact px, which is layout-engine-dependent)",
   rete-flow.spec.ts:1606). Determinism is not provable, so the cell asserts behaviour.
 
-  Seeded in `$onMount` rather than `<data>` (the 1,000-option ListboxVirtual precedent) and
+  Seeded in `$onMount` rather than `<data>` (the 1,000-option SelectVirtual precedent) and
   assigned as ONE fresh graph object — one commit, not 48.
 
   Container needs explicit height/width (the VR host mounts at max-content).
