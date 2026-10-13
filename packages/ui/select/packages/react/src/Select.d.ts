@@ -22,7 +22,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
   defaultValue?: (unknown) | null;
   onValueChange?: (next: (unknown) | null) => void;
   /**
-   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit.
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed.
    */
   multiple?: boolean;
   /**
@@ -66,7 +66,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   selectOnTab?: boolean;
   /**
-   * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+   * Show a clear button in the control whenever there is a value, and let Delete clear it from the keyboard while the popup is closed. In single-select Backspace clears too; in multi-select Delete clears every value while Backspace removes only the last chip.
    */
   clearable?: boolean;
   /**

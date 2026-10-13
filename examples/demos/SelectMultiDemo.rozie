@@ -9,9 +9,10 @@
 -->
 <rozie name="SelectMultiDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ value: ['banana', 'ghost'], changes: 0, payload: '', custom: ['apple', 'banana'], locked: ['apple', 'banana'], lockedChanges: 0, wrap: ['alpha', 'bravo', 'charlie', 'delta'] }</data>
+<data>{ value: ['banana', 'ghost'], changes: 0, payload: '', custom: ['apple', 'banana'], locked: ['apple', 'banana'], lockedChanges: 0, wrap: ['alpha', 'bravo', 'charlie', 'delta'], hid: ['ghost'] }</data>
 <script>
 const OPTIONS = [{ label: 'Apple', value: 'apple' }, { label: 'Banana', value: 'banana' }, { label: 'Cherry', value: 'cherry' }]
+const NO_OPTIONS = []
 const WRAP_OPTIONS = [
   { label: 'Alpha value', value: 'alpha' },
   { label: 'Bravo value', value: 'bravo' },
@@ -37,6 +38,7 @@ const chipText = (option) => (option ? option.label : '?')
   <span data-testid="readout-locked">{{ joined($data.locked) }}</span>
   <span data-testid="readout-locked-changes">{{ $data.lockedChanges }}</span>
   <span data-testid="readout-wrap">{{ joined($data.wrap) }}</span>
+  <span data-testid="readout-hid">{{ joined($data.hid) }}</span>
   <div data-testid="main"><Select :options="OPTIONS" r-model:value="$data.value" multiple clearable :close-on-select="false" placeholder="Pick fruit" aria-label="Fruit" @change="onChange($event)" /></div>
   <div data-testid="custom">
     <Select :options="OPTIONS" r-model:value="$data.custom" multiple :close-on-select="false" aria-label="Custom chips">
@@ -47,6 +49,7 @@ const chipText = (option) => (option ? option.label : '?')
     </Select>
   </div>
   <div data-testid="locked"><Select :options="OPTIONS" r-model:value="$data.locked" multiple clearable disabled aria-label="Locked" @change="onLockedChange()" /></div>
+  <div data-testid="hid"><Select :options="NO_OPTIONS" r-model:value="$data.hid" multiple hide-empty aria-label="Hidden empty" /></div>
   <div data-testid="wrap" style="width: 220px"><Select :options="WRAP_OPTIONS" r-model:value="$data.wrap" multiple block :close-on-select="false" aria-label="Wrap" /></div>
 </div>
 </template>

@@ -110,10 +110,51 @@ for (const target of TARGETS) {
     await expect(custom.locator('.custom-chip')).toHaveText(['Apple', 'Banana']);
     await expect(custom.locator('.rozie-select-chip__label')).toHaveCount(0); // default content replaced
     await expect(custom.locator('.rozie-select-chip__remove')).toHaveCount(0);
+    const customTrigger = custom.locator('[role="combobox"]');
+    await custom.locator('.custom-chip__x').first().click();
+    await expect(page.getByTestId('readout-custom')).toHaveText('banana'); // ordered observable
+    await expect(custom.locator('.custom-chip')).toHaveText(['Banana']);
+    await expect(customTrigger).toBeFocused(); // remove() returns focus
+    await expect(customTrigger).toHaveAttribute('aria-expanded', 'false'); // the click did not open the popup
+    await expect(custom.locator('[role="listbox"]')).toHaveCount(0);
+  });
+
+  runner(`select-multi [${target}]: a custom chip's remove() with the popup open keeps it open`, async ({ page }) => {
+    await page.goto(`/?example=SelectMulti&target=${target}`);
+    const custom = page.getByTestId('custom');
+    const customTrigger = custom.locator('[role="combobox"]');
+    await customTrigger.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(customTrigger).toHaveAttribute('aria-expanded', 'true');
     await custom.locator('.custom-chip__x').first().click();
     await expect(page.getByTestId('readout-custom')).toHaveText('banana');
-    await expect(custom.locator('.custom-chip')).toHaveText(['Banana']);
-    await expect(custom.locator('[role="combobox"]')).toBeFocused(); // remove() returns focus
+    await expect(customTrigger).toHaveAttribute('aria-expanded', 'true'); // not toggled shut
+    await expect(page.locator('[role="listbox"]')).toBeVisible();
+    await expect(customTrigger).toBeFocused();
+  });
+
+  runner(`select-multi [${target}]: clicking a default chip's label toggles the popup like the rest of the control`, async ({ page }) => {
+    await page.goto(`/?example=SelectMulti&target=${target}`);
+    const main = page.getByTestId('main');
+    const trigger = main.locator('[role="combobox"]');
+    await main.locator('.rozie-select-chip__label').first().click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('readout-value')).toHaveText('banana,ghost'); // nothing removed
+    await page.keyboard.press('Escape');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  runner(`select-multi [${target}]: under hideEmpty with no options Backspace still removes the last chip`, async ({ page }) => {
+    await page.goto(`/?example=SelectMulti&target=${target}`);
+    const hid = page.getByTestId('hid');
+    const trigger = hid.locator('[role="combobox"]');
+    await expect(hid.locator('.rozie-select-chip__label')).toHaveText(['ghost']);
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown'); // internally open, nothing shown
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Backspace');
+    await expect(page.getByTestId('readout-hid')).toHaveText('');
+    await expect(hid.locator('.rozie-select-chip')).toHaveCount(0);
   });
 
   runner(`select-multi [${target}]: a disabled multiple renders chips with disabled remove buttons; nothing removes`, async ({ page }) => {

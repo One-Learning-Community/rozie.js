@@ -207,7 +207,7 @@ export default class Select extends SignalWatcher(LitElement) {
   @property({ type: Object, attribute: 'value' }) _value_attr: unknown = null;
   private _valueControllable = createLitControllableProperty<unknown>({ host: this, eventName: 'value-change', defaultValue: null, initialControlledValue: undefined });
   /**
-   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit.
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed.
    */
   @property({ type: Boolean, reflect: true }) multiple: boolean = false;
   /**
@@ -251,7 +251,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'select-on-tab' }) selectOnTab: boolean = false;
   /**
-   * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+   * Show a clear button in the control whenever there is a value, and let Delete clear it from the keyboard while the popup is closed. In single-select Backspace clears too; in multi-select Delete clears every value while Backspace removes only the last chip.
    */
   @property({ type: Boolean, reflect: true }) clearable: boolean = false;
   /**
@@ -1631,7 +1631,7 @@ private __rozieFirstUpdateDone = false;
 
   // Keyboard clear while the popup is closed. Returns true when it handled the key.
   onClearKey = ($event: any) => {
-  if (!this.clearable || this._open$local.value || !this.hasValue()) return false;
+  if (!this.clearable || this.popupVisible() || !this.hasValue()) return false;
   if ($event.key === 'Delete' || $event.key === 'Backspace' && !this.multiple) {
     $event.preventDefault();
     this.clear();
@@ -1688,7 +1688,7 @@ private __rozieFirstUpdateDone = false;
   // Backspace with the popup closed removes the last chip (regardless of `clearable`).
   // Returns true when it handled the key.
   onChipKey = ($event: any) => {
-  if (!this.multiple || this._open$local.value || $event.key !== 'Backspace') return false;
+  if (!this.multiple || this.popupVisible() || $event.key !== 'Backspace') return false;
   const vals = this.selectedValues();
   if (vals.length === 0) return false;
   $event.preventDefault();
@@ -1704,11 +1704,38 @@ private __rozieFirstUpdateDone = false;
   // row all open the popup; the buttons inside stop propagation themselves.
   onControlClick = ($event: any) => {
   if (this.disabled) return;
-  // React, Svelte and Solid delegate events at the root, so stopPropagation in the
-  // button handler cannot keep the click from here: skip clicks that originate on
-  // the clear / chip-remove buttons instead (one code path on all six targets).
-  const t = $event.target;
-  if (t && typeof t.closest === 'function' && t.closest('.rozie-select-clear, .rozie-select-chip__remove')) return;
+  // React, Svelte and Solid delegate events at the root, so stopPropagation in a
+  // button handler cannot keep the click from here: decide from the event target
+  // instead (one code path on all six targets). The clear button never toggles; an
+  // INTERACTIVE element inside a chip (the default remove button, or any control a
+  // `chip` slot fill brings) never toggles; a chip's plain content (its label) does.
+  // Walk the composed path when the event offers one: on Lit a slotted fill lives in
+  // the light DOM while the chip wrapper is in the shadow root, and `closest()` does
+  // not cross that boundary. Fall back to `closest()` (React's synthetic event has no
+  // composedPath, and has no shadow boundary either).
+  const interactive = 'button, a[href], input, select, textarea, [role="button"]';
+  const path = typeof $event.composedPath === 'function' ? $event.composedPath() : [];
+  if (path.length > 0) {
+    let seenInteractive = false;
+    for (const el of path as any) {
+      if (el === $event.currentTarget) break;
+      if (!el || typeof el.matches !== 'function') continue;
+      if (el.matches('.rozie-select-clear')) return;
+      if (el.matches('.rozie-select-chip')) {
+        if (seenInteractive) return;
+        break;
+      }
+      if (el.matches(interactive)) seenInteractive = true;
+    }
+  } else {
+    const t = $event.target;
+    if (t && typeof t.closest === 'function') {
+      if (t.closest('.rozie-select-clear')) return;
+      const chip = t.closest('.rozie-select-chip');
+      const hit = t.closest(interactive);
+      if (chip && hit && chip.contains(hit)) return;
+    }
+  }
   this.toggle();
   this.focusControl();
 };
