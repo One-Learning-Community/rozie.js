@@ -8,9 +8,7 @@
  *      matches the contract exactly.
  *   3. compile()×6 emits ZERO error-severity diagnostics + non-empty code
  *      (ROZ127 slot==prop, ROZ121 expose-verb==event, ROZ524 React model-setter,
- *      Lit reserved-lifecycle all surface here as compile() errors). The
- *      DELIBERATE `focus` override is warn-only ROZ137 (accepted), so it does
- *      not trip the error gate.
+ *      Lit reserved-lifecycle all surface here as compile() errors).
  *
  * Pure GLUE over the @rozie/core public API — no compiler/emitter/IR change.
  */
@@ -31,7 +29,7 @@ const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Select',
-  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight'],
+  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight'],
   models: ['value'],
   emits: ['change', 'open-change'],
   slots: ['selected', 'option', 'empty'] as string[],
@@ -60,7 +58,7 @@ describe('Select.rozie surface gate', () => {
     expect(ir.name).toBe(EXPECT.name);
   });
 
-  it('props surface matches ', () => {
+  it('props surface matches', () => {
     const propNames = ir.props.map((p: { name: string }) => p.name);
     expect(sorted(propNames)).toEqual(sorted(EXPECT.props));
   });
@@ -72,7 +70,7 @@ describe('Select.rozie surface gate', () => {
     expect(sorted(modelNames)).toEqual(sorted(EXPECT.models));
   });
 
-  it('emits surface matches ', () => {
+  it('emits surface matches', () => {
     expect(sorted(ir.emits)).toEqual(sorted(EXPECT.emits));
   });
 
@@ -83,7 +81,7 @@ describe('Select.rozie surface gate', () => {
     expect(sorted(slotNames)).toEqual(sorted(EXPECT.slots));
   });
 
-  it('expose surface matches ', () => {
+  it('expose surface matches', () => {
     const exposeNames = ir.expose.map((e: { name: string }) => e.name);
     expect(sorted(exposeNames)).toEqual(sorted(EXPECT.expose));
   });

@@ -31,10 +31,14 @@
 <data>
 {
   value: null,
+  tabValue: null,
+  disabledValue: null,
 }
 </data>
 
 <script>
+const NONE = []
+const ALL_DISABLED = [{ label: 'A', value: 'a', disabled: true }, { label: 'B', value: 'b', disabled: true }]
 const OPTIONS = [
   { label: 'Apple', value: 'apple' },
   { label: 'Banana', value: 'banana' },
@@ -62,13 +66,25 @@ const pickValue = (v) => { $data.value = v }
   <Select
     :options="OPTIONS"
     r-model:value="$data.value"
-    id="demo-select"
+    id-base="demo-select"
     aria-label="Choose a fruit"
   >
     <template #option="{ option, selected }">
       <span class="opt" :class="{ 'opt-selected': selected }">{{ option.label }}</span>
     </template>
   </Select>
+
+  <div data-testid="empty-select">
+    <Select :options="NONE" hide-empty aria-label="Empty" />
+  </div>
+  <div data-testid="disabled-select">
+    <Select :options="ALL_DISABLED" r-model:value="$data.disabledValue" aria-label="All disabled" />
+    <span data-testid="readout-disabled">{{ $data.disabledValue }}</span>
+  </div>
+  <div data-testid="tab-select">
+    <Select :options="OPTIONS" r-model:value="$data.tabValue" select-on-tab aria-label="Tab commits" />
+    <span data-testid="readout-tab">{{ $data.tabValue }}</span>
+  </div>
 </div>
 </template>
 

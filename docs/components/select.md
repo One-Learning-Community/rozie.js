@@ -70,7 +70,9 @@ Pass an `options` array and two-way bind `value`:
 | `optionLabel` | `Function` | `null` | yes | `(option) => string` — resolve an object option's display label. |
 | `optionValue` | `Function` | `null` | yes | `(option) => value` — resolve an object option's committed value. |
 | `optionDisabled` | `Function` | `null` | yes | `(option) => boolean` — mark an option non-selectable. |
-| `id` | `String` | `''` | yes | Stable id base for the ARIA wiring (select id, per-option ids, `aria-activedescendant`). Empty (the default): each instance generates a unique base after mount (`rozie-select-<n>`). Set it when you need stable, predictable ids. |
+| `idBase` | `String` | `''` | yes | Id base for the popup, option and control elements. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Empty (the default): each instance generates a unique base after mount (`rozie-select-<n>`). |
+| `hideEmpty` | `Boolean` | `false` | yes | Show nothing instead of the empty state: with no options the popup is not shown, `aria-expanded` is `false`, and Escape is left to the host. |
+| `selectOnTab` | `Boolean` | `false` | yes | Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup). |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the control when there is no visible `<label for>`. |
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
@@ -136,4 +138,4 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 
 - The control carries `role="combobox"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant`; the popup is `role="listbox"` (with `aria-multiselectable` in multi-select); each option is `role="option"` with `aria-selected` / `aria-disabled`.
 - Supply an accessible name via a visible `<label for>` pointing at the control's `id`, or the `ariaLabel` prop.
-- Each instance generates a unique id base after mount, so several selectes on one page never share option ids or `aria-activedescendant` references. Set `id` yourself only when you need stable ids.
+- Each instance generates a unique id base after mount, so several selectes on one page never share option ids or `aria-activedescendant` references. Set `idBase` yourself only when you need stable ids.

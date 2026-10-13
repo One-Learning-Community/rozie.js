@@ -5,7 +5,7 @@
  * Pure GLUE over the @rozie/core public API. Asserts:
  *   1. lowerToIR() + compile()×6 emit ZERO error-severity diagnostics
  *      (ROZ127 slot==prop, ROZ121 expose-verb==event, ROZ524 React model-setter,
- *      Lit reserved-lifecycle — all surface here as compile() errors)..
+ *      Lit reserved-lifecycle — all surface here as compile() errors).
  *   2. The IR surface matches the contract exactly.
  * THROWS (non-zero exit) on any drift. No compiler/emitter/IR change.
  */
@@ -23,7 +23,7 @@ const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Select',
-  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'id', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight'],
+  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight'],
   models: ['value'],
   emits: ['change', 'open-change'],
   slots: ['selected', 'option', 'empty'],

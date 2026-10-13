@@ -93,7 +93,9 @@ export class PickFormComponent {
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
-| `id` | `String` | `''` |  |  |
+| `idBase` | `String` | `''` |  |  |
+| `hideEmpty` | `Boolean` | `false` |  |  |
+| `selectOnTab` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |

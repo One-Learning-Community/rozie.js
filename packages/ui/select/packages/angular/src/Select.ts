@@ -45,7 +45,7 @@ interface EmptyCtx {
 
       
       <div class="rozie-select-control" #controlEl>
-        <button #triggerEl type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="open$local()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="rozieAttr(ariaLabel())" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onControlKeyDown($event)">
+        <button #triggerEl type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="rozieAttr(popupVisible())" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(activeDescendant())" [attr.aria-label]="rozieAttr(ariaLabel())" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onTriggerKeyDown($event)">
           @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -61,7 +61,7 @@ interface EmptyCtx {
       </div>
 
       
-      @if (open$local() && !virtual()) {
+      @if (popupVisible() && !virtual()) {
     <div #listEl class="rozie-select-list" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
         @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-select-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
@@ -265,9 +265,17 @@ export class Select {
    */
   optionDisabled = input<((...args: any[]) => any) | null>(null);
   /**
-   * Stable id base for the ARIA wiring (the select id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`); set it when you need stable, predictable ids.
+   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
-  id = input<string>('');
+  idBase = input<string>('');
+  /**
+   * Show nothing instead of the empty state: when there are no options the popup is not shown, the control reports `aria-expanded="false"`, and Escape is left to the host.
+   */
+  hideEmpty = input<boolean>(false);
+  /**
+   * Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).
+   */
+  selectOnTab = input<boolean>(false);
   /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
@@ -348,7 +356,7 @@ export class Select {
   }
 
   ngAfterViewInit() {
-    if (!this.id()) this.autoId.set('rozie-select-' + this.nextAutoId());
+    if (!this.idBase()) this.autoId.set('rozie-select-' + this.nextAutoId());
     this.syncRows();
     if (this.virtual()) {
       // The list renders at mount when virtual, so the .rozie-select-list scroll container
@@ -1279,9 +1287,22 @@ export class Select {
     Reflect.set(globalThis, '__rozieAutoId', n);
     return n;
   };
-  // idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+  // idRoot(): the `idBase` prop, else the per-instance id generated in $onMount, else the
   // pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
-  idRoot = () => this.id() || this.autoId() || 'rozie-select';
+  idRoot = () => this.idBase() || this.autoId() || 'rozie-select';
+  // popupVisible(): the single gate every list branch and aria-expanded read.
+  popupVisible = () => {
+    if (!this.open$local()) return false;
+    if (!this.hideEmpty()) return true;
+    return this.visibleOptions().length > 0;
+  };
+  // Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
+  // listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
+  // the sibling families' generated output stay untouched).
+  onTriggerKeyDown = ($event: any) => {
+    if ($event.key === 'Tab' && this.open$local() && this.selectOnTab() && this.activeIndex() >= 0) this.commitActive();
+    this.onControlKeyDown($event);
+  };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
@@ -1356,7 +1377,7 @@ export class Select {
 
   protected get __style() {
       const __maxHeight = this.maxHeight();
-      return (this.open$local() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + __maxHeight : 'overflow-y:auto');
+      return (this.popupVisible() ? '' : 'display:none;') + (__maxHeight ? 'height:' + __maxHeight + ';max-height:' + __maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + __maxHeight : 'overflow-y:auto');
     }
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }

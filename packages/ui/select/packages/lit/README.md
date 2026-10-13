@@ -52,7 +52,9 @@ import '@rozie-ui/select-lit/themes/shadcn.css';    // or material.css, bootstra
 | `optionLabel` | `Function` | `null` |  |  |
 | `optionValue` | `Function` | `null` |  |  |
 | `optionDisabled` | `Function` | `null` |  |  |
-| `id` | `String` | `''` |  |  |
+| `idBase` | `String` | `''` |  |  |
+| `hideEmpty` | `Boolean` | `false` |  |  |
+| `selectOnTab` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |

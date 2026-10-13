@@ -4,7 +4,7 @@
 
   
   <div class="rozie-select-control" ref="controlElRef">
-    <button ref="triggerElRef" type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="(open$local) ?? undefined" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(activeDescendant) ?? undefined" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onControlKeyDown($event)">
+    <button ref="triggerElRef" type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="(popupVisible()) ?? undefined" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(activeDescendant) ?? undefined" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onTriggerKeyDown($event)">
       <slot name="selected" :selected="selectedLabel" :value="value">
         <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
       <span class="rozie-select-arrow" aria-hidden="true">▾</span>
@@ -12,7 +12,7 @@
   </div>
 
   
-  <div v-if="open$local && !props.virtual" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
+  <div v-if="popupVisible() && !props.virtual" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
     <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-select-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
       <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
         {{ labelOf(opt) }}
@@ -21,7 +21,7 @@
 
     <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
       <slot name="empty" :query="query">No options</slot>
-    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(open$local ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto')">
+    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto')">
     <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
     <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-select-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]" role="option" :aria-selected="!!isSelected(wr.row._opt)" :aria-disabled="!!disabledOf(wr.row._opt)" @click="select(wr.row._opt)" @mousemove="onOptionPointerMove(wr.vi.index)">
@@ -81,9 +81,17 @@ const props = withDefaults(
      */
     optionDisabled?: ((...args: any[]) => any) | null;
     /**
-     * Stable id base for the ARIA wiring (the select id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`); set it when you need stable, predictable ids.
+     * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
      */
-    id?: string;
+    idBase?: string;
+    /**
+     * Show nothing instead of the empty state: when there are no options the popup is not shown, the control reports `aria-expanded="false"`, and Escape is left to the host.
+     */
+    hideEmpty?: boolean;
+    /**
+     * Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).
+     */
+    selectOnTab?: boolean;
     /**
      * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
      */
@@ -101,7 +109,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, id: '', ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
 /**
@@ -1055,12 +1063,25 @@ const nextAutoId = () => {
   Reflect.set(globalThis, '__rozieAutoId', n);
   return n;
 };
-// idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+// idRoot(): the `idBase` prop, else the per-instance id generated in $onMount, else the
 // pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
-const idRoot = () => props.id || autoId.value || 'rozie-select';
+const idRoot = () => props.idBase || autoId.value || 'rozie-select';
+// popupVisible(): the single gate every list branch and aria-expanded read.
+const popupVisible = () => {
+  if (!open$local.value) return false;
+  if (!props.hideEmpty) return true;
+  return visibleOptions().length > 0;
+};
+// Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
+// listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
+// the sibling families' generated output stay untouched).
+const onTriggerKeyDown = ($event: any) => {
+  if ($event.key === 'Tab' && open$local.value && props.selectOnTab && activeIndex.value >= 0) commitActive();
+  onControlKeyDown($event);
+};
 
 onMounted(() => {
-  if (!props.id) autoId.value = 'rozie-select-' + nextAutoId();
+  if (!props.idBase) autoId.value = 'rozie-select-' + nextAutoId();
   syncRows();
   if (props.virtual) {
     // The list renders at mount when virtual, so the .rozie-select-list scroll container

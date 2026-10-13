@@ -156,15 +156,32 @@
     },
   },
 
-  // Stable id base for the ARIA wiring (listbox id + per-option ids +
-  // aria-activedescendant). '' (the default) → a unique per-instance base
+  // Stable id base for the ARIA wiring (popup id + per-option ids +
+  // aria-activedescendant). '' (the default) -> a unique per-instance base
   // generated in $onMount (idRoot()), so instances never share ids.
-  id:             {
+  idBase: {
     type: String,
     default: '',
     docs: {
       description:
-        'Stable id base for the ARIA wiring (the select id, per-option ids, and `aria-activedescendant`). Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`); set it when you need stable, predictable ids.',
+        'Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
+    },
+  },
+
+  hideEmpty: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Show nothing instead of the empty state: when there are no options the popup is not shown, the control reports `aria-expanded="false"`, and Escape is left to the host.',
+    },
+  },
+  selectOnTab: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).',
     },
   },
 
@@ -220,7 +237,7 @@
 
 <data>
 {
-  // The generated id base (idRoot()), set once in $onMount when `id` is empty.
+  // The generated id base (idRoot()), set once in $onMount when `idBase` is empty.
   autoId: '',
   open: false,
   // Virtual focus: index into the visible option list, or -1.
@@ -519,12 +536,25 @@ const nextAutoId = () => {
   return n
 }
 
-// idRoot(): the `id` prop, else the per-instance id generated in $onMount, else the
+// idRoot(): the `idBase` prop, else the per-instance id generated in $onMount, else the
 // pre-mount fallback. Also the listCore.rzts host contract (its optionId reads it).
-const idRoot = () => $props.id || $data.autoId || 'rozie-select'
+const idRoot = () => $props.idBase || $data.autoId || 'rozie-select'
+// popupVisible(): the single gate every list branch and aria-expanded read.
+const popupVisible = () => {
+  if (!$data.open) return false
+  if (!$props.hideEmpty) return true
+  return visibleOptions().length > 0
+}
+// Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
+// listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
+// the sibling families' generated output stay untouched).
+const onTriggerKeyDown = ($event) => {
+  if ($event.key === 'Tab' && $data.open && $props.selectOnTab && $data.activeIndex >= 0) commitActive()
+  onControlKeyDown($event)
+}
 
 $onMount(() => {
-  if (!$props.id) $data.autoId = 'rozie-select-' + nextAutoId()
+  if (!$props.idBase) $data.autoId = 'rozie-select-' + nextAutoId()
   syncRows()
   if ($props.virtual) {
     // The list renders at mount when virtual, so the .rozie-select-list scroll container
@@ -583,13 +613,13 @@ $expose({ open, close, toggle, clear, focusControl })
       class="rozie-select-trigger"
       role="combobox"
       aria-haspopup="listbox"
-      :aria-expanded="$data.open"
+      :aria-expanded="popupVisible()"
       :aria-controls="idRoot() + '-list'"
       :aria-activedescendant="activeDescendant"
       :aria-label="$props.ariaLabel"
       :disabled="$props.disabled"
       @click="toggle"
-      @keydown="onControlKeyDown($event)"
+      @keydown="onTriggerKeyDown($event)"
     >
       <slot name="selected" :selected="selectedLabel" :value="$props.value">
         <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
@@ -604,7 +634,7 @@ $expose({ open, close, toggle, clear, focusControl })
        pre-windowing render — the `&& !$props.virtual` only routes virtual usage to the
        windowed branch below; with virtual off this is exactly the prior behavior. -->
   <div
-    r-if="$data.open && !$props.virtual"
+    r-if="popupVisible() && !$props.virtual"
     ref="listEl"
     class="rozie-select-list"
     role="listbox"
@@ -655,7 +685,7 @@ $expose({ open, close, toggle, clear, focusControl })
     :id="idRoot() + '-list'"
     :aria-label="$props.ariaLabel"
     :aria-multiselectable="$props.multiple"
-    :style="($data.open ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
+    :style="(popupVisible() ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
   >
     <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 

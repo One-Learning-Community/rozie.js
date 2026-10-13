@@ -123,6 +123,34 @@ for (const target of TARGETS) {
       })
       .toBe(0);
   });
+
+  runner(`select [${target}]: hideEmpty shows no popup for an empty list; selectOnTab commits the active option`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    // --- hideEmpty + empty options ---
+    const empty = page.getByTestId('empty-select').locator('[role="combobox"]');
+    await empty.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('End');
+    await page.keyboard.type('z');
+    await expect(empty).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('empty-select').locator('[role="listbox"]')).toHaveCount(0);
+    // --- all-disabled list never activates a row ---
+    const dis = page.getByTestId('disabled-select').locator('[role="combobox"]');
+    await dis.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('readout-disabled')).toHaveText('');
+    await page.keyboard.press('Escape');
+    // --- selectOnTab ---
+    const tab = page.getByTestId('tab-select').locator('[role="combobox"]');
+    await tab.focus();
+    await page.keyboard.press('ArrowDown'); // open, active = first enabled (Apple)
+    await page.keyboard.press('ArrowDown'); // Banana
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('readout-tab')).toHaveText('banana');
+  });
 }
 
 // ---------------------------------------------------------------------------
