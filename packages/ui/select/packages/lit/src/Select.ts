@@ -91,6 +91,13 @@ export default class Select extends SignalWatcher(LitElement) {
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
 .rozie-select-placeholder[data-rozie-s-6e3ebfa6] { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+.rozie-select-clear[data-rozie-s-6e3ebfa6] {
+  flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-clear-color, var(--rsl-clear-color, currentColor));
+  font-size: var(--rozie-select-clear-size, var(--rsl-clear-size, 1rem));
+  opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.6));
+}
+.rozie-select-clear[data-rozie-s-6e3ebfa6]:hover { opacity: 1; }
 .rozie-select-arrow[data-rozie-s-6e3ebfa6] {
   font-size: 0.75em;
   color: var(--rozie-select-arrow-color, var(--rsl-arrow-color, currentColor));
@@ -221,6 +228,14 @@ export default class Select extends SignalWatcher(LitElement) {
    * Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).
    */
   @property({ type: Boolean, reflect: true, attribute: 'select-on-tab' }) selectOnTab: boolean = false;
+  /**
+   * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+   */
+  @property({ type: Boolean, reflect: true }) clearable: boolean = false;
+  /**
+   * Accessible name of the clear button (`aria-label`). Localise it.
+   */
+  @property({ type: String, reflect: true, attribute: 'clear-label' }) clearLabel: string = 'Clear';
   /**
    * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
    */
@@ -441,7 +456,7 @@ private __rozieFirstUpdateDone = false;
           ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
             ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}
         </div>
-        <span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
+        ${this.clearable && this.hasValue() && !this.disabled ? html`<button class="rozie-select-clear" type="button" tabindex="-1" aria-label=${this.clearLabel} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.noop(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onClearClick(); }} data-rozie-s-6e3ebfa6>×</button>` : nothing}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
       </div>
       
       ${this.popupVisible() && !this.virtual && !this.isGrouped() ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
@@ -1550,8 +1565,37 @@ private __rozieFirstUpdateDone = false;
   if (this.disabled) return;
   const hidden = this._open$local.value && !this.popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if (this.onClearKey($event)) return;
   if ($event.key === 'Tab' && this._open$local.value && this.selectOnTab && this.popupVisible() && this._activeIndex.value >= 0) this.commitActive();
   this.onControlKeyDown($event);
+};
+
+  // ── clearable ──────────────────────────────────────────────────────────────
+  hasValue = () => {
+  const cur = this.value;
+  if (this.multiple) return Array.isArray(cur) && cur.length > 0;
+  return cur !== null && cur !== undefined && cur !== '';
+};
+
+  // The clear button's mousedown is prevented (keeps focus on the trigger); the handler
+  // is a deliberate no-op, mirroring Combobox's onChipRemovePointerDown.
+  noop = () => {};
+
+  onClearClick = () => {
+  if (this.disabled) return;
+  this.clear();
+  this.focusControl();
+};
+
+  // Keyboard clear while the popup is closed. Returns true when it handled the key.
+  onClearKey = ($event: any) => {
+  if (!this.clearable || this._open$local.value || !this.hasValue()) return false;
+  if ($event.key === 'Delete' || $event.key === 'Backspace' && !this.multiple) {
+    $event.preventDefault();
+    this.clear();
+    return true;
+  }
+  return false;
 };
 
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
@@ -1562,6 +1606,11 @@ private __rozieFirstUpdateDone = false;
   // row all open the popup; the buttons inside stop propagation themselves.
   onControlClick = ($event: any) => {
   if (this.disabled) return;
+  // React, Svelte and Solid delegate events at the root, so stopPropagation in the
+  // button handler cannot keep the click from here: skip clicks that originate on
+  // the clear / chip-remove buttons instead (one code path on all six targets).
+  const t = $event.target;
+  if (t && typeof t.closest === 'function' && t.closest('.rozie-select-clear, .rozie-select-chip__remove')) return;
   this.toggle();
   this.focusControl();
 };
@@ -1588,7 +1637,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id-base', 'idbase', 'hide-empty', 'hideempty', 'select-on-tab', 'selectontab', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'block', 'groups', 'aria-label', 'arialabel', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight']);
+    const __skip = new Set<string>(['data-rozie-ref', 'options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id-base', 'idbase', 'hide-empty', 'hideempty', 'select-on-tab', 'selectontab', 'clearable', 'clear-label', 'clearlabel', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'block', 'groups', 'aria-label', 'arialabel', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

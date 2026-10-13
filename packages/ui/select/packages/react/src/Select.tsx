@@ -34,7 +34,7 @@ interface EmptyCtx { query: any; }
 
 interface GroupHeadingCtx { group: SelectGroup; }
 
-interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -91,6 +91,14 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    * Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).
    */
   selectOnTab?: boolean;
+  /**
+   * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+   */
+  clearable?: boolean;
+  /**
+   * Accessible name of the clear button (`aria-label`). Localise it.
+   */
+  clearLabel?: string;
   /**
    * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
    */
@@ -151,7 +159,7 @@ export interface SelectHandle {
 const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: SelectProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
   const __defaultGroups = useState(() => (() => [])())[0];
-  const props: Omit<SelectProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; idBase: string; hideEmpty: boolean; selectOnTab: boolean; placement: string; offset: number; disableFlip: boolean; disableShift: boolean; block: boolean; groups: any[]; ariaLabel: (string) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const props: Omit<SelectProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; idBase: string; hideEmpty: boolean; selectOnTab: boolean; clearable: boolean; clearLabel: string; placement: string; offset: number; disableFlip: boolean; disableShift: boolean; block: boolean; groups: any[]; ariaLabel: (string) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     multiple: _props.multiple ?? false,
@@ -165,6 +173,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     idBase: _props.idBase ?? '',
     hideEmpty: _props.hideEmpty ?? false,
     selectOnTab: _props.selectOnTab ?? false,
+    clearable: _props.clearable ?? false,
+    clearLabel: _props.clearLabel ?? 'Clear',
     placement: _props.placement ?? 'bottom-start',
     offset: _props.offset ?? 4,
     disableFlip: _props.disableFlip ?? false,
@@ -177,8 +187,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     maxHeight: _props.maxHeight ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, placement, offset, disableFlip, disableShift, block, groups, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderSelected, renderOption, renderEmpty, renderGroupHeading, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
-    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void placement; void offset; void disableFlip; void disableShift; void block; void groups; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderSelected; void renderOption; void renderEmpty; void renderGroupHeading; void slots;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, clearable, clearLabel, placement, offset, disableFlip, disableShift, block, groups, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderSelected, renderOption, renderEmpty, renderGroupHeading, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void clearable; void clearLabel; void placement; void offset; void disableFlip; void disableShift; void block; void groups; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderSelected; void renderOption; void renderEmpty; void renderGroupHeading; void slots;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);
@@ -1238,9 +1248,35 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     if (props.disabled) return;
     const hidden = open$local && !popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+    if (onClearKey($event)) return;
     if ($event.key === 'Tab' && open$local && props.selectOnTab && popupVisible() && activeIndex >= 0) commitActive();
     onControlKeyDown($event);
-  }, [activeIndex, commitActive, onControlKeyDown, open$local, popupVisible, props.disabled, props.selectOnTab]);
+  }, [activeIndex, commitActive, onClearKey, onControlKeyDown, open$local, popupVisible, props.disabled, props.selectOnTab]);
+  // ── clearable ──────────────────────────────────────────────────────────────
+  function hasValue() {
+    const cur = value;
+    if (props.multiple) return Array.isArray(cur) && cur.length > 0;
+    return cur !== null && cur !== undefined && cur !== '';
+  }
+  // The clear button's mousedown is prevented (keeps focus on the trigger); the handler
+  // is a deliberate no-op, mirroring Combobox's onChipRemovePointerDown.
+  const noop = useCallback(() => {}, []);
+  const onClearClick = useCallback(() => {
+    if (props.disabled) return;
+    clear();
+    focusControl();
+  }, [clear, focusControl, props.disabled]);
+  // Keyboard clear while the popup is closed. Returns true when it handled the key.
+  function onClearKey($event: any) {
+    if (!props.clearable || open$local || !hasValue()) return false;
+    if ($event.key === 'Delete' || $event.key === 'Backspace' && !props.multiple) {
+      $event.preventDefault();
+      clear();
+      return true;
+    }
+    return false;
+  }
+
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
   // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
   function triggerTabindex() {
@@ -1250,6 +1286,11 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // row all open the popup; the buttons inside stop propagation themselves.
   const onControlClick = useCallback(($event: any) => {
     if (props.disabled) return;
+    // React, Svelte and Solid delegate events at the root, so stopPropagation in the
+    // button handler cannot keep the click from here: skip clicks that originate on
+    // the clear / chip-remove buttons instead (one code path on all six targets).
+    const t = $event.target;
+    if (t && typeof t.closest === 'function' && t.closest('.rozie-select-clear, .rozie-select-chip__remove')) return;
     toggle();
     focusControl();
   }, [focusControl, props.disabled, toggle]);
@@ -1328,7 +1369,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
             <div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
               {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>)}
             </div>
-            <span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
+            {!!(props.clearable && hasValue() && !props.disabled) && <button type="button" className={"rozie-select-clear"} tabIndex={-1} aria-label={props.clearLabel} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onClearClick(); }} data-rozie-s-6e3ebfa6="">×</button>}<span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
           </div>
         </>)} children={<>
           

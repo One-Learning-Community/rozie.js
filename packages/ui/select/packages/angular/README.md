@@ -107,6 +107,8 @@ export class PickFormComponent {
 | `idBase` | `String` | `''` |  |  |
 | `hideEmpty` | `Boolean` | `false` |  |  |
 | `selectOnTab` | `Boolean` | `false` |  |  |
+| `clearable` | `Boolean` | `false` |  |  |
+| `clearLabel` | `String` | `"Clear"` |  |  |
 | `placement` | `String` | `"bottom-start"` |  |  |
 | `offset` | `Number` | `4` |  |  |
 | `disableFlip` | `Boolean` | `false` |  |  |

@@ -1,0 +1,30 @@
+<!--
+  SelectClearableDemo.rozie — BEHAVIORAL consumer for the Select's `clearable` prop
+  (select-clearable.spec.ts). Four selects: a clearable single (with a change
+  counter and last-payload readout), a plain one (inert), a disabled clearable
+  one that holds a value, and a clearable multiple.
+-->
+<rozie name="SelectClearableDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ value: 'banana', plain: 'apple', locked: 'apple', many: ['apple', 'banana'], changes: 0, payload: '' }</data>
+<script>
+const OPTIONS = [{ label: 'Apple', value: 'apple' }, { label: 'Banana', value: 'banana' }]
+const onChange = (detail) => {
+  $data.changes = $data.changes + 1
+  $data.payload = JSON.stringify(detail)
+}
+</script>
+<template>
+<div>
+  <span data-testid="readout-value">{{ $data.value }}</span>
+  <span data-testid="readout-changes">{{ $data.changes }}</span>
+  <span data-testid="readout-payload">{{ $data.payload }}</span>
+  <div data-testid="clearable"><Select :options="OPTIONS" r-model:value="$data.value" clearable clear-label="Reset" aria-label="Fruit" @change="onChange($event)" /></div>
+  <div data-testid="plain"><Select :options="OPTIONS" r-model:value="$data.plain" aria-label="Plain" /></div>
+  <span data-testid="readout-plain">{{ $data.plain }}</span>
+  <div data-testid="locked"><Select :options="OPTIONS" r-model:value="$data.locked" clearable disabled aria-label="Locked" /></div>
+  <div data-testid="many"><Select :options="OPTIONS" multiple r-model:value="$data.many" clearable aria-label="Many" /></div>
+  <span data-testid="readout-many">{{ JSON.stringify($data.many) }}</span>
+</div>
+</template>
+</rozie>

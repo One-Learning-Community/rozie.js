@@ -72,6 +72,8 @@ import '@rozie-ui/select-vue/themes/shadcn.css';    // or material.css, bootstra
 | `idBase` | `String` | `''` |  |  |
 | `hideEmpty` | `Boolean` | `false` |  |  |
 | `selectOnTab` | `Boolean` | `false` |  |  |
+| `clearable` | `Boolean` | `false` |  |  |
+| `clearLabel` | `String` | `"Clear"` |  |  |
 | `placement` | `String` | `"bottom-start"` |  |  |
 | `offset` | `Number` | `4` |  |  |
 | `disableFlip` | `Boolean` | `false` |  |  |

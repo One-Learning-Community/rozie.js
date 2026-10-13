@@ -76,7 +76,9 @@ interface GroupHeadingCtx {
     }
     }
             </div>
-            <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+            @if (clearable() && hasValue() && !(disabled() || this.__rozieCvaDisabled())) {
+    <button type="button" class="rozie-select-clear" tabindex="-1" [attr.aria-label]="clearLabel()" (mousedown)="$event.preventDefault(); noop()" (click)="onClearClick()">×</button>
+    }<span class="rozie-select-arrow" aria-hidden="true">▾</span>
           </div>
         </ng-template><ng-template #defaultSlot>
           
@@ -207,6 +209,13 @@ interface GroupHeadingCtx {
     .rozie-select-disabled .rozie-select-control { cursor: default; }
     .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
     .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+    .rozie-select-clear {
+      flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+      color: var(--rozie-select-clear-color, var(--rsl-clear-color, currentColor));
+      font-size: var(--rozie-select-clear-size, var(--rsl-clear-size, 1rem));
+      opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.6));
+    }
+    .rozie-select-clear:hover { opacity: 1; }
     .rozie-select-arrow {
       font-size: 0.75em;
       color: var(--rozie-select-arrow-color, var(--rsl-arrow-color, currentColor));
@@ -345,6 +354,14 @@ export class Select {
    * Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup).
    */
   selectOnTab = input<boolean>(false);
+  /**
+   * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+   */
+  clearable = input<boolean>(false);
+  /**
+   * Accessible name of the clear button (`aria-label`). Localise it.
+   */
+  clearLabel = input<string>('Clear');
   /**
    * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
    */
@@ -1466,8 +1483,33 @@ export class Select {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const hidden = __open$local && !this.popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+    if (this.onClearKey($event)) return;
     if ($event.key === 'Tab' && __open$local && this.selectOnTab() && this.popupVisible() && this.activeIndex() >= 0) this.commitActive();
     this.onControlKeyDown($event);
+  };
+  // ── clearable ──────────────────────────────────────────────────────────────
+  hasValue = () => {
+    const cur = this.value();
+    if (this.multiple()) return Array.isArray(cur) && cur.length > 0;
+    return cur !== null && cur !== undefined && cur !== '';
+  };
+  // The clear button's mousedown is prevented (keeps focus on the trigger); the handler
+  // is a deliberate no-op, mirroring Combobox's onChipRemovePointerDown.
+  noop = () => {};
+  onClearClick = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    this.clear();
+    this.focusControl();
+  };
+  // Keyboard clear while the popup is closed. Returns true when it handled the key.
+  onClearKey = ($event: any) => {
+    if (!this.clearable() || this.open$local() || !this.hasValue()) return false;
+    if ($event.key === 'Delete' || $event.key === 'Backspace' && !this.multiple()) {
+      $event.preventDefault();
+      this.clear();
+      return true;
+    }
+    return false;
   };
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
   // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
@@ -1476,6 +1518,11 @@ export class Select {
   // row all open the popup; the buttons inside stop propagation themselves.
   onControlClick = ($event: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    // React, Svelte and Solid delegate events at the root, so stopPropagation in the
+    // button handler cannot keep the click from here: skip clicks that originate on
+    // the clear / chip-remove buttons instead (one code path on all six targets).
+    const t = $event.target;
+    if (t && typeof t.closest === 'function' && t.closest('.rozie-select-clear, .rozie-select-chip__remove')) return;
     this.toggle();
     this.focusControl();
   };

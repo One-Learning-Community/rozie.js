@@ -9,7 +9,7 @@
           <slot name="selected" :selected="selectedLabel" :value="value">
             <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
         </div>
-        <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+        <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
       </div>
     </template>
       
@@ -129,6 +129,14 @@ const props = withDefaults(
      */
     selectOnTab?: boolean;
     /**
+     * Show a clear button in the control whenever there is a value, and let Delete (and Backspace in single-select) clear it from the keyboard while the popup is closed.
+     */
+    clearable?: boolean;
+    /**
+     * Accessible name of the clear button (`aria-label`). Localise it.
+     */
+    clearLabel?: string;
+    /**
      * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
      */
     placement?: string;
@@ -169,7 +177,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, clearable: false, clearLabel: 'Clear', placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
 /**
@@ -1185,8 +1193,33 @@ const onTriggerKeyDown = ($event: any) => {
   if (props.disabled) return;
   const hidden = open$local.value && !popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if (onClearKey($event)) return;
   if ($event.key === 'Tab' && open$local.value && props.selectOnTab && popupVisible() && activeIndex.value >= 0) commitActive();
   onControlKeyDown($event);
+};
+// ── clearable ──────────────────────────────────────────────────────────────
+const hasValue = () => {
+  const cur = value.value;
+  if (props.multiple) return Array.isArray(cur) && cur.length > 0;
+  return cur !== null && cur !== undefined && cur !== '';
+};
+// The clear button's mousedown is prevented (keeps focus on the trigger); the handler
+// is a deliberate no-op, mirroring Combobox's onChipRemovePointerDown.
+const noop = () => {};
+const onClearClick = () => {
+  if (props.disabled) return;
+  clear();
+  focusControl();
+};
+// Keyboard clear while the popup is closed. Returns true when it handled the key.
+const onClearKey = ($event: any) => {
+  if (!props.clearable || open$local.value || !hasValue()) return false;
+  if ($event.key === 'Delete' || $event.key === 'Backspace' && !props.multiple) {
+    $event.preventDefault();
+    clear();
+    return true;
+  }
+  return false;
 };
 // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
 // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
@@ -1195,6 +1228,11 @@ const triggerTabindex = () => props.disabled ? -1 : 0;
 // row all open the popup; the buttons inside stop propagation themselves.
 const onControlClick = ($event: any) => {
   if (props.disabled) return;
+  // React, Svelte and Solid delegate events at the root, so stopPropagation in the
+  // button handler cannot keep the click from here: skip clicks that originate on
+  // the clear / chip-remove buttons instead (one code path on all six targets).
+  const t = $event.target;
+  if (t && typeof t.closest === 'function' && t.closest('.rozie-select-clear, .rozie-select-chip__remove')) return;
   toggle();
   focusControl();
 };
@@ -1289,6 +1327,13 @@ useOutsideClick(
 .rozie-select-disabled .rozie-select-control { cursor: default; }
 .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
 .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+.rozie-select-clear {
+  flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-clear-color, var(--rsl-clear-color, currentColor));
+  font-size: var(--rozie-select-clear-size, var(--rsl-clear-size, 1rem));
+  opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.6));
+}
+.rozie-select-clear:hover { opacity: 1; }
 .rozie-select-arrow {
   font-size: 0.75em;
   color: var(--rozie-select-arrow-color, var(--rsl-arrow-color, currentColor));

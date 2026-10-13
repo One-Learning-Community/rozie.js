@@ -35,6 +35,13 @@
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
 .rozie-select-placeholder[data-rozie-s-6e3ebfa6] { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+.rozie-select-clear[data-rozie-s-6e3ebfa6] {
+  flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-clear-color, var(--rsl-clear-color, currentColor));
+  font-size: var(--rozie-select-clear-size, var(--rsl-clear-size, 1rem));
+  opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.6));
+}
+.rozie-select-clear[data-rozie-s-6e3ebfa6]:hover { opacity: 1; }
 .rozie-select-arrow[data-rozie-s-6e3ebfa6] {
   font-size: 0.75em;
   color: var(--rozie-select-arrow-color, var(--rsl-arrow-color, currentColor));
