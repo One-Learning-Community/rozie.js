@@ -14,13 +14,16 @@
   `shrink` cuts the option list to its first two entries (the active-index guard).
   It acts on the "s" KEY as well as on click: a click outside an open popup is a
   dismissal by design, so the spec presses the key to shrink the list while the
-  popup stays open (the SelectFloatingDemo `toggle-top` precedent).
+  popup stays open (the SelectFloatingDemo `toggle-top` precedent). CLICKING it
+  while the popup is open is the other case worth proving: one click that both
+  dismisses the popup and shrinks the list. `readout-log` records every
+  `open-change` of the grouped select (T = open, F = closed).
 
   This is a BEHAVIORAL cell — no screenshot stabilization here.
 -->
 <rozie name="SelectGroupsDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ value: null, short: false, mode: 'grouped' }</data>
+<data>{ value: null, short: false, mode: 'grouped', log: '' }</data>
 <script>
 const GROUPS = [{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]
 const ALL = [
@@ -37,6 +40,13 @@ const onShrinkKey = (e) => {
   if (e.key === 's') shrink()
 }
 const setMode = (next) => { $data.mode = next }
+// One letter per `open-change` of the grouped select: T = { open: true }, F = { open: false }.
+// A plain accumulator so two events fired in one tick are both recorded on every target.
+let seen = ''
+const onOpenChange = (e) => {
+  seen = seen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
+  $data.log = seen
+}
 </script>
 <template>
 <div>
@@ -45,7 +55,8 @@ const setMode = (next) => { $data.mode = next }
   <button type="button" data-testid="mode-flat" @click="setMode('flat')">Flat</button>
   <span data-testid="readout-value">{{ $data.value }}</span>
   <span data-testid="readout-mode">{{ $data.mode }}</span>
-  <Select r-if="$data.mode === 'grouped'" :options="options()" :groups="GROUPS" r-model:value="$data.value" aria-label="Food">
+  <span data-testid="readout-log">{{ $data.log }}</span>
+  <Select r-if="$data.mode === 'grouped'" :options="options()" :groups="GROUPS" r-model:value="$data.value" aria-label="Food" @open-change="onOpenChange($event)">
     <template #groupHeading="{ group }"><strong data-testid="heading">{{ group.label }}</strong></template>
   </Select>
   <Select r-if="$data.mode === 'virtual'" :options="options()" :groups="GROUPS" :virtual="true" maxHeight="320px" r-model:value="$data.value" aria-label="Food" />

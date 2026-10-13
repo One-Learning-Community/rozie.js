@@ -1,0 +1,119 @@
+<!--
+  SelectOpenStateDemo.rozie — BEHAVIORAL consumer for the Select's open state under
+  changes that reach it from OUTSIDE the control (select-open-state.spec.ts):
+
+    - swap-select: a floating `virtual` select whose `options` array is replaced
+      wholesale (`swap-a` / `swap-b` / `swap-c` / `swap-d`). Nothing else changes, so
+      only a prop moves: the rendered rows must follow. `swap-d` has the SAME length as
+      `swap-a`.
+    - hide-select: a `hideEmpty` select whose options go empty <-> non-empty
+      (`fill` / `drain`); every `open-change` it emits is logged.
+    - api-select: driven through its handle by buttons that sit OUTSIDE it and act on
+      CLICK (`api-open` / `api-toggle`) — an outside click that opens the popup.
+
+  The swap / fill / drain buttons act on a KEY as well as on click: a click outside an
+  open popup is a dismissal by design, so the spec presses the key when the popup has
+  to stay open (the SelectFloatingDemo `toggle-top` precedent).
+
+  Logs hold one letter per `open-change`: T = { open: true }, F = { open: false }.
+
+  This is a BEHAVIORAL cell — no screenshot stabilization here.
+-->
+<rozie name="SelectOpenStateDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ swap: 'a', swapValue: null, filled: false, hideValue: null, hideLog: '', apiValue: null, apiLog: '' }</data>
+<script>
+const make = (word, n) => {
+  const out = []
+  for (let i = 1; i <= n; i++) out.push({ label: word + ' ' + i, value: word.toLowerCase() + '-' + i })
+  return out
+}
+// Module constants: each swap hands the select a stable array of its own.
+const SET_A = make('Alpha', 5)
+const SET_B = make('Beta', 8)
+const SET_C = make('Gamma', 2)
+const SET_D = make('Delta', 5)
+const NONE = []
+const FRUIT = [
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana' },
+  { label: 'Cherry', value: 'cherry' },
+]
+const swapOptions = () => ($data.swap === 'b' ? SET_B : $data.swap === 'c' ? SET_C : $data.swap === 'd' ? SET_D : SET_A)
+const setSwap = (next) => { $data.swap = next }
+const onSwapKey = (e) => {
+  if (e.key === 'a' || e.key === 'b' || e.key === 'c' || e.key === 'd') setSwap(e.key)
+}
+const hideOptions = () => ($data.filled ? FRUIT : NONE)
+const setFilled = (next) => { $data.filled = next }
+const onFillKey = (e) => {
+  if (e.key === 'f') setFilled(true)
+  if (e.key === 'e') setFilled(false)
+}
+// Plain accumulators (not a $data read-then-write) so two events fired in one tick
+// are both recorded on every target.
+let hideSeen = ''
+const onHideOpenChange = (e) => {
+  hideSeen = hideSeen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
+  $data.hideLog = hideSeen
+}
+let apiSeen = ''
+const onApiOpenChange = (e) => {
+  apiSeen = apiSeen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
+  $data.apiLog = apiSeen
+}
+const apiOpen = () => { $refs.apiSelect.open() }
+const apiToggle = () => { $refs.apiSelect.toggle() }
+</script>
+<template>
+<div class="select-open-state-demo">
+  <div class="row">
+    <button type="button" data-testid="swap-a" @click="setSwap('a')">A (5)</button>
+    <button type="button" data-testid="swap-b" @click="setSwap('b')">B (8)</button>
+    <button type="button" data-testid="swap-c" @click="setSwap('c')">C (2)</button>
+    <button type="button" data-testid="swap-d" @click="setSwap('d')">D (5)</button>
+    <button type="button" data-testid="swap-keys" @keydown="onSwapKey($event)">Swap (press a / b / c / d)</button>
+    <span data-testid="readout-swap">{{ $data.swap }}</span>
+  </div>
+  <div data-testid="swap-select">
+    <Select :options="swapOptions()" r-model:value="$data.swapValue" :virtual="true" maxHeight="400px" aria-label="Swap" />
+  </div>
+
+  <div class="row">
+    <button type="button" data-testid="fill" @click="setFilled(true)">Fill</button>
+    <button type="button" data-testid="drain" @click="setFilled(false)">Drain</button>
+    <button type="button" data-testid="fill-keys" @keydown="onFillKey($event)">Fill / drain (press f / e)</button>
+    <span data-testid="readout-hide-log">{{ $data.hideLog }}</span>
+  </div>
+  <div data-testid="hide-select">
+    <Select :options="hideOptions()" r-model:value="$data.hideValue" hide-empty aria-label="Hide empty" @open-change="onHideOpenChange($event)" />
+  </div>
+
+  <div class="row">
+    <button type="button" data-testid="api-open" @click="apiOpen()">open()</button>
+    <button type="button" data-testid="api-toggle" @click="apiToggle()">toggle()</button>
+    <span data-testid="readout-api-log">{{ $data.apiLog }}</span>
+  </div>
+  <div data-testid="api-select">
+    <Select ref="apiSelect" :options="FRUIT" r-model:value="$data.apiValue" aria-label="Api" @open-change="onApiOpenChange($event)" />
+  </div>
+</div>
+</template>
+<style>
+.select-open-state-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 520px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+</style>
+</rozie>

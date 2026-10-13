@@ -265,6 +265,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const _watch6First = useRef(true);
   const _watch7First = useRef(true);
   const _watch8First = useRef(true);
+  const _watch9First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, single+multi selection, close/clear, and the
@@ -1329,32 +1330,28 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
 
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
   // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
-  // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
-  // (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
-  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-  // (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
-  // scrollElement stale), and (c) the consumer often seeds options AFTER the select mounts
-  // (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
-  // paints (or attempts run out) — idempotent + loop-free.
+  // re-attaches the virtualizer's rect observer (_willUpdate), and bumps the windowVer
+  // signal so the windowed <For>/{#each}/repeat re-derives. Retried over a few frames
+  // because (a) virtual-core measures the scroll rect asynchronously (D-09 Solid rAF-defer —
+  // a synchronous kick sees rectH 0 → empty window) and (b) Solid/Lit recreate the list node
+  // between mount and first commit (leaving virtual-core's scrollElement stale). Stops once
+  // the window paints (or attempts run out) — idempotent + loop-free.
+  //
+  // It does NOT feed options or the option count: on React this rAF chain runs in the
+  // closure of the render it started from, so anything it reads from props is that
+  // render's. Feeding from here put the mount-time options back over a set the consumer
+  // replaced within the chain's few frames (measured: the old rows stayed). The `options`
+  // watcher below owns the feed on every target; $onMount covers the mount-time set.
   const kickWindow = useCallback((attempts: any) => {
     if (!virtualizer.current) return;
     gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-select-list') : gridScrollEl.current;
-    // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
-    // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
-    // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
-    // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
-    if (windowSource().length > 0) {
-      syncRows();
-      virtualizer.current.setOptions(virtualizerOptions());
-    }
     virtualizer.current._willUpdate();
     setWindowVer(prev => prev + 1);
     remeasureWindow();
     if (windowedRows().length === 0 && attempts > 0) {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(attempts - 1));else setTimeout(() => kickWindow(attempts - 1), 16);
     }
-  }, [remeasureWindow, syncRows, virtualizerOptions, windowSource, windowedRows]);
+  }, [remeasureWindow, windowedRows]);
   // nextAutoId(): a page-wide counter shared by every Rozie component instance. It
   // lives on globalThis (read through Reflect, which type-checks in the plain-JS and
   // the TS script alike) so separately bundled copies of a leaf never hand out the
@@ -1393,12 +1390,22 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // a popup that stayed shut after Enter-then-ArrowDown).
   // The echo is written FIRST, for targets whose watchers run synchronously on a write.
   function syncPanel() {
+    // A write of the popover's that the `panelOpen` watcher below has not taken yet (the
+    // pair differs): leave it alone. Writing our own state over it here loses the
+    // dismissal — an outside click on a button that also changes `options` runs this
+    // function before that watcher on Angular, and the popup stayed "open" with no panel.
+    // The watcher takes it, close() changes $data.open, and that brings this function
+    // back with the pair equal.
+    if (panelOpen !== panelEcho) return;
     const visible = popupVisible();
     if (visible === panelOpen) return;
     setPanelEcho(visible);
     setPanelOpen(visible);
   }
-  // select -> popover: follows a derived primitive covering everything popupVisible() reads.
+  // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
+  // reads only $data, one whose getter reads only props. A getter that mixes the two is
+  // routed through a signal effect on Lit, which a plain property change does not re-run
+  // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
   // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
   // families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1597,15 +1604,19 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     syncPanel();
-  }, [open$local, props.hideEmpty, props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open$local]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
+    syncPanel();
+  }, [props.hideEmpty, props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
     if (panelOpen === panelEcho) return;
     setPanelEcho(panelOpen);
     if (!panelOpen) close();
   }, [panelOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch2First.current) { _watch2First.current = false; return; }
+    if (_watch3First.current) { _watch3First.current = false; return; }
     syncRows();
     if (props.virtual && virtualizer.current) {
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-select-list') : gridScrollEl.current;
@@ -1614,29 +1625,29 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       setWindowVer(prev => prev + 1);
       scheduleRemeasure();
     }
-  }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
-    if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
-    yieldToNative();
-  }, [coarse]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch5First.current) { _watch5First.current = false; return; }
     yieldToNative();
-  }, [props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [coarse]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch6First.current) { _watch6First.current = false; return; }
-    scheduleNativeSync();
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+    yieldToNative();
+  }, [props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch7First.current) { _watch7First.current = false; return; }
     scheduleNativeSync();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
+    scheduleNativeSync();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch9First.current) { _watch9First.current = false; return; }
     scheduleNativeSync();
   }, [props.groups]); // eslint-disable-line react-hooks/exhaustive-deps
 

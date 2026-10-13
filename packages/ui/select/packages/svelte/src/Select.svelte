@@ -1220,25 +1220,21 @@ const scrollActiveIntoView = () => {
 };
 // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
 // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
-// re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
-// (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
-// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-// (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
-// scrollElement stale), and (c) the consumer often seeds options AFTER the select mounts
-// (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
-// paints (or attempts run out) — idempotent + loop-free.
+// re-attaches the virtualizer's rect observer (_willUpdate), and bumps the windowVer
+// signal so the windowed <For>/{#each}/repeat re-derives. Retried over a few frames
+// because (a) virtual-core measures the scroll rect asynchronously (D-09 Solid rAF-defer —
+// a synchronous kick sees rectH 0 → empty window) and (b) Solid/Lit recreate the list node
+// between mount and first commit (leaving virtual-core's scrollElement stale). Stops once
+// the window paints (or attempts run out) — idempotent + loop-free.
+//
+// It does NOT feed options or the option count: on React this rAF chain runs in the
+// closure of the render it started from, so anything it reads from props is that
+// render's. Feeding from here put the mount-time options back over a set the consumer
+// replaced within the chain's few frames (measured: the old rows stayed). The `options`
+// watcher below owns the feed on every target; $onMount covers the mount-time set.
 const kickWindow = (attempts: any) => {
   if (!virtualizer) return;
   gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
-  // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
-  // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
-  // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
-  // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
-  if (windowSource().length > 0) {
-    syncRows();
-    virtualizer.setOptions(virtualizerOptions());
-  }
   virtualizer._willUpdate();
   windowVer = windowVer + 1;
   remeasureWindow();
@@ -1282,12 +1278,22 @@ const popupVisible = () => {
 // a popup that stayed shut after Enter-then-ArrowDown).
 // The echo is written FIRST, for targets whose watchers run synchronously on a write.
 const syncPanel = () => {
+  // A write of the popover's that the `panelOpen` watcher below has not taken yet (the
+  // pair differs): leave it alone. Writing our own state over it here loses the
+  // dismissal — an outside click on a button that also changes `options` runs this
+  // function before that watcher on Angular, and the popup stayed "open" with no panel.
+  // The watcher takes it, close() changes $data.open, and that brings this function
+  // back with the pair equal.
+  if (panelOpen !== panelEcho) return;
   const visible = popupVisible();
   if (visible === panelOpen) return;
   panelEcho = visible;
   panelOpen = visible;
 };
-// select -> popover: follows a derived primitive covering everything popupVisible() reads.
+// select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
+// reads only $data, one whose getter reads only props. A getter that mixes the two is
+// routed through a signal effect on Lit, which a plain property change does not re-run
+// (measured: with `hideEmpty`, options arriving while open never showed the popup there).
 // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
 // families' generated output stay untouched).
 //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1487,17 +1493,21 @@ onDestroy(() => (() => {
 })());
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => (open$local ? 'o' : 'c') + (hideEmpty ? 'h' : 's') + (options ? options.length : 0) + '|' + query)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+$effect(() => { (() => open$local)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
   syncPanel();
 })(); }); });
 let __rozieWatchInitial_1 = true;
-$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+$effect(() => { (() => (hideEmpty ? 'h' : 's') + (options ? options.length : 0))(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+  syncPanel();
+})(); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
   if (panelOpen === panelEcho) return;
   panelEcho = panelOpen;
   if (!panelOpen) close();
 })(); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { (() => (options ? options.length : 0) + '|' + query)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
   syncRows();
   if (virtual && virtualizer) {
     gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
@@ -1507,28 +1517,28 @@ $effect(() => { (() => (options ? options.length : 0) + '|' + query)(); untrack(
     scheduleRemeasure();
   }
 })(); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+let __rozieWatchInitial_4 = true;
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
   if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 })(); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
-  yieldToNative();
-})(); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
+$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
   yieldToNative();
 })(); }); });
 let __rozieWatchInitial_6 = true;
-$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
-  scheduleNativeSync();
+$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
+  yieldToNative();
 })(); }); });
 let __rozieWatchInitial_7 = true;
-$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
+$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 let __rozieWatchInitial_8 = true;
-$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
+  scheduleNativeSync();
+})(); }); });
+let __rozieWatchInitial_9 = true;
+$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 

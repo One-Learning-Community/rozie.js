@@ -1271,25 +1271,21 @@ const scrollActiveIntoView = () => {
 };
 // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
 // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
-// re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
-// (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
-// re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-// asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-// (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
-// scrollElement stale), and (c) the consumer often seeds options AFTER the select mounts
-// (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
-// paints (or attempts run out) — idempotent + loop-free.
+// re-attaches the virtualizer's rect observer (_willUpdate), and bumps the windowVer
+// signal so the windowed <For>/{#each}/repeat re-derives. Retried over a few frames
+// because (a) virtual-core measures the scroll rect asynchronously (D-09 Solid rAF-defer —
+// a synchronous kick sees rectH 0 → empty window) and (b) Solid/Lit recreate the list node
+// between mount and first commit (leaving virtual-core's scrollElement stale). Stops once
+// the window paints (or attempts run out) — idempotent + loop-free.
+//
+// It does NOT feed options or the option count: on React this rAF chain runs in the
+// closure of the render it started from, so anything it reads from props is that
+// render's. Feeding from here put the mount-time options back over a set the consumer
+// replaced within the chain's few frames (measured: the old rows stayed). The `options`
+// watcher below owns the feed on every target; $onMount covers the mount-time set.
 const kickWindow = (attempts: any) => {
   if (!virtualizer) return;
   gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-select-list') : gridScrollEl;
-  // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
-  // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
-  // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
-  // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
-  if (windowSource().length > 0) {
-    syncRows();
-    virtualizer.setOptions(virtualizerOptions());
-  }
   virtualizer._willUpdate();
   windowVer.value = windowVer.value + 1;
   remeasureWindow();
@@ -1333,12 +1329,22 @@ const popupVisible = () => {
 // a popup that stayed shut after Enter-then-ArrowDown).
 // The echo is written FIRST, for targets whose watchers run synchronously on a write.
 const syncPanel = () => {
+  // A write of the popover's that the `panelOpen` watcher below has not taken yet (the
+  // pair differs): leave it alone. Writing our own state over it here loses the
+  // dismissal — an outside click on a button that also changes `options` runs this
+  // function before that watcher on Angular, and the popup stayed "open" with no panel.
+  // The watcher takes it, close() changes $data.open, and that brings this function
+  // back with the pair equal.
+  if (panelOpen.value !== panelEcho.value) return;
   const visible = popupVisible();
   if (visible === panelOpen.value) return;
   panelEcho.value = visible;
   panelOpen.value = visible;
 };
-// select -> popover: follows a derived primitive covering everything popupVisible() reads.
+// select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
+// reads only $data, one whose getter reads only props. A getter that mixes the two is
+// routed through a signal effect on Lit, which a plain property change does not re-run
+// (measured: with `hideEmpty`, options arriving while open never showed the popup there).
 // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
 // families' generated output stay untouched).
 //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1519,7 +1525,10 @@ onBeforeUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup();
 });
 
-watch(() => (open$local.value ? 'o' : 'c') + (props.hideEmpty ? 'h' : 's') + (props.options ? props.options.length : 0) + '|' + query.value, () => {
+watch(() => open$local.value, () => {
+  syncPanel();
+}, { flush: 'post' });
+watch(() => (props.hideEmpty ? 'h' : 's') + (props.options ? props.options.length : 0), () => {
   syncPanel();
 }, { flush: 'post' });
 watch(() => panelOpen.value, () => {
@@ -1527,7 +1536,7 @@ watch(() => panelOpen.value, () => {
   panelEcho.value = panelOpen.value;
   if (!panelOpen.value) close();
 }, { flush: 'post' });
-watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
+watch(() => props.options, () => {
   syncRows();
   if (props.virtual && virtualizer) {
     gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-select-list') : gridScrollEl;

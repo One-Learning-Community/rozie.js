@@ -522,6 +522,7 @@ export class Select {
   private __rozieWatchInitial_6 = true;
   private __rozieWatchInitial_7 = true;
   private __rozieWatchInitial_8 = true;
+  private __rozieWatchInitial_9 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -548,16 +549,19 @@ export class Select {
       // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
       if (this.virtualizerCleanup) this.virtualizerCleanup();
     });
-    effect(() => { const __watchVal = (() => (this.open$local() ? 'o' : 'c') + (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.open$local())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0))(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      this.syncPanel();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       const __panelOpen = this.panelOpen();
       if (__panelOpen === this.panelEcho()) return;
       this.panelEcho.set(__panelOpen);
       if (!__panelOpen) this.close();
     })(); }); });
-    effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       this.syncRows();
       if (this.virtual() && this.virtualizer) {
         this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
@@ -567,22 +571,22 @@ export class Select {
         this.scheduleRemeasure();
       }
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
       if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
     })(); }); });
-    effect(() => { const __watchVal = (() => this.coarse())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.coarse())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
       this.yieldToNative();
     })(); }); });
-    effect(() => { const __watchVal = (() => (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
       this.yieldToNative();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
   }
@@ -1671,25 +1675,21 @@ export class Select {
   };
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
   // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,
-  // re-feeds the CURRENT option count into the virtualizer, re-attaches its rect observer
-  // (_willUpdate), and bumps the windowVer signal so the windowed <For>/{#each}/repeat
-  // re-derives. Retried over a few frames because (a) virtual-core measures the scroll rect
-  // asynchronously (D-09 Solid rAF-defer — a synchronous kick sees rectH 0 → empty window),
-  // (b) Solid/Lit recreate the list node between mount and first commit (leaving virtual-core's
-  // scrollElement stale), and (c) the consumer often seeds options AFTER the select mounts
-  // (Lit/React), so the count must be re-read once the prop propagates. Stops once the window
-  // paints (or attempts run out) — idempotent + loop-free.
+  // re-attaches the virtualizer's rect observer (_willUpdate), and bumps the windowVer
+  // signal so the windowed <For>/{#each}/repeat re-derives. Retried over a few frames
+  // because (a) virtual-core measures the scroll rect asynchronously (D-09 Solid rAF-defer —
+  // a synchronous kick sees rectH 0 → empty window) and (b) Solid/Lit recreate the list node
+  // between mount and first commit (leaving virtual-core's scrollElement stale). Stops once
+  // the window paints (or attempts run out) — idempotent + loop-free.
+  //
+  // It does NOT feed options or the option count: on React this rAF chain runs in the
+  // closure of the render it started from, so anything it reads from props is that
+  // render's. Feeding from here put the mount-time options back over a set the consumer
+  // replaced within the chain's few frames (measured: the old rows stayed). The `options`
+  // watcher below owns the feed on every target; $onMount covers the mount-time set.
   kickWindow = (attempts: any) => {
     if (!this.virtualizer) return;
     this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
-    // Only re-feed the count from a NON-EMPTY source: on React these rAF closures capture
-    // stale (mount-time, empty) props, so feeding here would CLOBBER the $watch's correct
-    // count back to 0. The $watch (fresh useEffect props) owns React's count; the kick owns
-    // the Solid/Lit scroll-element re-attach + the deferred windowVer re-derive.
-    if (this.windowSource().length > 0) {
-      this.syncRows();
-      this.virtualizer.setOptions(this.virtualizerOptions());
-    }
     this.virtualizer._willUpdate();
     this.windowVer.set(this.windowVer() + 1);
     this.remeasureWindow();
@@ -1733,12 +1733,22 @@ export class Select {
   // a popup that stayed shut after Enter-then-ArrowDown).
   // The echo is written FIRST, for targets whose watchers run synchronously on a write.
   syncPanel = () => {
+    // A write of the popover's that the `panelOpen` watcher below has not taken yet (the
+    // pair differs): leave it alone. Writing our own state over it here loses the
+    // dismissal — an outside click on a button that also changes `options` runs this
+    // function before that watcher on Angular, and the popup stayed "open" with no panel.
+    // The watcher takes it, close() changes $data.open, and that brings this function
+    // back with the pair equal.
+    if (this.panelOpen() !== this.panelEcho()) return;
     const visible = this.popupVisible();
     if (visible === this.panelOpen()) return;
     this.panelEcho.set(visible);
     this.panelOpen.set(visible);
   };
-  // select -> popover: follows a derived primitive covering everything popupVisible() reads.
+  // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
+  // reads only $data, one whose getter reads only props. A getter that mixes the two is
+  // routed through a signal effect on Lit, which a plain property change does not re-run
+  // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
   // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
   // families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true

@@ -710,6 +710,10 @@ export const EXAMPLES = [
   // `nativePicker` on a coarse primary pointer lays an invisible native <select> over the
   // control. Behavioral-only (select-native.spec.ts); the spec overrides matchMedia.
   'SelectNative',
+  // @rozie-ui/select open state under outside changes (loader → examples/demos/SelectOpenStateDemo.rozie):
+  // options replaced under a windowed list, `hideEmpty` options going empty <-> non-empty, and the
+  // handle's open() / toggle() called from an outside click. Behavioral-only (select-open-state.spec.ts).
+  'SelectOpenState',
   // @rozie-ui/select vs @rozie-ui/combobox token parity (loader → examples/demos/SelectScreenshotDemo.rozie):
   // both families rendered side by side so select-screenshot.spec.ts can compare computed styles.
   // Behavioral-only; NOT a screenshot cell.
@@ -1725,6 +1729,8 @@ export const LIT_TAGS: Record<Example, string> = {
   SelectMulti: 'rozie-select-multi',
   // 'rozie-select-native-demo' = kebab of SelectNativeDemo.
   SelectNative: 'rozie-select-native',
+  // 'rozie-select-open-state-demo' = kebab of SelectOpenStateDemo.
+  SelectOpenState: 'rozie-select-open-state',
   // 'rozie-select-screenshot-demo' = kebab of SelectScreenshotDemo.
   SelectScreenshot: 'rozie-select-screenshot',
   // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-select-virtual-demo'
@@ -2301,6 +2307,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SelectMulti: {},
   // SelectNativeDemo is self-contained (own options + internal r-models). No parent props.
   SelectNative: {},
+  // SelectOpenStateDemo is self-contained (own options + internal r-models). No parent props.
+  SelectOpenState: {},
   // SelectScreenshotDemo is self-contained (own options + internal r-models). No parent props.
   SelectScreenshot: {},
   // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
