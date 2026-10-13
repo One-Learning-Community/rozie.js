@@ -419,6 +419,7 @@ export class Select {
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;
   private __rozieWatchInitial_2 = true;
+  private __rozieWatchInitial_3 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -452,8 +453,6 @@ export class Select {
     })(); }); });
     effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncRows();
-      // The list shrank under the highlight: move it to the first enabled option.
-      if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
       if (this.virtual() && this.virtualizer) {
         this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
         this.virtualizer.setOptions(this.virtualizerOptions());
@@ -461,6 +460,9 @@ export class Select {
         this.windowVer.set(this.windowVer() + 1);
         this.scheduleRemeasure();
       }
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
     })(); }); });
   }
 

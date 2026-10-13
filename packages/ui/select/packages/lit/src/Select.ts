@@ -277,6 +277,7 @@ export default class Select extends SignalWatcher(LitElement) {
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_2 = true;
+private __rozieFirstUpdateDone = false;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
@@ -380,8 +381,6 @@ private __rozieWatchInitial_2 = true;
     })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this.options ? this.options.length : 0) + '|' + this._query.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncRows();
-      // The list shrank under the highlight: move it to the first enabled option.
-      if (this._activeIndex.value >= this.visibleOptions().length) this._activeIndex.value = this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1;
       if (this.virtual && this.virtualizer) {
         this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-select-list') : this.gridScrollEl;
         this.virtualizer.setOptions(this.virtualizerOptions());
@@ -404,6 +403,13 @@ private __rozieWatchInitial_2 = true;
       this._windowVer.value = this._windowVer.value + 1;
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
     }
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('options'))) { const __watchVal = (() => this.options ? this.options.length : 0)(); (() => {
+      if (this._activeIndex.value >= this.visibleOptions().length) this._activeIndex.value = this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1;
+    })(); }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {

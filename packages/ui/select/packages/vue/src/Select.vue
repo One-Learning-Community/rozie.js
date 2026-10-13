@@ -1230,8 +1230,6 @@ watch(() => panelOpen.value, () => {
 }, { flush: 'post' });
 watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
   syncRows();
-  // The list shrank under the highlight: move it to the first enabled option.
-  if (activeIndex.value >= visibleOptions().length) activeIndex.value = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
   if (props.virtual && virtualizer) {
     gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-select-list') : gridScrollEl;
     virtualizer.setOptions(virtualizerOptions());
@@ -1239,6 +1237,9 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
     windowVer.value = windowVer.value + 1;
     scheduleRemeasure();
   }
+}, { flush: 'post' });
+watch(() => props.options ? props.options.length : 0, () => {
+  if (activeIndex.value >= visibleOptions().length) activeIndex.value = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 }, { flush: 'post' });
 
 defineExpose({ open, close, toggle, clear, focusControl });

@@ -835,8 +835,6 @@ $onMount(() => {
 // (length + query), never a freshly-built array (the stale-array Pitfall).
 $watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.query), () => {
   syncRows()
-  // The list shrank under the highlight: move it to the first enabled option.
-  if ($data.activeIndex >= visibleOptions().length) $data.activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1
   if ($props.virtual && virtualizer) {
     gridScrollEl = $el ? $el.querySelector('.rozie-select-list') : gridScrollEl
     virtualizer.setOptions(virtualizerOptions())
@@ -844,6 +842,15 @@ $watch(() => (($props.options ? $props.options.length : 0) + '|' + $data.query),
     $data.windowVer = $data.windowVer + 1
     scheduleRemeasure()
   }
+})
+
+// The list shrank under the highlight: move it to the first enabled option.
+// A watcher of its own whose getter reads ONLY props: on Lit a getter that mixes
+// props with $data (like the one above) is routed through a signal effect, which
+// a plain property change never re-runs; a props-only getter is routed through
+// updated(changedProperties) and does re-run.
+$watch(() => ($props.options ? $props.options.length : 0), () => {
+  if ($data.activeIndex >= visibleOptions().length) $data.activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1
 })
 
 $onUnmount(() => {

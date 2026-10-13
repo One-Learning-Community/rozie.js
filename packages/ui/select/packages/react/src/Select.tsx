@@ -235,6 +235,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
+  const _watch3First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, single+multi selection, close/clear, and the
@@ -1294,8 +1295,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
     syncRows();
-    // The list shrank under the highlight: move it to the first enabled option.
-    if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
     if (props.virtual && virtualizer.current) {
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-select-list') : gridScrollEl.current;
       virtualizer.current.setOptions(virtualizerOptions());
@@ -1304,6 +1303,10 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       scheduleRemeasure();
     }
   }, [props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
+    if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useOutsideClick(
     [controlEl, listEl],

@@ -45,6 +45,11 @@ for (const target of TARGETS) {
     await expect.poll(activeText).toBe('Water');
     await page.keyboard.press('ArrowDown'); await expect.poll(activeText).toBe('Carrot');
     await page.keyboard.press('ArrowDown'); await expect.poll(activeText).toBe('Apple'); // skips disabled Leek
+    // Type-ahead lands on the option's VISUAL index: Banana is third in source order
+    // (index 2) and fifth in visual order (index 4).
+    await page.keyboard.type('b');           await expect.poll(activeText).toBe('Banana');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-4$/);
+    await page.waitForTimeout(700); // let the 600ms type-ahead buffer reset
     await page.keyboard.type('o');           await expect.poll(activeText).toBe('Oat');
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('readout-value')).toHaveText('oat');
@@ -61,10 +66,13 @@ for (const target of TARGETS) {
     await page.getByTestId('shrink').press('s');
     await expect(page.locator('[role="option"]')).toHaveCount(2);
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    // The highlight moved to an option that exists (never the stale sixth one).
-    await expect(trigger).not.toHaveAttribute('aria-activedescendant', /-opt-5$/);
+    // The highlight is clamped to the first enabled option of the shrunk list. The two
+    // options left are Apple (fruit) and Carrot (veg); in visual order Carrot comes first.
+    await expect(page.locator('[role="option"]')).toHaveText(['Carrot', 'Apple']);
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
     const id = await trigger.getAttribute('aria-activedescendant');
-    if (id) await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+    await expect(page.locator(`[id="${id}"]`)).toHaveCount(1);
+    await expect(page.locator(`[id="${id}"]`)).toHaveText('Carrot');
   });
 
   runner(`select-groups [${target}]: with virtual on, groups are ignored — flat source order, navigation still works`, async ({ page }) => {

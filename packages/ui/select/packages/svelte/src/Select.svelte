@@ -1207,8 +1207,6 @@ $effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_1) 
 let __rozieWatchInitial_2 = true;
 $effect(() => { (() => (options ? options.length : 0) + '|' + query)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
   syncRows();
-  // The list shrank under the highlight: move it to the first enabled option.
-  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
   if (virtual && virtualizer) {
     gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
     virtualizer.setOptions(virtualizerOptions());
@@ -1216,6 +1214,10 @@ $effect(() => { (() => (options ? options.length : 0) + '|' + query)(); untrack(
     windowVer = windowVer + 1;
     scheduleRemeasure();
   }
+})(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 })(); }); });
 
 $effect(() => {

@@ -322,8 +322,6 @@ export default function Select(_props: SelectProps): JSX.Element {
   })()), { defer: true }));
   createEffect(on(() => (() => (local.options ? local.options.length : 0) + '|' + query())(), (v) => untrack(() => (() => {
     syncRows();
-    // The list shrank under the highlight: move it to the first enabled option.
-    if (activeIndex() >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
     if (local.virtual && virtualizer) {
       gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-select-list') : gridScrollEl;
       virtualizer.setOptions(virtualizerOptions());
@@ -331,6 +329,9 @@ export default function Select(_props: SelectProps): JSX.Element {
       setWindowVer(windowVer() + 1);
       scheduleRemeasure();
     }
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.options ? local.options.length : 0)(), (v) => untrack(() => (() => {
+    if (activeIndex() >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   })()), { defer: true }));
   let controlElRef: HTMLElement | null = null;
   let triggerElRef: HTMLElement | null = null;
