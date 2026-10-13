@@ -972,6 +972,9 @@ private __rozieFirstUpdateDone = false;
   // `visibleOptions` and every spine function that reaches it. The nine below
   // `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
   // tests/spine-copies.test.ts — change them in the spine first, then here.
+  // One of them is declared under another name: the spine's `open` is `openCore` here
+  // (same body, byte for byte). The name `open` belongs to the gated host function right
+  // after this block, which every other copy reaches when it calls `open()`.
   // Combobox likewise keeps its navigation host-local.
   // The option list every index refers to, in visual order. Select-only: there is
   // no query filter (nothing writes `$data.query`).
@@ -984,7 +987,7 @@ private __rozieFirstUpdateDone = false;
   return opts.findIndex((o: any) => !this.disabledOf(o));
 };
 
-  open = () => {
+  openCore = () => {
   if (this.disabled) return;
   if (this._open$local.value) return;
   this._open$local.value = true;
@@ -1089,6 +1092,16 @@ private __rozieFirstUpdateDone = false;
 };
 
   // ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
+  // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
+  // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
+  // through it, so the custom popup can never open while the native picker is active.
+  // It carries the public name because `$expose` binds a verb to the script binding of
+  // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  open = () => {
+  if (this.nativeActive()) return;
+  this.openCore();
+};
+
   // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
   // The PURE windowing math (the windowed slice + spacer geometry) is the SAME
   // virtual-core bridge data-table consumes. It is a compile-time `.rzts` partial:

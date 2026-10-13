@@ -8,6 +8,12 @@
  * declaration of a partial (ROZ139). So Select defines `visibleOptions` itself
  * and carries verbatim copies of the nine spine functions that reach it. This
  * test fails when a copy and the spine drift apart, naming the function.
+ *
+ * One copy is declared under another name: the spine's `open` is `openCore` in
+ * Select (RENAMED below). Select's own `open` is a gate in front of it — it
+ * returns early while the native picker is active — and has to carry the
+ * public name because `$expose` binds a verb to the script binding of that
+ * name. Only the declared name differs; the body is compared byte for byte.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -29,6 +35,8 @@ const COPIED = [
   'onTypeahead',
   'onControlKeyDown',
 ] as const;
+/** Spine name -> the name its copy is declared under in Select, where they differ. */
+const RENAMED: Partial<Record<(typeof COPIED)[number], string>> = { open: 'openCore' };
 /** Host-local in Select: the nine copies plus Select's own `visibleOptions`. */
 const HOST_LOCAL = ['visibleOptions', ...COPIED];
 
@@ -76,10 +84,21 @@ describe('Select host-local navigation is a verbatim copy of the list spine', ()
   for (const name of COPIED) {
     it(`${name} matches listCore.rzts`, () => {
       const canonical = statementText(spine, name);
-      expect(canonical.startsWith(`const ${name} = `)).toBe(true);
-      expect(statementText(select, name)).toBe(canonical);
+      const head = `const ${name} = `;
+      expect(canonical.startsWith(head)).toBe(true);
+      const localName = RENAMED[name] ?? name;
+      // Only the declared name in the declaration head is replaced; the body is untouched.
+      const expected = `const ${localName} = ` + canonical.slice(head.length);
+      expect(statementText(select, localName)).toBe(expected);
     });
   }
+
+  it('open is a host gate in front of openCore: inert while the native picker is active', () => {
+    const gate = statementText(select, 'open');
+    expect(gate).toBe(['const open = () => {', '  if (nativeActive()) return', '  openCore()', '}'].join('\n'));
+    // …and nothing else reaches the spine's body directly.
+    expect(select.split('openCore()').length - 1).toBe(1);
+  });
 
   it('none of the host-local names is imported from listCore.rzts', () => {
     const imports = [...select.matchAll(/^import \{([^}]*)\} from '@rozie-ui\/headless-core\/listCore\.rzts'$/gm)];

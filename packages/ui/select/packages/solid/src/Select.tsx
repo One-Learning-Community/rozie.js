@@ -746,6 +746,9 @@ export default function Select(_props: SelectProps): JSX.Element {
   // `visibleOptions` and every spine function that reaches it. The nine below
   // `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
   // tests/spine-copies.test.ts — change them in the spine first, then here.
+  // One of them is declared under another name: the spine's `open` is `openCore` here
+  // (same body, byte for byte). The name `open` belongs to the gated host function right
+  // after this block, which every other copy reaches when it calls `open()`.
   // Combobox likewise keeps its navigation host-local.
 
   // The option list every index refers to, in visual order. Select-only: there is
@@ -759,7 +762,7 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (sel !== -1) return sel;
     return opts.findIndex((o: any) => !disabledOf(o));
   }
-  function open() {
+  function openCore() {
     if (local.disabled) return;
     if (open$local()) return;
     setOpen$local(true);
@@ -852,6 +855,16 @@ export default function Select(_props: SelectProps): JSX.Element {
     }
   }
   // ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
+
+  // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
+  // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
+  // through it, so the custom popup can never open while the native picker is active.
+  // It carries the public name because `$expose` binds a verb to the script binding of
+  // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  function open() {
+    if (nativeActive()) return;
+    openCore();
+  }
 
   // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
   // The PURE windowing math (the windowed slice + spacer geometry) is the SAME

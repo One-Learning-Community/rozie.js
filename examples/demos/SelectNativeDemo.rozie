@@ -96,6 +96,9 @@ const shown = () => {
   if (v === null || v === undefined) return ''
   return typeof v === 'object' ? 'object' : String(v)
 }
+// The imperative handle of the `single` select.
+const handleOpen = () => { $refs.singleRef.open() }
+const handleToggle = () => { $refs.singleRef.toggle() }
 const setApple = () => { $data.value = 'apple' }
 const setNone = () => { $data.value = null }
 </script>
@@ -117,6 +120,8 @@ const setNone = () => { $data.value = null }
   <span data-testid="readout-inl">{{ $data.inl }}</span>
   <button type="button" data-testid="set-apple" @click="setApple()">set apple</button>
   <button type="button" data-testid="set-none" @click="setNone()">set none</button>
+  <button type="button" data-testid="handle-open" @click="handleOpen()">handle open</button>
+  <button type="button" data-testid="handle-toggle" @click="handleToggle()">handle toggle</button>
   <span data-testid="readout-guarded">{{ $data.guarded }}</span>
   <span data-testid="readout-guarded-changes">{{ $data.guardedChanges }}</span>
   <span data-testid="readout-rejected">{{ $data.rejected }}</span>
@@ -127,7 +132,7 @@ const setNone = () => { $data.value = null }
   <button type="button" data-testid="swap-groups" @click="swapGroups()">swap groups</button>
   <button type="button" data-testid="toggle-native" @click="toggleNative()">toggle native</button>
   <button type="button" data-testid="toggle-virtual" @click="toggleVirtual()">toggle virtual</button>
-  <div data-testid="single"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.value" native-picker clearable placeholder="Pick" aria-label="Drink" @change="onChange($event)" @open-change="onOpenChange()" /></div>
+  <div data-testid="single"><Select ref="singleRef" :options="OPTIONS" :groups="GROUPS" r-model:value="$data.value" native-picker clearable placeholder="Pick" aria-label="Drink" @change="onChange($event)" @open-change="onOpenChange()" /></div>
   <div data-testid="plain"><Select :options="FLAT" r-model:value="$data.plain" native-picker placeholder="Choose" aria-label="Plain" @change="onPlainChange()" /></div>
   <div data-testid="multi"><Select :options="FLAT" r-model:value="$data.multi" multiple native-picker aria-label="Many" @change="onMultiChange($event)" /></div>
   <div data-testid="guarded"><Select :options="FLAT" r-model:value="$data.guarded" native-picker aria-label="Guarded" @change="onGuardedChange($event)" /></div>

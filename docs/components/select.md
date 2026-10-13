@@ -91,7 +91,7 @@ On a phone the operating system's own picker (the iOS wheel, the Android dialog)
 - The `placeholder` is the first entry of the OS picker. With `clearable`, choosing it clears the value; without `clearable` it is disabled once there is a value.
 - If your code does not accept a commit (a controlled value you keep as it was), the OS picker goes back to showing the real selection.
 - What the OS picker cannot do is left out: `option`, `groupHeading` and `empty` slot content is not shown there, and the keyboard model in [Keyboard](#keyboard) does not apply.
-- While it is active the native `<select>` carries the `ariaLabel` and takes focus; the custom trigger is `aria-hidden` and out of the tab order, and the root carries the `rozie-select--native` class. The `open()` / `toggle()` handle verbs still drive the custom popup.
+- While it is active the native `<select>` carries the `ariaLabel` and takes focus; the custom trigger is `aria-hidden` and out of the tab order, and the root carries the `rozie-select--native` class. The `open()` and `toggle()` handle verbs do nothing while it is active (the OS picker cannot be opened from script); `close()`, `clear()` and `focusControl()` work as usual.
 - It is single-select only: a `multiple` select always uses the custom popup. It also stays off with a mouse or trackpad, and with `virtual` or `inline`. The native `<select>` has no `name`: it does not take part in form submission.
 
 ## API

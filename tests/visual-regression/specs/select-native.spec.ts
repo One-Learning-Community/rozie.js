@@ -200,6 +200,40 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('readout-opens')).toHaveText('5');
   });
 
+  runner(`select-native [${target}]: the handle's open() and toggle() are inert while the native picker is active`, async ({ page }) => {
+    await openCoarse(page, target);
+    const single = page.getByTestId('single');
+    const native = single.locator(NATIVE);
+    const trigger = single.locator('[role="combobox"]');
+    await expect(native).toHaveCount(1);
+    // native active: neither verb opens the custom popup
+    await page.getByTestId('handle-open').click();
+    await page.getByTestId('handle-toggle').click();
+    await page.getByTestId('handle-open').click();
+    // ordered after: a native commit is observed, and nothing opened before or by it
+    await native.selectOption({ label: 'Banana' });
+    await expect(page.getByTestId('readout-value')).toHaveText('banana');
+    await expect(page.getByTestId('readout-changes')).toHaveText('1');
+    await expect(page.getByTestId('readout-opens')).toHaveText('0');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.locator(OPEN_LISTBOX)).toHaveCount(0);
+    await expect(single.locator('.rozie-select')).not.toHaveClass(/rozie-select-open/);
+    // native inactive: the same buttons drive the custom popup
+    await setCoarse(page, false);
+    await expect(native).toHaveCount(0);
+    await page.getByTestId('handle-toggle').click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(OPEN_LISTBOX)).toHaveCount(1);
+    await expect(page.getByTestId('readout-opens')).toHaveText('1');
+    await page.keyboard.press('Escape'); // closes it (a button click would count as an outside click)
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('readout-opens')).toHaveText('2');
+    await page.getByTestId('handle-open').click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('readout-opens')).toHaveText('3');
+    await expect(page.getByTestId('readout-value')).toHaveText('banana');
+  });
+
   runner(`select-native [${target}]: multiple never uses the native picker; the custom popup and chips work as usual`, async ({ page }) => {
     await openCoarse(page, target);
     const multi = page.getByTestId('multi');

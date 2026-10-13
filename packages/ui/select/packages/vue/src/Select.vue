@@ -544,6 +544,9 @@ const yieldToNative = () => {
 // `visibleOptions` and every spine function that reaches it. The nine below
 // `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
 // tests/spine-copies.test.ts — change them in the spine first, then here.
+// One of them is declared under another name: the spine's `open` is `openCore` here
+// (same body, byte for byte). The name `open` belongs to the gated host function right
+// after this block, which every other copy reaches when it calls `open()`.
 // Combobox likewise keeps its navigation host-local.
 
 // The option list every index refers to, in visual order. Select-only: there is
@@ -555,7 +558,7 @@ const resolveInitialActive = () => {
   if (sel !== -1) return sel;
   return opts.findIndex((o: any) => !disabledOf(o));
 };
-const open = () => {
+const openCore = () => {
   if (props.disabled) return;
   if (open$local.value) return;
   open$local.value = true;
@@ -648,6 +651,16 @@ const onControlKeyDown = ($event: any) => {
   }
 };
 // ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
+
+// The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
+// and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
+// through it, so the custom popup can never open while the native picker is active.
+// It carries the public name because `$expose` binds a verb to the script binding of
+// that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+const open = () => {
+  if (nativeActive()) return;
+  openCore();
+};
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
