@@ -54,6 +54,28 @@ Pass an `options` array and two-way bind `value`:
 
 `r-model:value` is Rozie's [two-way bind](/guide/props-and-two-way#model-true-→-idiomatic-two-way-binding-everywhere): the consumer hands `Select` a value, `Select` writes the new selection back, and the framework reconciler picks it up with no `onChange → setState` wiring. Because `value` is the component's sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Select` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
 
+## Option groups
+
+Give each option an optional `group` id and pass `groups` — an ordered `[{ id, label }]` list — to render the options in sections:
+
+```rozie
+<template>
+  <Select
+    r-model:value="$data.food"
+    :options="[
+      { label: 'Apple', value: 'apple', group: 'fruit' },
+      { label: 'Carrot', value: 'carrot', group: 'veg' },
+      { label: 'Water', value: 'water' },
+    ]"
+    :groups="[{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]"
+  >
+    <template #groupHeading="{ group }"><strong>{{ group.label }}</strong></template>
+  </Select>
+</template>
+```
+
+Options without a `group` come first with no heading, then the listed groups in `groups` order, then any group that appears on an option but is not listed (headed by its id). Options keep their source order inside a group. Each section is a `role="group"` element named by its label, and the arrow keys, Home/End and type-ahead walk the options in the order they are shown. Grouping applies only while `groups` is non-empty, and is not applied while `virtual` is on.
+
 ## API
 
 ### Props
@@ -74,7 +96,8 @@ Pass an `options` array and two-way bind `value`:
 | `hideEmpty` | `Boolean` | `false` | yes | Show nothing instead of the empty state: with no options the popup is not shown, `aria-expanded` is `false`, and Escape is left to the host. |
 | `selectOnTab` | `Boolean` | `false` | yes | Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup). |
 | `ariaLabel` | `String` | `null` | yes | Accessible name for the control when there is no visible `<label for>`. |
-| `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. |
+| `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; ungrouped options come first, and groups present on options but absent here follow in first-appearance order. Keyboard navigation and type-ahead follow that visual order. Empty (the default) renders a flat list. Ignored when `virtual` is on. |
+| `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. Grouping is not applied while `virtual` is on. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
 | `placement` | `String` | `"bottom-start"` | yes | Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Ignored when `inline` is set. |
@@ -109,6 +132,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `selected` | `selected, value` | Custom rendering of the select-only trigger's chosen-value display. |
 | `option` | `option, index, active, selected, disabled` | Custom per-option rendering (the main scoped slot). |
 | `empty` | `query` | Shown when the (filtered) option list is empty. |
+| `groupHeading` | `group` | Custom rendering of a group's heading (`group` is the `{ id, label }` entry). Defaults to the group's label. |
 
 ## Theming
 

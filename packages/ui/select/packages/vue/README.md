@@ -77,6 +77,7 @@ import '@rozie-ui/select-vue/themes/shadcn.css';    // or material.css, bootstra
 | `disableFlip` | `Boolean` | `false` |  |  |
 | `disableShift` | `Boolean` | `false` |  |  |
 | `block` | `Boolean` | `false` |  |  |
+| `groups` | `Array` | `[]` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |
@@ -120,3 +121,4 @@ const lb = ref();          // template ref
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| groupHeading | group |

@@ -1,3 +1,10 @@
+<script module lang="ts">
+/** An entry of the `groups` prop. */
+export interface SelectGroup {
+  id: string;
+  label: string;
+}
+</script>
 <script lang="ts">
 import Popover from '@rozie-ui/popover-svelte';
 import { applyListeners, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runtime-svelte';
@@ -5,7 +12,7 @@ import { applyListeners, rozieAttr, rozieDisplay, rozieStyle } from '@rozie/runt
 import type { Snippet } from 'svelte';
 import { onDestroy, onMount, untrack } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'options' | 'value' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'selected' | 'option' | 'empty' | 'snippets' | 'onopenchange' | 'onchange' | 'children'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'options' | 'value' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'selected' | 'option' | 'empty' | 'groupHeading' | 'snippets' | 'onopenchange' | 'onchange' | 'children'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -81,11 +88,15 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   block?: boolean;
   /**
+   * Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; groups present on options but absent here follow in first-appearance order. Empty (the default) renders a flat list. Ignored when `virtual` is on.
+   */
+  groups?: any[];
+  /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel?: (string) | null;
   /**
-   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded. Grouping is not applied while `virtual` is on.
    */
   virtual?: boolean;
   /**
@@ -99,12 +110,14 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   selected?: Snippet<[{ selected: any; value: any }]>;
   option?: Snippet<[{ option: any; index: any; active: any; selected: any; disabled: any }]>;
   empty?: Snippet<[{ query: any }]>;
+  groupHeading?: Snippet<[{ group: SelectGroup }]>;
   snippets?: Record<string, any>;
   onopenchange?: (...args: any[]) => void;
   onchange?: (...args: any[]) => void;
 }
 
 let __defaultOptions = (() => [])();
+let __defaultGroups = (() => [])();
 
 let {
   options = __defaultOptions,
@@ -125,6 +138,7 @@ let {
   disableFlip = false,
   disableShift = false,
   block = false,
+  groups = __defaultGroups,
   ariaLabel = null,
   virtual = false,
   estimateRowHeight = 36,
@@ -132,6 +146,7 @@ let {
   selected: __selectedProp,
   option: __optionProp,
   empty: __emptyProp,
+  groupHeading: __groupHeadingProp,
   snippets,
   onopenchange,
   onchange,
@@ -141,6 +156,7 @@ let {
 const selected = $derived(__selectedProp ?? snippets?.selected);
 const option = $derived(__optionProp ?? snippets?.option);
 const empty = $derived(__emptyProp ?? snippets?.empty);
+const groupHeading = $derived(__groupHeadingProp ?? snippets?.groupHeading);
 
 let autoId = $state('');
 let open$local = $state(false);
@@ -223,6 +239,7 @@ const disabledOf = (opt: any) => {
 // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
 // per-instance id) so the option ids follow the host's auto-id fallback.
 const optionId = (index: any) => idRoot() + '-opt-' + index;
+
 // ---- derived state -----------------------------------------------------
 // The visible option list: identity in select-only / non-filtering mode,
 // a case-insensitive substring filter when a combobox query is present.
@@ -230,15 +247,6 @@ const optionId = (index: any) => idRoot() + '-opt-' + index;
 // targets — a `$computed` is a value on React but an accessor on Solid, so
 // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
 // plain function is identical everywhere.
-const visibleOptions = () => {
-  const q = (query || '').trim().toLowerCase();
-  if (q === '') return options;
-  return options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
-};
-
-// The label shown in the (select-only) trigger when closed. A real `$computed`
-// — read bare in the template, never aliased in script, so the per-target
-// accessor form stays uniform.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
   const v = valueOf(opt);
@@ -246,34 +254,8 @@ const isSelected = (opt: any) => {
   if (multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
 };
+
 // First enabled visible index, preferring the currently-selected option.
-const resolveInitialActive = () => {
-  const opts = visibleOptions();
-  const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
-  if (sel !== -1) return sel;
-  return opts.findIndex((o: any) => !disabledOf(o));
-};
-// ---- open / close ------------------------------------------------------
-// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
-// $emit's directly — no longer funneled through a single wrapper. The
-// former "route every emit through ONE wrapper fn" workaround guarded
-// against a React duplicate `const {onOpenChange}=props` per emit-site
-// (TS2451); verified against the current emitter (target-react
-// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
-// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
-// target into exactly one destructure, and a non-escaping function (e.g.
-// `open`, reachable here only via `$expose`) never destructures at all — so
-// no combination of these three functions can produce the duplicate-const
-// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
-export const open = () => {
-  if (disabled) return;
-  if (open$local) return;
-  open$local = true;
-  activeIndex = resolveInitialActive();
-  onopenchange?.({
-    open: true
-  });
-};
 export const close = () => {
   if (!open$local) return;
   open$local = false;
@@ -281,9 +263,6 @@ export const close = () => {
   onopenchange?.({
     open: false
   });
-};
-export const toggle = () => {
-  if (open$local) close();else open();
 };
 // ---- selection ---------------------------------------------------------
 const select = (opt: any) => {
@@ -321,7 +300,80 @@ export const clear = () => {
     option: null
   });
 };
+
 // ---- keyboard navigation over the VISIBLE list -------------------------
+// Pointer hover sets the virtual highlight (matches native <select> feel).
+const onOptionPointerMove = (index: any) => {
+  if (activeIndex !== index) activeIndex = index;
+};
+// ---- option grouping (src/internal/groupOptions.ts) ---------------------
+// The pure stable-partition helper is a RUNTIME import (not a `.rzts` partial):
+// codegen's `copyInternal` vendors it into each leaf at `./internal/groupOptions`.
+// It is a byte copy of @rozie-ui/headless-core/src/internal/groupOptions.ts.
+import { groupOptions } from './internal/groupOptions';
+const groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt ? opt.group : null;
+// Grouping is active only for a non-empty `groups` list, and never while windowing.
+const isGrouped = () => !virtual && Array.isArray(groups) && groups.length > 0;
+// Visual order: identity when ungrouped, group-partitioned when grouped. Memoised on
+// the inputs so repeated calls in one render return the SAME array (stable indices).
+const orderedOptionsCache = {
+  keys: null as any[] | null,
+  val: null as any
+};
+const orderedOptions = () => {
+  const __rozieMemoKey = [options, groups, virtual];
+  const __rozieMemoPrev = orderedOptionsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+    return orderedOptionsCache.val;
+  }
+  const __rozieMemoVal = isGrouped() ? groupOptions(options, groups, groupOfOption).ordered : options;
+  orderedOptionsCache.keys = __rozieMemoKey;
+  orderedOptionsCache.val = __rozieMemoVal;
+  return __rozieMemoVal;
+};
+// Blocks for the grouped render; each item carries its index in visibleOptions().
+const groupBlocks = () => {
+  const res = groupOptions(options, groups, groupOfOption);
+  let i = 0;
+  return res.blocks.map((b: any) => ({
+    group: b.group,
+    items: b.items.map((opt: any) => ({
+      opt,
+      index: i++
+    }))
+  }));
+};
+// ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════
+// These ten functions are defined here instead of imported from listCore.rzts.
+// The spine's navigation is bound to the spine's own `visibleOptions()`, and the
+// partial inliner does not allow shadowing one function of a partial (ROZ139).
+// Select needs navigation over the grouped VISUAL order, so it owns
+// `visibleOptions` and every spine function that reaches it. The nine below
+// `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
+// tests/spine-copies.test.ts — change them in the spine first, then here.
+// Combobox likewise keeps its navigation host-local.
+
+// The option list every index refers to, in visual order. Select-only: there is
+// no query filter (nothing writes `$data.query`).
+const visibleOptions = () => orderedOptions();
+const resolveInitialActive = () => {
+  const opts = visibleOptions();
+  const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
+  if (sel !== -1) return sel;
+  return opts.findIndex((o: any) => !disabledOf(o));
+};
+export const open = () => {
+  if (disabled) return;
+  if (open$local) return;
+  open$local = true;
+  activeIndex = resolveInitialActive();
+  onopenchange?.({
+    open: true
+  });
+};
+export const toggle = () => {
+  if (open$local) close();else open();
+};
 const nextEnabled = (from: any, dir: any) => {
   const opts = visibleOptions();
   if (opts.length === 0) return -1;
@@ -351,8 +403,6 @@ const commitActive = () => {
   const opts = visibleOptions();
   if (activeIndex >= 0 && activeIndex < opts.length) select(opts[activeIndex]);
 };
-// Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
-// first option whose label starts with the buffer.
 const onTypeahead = (ch: any) => {
   if (typeTimer !== null) clearTimeout(typeTimer);
   typeBuffer += ch.toLowerCase();
@@ -367,9 +417,6 @@ const onTypeahead = (ch: any) => {
     scrollActiveIntoView();
   }
 };
-// Key handler shared by the trigger and the combobox input. The printable-
-// character branch is reached only in select-only mode (the combobox input
-// types through @input).
 const onControlKeyDown = ($event: any) => {
   const key = $event.key;
   if (key === 'ArrowDown') {
@@ -407,13 +454,7 @@ const onControlKeyDown = ($event: any) => {
     onTypeahead(key);
   }
 };
-
-// Combobox input handler: keep the popup open while typing, reset the active
-// highlight to the first match, and surface the query for remote filtering.
-// Pointer hover sets the virtual highlight (matches native <select> feel).
-const onOptionPointerMove = (index: any) => {
-  if (activeIndex !== index) activeIndex = index;
-};
+// ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -833,11 +874,10 @@ let scrollEndPinnedTop = -1;
 // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
 // the same wrapped row the count windows over.
 //
-// $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
-// FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
-// would never hit while filtering). The key covers everything the map reads:
-// options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
-// resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+// $memo, keyed on the TRUE inputs. The key covers everything the map reads:
+// options ref + groups + virtual (visibleOptions' inputs — with `virtual` on,
+// grouping is off, so this is source order) and the optionValue resolver
+// (valueOf in the map body).
 // Same reference-stability contract the sibling Combobox's filteredOptions carries —
 // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
 // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
@@ -846,7 +886,7 @@ const windowSourceCache = {
   val: null as any
 };
 const windowSource = () => {
-  const __rozieMemoKey = [options, query, optionValue, optionLabel];
+  const __rozieMemoKey = [options, groups, virtual, optionValue];
   const __rozieMemoPrev = windowSourceCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return windowSourceCache.val;
@@ -1167,6 +1207,8 @@ $effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_1) 
 let __rozieWatchInitial_2 = true;
 $effect(() => { (() => (options ? options.length : 0) + '|' + query)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
   syncRows();
+  // The list shrank under the highlight: move it to the first enabled option.
+  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
   if (virtual && virtualizer) {
     gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
     virtualizer.setOptions(virtualizerOptions());
@@ -1198,7 +1240,7 @@ $effect(() => {
 });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': disabled, 'rozie-select-inline': inline, 'rozie-select--block': block }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><Popover trigger="manual" bind:open={panelOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} disableDismiss={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6>{#snippet anchor()}<div class="rozie-select-control" bind:this={controlEl} onclick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6><div bind:this={triggerEl} class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex={rozieAttr(triggerTabindex())} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : null)} aria-label={ariaLabel} aria-disabled={!!disabled} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}</div><span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span></div>{/snippet}{#if popupVisible() && !virtual}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-6e3ebfa6>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-select-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onclick={($event) => { select(wr.row._opt); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) })}{:else}{rozieDisplay(labelOf(wr.row._opt))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</Popover></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': disabled, 'rozie-select-inline': inline, 'rozie-select--block': block }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><Popover trigger="manual" bind:open={panelOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} disableDismiss={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6>{#snippet anchor()}<div class="rozie-select-control" bind:this={controlEl} onclick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6><div bind:this={triggerEl} class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex={rozieAttr(triggerTabindex())} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : null)} aria-label={ariaLabel} aria-disabled={!!disabled} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}</div><span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span></div>{/snippet}{#if popupVisible() && !virtual && !isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-6e3ebfa6>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-select-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if popupVisible() && !virtual && isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-6e3ebfa6>{#each groupBlocks() as blk ('grp-' + (blk.group ? blk.group.id : '_ungrouped'))}<div class="rozie-select-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-6e3ebfa6>{#if blk.group}<div class="rozie-select-group-heading" role="presentation" data-rozie-s-6e3ebfa6>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as row (optionId(row.index))}<div id={rozieAttr(optionId(row.index))} class={["rozie-select-option", { 'is-active': activeIndex === row.index, 'is-selected': isSelected(row.opt), 'is-disabled': disabledOf(row.opt) }]} role="option" aria-selected={!!isSelected(row.opt)} aria-disabled={!!disabledOf(row.opt)} onclick={($event) => { select(row.opt); }} onmousemove={($event) => { onOptionPointerMove(row.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: row.opt, index: row.index, active: activeIndex === row.index, selected: isSelected(row.opt), disabled: disabledOf(row.opt) })}{:else}{rozieDisplay(labelOf(row.opt))}{/if}</div>{/each}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onclick={($event) => { select(wr.row._opt); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) })}{:else}{rozieDisplay(labelOf(wr.row._opt))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</Popover></div>
 
 <style>
 :global {
@@ -1303,6 +1345,12 @@ $effect(() => {
     color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
   }
   .rozie-select-option.is-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+  .rozie-select-group-heading[data-rozie-s-6e3ebfa6] {
+    padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.25rem 0.6rem));
+    font-size: var(--rozie-select-group-heading-size, var(--rsl-group-heading-size, 0.75rem));
+    font-weight: var(--rozie-select-group-heading-weight, var(--rsl-group-heading-weight, 600));
+    color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.55)));
+  }
   .rozie-select-empty[data-rozie-s-6e3ebfa6] { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
   .rozie-select-spacer[data-rozie-s-6e3ebfa6] { margin: 0; padding: 0; border: 0; flex: none; }
   .rozie-select-list--virtual[data-rozie-s-6e3ebfa6] { overflow-anchor: none; }

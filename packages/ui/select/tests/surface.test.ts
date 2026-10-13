@@ -29,10 +29,10 @@ const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Select',
-  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight', 'placement', 'offset', 'disableFlip', 'disableShift', 'block'],
+  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'groups', 'virtual', 'estimateRowHeight', 'maxHeight', 'placement', 'offset', 'disableFlip', 'disableShift', 'block'],
   models: ['value'],
   emits: ['change', 'open-change'],
-  slots: ['selected', 'option', 'empty'] as string[],
+  slots: ['selected', 'option', 'empty', 'groupHeading'] as string[],
   expose: ['open', 'close', 'toggle', 'clear', 'focusControl'],
 } as const;
 

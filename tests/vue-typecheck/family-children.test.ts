@@ -168,7 +168,11 @@ const FAMILIES: FamilySpec[] = [
         // inherent residual, exactly like Phase 65's "no leaf fully clean" finding.
         // (The earlier TS2339 ×8 Class-3 windowing `never` narrowing was already
         // cleared by Phase 65 Plan 04.)
-        TS2322: 3,
+        //
+        // 3 → 4 (select option groups): the new grouped listbox branch carries the
+        // same `:aria-label="props.ariaLabel"` binding as the flat and windowed
+        // branches — one more site of the residual described above, not a new class.
+        TS2322: 4,
       },
     },
   },

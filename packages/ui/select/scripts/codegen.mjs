@@ -9,17 +9,22 @@
  * contract as rozie-codegen.ts + the in-compile ROZ977 guard); per the scope
  * fence, an error means a mis-wired codegen path, never an emitter edit.
  *
- * This is the first @rozie-ui family with NO third-party vanilla engine, so
- * there is no `src/internal/` helper to vendor. Instead it vendors the
- * `src/themes/` design-token presets (base / shadcn / material / bootstrap)
- * into each leaf so consumers can `import '@rozie-ui/select-<fw>/themes/X.css'`.
+ * This family has NO third-party vanilla engine. It vendors two things into
+ * each leaf:
+ *   - `src/themes/` — the design-token presets (base / shadcn / material /
+ *     bootstrap), so consumers can `import '@rozie-ui/select-<fw>/themes/X.css'`.
+ *   - `src/internal/` — `groupOptions.ts`, the pure stable-partition helper
+ *     behind the `groups` prop (a byte copy of
+ *     `@rozie-ui/headless-core/src/internal/groupOptions.ts`, guarded by that
+ *     package's `tests/vendored-internal.test.ts`), so the compiled component's
+ *     relative `./internal/groupOptions` import resolves.
  *
  * Steps:
  *   1. read src/Select.rozie
  *   2. parse() + lowerToIR() ONCE → ir (props/slots/emits/expose) for docs tables
  *   3. for each of the 6 targets: compile() → write leaf src/<file>
  *        (React only: also write Select.css + Select.d.ts)
- *   4. copy src/themes/ → each leaf src/themes/
+ *   4. copy src/themes/ → each leaf src/themes/, src/internal/ → each leaf src/internal/
  *   5. render each leaf README from the IR + the hand-kept event/handle manifests
  *   6. ENFORCE validateDocsPropsTable against docs/components/select.md
  *      (THROWS on drift of the IR-derivable structural columns — prop name,
@@ -27,7 +32,7 @@
  *   7. ENFORCE validateDocsSurfaceNames — every emitted event / exposed handle
  *      name must appear backticked in the docs page(s) (../../docs-surface-guard.mjs)
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
@@ -73,6 +78,25 @@ function copyThemes(leafSrc, pkgName) {
     const patched = content.replace(/@rozie-ui\/[\w-]+-react\/themes\//g, `${pkgName}/themes/`);
     if (patched !== content) writeFileSync(filePath, patched);
   }
+}
+
+/**
+ * Vendor src/internal/ → leaf src/internal/ (excluding *.test.ts).
+ *
+ * Same as the combobox codegen's copyInternal: the destination is removed
+ * first so a rename/removal in src/internal/ doesn't leave a stale,
+ * no-longer-imported module behind — cpSync merges into an existing
+ * directory rather than mirroring it.
+ */
+function copyInternal(leafSrc) {
+  const src = resolve(ROOT, 'src/internal');
+  if (!existsSync(src)) return;
+  const dest = resolve(leafSrc, 'internal');
+  rmSync(dest, { recursive: true, force: true });
+  cpSync(src, dest, {
+    recursive: true,
+    filter: (from) => !from.endsWith('.test.ts'),
+  });
 }
 
 function main() {
@@ -149,6 +173,8 @@ function main() {
 
     // (4) vendor the design-token presets.
     copyThemes(leafSrc, leafPkgName(cfg.dir));
+    // (4b) vendor the internal helpers (groupOptions.ts).
+    copyInternal(leafSrc);
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);

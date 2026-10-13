@@ -1,5 +1,5 @@
 ---
-surface_hash: 06a203fbf92a
+surface_hash: 8ee62bb45652
 ---
 
 # Headless select / combobox comparison
@@ -35,7 +35,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Two-way value binding | ⚠️ value+onChange | ✅ `v-model` | ⚠️ bind store | ⚠️ signal | ⚠️ wire CVA | — | ✅ `r-model:value` (Angular CVA) |
 | Type-ahead (printable keys) | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Client filter **+ remote hook** | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | via [`@rozie-ui/combobox`](/components/combobox) |
-| Scoped option rendering | ✅ render-prop | ✅ slot | ✅ snippet | ✅ | ⚠️ template | — | ✅ `option` / `selected` / `empty` slots |
+| Scoped option rendering | ✅ render-prop | ✅ slot | ✅ snippet | ✅ | ⚠️ template | — | ✅ `option` / `selected` / `empty` / `groupHeading` slots |
 | Floating popup (flip / shift / width-match) | ✅ | ⚠️ (Reka ✅; HUI wire it) | ✅ | ✅ | ⚠️ CDK overlay | — | ✅ built in (`placement` / `offset`; composes [`@rozie-ui/popover`](/components/popover)) |
 | Windowing for long lists | ✅ (wire a virtualizer) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ opt-in `virtual` (virtual-core, ×6) |
 | Imperative handle | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ | hand-roll | ✅ uniform 5-verb `$expose` |

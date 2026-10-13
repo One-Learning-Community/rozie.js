@@ -1,0 +1,55 @@
+<!--
+  SelectGroupsDemo.rozie — BEHAVIORAL consumer for the Select's option groups
+  (select-groups.spec.ts). One Select is on the page at a time; the `mode-*`
+  buttons swap it:
+
+    - grouped (the default): `groups` set + a custom #groupHeading slot. Visual
+      order is Water (ungrouped, first), Vegetables: Carrot, Leek (disabled),
+      Fruit: Apple, Banana, then the unlisted group `grain`: Oat.
+    - virtual: the same `groups` with `virtual` on — grouping is not applied, the
+      options render flat in source order.
+    - flat: no `groups` — options that carry a `group` still render flat in
+      source order.
+
+  `shrink` cuts the option list to its first two entries (the active-index guard).
+  It acts on the "s" KEY as well as on click: a click outside an open popup is a
+  dismissal by design, so the spec presses the key to shrink the list while the
+  popup stays open (the SelectFloatingDemo `toggle-top` precedent).
+
+  This is a BEHAVIORAL cell — no screenshot stabilization here.
+-->
+<rozie name="SelectGroupsDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ value: null, short: false, mode: 'grouped' }</data>
+<script>
+const GROUPS = [{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]
+const ALL = [
+  { label: 'Apple', value: 'apple', group: 'fruit' },
+  { label: 'Carrot', value: 'carrot', group: 'veg' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Water', value: 'water' },
+  { label: 'Leek', value: 'leek', group: 'veg', disabled: true },
+  { label: 'Oat', value: 'oat', group: 'grain' },
+]
+const options = () => ($data.short ? ALL.slice(0, 2) : ALL)
+const shrink = () => { $data.short = true }
+const onShrinkKey = (e) => {
+  if (e.key === 's') shrink()
+}
+const setMode = (next) => { $data.mode = next }
+</script>
+<template>
+<div>
+  <button type="button" data-testid="shrink" @click="shrink()" @keydown="onShrinkKey($event)">Shrink (click, or press s)</button>
+  <button type="button" data-testid="mode-virtual" @click="setMode('virtual')">Virtual</button>
+  <button type="button" data-testid="mode-flat" @click="setMode('flat')">Flat</button>
+  <span data-testid="readout-value">{{ $data.value }}</span>
+  <span data-testid="readout-mode">{{ $data.mode }}</span>
+  <Select r-if="$data.mode === 'grouped'" :options="options()" :groups="GROUPS" r-model:value="$data.value" aria-label="Food">
+    <template #groupHeading="{ group }"><strong data-testid="heading">{{ group.label }}</strong></template>
+  </Select>
+  <Select r-if="$data.mode === 'virtual'" :options="options()" :groups="GROUPS" :virtual="true" maxHeight="320px" r-model:value="$data.value" aria-label="Food" />
+  <Select r-if="$data.mode === 'flat'" :options="options()" r-model:value="$data.value" aria-label="Food" />
+</div>
+</template>
+</rozie>

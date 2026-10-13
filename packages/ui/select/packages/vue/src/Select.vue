@@ -5,7 +5,7 @@
   <Popover trigger="manual" v-model:open="panelOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift" :id-base="idRoot()"><template #anchor>
       
       <div class="rozie-select-control" ref="controlElRef" @click="onControlClick($event)">
-        <div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+        <div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
           <slot name="selected" :selected="selectedLabel" :value="value">
             <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
         </div>
@@ -13,13 +13,25 @@
       </div>
     </template>
       
-      <div v-if="popupVisible() && !props.virtual" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
+      <div v-if="popupVisible() && !props.virtual && !isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
         <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-select-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
           <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
             {{ labelOf(opt) }}
           </slot>
         </div>
 
+        <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
+          <slot name="empty" :query="query">No options</slot>
+        </div></div><div v-if="popupVisible() && !props.virtual && isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
+        <div v-for="blk in groupBlocks()" :key="'grp-' + (blk.group ? blk.group.id : '_ungrouped')" class="rozie-select-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
+          <div v-if="blk.group" class="rozie-select-group-heading" role="presentation">
+            <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
+          </div><div v-for="row in blk.items" :key="optionId(row.index)" :id="optionId(row.index)" :class="['rozie-select-option', { 'is-active': activeIndex === row.index, 'is-selected': isSelected(row.opt), 'is-disabled': disabledOf(row.opt) }]" role="option" :aria-selected="!!isSelected(row.opt)" :aria-disabled="!!disabledOf(row.opt)" @click="select(row.opt)" @mousemove="onOptionPointerMove(row.index)">
+            <slot name="option" :option="row.opt" :index="row.index" :active="activeIndex === row.index" :selected="isSelected(row.opt)" :disabled="disabledOf(row.opt)">
+              {{ labelOf(row.opt) }}
+            </slot>
+          </div>
+        </div>
         <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
           <slot name="empty" :query="query">No options</slot>
         </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto')">
@@ -40,11 +52,31 @@
 
 </template>
 
+<script lang="ts">
+/** An entry of the `groups` prop. */
+export interface SelectGroup {
+  id: string;
+  label: string;
+}
+</script>
+
 <script setup lang="ts">
 import Popover from '@rozie-ui/popover-vue';
 
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useOutsideClick } from '@rozie/runtime-vue';
+
+// ---- option grouping (src/internal/groupOptions.ts) ---------------------
+// The pure stable-partition helper is a RUNTIME import (not a `.rzts` partial):
+// codegen's `copyInternal` vendors it into each leaf at `./internal/groupOptions`.
+// It is a byte copy of @rozie-ui/headless-core/src/internal/groupOptions.ts.
+import { groupOptions } from './internal/groupOptions';
+// virtual-core: the framework-agnostic windowing state machine (the data-table
+// precedent — NO per-framework adapter). The static import is emitted unconditionally
+// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
+// `virtualizer` guard so the non-virtual emitted path executes none of it
+// (byte-identical-off).
+import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 
 const props = withDefaults(
   defineProps<{
@@ -117,11 +149,15 @@ const props = withDefaults(
      */
     block?: boolean;
     /**
+     * Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; groups present on options but absent here follow in first-appearance order. Empty (the default) renders a flat list. Ignored when `virtual` is on.
+     */
+    groups?: any[];
+    /**
      * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
      */
     ariaLabel?: string | null;
     /**
-     * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+     * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded. Grouping is not applied while `virtual` is on.
      */
     virtual?: boolean;
     /**
@@ -133,7 +169,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
 /**
@@ -150,6 +186,9 @@ const emit = defineEmits<{
 
 defineSlots<{
   selected(props: { selected: any; value: any }): any;
+  option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
+  empty(props: { query: any }): any;
+  groupHeading(props: { group: SelectGroup }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
   empty(props: { query: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
@@ -255,6 +294,7 @@ const disabledOf = (opt: any) => {
 // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
 // per-instance id) so the option ids follow the host's auto-id fallback.
 const optionId = (index: any) => idRoot() + '-opt-' + index;
+
 // ---- derived state -----------------------------------------------------
 // The visible option list: identity in select-only / non-filtering mode,
 // a case-insensitive substring filter when a combobox query is present.
@@ -262,15 +302,6 @@ const optionId = (index: any) => idRoot() + '-opt-' + index;
 // targets — a `$computed` is a value on React but an accessor on Solid, so
 // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
 // plain function is identical everywhere.
-const visibleOptions = () => {
-  const q = (query.value || '').trim().toLowerCase();
-  if (q === '') return props.options;
-  return props.options.filter((opt: any) => labelOf(opt).toLowerCase().includes(q));
-};
-
-// The label shown in the (select-only) trigger when closed. A real `$computed`
-// — read bare in the template, never aliased in script, so the per-target
-// accessor form stays uniform.
 // Is a given option currently selected? Multi compares array membership.
 const isSelected = (opt: any) => {
   const v = valueOf(opt);
@@ -278,34 +309,8 @@ const isSelected = (opt: any) => {
   if (props.multiple) return Array.isArray(cur) && cur.includes(v);
   return cur === v;
 };
+
 // First enabled visible index, preferring the currently-selected option.
-const resolveInitialActive = () => {
-  const opts = visibleOptions();
-  const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
-  if (sel !== -1) return sel;
-  return opts.findIndex((o: any) => !disabledOf(o));
-};
-// ---- open / close ------------------------------------------------------
-// Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
-// $emit's directly — no longer funneled through a single wrapper. The
-// former "route every emit through ONE wrapper fn" workaround guarded
-// against a React duplicate `const {onOpenChange}=props` per emit-site
-// (TS2451); verified against the current emitter (target-react
-// `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
-// hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
-// target into exactly one destructure, and a non-escaping function (e.g.
-// `open`, reachable here only via `$expose`) never destructures at all — so
-// no combination of these three functions can produce the duplicate-const
-// shape. See project_next_port_listbox / project_emitter_hardening_backlog.
-const open = () => {
-  if (props.disabled) return;
-  if (open$local.value) return;
-  open$local.value = true;
-  activeIndex.value = resolveInitialActive();
-  emit('open-change', {
-    open: true
-  });
-};
 const close = () => {
   if (!open$local.value) return;
   open$local.value = false;
@@ -313,9 +318,6 @@ const close = () => {
   emit('open-change', {
     open: false
   });
-};
-const toggle = () => {
-  if (open$local.value) close();else open();
 };
 // ---- selection ---------------------------------------------------------
 const select = (opt: any) => {
@@ -353,7 +355,75 @@ const clear = () => {
     option: null
   });
 };
+
 // ---- keyboard navigation over the VISIBLE list -------------------------
+// Pointer hover sets the virtual highlight (matches native <select> feel).
+const onOptionPointerMove = (index: any) => {
+  if (activeIndex.value !== index) activeIndex.value = index;
+};
+const groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt ? opt.group : null;
+// Grouping is active only for a non-empty `groups` list, and never while windowing.
+const isGrouped = () => !props.virtual && Array.isArray(props.groups) && props.groups.length > 0;
+// Visual order: identity when ungrouped, group-partitioned when grouped. Memoised on
+// the inputs so repeated calls in one render return the SAME array (stable indices).
+const orderedOptionsCache = {
+  keys: null as any[] | null,
+  val: null as any
+};
+const orderedOptions = () => {
+  const __rozieMemoKey = [props.options, props.groups, props.virtual];
+  const __rozieMemoPrev = orderedOptionsCache.keys;
+  if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+    return orderedOptionsCache.val;
+  }
+  const __rozieMemoVal = isGrouped() ? groupOptions(props.options, props.groups, groupOfOption).ordered : props.options;
+  orderedOptionsCache.keys = __rozieMemoKey;
+  orderedOptionsCache.val = __rozieMemoVal;
+  return __rozieMemoVal;
+};
+// Blocks for the grouped render; each item carries its index in visibleOptions().
+const groupBlocks = () => {
+  const res = groupOptions(props.options, props.groups, groupOfOption);
+  let i = 0;
+  return res.blocks.map((b: any) => ({
+    group: b.group,
+    items: b.items.map((opt: any) => ({
+      opt,
+      index: i++
+    }))
+  }));
+};
+// ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════
+// These ten functions are defined here instead of imported from listCore.rzts.
+// The spine's navigation is bound to the spine's own `visibleOptions()`, and the
+// partial inliner does not allow shadowing one function of a partial (ROZ139).
+// Select needs navigation over the grouped VISUAL order, so it owns
+// `visibleOptions` and every spine function that reaches it. The nine below
+// `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
+// tests/spine-copies.test.ts — change them in the spine first, then here.
+// Combobox likewise keeps its navigation host-local.
+
+// The option list every index refers to, in visual order. Select-only: there is
+// no query filter (nothing writes `$data.query`).
+const visibleOptions = () => orderedOptions();
+const resolveInitialActive = () => {
+  const opts = visibleOptions();
+  const sel = opts.findIndex((o: any) => isSelected(o) && !disabledOf(o));
+  if (sel !== -1) return sel;
+  return opts.findIndex((o: any) => !disabledOf(o));
+};
+const open = () => {
+  if (props.disabled) return;
+  if (open$local.value) return;
+  open$local.value = true;
+  activeIndex.value = resolveInitialActive();
+  emit('open-change', {
+    open: true
+  });
+};
+const toggle = () => {
+  if (open$local.value) close();else open();
+};
 const nextEnabled = (from: any, dir: any) => {
   const opts = visibleOptions();
   if (opts.length === 0) return -1;
@@ -383,8 +453,6 @@ const commitActive = () => {
   const opts = visibleOptions();
   if (activeIndex.value >= 0 && activeIndex.value < opts.length) select(opts[activeIndex.value]);
 };
-// Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
-// first option whose label starts with the buffer.
 const onTypeahead = (ch: any) => {
   if (typeTimer !== null) clearTimeout(typeTimer);
   typeBuffer += ch.toLowerCase();
@@ -399,9 +467,6 @@ const onTypeahead = (ch: any) => {
     scrollActiveIntoView();
   }
 };
-// Key handler shared by the trigger and the combobox input. The printable-
-// character branch is reached only in select-only mode (the combobox input
-// types through @input).
 const onControlKeyDown = ($event: any) => {
   const key = $event.key;
   if (key === 'ArrowDown') {
@@ -439,13 +504,7 @@ const onControlKeyDown = ($event: any) => {
     onTypeahead(key);
   }
 };
-
-// Combobox input handler: keep the popup open while typing, reset the active
-// highlight to the first match, and surface the query for remote filtering.
-// Pointer hover sets the virtual highlight (matches native <select> feel).
-const onOptionPointerMove = (index: any) => {
-  if (activeIndex.value !== index) activeIndex.value = index;
-};
+// ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
 // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
 // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -833,12 +892,6 @@ const rowIsOutsideWindow = (r: any) => {
 // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
 
 // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
-// virtual-core: the framework-agnostic windowing state machine (the data-table
-// precedent — NO per-framework adapter). The static import is emitted unconditionally
-// (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
-// `virtualizer` guard so the non-virtual emitted path executes none of it
-// (byte-identical-off).
-import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
 // Windowing instance state (the `let table` precedent — React hoists reassigned
 // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
 // when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
@@ -865,11 +918,10 @@ let scrollEndPinnedTop = -1;
 // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
 // the same wrapped row the count windows over.
 //
-// $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
-// FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
-// would never hit while filtering). The key covers everything the map reads:
-// options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
-// resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+// $memo, keyed on the TRUE inputs. The key covers everything the map reads:
+// options ref + groups + virtual (visibleOptions' inputs — with `virtual` on,
+// grouping is off, so this is source order) and the optionValue resolver
+// (valueOf in the map body).
 // Same reference-stability contract the sibling Combobox's filteredOptions carries —
 // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
 // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
@@ -878,7 +930,7 @@ const windowSourceCache = {
   val: null as any
 };
 const windowSource = () => {
-  const __rozieMemoKey = [props.options, query.value, props.optionValue, props.optionLabel];
+  const __rozieMemoKey = [props.options, props.groups, props.virtual, props.optionValue];
   const __rozieMemoPrev = windowSourceCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return windowSourceCache.val;
@@ -1178,6 +1230,8 @@ watch(() => panelOpen.value, () => {
 }, { flush: 'post' });
 watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
   syncRows();
+  // The list shrank under the highlight: move it to the first enabled option.
+  if (activeIndex.value >= visibleOptions().length) activeIndex.value = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
   if (props.virtual && virtualizer) {
     gridScrollEl = __rozieRootRef.value ? __rozieRootRef.value!.querySelector('.rozie-select-list') : gridScrollEl;
     virtualizer.setOptions(virtualizerOptions());
@@ -1298,6 +1352,12 @@ useOutsideClick(
   color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
 }
 .rozie-select-option.is-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+.rozie-select-group-heading {
+  padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.25rem 0.6rem));
+  font-size: var(--rozie-select-group-heading-size, var(--rsl-group-heading-size, 0.75rem));
+  font-weight: var(--rozie-select-group-heading-weight, var(--rsl-group-heading-weight, 600));
+  color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.55)));
+}
 .rozie-select-empty { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
 .rozie-select-spacer { margin: 0; padding: 0; border: 0; flex: none; }
 .rozie-select-list--virtual { overflow-anchor: none; }

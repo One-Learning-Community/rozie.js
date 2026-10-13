@@ -163,7 +163,14 @@ const FAMILIES: FamilySpec[] = [
     baseline: {
       'Select.tsx': {
         // TS2339 ×8 (Class-3 windowing) CLEARED by Plan 04.
-        TS7006: 1,
+        // 1 → 4 (select option groups): `visibleOptions()` is now host-local and
+        // reads a `$memo` (`orderedOptions`), whose wrapper returns `val: any`, so
+        // the flat branch's `.map((opt, index) => …)` loses contextual typing (+2);
+        // the grouped branch's `blk.items.map((row) => …)` iterates the result of an
+        // emitter-annotated `(b: any)` callback (+1). The same Class-6 leaf-body
+        // noise combobox/react records for its `$memo` (see above); the consumer
+        // surface (Select.d.ts) is untouched.
+        TS7006: 4,
       },
     },
   },

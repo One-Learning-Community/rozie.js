@@ -10,9 +10,10 @@
 //     round-trip anti-drift guard (Phase 75 Plan 03, D-03): re-derives
 //     buildManifest(lowerToIR(Combobox.rozie)) and asserts it deep-equals the
 //     committed __fixtures__/rozie-manifest.expected.json bytes.
-//   • src/internal/groupOptions.test.ts — the pure group-partition helper
-//     (combobox-native-groups) — mirrors command-palette's
-//     src/internal/**/*.test.ts include.
+//   • src/internal/**/*.test.ts — unit tests for vendored internal helpers
+//     (mirrors command-palette's include). None today: groupOptions.ts is a
+//     guarded byte copy of @rozie-ui/headless-core/src/internal/groupOptions.ts
+//     and its unit tests live in that package (tests/groupOptions.test.ts).
 //   • tests/seed-query.behavior.test.ts — mount-and-drive behavioral proof for
 //     the `seedQuery` imperative handle verb, importing the committed
 //     packages/vue/src/Combobox.vue leaf (the captcha

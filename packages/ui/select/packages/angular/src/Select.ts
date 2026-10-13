@@ -5,6 +5,11 @@ import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAtt
 
 import { Popover } from '@rozie-ui/popover-angular';
 
+// ---- option grouping (src/internal/groupOptions.ts) ---------------------
+// The pure stable-partition helper is a RUNTIME import (not a `.rzts` partial):
+// codegen's `copyInternal` vendors it into each leaf at `./internal/groupOptions`.
+// It is a byte copy of @rozie-ui/headless-core/src/internal/groupOptions.ts.
+import { groupOptions } from './internal/groupOptions';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
@@ -16,6 +21,12 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
 // when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
 // virtualizer observes; remeasurePending dedupes the deferred sweep.
+
+/** An entry of the `groups` prop. */
+export interface SelectGroup {
+  id: string;
+  label: string;
+}
 
 interface SelectedCtx {
   $implicit: { selected: any; value: any };
@@ -37,6 +48,11 @@ interface EmptyCtx {
   query: any;
 }
 
+interface GroupHeadingCtx {
+  $implicit: { group: SelectGroup };
+  group: SelectGroup;
+}
+
 @Component({
   selector: 'rozie-select',
   standalone: true,
@@ -48,7 +64,7 @@ interface EmptyCtx {
       <rozie-popover trigger="manual" [open]="panelOpen()" (openChange)="panelOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()" [idBase]="idRoot()"><ng-template #anchor>
           
           <div class="rozie-select-control" #controlEl (click)="onControlClick($event)">
-            <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
+            <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
               @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -64,7 +80,7 @@ interface EmptyCtx {
           </div>
         </ng-template><ng-template #defaultSlot>
           
-          @if (popupVisible() && !virtual()) {
+          @if (popupVisible() && !virtual() && !isGrouped()) {
     <div #listEl class="rozie-select-list" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
             @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-select-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
@@ -78,6 +94,40 @@ interface EmptyCtx {
             </div>
     }
 
+            @if (visibleOptions().length === 0) {
+    <div class="rozie-select-empty" role="presentation">
+              @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+    <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
+    } @else {
+    No options
+    }
+            </div>
+    }</div>
+    }@if (popupVisible() && !virtual() && isGrouped()) {
+    <div #listEl class="rozie-select-list" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
+            @for (blk of groupBlocks(); track 'grp-' + (blk.group ? blk.group.id : '_ungrouped')) {
+    <div class="rozie-select-group" role="group" [attr.aria-label]="rozieAttr(blk.group ? blk.group.label : null)">
+              @if (blk.group) {
+    <div class="rozie-select-group-heading" role="presentation">
+                @if ((groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading'])) {
+    <ng-container *ngTemplateOutlet="(groupHeadingTpl ?? __rozieFillMap()['groupHeading'] ?? templates()?.['groupHeading']); context: { $implicit: { group: blk.group }, group: blk.group }" />
+    } @else {
+    {{ rozieDisplay(blk.group.label) }}
+    }
+              </div>
+    }@for (row of blk.items; track optionId(row.index)) {
+    <div [attr.id]="rozieAttr(optionId(row.index))" class="rozie-select-option" [ngClass]="{ 'is-active': activeIndex() === row.index, 'is-selected': isSelected(row.opt), 'is-disabled': disabledOf(row.opt) }" role="option" [attr.aria-selected]="!!isSelected(row.opt)" [attr.aria-disabled]="!!disabledOf(row.opt)" (click)="select(row.opt)" (mousemove)="onOptionPointerMove(row.index)">
+                @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+    <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: row.opt, index: row.index, active: activeIndex() === row.index, selected: isSelected(row.opt), disabled: disabledOf(row.opt) }, option: row.opt, index: row.index, active: activeIndex() === row.index, selected: isSelected(row.opt), disabled: disabledOf(row.opt) }" />
+    } @else {
+
+                  {{ rozieDisplay(labelOf(row.opt)) }}
+                
+    }
+              </div>
+    }
+            </div>
+    }
             @if (visibleOptions().length === 0) {
     <div class="rozie-select-empty" role="presentation">
               @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
@@ -221,6 +271,12 @@ interface EmptyCtx {
       color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
     }
     .rozie-select-option.is-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+    .rozie-select-group-heading {
+      padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.25rem 0.6rem));
+      font-size: var(--rozie-select-group-heading-size, var(--rsl-group-heading-size, 0.75rem));
+      font-weight: var(--rozie-select-group-heading-weight, var(--rsl-group-heading-weight, 600));
+      color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.55)));
+    }
     .rozie-select-empty { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
     .rozie-select-spacer { margin: 0; padding: 0; border: 0; flex: none; }
     .rozie-select-list--virtual { overflow-anchor: none; }
@@ -310,11 +366,15 @@ export class Select {
    */
   block = input<boolean>(false);
   /**
+   * Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; groups present on options but absent here follow in first-appearance order. Empty (the default) renders a flat list. Ignored when `virtual` is on.
+   */
+  groups = input<any[]>((() => [])());
+  /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel = input<(string) | null>(null);
   /**
-   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded.
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded. Grouping is not applied while `virtual` is on.
    */
   virtual = input<boolean>(false);
   /**
@@ -343,6 +403,7 @@ export class Select {
   @ContentChild('selected', { read: TemplateRef }) selectedTpl?: TemplateRef<SelectedCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
+  @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });
   __rozieFillMap = computed(() => {
@@ -391,6 +452,8 @@ export class Select {
     })(); }); });
     effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncRows();
+      // The list shrank under the highlight: move it to the first enabled option.
+      if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
       if (this.virtual() && this.virtualizer) {
         this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
         this.virtualizer.setOptions(this.virtualizerOptions());
@@ -445,15 +508,14 @@ export class Select {
   typeBuffer = '';
   typeTimer: any = null;
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
-  // The option resolvers, client filter, enabled-index navigation, the keyboard
-  // reducer, type-ahead, single+multi selection, open/close state, and
-  // activeDescendant derivation now live in the shared, focus-/input-mode
-  // parameterized list spine. It is a compile-time `.rzts` script-partial: it
-  // dissolves into this leaf via inlineScriptPartials() before IR lowering (zero
-  // runtime dep). Select consumes it in focus-model `activedescendant` +
-  // input-mode `select-only` + multi + type-ahead. The spine closes over this
-  // host's pieces by convention: the reassigned module-`let`s typeBuffer/typeTimer
-  // (above) and the impure ref fns focusControl/scrollActiveIntoView (below).
+  // The option resolvers, single+multi selection, close/clear, and the
+  // activeDescendant derivation come from the shared list spine. It is a
+  // compile-time `.rzts` script-partial: it dissolves into this leaf via
+  // inlineScriptPartials() before IR lowering (zero runtime dep). The spine closes
+  // over this host's pieces by convention: idRoot() and the impure ref fn
+  // focusControl (below). Navigation, type-ahead and open/toggle are host-local —
+  // see HOST-LOCAL NAVIGATION below; they use the reassigned module-`let`s
+  // typeBuffer/typeTimer (above) and scrollActiveIntoView (below).
   // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
   // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
   // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
@@ -515,19 +577,6 @@ export class Select {
   // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
   // per-instance id) so the option ids follow the host's auto-id fallback.
   optionId = (index: any) => this.idRoot() + '-opt-' + index;
-  // ---- derived state -----------------------------------------------------
-  // The visible option list: identity in select-only / non-filtering mode,
-  // a case-insensitive substring filter when a combobox query is present.
-  // A plain function (not `$computed`) so it reads uniformly across all six
-  // targets — a `$computed` is a value on React but an accessor on Solid, so
-  // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
-  // plain function is identical everywhere.
-  visibleOptions = () => {
-    const __options = this.options();
-    const q = (this.query() || '').trim().toLowerCase();
-    if (q === '') return __options;
-    return __options.filter((opt: any) => this.labelOf(opt).toLowerCase().includes(q));
-  };
   // Is a given option currently selected? Multi compares array membership.
   isSelected = (opt: any) => {
     const v = this.valueOf$local(opt);
@@ -536,33 +585,6 @@ export class Select {
     return cur === v;
   };
   // First enabled visible index, preferring the currently-selected option.
-  resolveInitialActive = () => {
-    const opts = this.visibleOptions();
-    const sel = opts.findIndex((o: any) => this.isSelected(o) && !this.disabledOf(o));
-    if (sel !== -1) return sel;
-    return opts.findIndex((o: any) => !this.disabledOf(o));
-  };
-  // ---- open / close ------------------------------------------------------
-  // Phase 73 item #8 (emitter-hardening batch): each of `open`/`close`/`toggle`
-  // $emit's directly — no longer funneled through a single wrapper. The
-  // former "route every emit through ONE wrapper fn" workaround guarded
-  // against a React duplicate `const {onOpenChange}=props` per emit-site
-  // (TS2451); verified against the current emitter (target-react
-  // `emitScript-multiEmitDedupe.test.ts`) that the shipped ITEM-1 (Phase 46)
-  // hoist-once dedupe already collapses N ESCAPING helpers sharing an emit
-  // target into exactly one destructure, and a non-escaping function (e.g.
-  // `open`, reachable here only via `$expose`) never destructures at all — so
-  // no combination of these three functions can produce the duplicate-const
-  // shape. See project_next_port_listbox / project_emitter_hardening_backlog.
-  open = () => {
-    if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    if (this.open$local()) return;
-    this.open$local.set(true);
-    this.activeIndex.set(this.resolveInitialActive());
-    this.openChange.emit({
-      open: true
-    });
-  };
   close = () => {
     if (!this.open$local()) return;
     this.open$local.set(false);
@@ -570,9 +592,6 @@ export class Select {
     this.openChange.emit({
       open: false
     });
-  };
-  toggle = () => {
-    if (this.open$local()) this.close();else this.open();
   };
   // ---- selection ---------------------------------------------------------
   select = (opt: any) => {
@@ -611,6 +630,74 @@ export class Select {
     });
   };
   // ---- keyboard navigation over the VISIBLE list -------------------------
+  // Pointer hover sets the virtual highlight (matches native <select> feel).
+  onOptionPointerMove = (index: any) => {
+    if (this.activeIndex() !== index) this.activeIndex.set(index);
+  };
+  groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt ? opt.group : null;
+  // Grouping is active only for a non-empty `groups` list, and never while windowing.
+  isGrouped = () => !this.virtual() && Array.isArray(this.groups()) && this.groups().length > 0;
+  // Visual order: identity when ungrouped, group-partitioned when grouped. Memoised on
+  // the inputs so repeated calls in one render return the SAME array (stable indices).
+  orderedOptionsCache = {
+    keys: null as any[] | null,
+    val: null as any
+  };
+  orderedOptions = () => {
+    const __options = this.options();
+    const __groups = this.groups();
+    const __rozieMemoKey = [__options, __groups, this.virtual()];
+    const __rozieMemoPrev = this.orderedOptionsCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+      return this.orderedOptionsCache.val;
+    }
+    const __rozieMemoVal = this.isGrouped() ? groupOptions(__options, __groups, this.groupOfOption).ordered : __options;
+    this.orderedOptionsCache.keys = __rozieMemoKey;
+    this.orderedOptionsCache.val = __rozieMemoVal;
+    return __rozieMemoVal;
+  };
+  // Blocks for the grouped render; each item carries its index in visibleOptions().
+  groupBlocks = () => {
+    const res = groupOptions(this.options(), this.groups(), this.groupOfOption);
+    let i = 0;
+    return res.blocks.map((b: any) => ({
+      group: b.group,
+      items: b.items.map((opt: any) => ({
+        opt,
+        index: i++
+      }))
+    }));
+  };
+  // ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════
+  // These ten functions are defined here instead of imported from listCore.rzts.
+  // The spine's navigation is bound to the spine's own `visibleOptions()`, and the
+  // partial inliner does not allow shadowing one function of a partial (ROZ139).
+  // Select needs navigation over the grouped VISUAL order, so it owns
+  // `visibleOptions` and every spine function that reaches it. The nine below
+  // `visibleOptions` are VERBATIM copies of listCore.rzts, kept in sync by
+  // tests/spine-copies.test.ts — change them in the spine first, then here.
+  // Combobox likewise keeps its navigation host-local.
+  // The option list every index refers to, in visual order. Select-only: there is
+  // no query filter (nothing writes `$data.query`).
+  visibleOptions = () => this.orderedOptions();
+  resolveInitialActive = () => {
+    const opts = this.visibleOptions();
+    const sel = opts.findIndex((o: any) => this.isSelected(o) && !this.disabledOf(o));
+    if (sel !== -1) return sel;
+    return opts.findIndex((o: any) => !this.disabledOf(o));
+  };
+  open = () => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    if (this.open$local()) return;
+    this.open$local.set(true);
+    this.activeIndex.set(this.resolveInitialActive());
+    this.openChange.emit({
+      open: true
+    });
+  };
+  toggle = () => {
+    if (this.open$local()) this.close();else this.open();
+  };
   nextEnabled = (from: any, dir: any) => {
     const opts = this.visibleOptions();
     if (opts.length === 0) return -1;
@@ -641,8 +728,6 @@ export class Select {
     const opts = this.visibleOptions();
     if (__activeIndex >= 0 && __activeIndex < opts.length) this.select(opts[__activeIndex]);
   };
-  // Type-ahead for select-only listboxes: accumulate keystrokes and jump to the
-  // first option whose label starts with the buffer.
   onTypeahead = (ch: any) => {
     if (this.typeTimer !== null) clearTimeout(this.typeTimer);
     this.typeBuffer += ch.toLowerCase();
@@ -657,9 +742,6 @@ export class Select {
       this.scrollActiveIntoView();
     }
   };
-  // Key handler shared by the trigger and the combobox input. The printable-
-  // character branch is reached only in select-only mode (the combobox input
-  // types through @input).
   onControlKeyDown = ($event: any) => {
     const __open$local = this.open$local();
     const key = $event.key;
@@ -698,12 +780,17 @@ export class Select {
       this.onTypeahead(key);
     }
   };
-  // Combobox input handler: keep the popup open while typing, reset the active
-  // highlight to the first match, and surface the query for remote filtering.
-  // Pointer hover sets the virtual highlight (matches native <select> feel).
-  onOptionPointerMove = (index: any) => {
-    if (this.activeIndex() !== index) this.activeIndex.set(index);
-  };
+  // ══ HOST-LOCAL NAVIGATION (end) ═══════════════════════════════════════════
+  // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
+  // The PURE windowing math (the windowed slice + spacer geometry) is the SAME
+  // virtual-core bridge data-table consumes. It is a compile-time `.rzts` partial:
+  // the imported symbols DISSOLVE into this leaf via inlineScriptPartials() before
+  // IR lowering (zero runtime dep). The math closes over this host's pieces BY
+  // CONVENTION (D-04/D-05): windowSource(), the virtualizer instance + gridScrollEl +
+  // the virtual-core fns, scheduleRemeasure(), $data.windowVer/$data.editVer, and the
+  // no-op pin hook pinnedEditIndex()/pinnedMeasurement() defined below. The impure
+  // DOM/refs pieces stay HERE per-consumer (ROZ123). NB the pin hooks are defined in
+  // THIS host (not the shared partial) so data-table's A==B byte-identity is untouched.
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -1108,11 +1195,10 @@ export class Select {
   // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
   // the same wrapped row the count windows over.
   //
-  // $memo, keyed on the TRUE inputs — NOT on visibleOptions() itself, which returns a
-  // FRESH filtered array whenever a query is active (a visibleOptions()-keyed cache
-  // would never hit while filtering). The key covers everything the map reads:
-  // options ref + query (visibleOptions' inputs) and the optionValue/optionLabel
-  // resolvers (valueOf in the map body; labelOf inside visibleOptions' filter path).
+  // $memo, keyed on the TRUE inputs. The key covers everything the map reads:
+  // options ref + groups + virtual (visibleOptions' inputs — with `virtual` on,
+  // grouping is off, so this is source order) and the optionValue resolver
+  // (valueOf in the map body).
   // Same reference-stability contract the sibling Combobox's filteredOptions carries —
   // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
   // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
@@ -1121,7 +1207,7 @@ export class Select {
     val: null as any
   };
   windowSource = () => {
-    const __rozieMemoKey = [this.options(), this.query(), this.optionValue(), this.optionLabel()];
+    const __rozieMemoKey = [this.options(), this.groups(), this.virtual(), this.optionValue()];
     const __rozieMemoPrev = this.windowSourceCache.keys;
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return this.windowSourceCache.val;
@@ -1415,7 +1501,7 @@ export class Select {
   static ngTemplateContextGuard(
     _dir: Select,
     _ctx: unknown,
-  ): _ctx is SelectedCtx | OptionCtx | EmptyCtx {
+  ): _ctx is SelectedCtx | OptionCtx | EmptyCtx | GroupHeadingCtx {
     return true;
   }
 

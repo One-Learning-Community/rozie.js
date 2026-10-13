@@ -4,7 +4,7 @@
  * implementation exists (TDD RED), per the combobox-native-groups plan Task 1.
  */
 import { describe, it, expect } from 'vitest';
-import { groupOptions, type OptionGroup } from './groupOptions';
+import { groupOptions, type OptionGroup } from '../src/internal/groupOptions';
 
 interface Opt {
   value: string;

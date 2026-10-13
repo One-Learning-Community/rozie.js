@@ -99,6 +99,12 @@
   color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
 }
 .rozie-select-option.is-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+.rozie-select-group-heading[data-rozie-s-6e3ebfa6] {
+  padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.25rem 0.6rem));
+  font-size: var(--rozie-select-group-heading-size, var(--rsl-group-heading-size, 0.75rem));
+  font-weight: var(--rozie-select-group-heading-weight, var(--rsl-group-heading-weight, 600));
+  color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.55)));
+}
 .rozie-select-empty[data-rozie-s-6e3ebfa6] { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
 .rozie-select-spacer[data-rozie-s-6e3ebfa6] { margin: 0; padding: 0; border: 0; flex: none; }
 .rozie-select-list--virtual[data-rozie-s-6e3ebfa6] { overflow-anchor: none; }

@@ -696,6 +696,10 @@ export const EXAMPLES = [
   // flipped above near the viewport bottom, outside-click dismissal, open-change
   // counting. Behavioral-only (select-floating.spec.ts); NOT a screenshot cell.
   'SelectFloating',
+  // @rozie-ui/select option groups (loader → examples/demos/SelectGroupsDemo.rozie):
+  // the `groups` prop + `groupHeading` slot, and keyboard navigation / type-ahead over
+  // the grouped visual order. Behavioral-only (select-groups.spec.ts); NOT a screenshot cell.
+  'SelectGroups',
   // (P3/D-03: Select's editable combobox mode was retired — type-to-filter now
   // lives in @rozie-ui/combobox; the former SelectCombobox cell is removed.)
   // Phase 64 P4 (headless windowing, SC-5) — the WINDOWED long-list cells (loaders →
@@ -1699,6 +1703,8 @@ export const LIT_TAGS: Record<Example, string> = {
   SelectBehavior: 'rozie-select-behavior',
   // 'rozie-select-floating-demo' = kebab of SelectFloatingDemo.
   SelectFloating: 'rozie-select-floating',
+  // 'rozie-select-groups-demo' = kebab of SelectGroupsDemo.
+  SelectGroups: 'rozie-select-groups',
   // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-select-virtual-demo'
   // / 'rozie-combobox-virtual-demo' = kebab of {Select,Combobox}VirtualDemo.
   SelectVirtual: 'rozie-select-virtual',
@@ -2265,6 +2271,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SelectBehavior: {},
   // SelectFloatingDemo is self-contained (own options + internal r-model). No parent props.
   SelectFloating: {},
+  // SelectGroupsDemo is self-contained (own options + groups + internal r-model). No parent props.
+  SelectGroups: {},
   // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
   // 1,000-option list in $onMount and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.

@@ -82,6 +82,7 @@ import '@rozie-ui/select-solid/themes/shadcn.css';    // or material.css, bootst
 | `disableFlip` | `Boolean` | `false` |  |  |
 | `disableShift` | `Boolean` | `false` |  |  |
 | `block` | `Boolean` | `false` |  |  |
+| `groups` | `Array` | `[]` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |
@@ -122,3 +123,4 @@ handle?.open();
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| groupHeading | group |

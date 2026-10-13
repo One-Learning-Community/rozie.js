@@ -74,6 +74,7 @@ import '@rozie-ui/select-svelte/themes/shadcn.css';    // or material.css, boots
 | `disableFlip` | `Boolean` | `false` |  |  |
 | `disableShift` | `Boolean` | `false` |  |  |
 | `block` | `Boolean` | `false` |  |  |
+| `groups` | `Array` | `[]` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |
@@ -114,3 +115,4 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |
+| groupHeading | group |
