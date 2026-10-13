@@ -205,6 +205,51 @@ for (const target of TARGETS) {
     await page.getByTestId('off-select').locator('.rozie-select-control').click({ force: true });
     await expect(dis).toHaveAttribute('aria-expanded', 'false');
   });
+
+  runner(`select [${target}]: one click on the trigger text toggles exactly once`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const trigger = page.getByTestId('main-select').locator('[role="combobox"]');
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await trigger.click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  runner(`select [${target}]: disabled select ignores DOM clicks and keys (no pointer events)`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const off = page.getByTestId('off-select');
+    const dis = off.locator('[role="combobox"]');
+    const readout = page.getByTestId('readout-off');
+    await expect(dis).toHaveAttribute('aria-disabled', 'true');
+    // DOM-level clicks bypass pointer-events:none, so the host guard is what holds.
+    await off.locator('.rozie-select-control').dispatchEvent('click');
+    await expect(dis).toHaveAttribute('aria-expanded', 'false');
+    await dis.dispatchEvent('click');
+    await expect(dis).toHaveAttribute('aria-expanded', 'false');
+    await expect(off.locator('[role="listbox"]')).toHaveCount(0);
+    // A click must not steal focus either.
+    await expect(dis).not.toBeFocused();
+    // Keyboard: focus programmatically (tabindex=-1), then drive keys.
+    await dis.evaluate((el) => (el as HTMLElement).focus());
+    await expect(dis).toBeFocused();
+    // A disabled select must not swallow keys: the spine would preventDefault ArrowDown/Space
+    // (page scroll suppressed) even though open() itself no-ops, so the host guard is what
+    // leaves them to the browser.
+    for (const key of ['ArrowDown', ' ']) {
+      const prevented = await dis.evaluate((el, k) => {
+        const ev = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
+        el.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      }, key);
+      expect(prevented, `keydown ${JSON.stringify(key)} on a disabled select is not consumed`).toBe(false);
+    }
+    for (const key of ['ArrowDown', ' ', 'Enter', 'a']) {
+      await page.keyboard.press(key);
+      await expect(dis).toHaveAttribute('aria-expanded', 'false');
+      await expect(off.locator('[role="listbox"]')).toHaveCount(0);
+      await expect(readout).toHaveText('');
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
