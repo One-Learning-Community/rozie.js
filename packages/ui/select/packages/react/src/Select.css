@@ -3,10 +3,17 @@
   display: inline-block;
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
+  /* The popup's stacking order is the composed popover's now; keep the select's own
+     `--rozie-select-z` token steering it (custom properties inherit into the panel). */
+  --rozie-popover-z: var(--rozie-select-z, var(--rsl-z, 1000));
 }
 .rozie-select-control[data-rozie-s-6e3ebfa6] {
   box-sizing: border-box;
-  width: 100%;
+  /* NOT `width: 100%`: the control renders inside the popover's anchor wrapper
+     (`display: inline-block`, shrink-to-fit), so a percentage width is circular. It
+     sizes to its content with the root's own minimum, which is the box the root's
+     `inline-block` + `min-width` gave it before. `block` and `inline` stretch it. */
+  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -34,11 +41,6 @@
   opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
 }
 .rozie-select-list[data-rozie-s-6e3ebfa6] {
-  position: absolute;
-  z-index: var(--rozie-select-z, var(--rsl-z, 1000));
-  top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
   max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
@@ -55,11 +57,22 @@
   width: 100%;
 }
 .rozie-select-inline[data-rozie-s-6e3ebfa6] .rozie-select-list[data-rozie-s-6e3ebfa6] {
-  position: static;
   margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+.rozie-select-inline[data-rozie-s-6e3ebfa6],
+.rozie-select--block[data-rozie-s-6e3ebfa6] {
+  container-type: inline-size;
+}
+.rozie-select-inline[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6],
+.rozie-select--block[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] {
+  width: 100cqw;
+}
+.rozie-select--block[data-rozie-s-6e3ebfa6] {
+  display: block;
+  width: 100%;
 }
 .rozie-select-option[data-rozie-s-6e3ebfa6] {
   padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));

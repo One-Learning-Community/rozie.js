@@ -3,6 +3,8 @@ import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
 
+import { Popover } from '@rozie-ui/popover-angular';
+
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
@@ -38,80 +40,82 @@ interface EmptyCtx {
 @Component({
   selector: 'rozie-select',
   standalone: true,
-  imports: [NgTemplateOutlet, NgClass],
+  imports: [NgTemplateOutlet, NgClass, Popover],
   template: `
 
-    <div class="rozie-select" [ngClass]="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-select-inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-
+    <div class="rozie-select" [ngClass]="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-select-inline': inline(), 'rozie-select--block': block() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
       
-      <div class="rozie-select-control" #controlEl (click)="onControlClick($event)">
-        <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
-          @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
+      <rozie-popover trigger="manual" [open]="panelOpen()" (openChange)="panelOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()" [idBase]="idRoot()"><ng-template #anchor>
+          
+          <div class="rozie-select-control" #controlEl (click)="onControlClick($event)">
+            <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
+              @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
 
-            @if (selectedLabel()) {
+                @if (selectedLabel()) {
     <span class="rozie-select-selected">{{ rozieDisplay(selectedLabel()) }}</span>
     } @else {
     <span class="rozie-select-placeholder">{{ placeholder() }}</span>
     }
     }
-        </div>
-        <span class="rozie-select-arrow" aria-hidden="true">▾</span>
-      </div>
-
-      
-      @if (popupVisible() && !virtual()) {
+            </div>
+            <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+          </div>
+        </ng-template><ng-template #defaultSlot>
+          
+          @if (popupVisible() && !virtual()) {
     <div #listEl class="rozie-select-list" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()">
-        @for (opt of visibleOptions(); track optionId(index); let index = $index) {
+            @for (opt of visibleOptions(); track optionId(index); let index = $index) {
     <div [attr.id]="rozieAttr(optionId(index))" class="rozie-select-option" [ngClass]="{ 'is-active': activeIndex() === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }" role="option" [attr.aria-selected]="!!isSelected(opt)" [attr.aria-disabled]="!!disabledOf(opt)" (click)="select(opt)" (mousemove)="onOptionPointerMove(index)">
-          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+              @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }, option: opt, index: index, active: activeIndex() === index, selected: isSelected(opt), disabled: disabledOf(opt) }" />
     } @else {
 
-            {{ rozieDisplay(labelOf(opt)) }}
-          
+                {{ rozieDisplay(labelOf(opt)) }}
+              
     }
-        </div>
+            </div>
     }
 
-        @if (visibleOptions().length === 0) {
+            @if (visibleOptions().length === 0) {
     <div class="rozie-select-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+              @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No options
     }
-        </div>
+            </div>
     }</div>
     }@if (virtual()) {
     <div #listEl class="rozie-select-list rozie-select-list--virtual" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()" [attr.style]="__style">
-        <div class="rozie-select-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></div>
+            <div class="rozie-select-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></div>
 
-        @for (wr of windowedRows(); track wr.row.id) {
+            @for (wr of windowedRows(); track wr.row.id) {
     <div [attr.id]="rozieAttr(optionId(wr.vi.index))" [attr.data-index]="rozieAttr(wr.vi.index)" class="rozie-select-option" [ngClass]="{ 'is-active': activeIndex() === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }" role="option" [attr.aria-selected]="!!isSelected(wr.row._opt)" [attr.aria-disabled]="!!disabledOf(wr.row._opt)" (click)="select(wr.row._opt)" (mousemove)="onOptionPointerMove(wr.vi.index)">
-          @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
+              @if ((optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option'])) {
     <ng-container *ngTemplateOutlet="(optionTpl ?? __rozieFillMap()['option'] ?? templates()?.['option']); context: { $implicit: { option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }, option: wr.row._opt, index: wr.vi.index, active: activeIndex() === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }" />
     } @else {
 
-            {{ rozieDisplay(labelOf(wr.row._opt)) }}
-          
+                {{ rozieDisplay(labelOf(wr.row._opt)) }}
+              
     }
-        </div>
+            </div>
     }
 
-        <div class="rozie-select-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></div>
+            <div class="rozie-select-spacer" aria-hidden="true" [attr.style]="'height:' + padBottom() + 'px'"></div>
 
-        @if (windowSource().length === 0) {
+            @if (windowSource().length === 0) {
     <div class="rozie-select-empty" role="presentation">
-          @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
+              @if ((emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty'])) {
     <ng-container *ngTemplateOutlet="(emptyTpl ?? __rozieFillMap()['empty'] ?? templates()?.['empty']); context: { $implicit: { query: query() }, query: query() }" />
     } @else {
     No options
     }
-        </div>
+            </div>
     }</div>
-    }</div>
+    }</ng-template></rozie-popover>
+    </div>
 
   `,
   styles: [`
@@ -121,10 +125,17 @@ interface EmptyCtx {
       display: inline-block;
       min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
       font: var(--rozie-select-font, inherit);
+      /* The popup's stacking order is the composed popover's now; keep the select's own
+         \`--rozie-select-z\` token steering it (custom properties inherit into the panel). */
+      --rozie-popover-z: var(--rozie-select-z, var(--rsl-z, 1000));
     }
     .rozie-select-control {
       box-sizing: border-box;
-      width: 100%;
+      /* NOT \`width: 100%\`: the control renders inside the popover's anchor wrapper
+         (\`display: inline-block\`, shrink-to-fit), so a percentage width is circular. It
+         sizes to its content with the root's own minimum, which is the box the root's
+         \`inline-block\` + \`min-width\` gave it before. \`block\` and \`inline\` stretch it. */
+      min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -152,11 +163,6 @@ interface EmptyCtx {
       opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
     }
     .rozie-select-list {
-      position: absolute;
-      z-index: var(--rozie-select-z, var(--rsl-z, 1000));
-      top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
-      left: 0;
-      right: 0;
       margin: 0;
       padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
       max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
@@ -173,11 +179,22 @@ interface EmptyCtx {
       width: 100%;
     }
     .rozie-select-inline .rozie-select-list {
-      position: static;
       margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
       border: none;
       border-radius: 0;
       box-shadow: none;
+    }
+    .rozie-select-inline,
+    .rozie-select--block {
+      container-type: inline-size;
+    }
+    .rozie-select-inline .rozie-select-control,
+    .rozie-select--block .rozie-select-control {
+      width: 100cqw;
+    }
+    .rozie-select--block {
+      display: block;
+      width: 100%;
     }
     .rozie-select-option {
       padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));
@@ -273,6 +290,26 @@ export class Select {
    */
   selectOnTab = input<boolean>(false);
   /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
+   */
+  placement = input<string>('bottom-start');
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   */
+  offset = input<number>(4);
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  disableFlip = input<boolean>(false);
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  disableShift = input<boolean>(false);
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   */
+  block = input<boolean>(false);
+  /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel = input<(string) | null>(null);
@@ -290,6 +327,8 @@ export class Select {
   maxHeight = input<string>('');
   autoId = signal('');
   open$local = signal(false);
+  panelOpen = signal(false);
+  panelEcho = signal(false);
   activeIndex = signal(-1);
   query = signal('');
   rows = signal<any[]>([]);
@@ -317,12 +356,14 @@ export class Select {
     return map;
   });
   private __rozieWatchInitial_0 = true;
+  private __rozieWatchInitial_1 = true;
+  private __rozieWatchInitial_2 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
 
       effect((onCleanup) => {
-        if (!(this.open$local())) return;
+        if (!(this.open$local() && (this.inline() || !this.popupVisible()))) return;
         const listenTarget = typeof document === 'undefined' ? null : document;
         if (!listenTarget) return;
         const handler = ($event: MouseEvent) => {
@@ -339,7 +380,16 @@ export class Select {
       // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
       if (this.virtualizerCleanup) this.virtualizerCleanup();
     });
-    effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.open$local() ? 'o' : 'c') + (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      this.syncPanel();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      const __panelOpen = this.panelOpen();
+      if (__panelOpen === this.panelEcho()) return;
+      this.panelEcho.set(__panelOpen);
+      if (!__panelOpen) this.close();
+    })(); }); });
+    effect(() => { const __watchVal = (() => (this.options() ? this.options().length : 0) + '|' + this.query())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncRows();
       if (this.virtual() && this.virtualizer) {
         this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
@@ -1292,6 +1342,30 @@ export class Select {
     if (!this.hideEmpty()) return true;
     return this.visibleOptions().length > 0;
   };
+  // ---- composed popover <-> open state ------------------------------------
+  // The popover's `open` model is bound to $data.panelOpen, NOT to $data.open: the
+  // popover emits nothing of its own, it only writes its model when it dismisses
+  // (outside click, or Escape seen at the document). Binding it to a field of its own
+  // makes that write visible, so a popover-initiated close is routed through the
+  // spine's close() like every other close — one `open-change` per real transition and
+  // the highlight reset.
+  //
+  // Telling the popover's write from our own is done with STATE, not a flag:
+  // $data.panelEcho is written together with every $data.panelOpen write made here, so
+  // in any one render/flush the pair is consistent — equal means "ours", different
+  // means "the popover closed itself" (it can never open itself: `trigger="manual"`).
+  // A plain variable in its place is read live while the reactive values are per-render
+  // snapshots on React: when a close and a re-open land in one commit, both watchers
+  // run in one pass and the second one misreads our own write as a dismissal (seen as
+  // a popup that stayed shut after Enter-then-ArrowDown).
+  // The echo is written FIRST, for targets whose watchers run synchronously on a write.
+  syncPanel = () => {
+    const visible = this.popupVisible();
+    if (visible === this.panelOpen()) return;
+    this.panelEcho.set(visible);
+    this.panelOpen.set(visible);
+  };
+  // select -> popover: follows a derived primitive covering everything popupVisible() reads.
   // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
   // families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true

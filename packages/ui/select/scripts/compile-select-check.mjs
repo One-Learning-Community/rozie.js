@@ -23,7 +23,7 @@ const resolver = new ProducerResolver({ root: ROOT });
 
 const EXPECT = {
   name: 'Select',
-  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight'],
+  props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'ariaLabel', 'virtual', 'estimateRowHeight', 'maxHeight', 'placement', 'offset', 'disableFlip', 'disableShift', 'block'],
   models: ['value'],
   emits: ['change', 'open-change'],
   slots: ['selected', 'option', 'empty'],

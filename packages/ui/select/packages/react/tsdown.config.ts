@@ -11,7 +11,13 @@ export default defineConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  external: ['react', 'react-dom', '@rozie/runtime-react', /\.css$/],
+  // @rozie-ui/popover-react is a published-package runtime peerDependency (the
+  // Option-A composition, mirroring combobox/data-table), NOT vendored source —
+  // it MUST stay external so it is not inlined/duplicated into this leaf's bundle
+  // (an inlined copy would defeat the peerDependency and double-load the
+  // primitive's own module-scope state alongside any copy the consumer's app
+  // separately imports).
+  external: ['react', 'react-dom', '@rozie/runtime-react', '@rozie-ui/popover-react', /\.css$/],
   // The generated component does a side-effect `import './Select.css'`; mark
   // it external and copy the file into dist so the relative specifier resolves
   // at the consumer's bundler.

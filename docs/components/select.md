@@ -19,7 +19,7 @@ There is no vanilla-JS dependency: selection state, keyboard navigation, type-ah
 | `@rozie-ui/select-solid` | `npm i @rozie-ui/select-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/solid/README.md) |
 | `@rozie-ui/select-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/lit/README.md) |
 
-Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
+Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` — composed internally for the floating popup — which in turn requires `@floating-ui/dom`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
 
 ## Quick start
 
@@ -63,7 +63,7 @@ Pass an `options` array and two-way bind `value`:
 | `options` | `Array` | `[]` | yes | The option set. Each entry is a primitive (`string`/`number`) or an object resolved via the `option*` props (falling back to `.label` / `.value` / `.disabled`). |
 | `value` | `unknown` | `null` | yes (via `r-model`) | The selected value. `model: true` — scalar in single-select, an array of values in multi-select. The sole model prop, so Angular emits a `ControlValueAccessor`. |
 | `multiple` | `Boolean` | `false` | yes | Multi-select: `value` becomes an array; selecting toggles membership and keeps the popup open. |
-| `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as an absolute popup, so an `overflow:hidden` ancestor (e.g. a command palette) can't clip it. Defaults to the standalone dropdown behavior. |
+| `inline` | `Boolean` | `false` | yes | Render the results list in normal flow (static) rather than as a floating popup, so an `overflow:hidden` ancestor (e.g. a command palette) can't clip it. Defaults to the standalone dropdown behavior. |
 | `disabled` | `Boolean` | `false` | yes | Disable the control (also sets the Angular CVA disabled state). |
 | `placeholder` | `String` | `''` | yes | Placeholder text for the empty control. |
 | `closeOnSelect` | `Boolean` | `true` | yes | Close the popup after a single-select commit. Multi-select keeps it open regardless. |
@@ -77,6 +77,11 @@ Pass an `options` array and two-way bind `value`:
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
+| `placement` | `String` | `"bottom-start"` | yes | Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Ignored when `inline` is set. |
+| `offset` | `Number` | `4` | yes | Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token). |
+| `disableFlip` | `Boolean` | `false` | yes | Disable the popup's Floating UI `flip` middleware: by default the popup flips above the control when there is no room below. Ignored when `inline` is set. |
+| `disableShift` | `Boolean` | `false` | yes | Disable the popup's Floating UI `shift` middleware: by default the popup shifts to stay within the viewport. Ignored when `inline` is set. |
+| `block` | `Boolean` | `false` | yes | Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. |
 
 ### Events
 
@@ -137,5 +142,6 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 ## Accessibility
 
 - The control carries `role="combobox"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant`; the popup is `role="listbox"` (with `aria-multiselectable` in multi-select); each option is `role="option"` with `aria-selected` / `aria-disabled`.
+- The popup is positioned by composing the published [`@rozie-ui/popover`](/components/popover) leaf (Floating UI): it opens below the control at the control's width, flips above when there is no room below, and shifts to stay on-screen. A click outside, or Escape, closes it; `open-change` fires once per open or close whichever way it happened. `inline` switches the floating off and renders the list in normal flow.
 - Supply an accessible name via a visible `<label for>` pointing at the control's `id`, or the `ariaLabel` prop.
 - Each instance generates a unique id base after mount, so several selectes on one page never share option ids or `aria-activedescendant` references. Set `idBase` yourself only when you need stable ids.

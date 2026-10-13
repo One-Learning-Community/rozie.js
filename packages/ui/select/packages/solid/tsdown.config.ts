@@ -10,5 +10,11 @@ export default defineConfig(solidLeafConfig({
   outputOptions(options) {
     return { ...options, exports: 'named' };
   },
-  external: ['solid-js', '@rozie/runtime-solid'],
+  // @rozie-ui/popover-solid is a published-package runtime peerDependency (the
+  // Option-A composition, mirroring combobox/data-table) — NOT vendored source.
+  // It MUST stay external: solid-js components must be JSX-compiled by the
+  // CONSUMING app's own solid preset, so popover-solid's own dist ships
+  // un-transformed JSX that rolldown cannot parse if bundled here (and inlining
+  // would double-load the primitive's own module-scope state).
+  external: ['solid-js', '@rozie/runtime-solid', '@rozie-ui/popover-solid'],
 }));

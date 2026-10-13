@@ -10,6 +10,17 @@ npm i @rozie-ui/select-lit
 
 Peer dependencies: `lit + @lit-labs/preact-signals + @preact/signals-core`. Install them alongside this package.
 
+**Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
+
+- `@rozie-ui/popover-lit` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/select-lit`
+- `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-lit`
+
+Install the whole chain in one line:
+
+```bash
+npm i @rozie-ui/select-lit @rozie-ui/popover-lit @floating-ui/dom
+```
+
 Also installed: `@rozie/runtime-lit` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
@@ -55,6 +66,11 @@ import '@rozie-ui/select-lit/themes/shadcn.css';    // or material.css, bootstra
 | `idBase` | `String` | `''` |  |  |
 | `hideEmpty` | `Boolean` | `false` |  |  |
 | `selectOnTab` | `Boolean` | `false` |  |  |
+| `placement` | `String` | `"bottom-start"` |  |  |
+| `offset` | `Number` | `4` |  |  |
+| `disableFlip` | `Boolean` | `false` |  |  |
+| `disableShift` | `Boolean` | `false` |  |  |
+| `block` | `Boolean` | `false` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `virtual` | `Boolean` | `false` |  |  |
 | `estimateRowHeight` | `Number` | `36` |  |  |

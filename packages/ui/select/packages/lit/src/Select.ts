@@ -3,6 +3,7 @@ import { customElement, property, query, queryAssignedElements, state } from 'li
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, attachOutsideClickListener, createLitControllableProperty, rozieAttr, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
+import '@rozie-ui/popover-lit';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
@@ -43,10 +44,17 @@ export default class Select extends SignalWatcher(LitElement) {
   display: inline-block;
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
+  /* The popup's stacking order is the composed popover's now; keep the select's own
+     \`--rozie-select-z\` token steering it (custom properties inherit into the panel). */
+  --rozie-popover-z: var(--rozie-select-z, var(--rsl-z, 1000));
 }
 .rozie-select-control[data-rozie-s-6e3ebfa6] {
   box-sizing: border-box;
-  width: 100%;
+  /* NOT \`width: 100%\`: the control renders inside the popover's anchor wrapper
+     (\`display: inline-block\`, shrink-to-fit), so a percentage width is circular. It
+     sizes to its content with the root's own minimum, which is the box the root's
+     \`inline-block\` + \`min-width\` gave it before. \`block\` and \`inline\` stretch it. */
+  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -74,11 +82,6 @@ export default class Select extends SignalWatcher(LitElement) {
   opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
 }
 .rozie-select-list[data-rozie-s-6e3ebfa6] {
-  position: absolute;
-  z-index: var(--rozie-select-z, var(--rsl-z, 1000));
-  top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
   max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
@@ -95,11 +98,22 @@ export default class Select extends SignalWatcher(LitElement) {
   width: 100%;
 }
 .rozie-select-inline[data-rozie-s-6e3ebfa6] .rozie-select-list[data-rozie-s-6e3ebfa6] {
-  position: static;
   margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+.rozie-select-inline[data-rozie-s-6e3ebfa6],
+.rozie-select--block[data-rozie-s-6e3ebfa6] {
+  container-type: inline-size;
+}
+.rozie-select-inline[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6],
+.rozie-select--block[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] {
+  width: 100cqw;
+}
+.rozie-select--block[data-rozie-s-6e3ebfa6] {
+  display: block;
+  width: 100%;
 }
 .rozie-select-option[data-rozie-s-6e3ebfa6] {
   padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));
@@ -187,6 +201,26 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'select-on-tab' }) selectOnTab: boolean = false;
   /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
+   */
+  @property({ type: String, reflect: true }) placement: string = 'bottom-start';
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   */
+  @property({ type: Number, reflect: true }) offset: number = 4;
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'disable-flip' }) disableFlip: boolean = false;
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  @property({ type: Boolean, reflect: true, attribute: 'disable-shift' }) disableShift: boolean = false;
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   */
+  @property({ type: Boolean, reflect: true }) block: boolean = false;
+  /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
@@ -204,6 +238,8 @@ export default class Select extends SignalWatcher(LitElement) {
   @property({ type: String, reflect: true, attribute: 'max-height' }) maxHeight: string = '';
   private _autoId = signal('');
   private _open$local = signal(false);
+  private _panelOpen = signal(false);
+  private _panelEcho = signal(false);
   private _activeIndex = signal(-1);
   private _query = signal('');
   private _rows = signal<any[]>([]);
@@ -214,6 +250,8 @@ export default class Select extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+private __rozieWatchInitial_1 = true;
+private __rozieWatchInitial_2 = true;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
@@ -243,7 +281,7 @@ private __rozieWatchInitial_0 = true;
   private _rozieTornDown = false;
 
   private _armListeners(): void {
-    const _u0 = attachOutsideClickListener([() => this._refControlEl, () => this._refListEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this._open$local.value));
+    const _u0 = attachOutsideClickListener([() => this._refControlEl, () => this._refListEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this._open$local.value && (this.inline || !this.popupVisible())));
     this._disconnectCleanups.push(_u0);
 
     {
@@ -292,7 +330,15 @@ private __rozieWatchInitial_0 = true;
   firstUpdated(): void {
     this._armListeners();
 
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this.options ? this.options.length : 0) + '|' + this._query.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this._open$local.value ? 'o' : 'c') + (this.hideEmpty ? 'h' : 's') + (this.options ? this.options.length : 0) + '|' + this._query.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+      this.syncPanel();
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._panelOpen.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      if (this._panelOpen.value === this._panelEcho.value) return;
+      this._panelEcho.value = this._panelOpen.value;
+      if (!this._panelOpen.value) this.close();
+    })(); }); }));
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this.options ? this.options.length : 0) + '|' + this._query.value)(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncRows();
       if (this.virtual && this.virtualizer) {
         this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-select-list') : this.gridScrollEl;
@@ -340,41 +386,40 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-<div class="${Object.entries({ "rozie-select": true, 'rozie-select-open': this.popupVisible(), 'rozie-select-disabled': this.disabled, 'rozie-select-inline': this.inline }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-6e3ebfa6>
-
+<div class="${Object.entries({ "rozie-select": true, 'rozie-select-open': this.popupVisible(), 'rozie-select-disabled': this.disabled, 'rozie-select-inline': this.inline, 'rozie-select--block': this.block }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-6e3ebfa6>
   
-  <div class="rozie-select-control" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onControlClick($event); }} data-rozie-ref="controlEl" data-rozie-s-6e3ebfa6>
-    <div class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex=${rozieAttr(this.triggerTabindex())} aria-expanded=${!!this.popupVisible()} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.popupVisible() ? this.activeDescendant : null)} aria-label=${rozieAttr(this.ariaLabel)} aria-disabled=${!!this.disabled} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
-      ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
-        ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}
-    </div>
-    <span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
-  </div>
+  <rozie-popover trigger="manual" .open=${this._panelOpen.value} @open-change=${($event: CustomEvent) => { this._panelOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} .idBase=${this.idRoot()} data-rozie-s-6e3ebfa6><div class="rozie-select-control" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onControlClick($event); }} data-rozie-ref="controlEl" data-rozie-s-6e3ebfa6 slot="anchor">
+        <div class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex=${rozieAttr(this.triggerTabindex())} aria-expanded=${!!this.popupVisible()} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.popupVisible() ? this.activeDescendant : null)} aria-label=${rozieAttr(this.ariaLabel)} aria-disabled=${!!this.disabled} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
+          ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
+            ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}
+        </div>
+        <span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
+      </div>
+      
+      ${this.popupVisible() && !this.virtual ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+        ${repeat<any>(this.visibleOptions(), (opt, index) => this.optionId(index), (opt, index) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === index, 'is-selected': this.isSelected(opt), 'is-disabled': this.disabledOf(opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(index))} role="option" aria-selected=${!!this.isSelected(opt)} aria-disabled=${!!this.disabledOf(opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>
+          ${this.option !== undefined ? this.option({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}); } catch { return '{}'; } })()}>
+            ${rozieDisplay(this.labelOf(opt))}
+          </slot>`}
+        </div>`)}
 
-  
-  ${this.popupVisible() && !this.virtual ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
-    ${repeat<any>(this.visibleOptions(), (opt, index) => this.optionId(index), (opt, index) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === index, 'is-selected': this.isSelected(opt), 'is-disabled': this.disabledOf(opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(index))} role="option" aria-selected=${!!this.isSelected(opt)} aria-disabled=${!!this.disabledOf(opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>
-      ${this.option !== undefined ? this.option({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}); } catch { return '{}'; } })()}>
-        ${rozieDisplay(this.labelOf(opt))}
-      </slot>`}
-    </div>`)}
+        ${this.visibleOptions().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
+          ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
+        </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+        <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-6e3ebfa6></div>
 
-    ${this.visibleOptions().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
-      ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-    </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
-    <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-6e3ebfa6></div>
+        ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row._opt), 'is-disabled': this.disabledOf(wr.row._opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row._opt)} aria-disabled=${!!this.disabledOf(wr.row._opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(wr.row._opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>
+          ${this.option !== undefined ? this.option({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}); } catch { return '{}'; } })()}>
+            ${rozieDisplay(this.labelOf(wr.row._opt))}
+          </slot>`}
+        </div>`)}
 
-    ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row._opt), 'is-disabled': this.disabledOf(wr.row._opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row._opt)} aria-disabled=${!!this.disabledOf(wr.row._opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(wr.row._opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>
-      ${this.option !== undefined ? this.option({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: wr.row._opt, index: wr.vi.index, active: this._activeIndex.value === wr.vi.index, selected: this.isSelected(wr.row._opt), disabled: this.disabledOf(wr.row._opt)}); } catch { return '{}'; } })()}>
-        ${rozieDisplay(this.labelOf(wr.row._opt))}
-      </slot>`}
-    </div>`)}
+        <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>
 
-    <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>
-
-    ${this.windowSource().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
-      ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-    </div>` : nothing}</div>` : nothing}</div>
+        ${this.windowSource().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
+          ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
+        </div>` : nothing}</div>` : nothing}</rozie-popover>
+</div>
 `;
   }
 
@@ -1375,6 +1420,31 @@ private __rozieWatchInitial_0 = true;
   return this.visibleOptions().length > 0;
 };
 
+  // ---- composed popover <-> open state ------------------------------------
+  // The popover's `open` model is bound to $data.panelOpen, NOT to $data.open: the
+  // popover emits nothing of its own, it only writes its model when it dismisses
+  // (outside click, or Escape seen at the document). Binding it to a field of its own
+  // makes that write visible, so a popover-initiated close is routed through the
+  // spine's close() like every other close — one `open-change` per real transition and
+  // the highlight reset.
+  //
+  // Telling the popover's write from our own is done with STATE, not a flag:
+  // $data.panelEcho is written together with every $data.panelOpen write made here, so
+  // in any one render/flush the pair is consistent — equal means "ours", different
+  // means "the popover closed itself" (it can never open itself: `trigger="manual"`).
+  // A plain variable in its place is read live while the reactive values are per-render
+  // snapshots on React: when a close and a re-open land in one commit, both watchers
+  // run in one pass and the second one misreads our own write as a dismissal (seen as
+  // a popup that stayed shut after Enter-then-ArrowDown).
+  // The echo is written FIRST, for targets whose watchers run synchronously on a write.
+  syncPanel = () => {
+  const visible = this.popupVisible();
+  if (visible === this._panelOpen.value) return;
+  this._panelEcho.value = visible;
+  this._panelOpen.value = visible;
+};
+
+  // select -> popover: follows a derived primitive covering everything popupVisible() reads.
   // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
   // families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1424,7 +1494,7 @@ private __rozieWatchInitial_0 = true;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id-base', 'idbase', 'hide-empty', 'hideempty', 'select-on-tab', 'selectontab', 'aria-label', 'arialabel', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight']);
+    const __skip = new Set<string>(['data-rozie-ref', 'options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'close-on-select', 'closeonselect', 'option-label', 'optionlabel', 'option-value', 'optionvalue', 'option-disabled', 'optiondisabled', 'id-base', 'idbase', 'hide-empty', 'hideempty', 'select-on-tab', 'selectontab', 'placement', 'offset', 'disable-flip', 'disableflip', 'disable-shift', 'disableshift', 'block', 'aria-label', 'arialabel', 'virtual', 'estimate-row-height', 'estimaterowheight', 'max-height', 'maxheight']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

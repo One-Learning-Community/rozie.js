@@ -1,5 +1,5 @@
 ---
-surface_hash: 5054dd895273
+surface_hash: 06a203fbf92a
 ---
 
 # Headless select / combobox comparison
@@ -36,6 +36,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 | Type-ahead (printable keys) | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | ✅ |
 | Client filter **+ remote hook** | ✅ | ✅ | ✅ | ✅ | ⚠️ | — | via [`@rozie-ui/combobox`](/components/combobox) |
 | Scoped option rendering | ✅ render-prop | ✅ slot | ✅ snippet | ✅ | ⚠️ template | — | ✅ `option` / `selected` / `empty` slots |
+| Floating popup (flip / shift / width-match) | ✅ | ⚠️ (Reka ✅; HUI wire it) | ✅ | ✅ | ⚠️ CDK overlay | — | ✅ built in (`placement` / `offset`; composes [`@rozie-ui/popover`](/components/popover)) |
 | Windowing for long lists | ✅ (wire a virtualizer) | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ opt-in `virtual` (virtual-core, ×6) |
 | Imperative handle | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ varies | ⚠️ | hand-roll | ✅ uniform 5-verb `$expose` |
 | Zero-config styling, re-skinnable | ⚠️ unstyled, wire it | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ CSS-var tokens + shadcn/Material/Bootstrap bridges |
@@ -60,7 +61,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/select` showcase + API reference](/components/select) documents the `@rozie-ui/select-*` packages: designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/select-solid` (`npm i @rozie-ui/select-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the ARIA behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/select-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
+The [`@rozie-ui/select` showcase + API reference](/components/select) documents the `@rozie-ui/select-*` packages: designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/select-solid` (`npm i @rozie-ui/select-solid`) is on npm — the other five targets are still in dogfooding. There is no list engine to import and no required CSS: the ARIA behaviour and a fully-tokenised skin ship inside the component (the floating popup comes from the required `@rozie-ui/popover-*` peer, which brings `@floating-ui/dom`), with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/select-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
 
 ## Cross-references
 

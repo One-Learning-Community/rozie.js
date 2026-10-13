@@ -29,7 +29,7 @@
  */
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
+import { compile, createDefaultRegistry, lowerToIR, ProducerResolver, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
@@ -38,7 +38,6 @@ import { renderReadme, validateDocsPropsTable } from './readme.mjs';
 const ROOT = resolve(import.meta.dirname, '..'); // packages/ui/select
 const REPO_ROOT = resolve(ROOT, '..', '..', '..'); // monorepo root
 const SRC = resolve(ROOT, 'src/Select.rozie');
-const FILENAME = 'Select.rozie';
 
 /** Per-target leaf dir + emitted filename (build mode is informational). */
 const TARGETS = {
@@ -80,8 +79,18 @@ function main() {
   const source = readFileSync(SRC, 'utf8');
 
   // (2) parse + lower ONCE for the doc tables.
-  const { ast } = parse(source, { filename: FILENAME });
-  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry() });
+  // A per-compiler-instance resolver, rooted at this package, reused across the
+  // doc-table lowerToIR() call and every per-target compile() below (the
+  // combobox/data-table codegen shape). The published `@rozie-ui/popover-<target>`
+  // package Select composes is found by walking node_modules UPWARD from
+  // dirname(filename) (select/src) — it resolves because this package declares
+  // each popover-<target> as a devDependency. `filename` MUST therefore be the
+  // ABSOLUTE path to src/Select.rozie (not a bare label), or the walk starts from
+  // process.cwd() and the cross-package `<components>` lookup fails with ROZ945.
+  const resolver = new ProducerResolver({ root: ROOT });
+
+  const { ast } = parse(source, { filename: SRC });
+  const { ir } = lowerToIR(ast, { modifierRegistry: createDefaultRegistry(), filename: SRC, resolver });
 
   // Keep the hand-kept manifests in lockstep with the IR.
   for (const ev of ir.emits) {
@@ -101,7 +110,7 @@ function main() {
 
   // (3)(4)(5) per-target emit + vendor themes + README.
   for (const [target, cfg] of Object.entries(TARGETS)) {
-    const r = compile(source, { target, filename: FILENAME });
+    const r = compile(source, { target, filename: SRC, resolverRoot: ROOT, resolver });
     const errs = r.diagnostics.filter((d) => d.severity === 'error');
     if (errs.length) {
       throw new Error(

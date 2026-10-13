@@ -1,0 +1,135 @@
+<!--
+  SelectFloatingDemo.rozie — BEHAVIORAL consumer for the Select's floating popup
+  (select-floating.spec.ts). The popup is positioned by the composed
+  @rozie-ui/popover leaf, so the things worth proving need a real layout engine:
+
+    - top-select / second-select: two selects in normal position, side by side.
+      The popup opens below its control and matches the control's width; clicking
+      one select while the other is open closes only the other one.
+    - nested-outer: a select with a custom #option slot (plain text).
+    - block-select: a `block` select — the control and popup fill the container.
+    - virtual-select: a windowed (`virtual`) select that floats — the popover keeps
+      its panel mounted while closed so the virtualizer keeps its scroll element.
+    - bottom-select: pinned to the bottom of a 580px-tall box, so in a 600px-tall
+      viewport there is no room below it and the popup flips above the control.
+
+  top-select also reports every `open-change` it emits (`readout-log`, one letter
+  per event: T = open, F = closed) and can be driven through its handle: the
+  `toggle-top` button calls `toggle()` on the "o" KEY (not on click — a click
+  outside an open popup is a dismissal by design).
+
+  This is a BEHAVIORAL cell — no screenshot stabilization here.
+-->
+
+<rozie name="SelectFloatingDemo">
+
+<components>
+{
+  Select: '../../packages/ui/select/src/Select.rozie',
+}
+</components>
+
+<data>
+{
+  top: null,
+  second: null,
+  nested: null,
+  block: null,
+  bottom: null,
+  big: null,
+  many: [],
+  log: '',
+}
+</data>
+
+<script>
+const OPTIONS = [
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana' },
+  { label: 'Cherry', value: 'cherry' },
+  { label: 'Date', value: 'date' },
+  { label: 'Elderberry', value: 'elderberry' },
+]
+
+// A plain accumulator (not a $data read-then-write) so two events fired in one
+// tick are both recorded on every target.
+let seen = ''
+const onTopOpenChange = (e) => {
+  seen = seen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
+  $data.log = seen
+}
+
+// 500 options for the windowed select, seeded after mount (the SelectVirtualDemo shape).
+$onMount(() => {
+  const out = []
+  for (let i = 1; i <= 500; i++) out.push({ label: 'Option ' + i, value: 'opt-' + i })
+  $data.many = out
+})
+
+const onToggleKey = (e) => {
+  if (e.key === 'o') $refs.topSelect.toggle()
+}
+</script>
+
+<template>
+<div class="select-floating-demo">
+  <div class="row">
+    <div data-testid="top-select">
+      <Select ref="topSelect" :options="OPTIONS" r-model:value="$data.top" aria-label="Top" @open-change="onTopOpenChange($event)" />
+    </div>
+    <div data-testid="second-select">
+      <Select :options="OPTIONS" r-model:value="$data.second" aria-label="Second" />
+    </div>
+  </div>
+
+  <div class="row">
+    <button type="button" data-testid="toggle-top" @keydown="onToggleKey($event)">Toggle top (press o)</button>
+    <span data-testid="readout-log">{{ $data.log }}</span>
+  </div>
+
+  <div data-testid="nested-outer">
+    <Select :options="OPTIONS" r-model:value="$data.nested" aria-label="Nested">
+      <template #option="{ option }">{{ option.label }}</template>
+    </Select>
+  </div>
+
+  <div data-testid="block-select" class="block-box">
+    <Select :options="OPTIONS" r-model:value="$data.block" block aria-label="Block" />
+  </div>
+
+  <div data-testid="virtual-select">
+    <Select :options="$data.many" r-model:value="$data.big" :virtual="true" maxHeight="200px" aria-label="Virtual" />
+  </div>
+
+  <div data-testid="bottom-select" class="bottom">
+    <Select :options="OPTIONS" r-model:value="$data.bottom" aria-label="Bottom" />
+  </div>
+</div>
+</template>
+
+<style>
+.select-floating-demo {
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  width: 520px;
+  height: 580px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.block-box {
+  width: 420px;
+}
+.bottom {
+  margin-top: auto;
+}
+</style>
+
+</rozie>

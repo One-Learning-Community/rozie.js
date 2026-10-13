@@ -1,44 +1,48 @@
 <template>
 
-<div :class="['rozie-select', { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': props.disabled, 'rozie-select-inline': props.inline }]" ref="__rozieRootRef" v-bind="$attrs">
-
+<div :class="['rozie-select', { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': props.disabled, 'rozie-select-inline': props.inline, 'rozie-select--block': props.block }]" ref="__rozieRootRef" v-bind="$attrs">
   
-  <div class="rozie-select-control" ref="controlElRef" @click="onControlClick($event)">
-    <div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
-      <slot name="selected" :selected="selectedLabel" :value="value">
-        <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
-    </div>
-    <span class="rozie-select-arrow" aria-hidden="true">▾</span>
-  </div>
+  <Popover trigger="manual" v-model:open="panelOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift" :id-base="idRoot()"><template #anchor>
+      
+      <div class="rozie-select-control" ref="controlElRef" @click="onControlClick($event)">
+        <div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+          <slot name="selected" :selected="selectedLabel" :value="value">
+            <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
+        </div>
+        <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+      </div>
+    </template>
+      
+      <div v-if="popupVisible() && !props.virtual" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
+        <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-select-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
+          <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
+            {{ labelOf(opt) }}
+          </slot>
+        </div>
 
-  
-  <div v-if="popupVisible() && !props.virtual" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
-    <div v-for="(opt, index) in visibleOptions()" :key="optionId(index)" :id="optionId(index)" :class="['rozie-select-option', { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]" role="option" :aria-selected="!!isSelected(opt)" :aria-disabled="!!disabledOf(opt)" @click="select(opt)" @mousemove="onOptionPointerMove(index)">
-      <slot name="option" :option="opt" :index="index" :active="activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
-        {{ labelOf(opt) }}
-      </slot>
-    </div>
+        <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
+          <slot name="empty" :query="query">No options</slot>
+        </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto')">
+        <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
-    <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
-      <slot name="empty" :query="query">No options</slot>
-    </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto')">
-    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
+        <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-select-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]" role="option" :aria-selected="!!isSelected(wr.row._opt)" :aria-disabled="!!disabledOf(wr.row._opt)" @click="select(wr.row._opt)" @mousemove="onOptionPointerMove(wr.vi.index)">
+          <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
+            {{ labelOf(wr.row._opt) }}
+          </slot>
+        </div>
 
-    <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-select-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]" role="option" :aria-selected="!!isSelected(wr.row._opt)" :aria-disabled="!!disabledOf(wr.row._opt)" @click="select(wr.row._opt)" @mousemove="onOptionPointerMove(wr.vi.index)">
-      <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
-        {{ labelOf(wr.row._opt) }}
-      </slot>
-    </div>
+        <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
 
-    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
-
-    <div v-if="windowSource().length === 0" class="rozie-select-empty" role="presentation">
-      <slot name="empty" :query="query">No options</slot>
-    </div></div></div>
+        <div v-if="windowSource().length === 0" class="rozie-select-empty" role="presentation">
+          <slot name="empty" :query="query">No options</slot>
+        </div></div></Popover>
+</div>
 
 </template>
 
 <script setup lang="ts">
+import Popover from '@rozie-ui/popover-vue';
+
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useOutsideClick } from '@rozie/runtime-vue';
 
@@ -93,6 +97,26 @@ const props = withDefaults(
      */
     selectOnTab?: boolean;
     /**
+     * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
+     */
+    placement?: string;
+    /**
+     * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+     */
+    offset?: number;
+    /**
+     * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+     */
+    disableFlip?: boolean;
+    /**
+     * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+     */
+    disableShift?: boolean;
+    /**
+     * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+     */
+    block?: boolean;
+    /**
      * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
      */
     ariaLabel?: string | null;
@@ -109,7 +133,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
 /**
@@ -134,6 +158,8 @@ defineSlots<{
 
 const autoId = ref('');
 const open$local = ref(false);
+const panelOpen = ref(false);
+const panelEcho = ref(false);
 const activeIndex = ref(-1);
 const query = ref('');
 const rows = ref<any[]>([]);
@@ -1072,6 +1098,30 @@ const popupVisible = () => {
   if (!props.hideEmpty) return true;
   return visibleOptions().length > 0;
 };
+// ---- composed popover <-> open state ------------------------------------
+// The popover's `open` model is bound to $data.panelOpen, NOT to $data.open: the
+// popover emits nothing of its own, it only writes its model when it dismisses
+// (outside click, or Escape seen at the document). Binding it to a field of its own
+// makes that write visible, so a popover-initiated close is routed through the
+// spine's close() like every other close — one `open-change` per real transition and
+// the highlight reset.
+//
+// Telling the popover's write from our own is done with STATE, not a flag:
+// $data.panelEcho is written together with every $data.panelOpen write made here, so
+// in any one render/flush the pair is consistent — equal means "ours", different
+// means "the popover closed itself" (it can never open itself: `trigger="manual"`).
+// A plain variable in its place is read live while the reactive values are per-render
+// snapshots on React: when a close and a re-open land in one commit, both watchers
+// run in one pass and the second one misreads our own write as a dismissal (seen as
+// a popup that stayed shut after Enter-then-ArrowDown).
+// The echo is written FIRST, for targets whose watchers run synchronously on a write.
+const syncPanel = () => {
+  const visible = popupVisible();
+  if (visible === panelOpen.value) return;
+  panelEcho.value = visible;
+  panelOpen.value = visible;
+};
+// select -> popover: follows a derived primitive covering everything popupVisible() reads.
 // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
 // families' generated output stay untouched).
 //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1118,6 +1168,14 @@ onBeforeUnmount(() => {
   if (virtualizerCleanup) virtualizerCleanup();
 });
 
+watch(() => (open$local.value ? 'o' : 'c') + (props.hideEmpty ? 'h' : 's') + (props.options ? props.options.length : 0) + '|' + query.value, () => {
+  syncPanel();
+}, { flush: 'post' });
+watch(() => panelOpen.value, () => {
+  if (panelOpen.value === panelEcho.value) return;
+  panelEcho.value = panelOpen.value;
+  if (!panelOpen.value) close();
+}, { flush: 'post' });
 watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () => {
   syncRows();
   if (props.virtual && virtualizer) {
@@ -1134,7 +1192,7 @@ defineExpose({ open, close, toggle, clear, focusControl });
 useOutsideClick(
   [controlElRef, listElRef],
   ($event) => ((close) as (...args: any[]) => any)($event),
-  () => open$local.value,
+  () => open$local.value && (props.inline || !popupVisible()),
 );
 </script>
 
@@ -1144,10 +1202,17 @@ useOutsideClick(
   display: inline-block;
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
+  /* The popup's stacking order is the composed popover's now; keep the select's own
+     `--rozie-select-z` token steering it (custom properties inherit into the panel). */
+  --rozie-popover-z: var(--rozie-select-z, var(--rsl-z, 1000));
 }
 .rozie-select-control {
   box-sizing: border-box;
-  width: 100%;
+  /* NOT `width: 100%`: the control renders inside the popover's anchor wrapper
+     (`display: inline-block`, shrink-to-fit), so a percentage width is circular. It
+     sizes to its content with the root's own minimum, which is the box the root's
+     `inline-block` + `min-width` gave it before. `block` and `inline` stretch it. */
+  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1175,11 +1240,6 @@ useOutsideClick(
   opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
 }
 .rozie-select-list {
-  position: absolute;
-  z-index: var(--rozie-select-z, var(--rsl-z, 1000));
-  top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
   max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
@@ -1196,11 +1256,22 @@ useOutsideClick(
   width: 100%;
 }
 .rozie-select-inline .rozie-select-list {
-  position: static;
   margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+.rozie-select-inline,
+.rozie-select--block {
+  container-type: inline-size;
+}
+.rozie-select-inline .rozie-select-control,
+.rozie-select--block .rozie-select-control {
+  width: 100cqw;
+}
+.rozie-select--block {
+  display: block;
+  width: 100%;
 }
 .rozie-select-option {
   padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));

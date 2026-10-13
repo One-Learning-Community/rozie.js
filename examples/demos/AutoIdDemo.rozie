@@ -1,10 +1,14 @@
 <!--
   AutoIdDemo.rozie — BEHAVIORAL cell for the per-instance default id base (oinbox
-  0.8.0 follow-up F6, quick 261002-ekf): two default-configured Selectes and two
-  default-configured Popovers (keepMounted, so both panels render without a
-  gesture) must never share an id. Driven by
-  tests/visual-regression/specs/auto-id.spec.ts on all 6 targets.
-  Behavioral-only — no pixel baseline.
+  0.8.0 follow-up F6, quick 261002-ekf): two default-configured Selects must never
+  share an id. Driven by tests/visual-regression/specs/auto-id.spec.ts on all 6
+  targets. Behavioral-only — no pixel baseline.
+
+  The two default-configured Popovers the same spec checks live in the sibling
+  AutoIdPopoverDemo.rozie: Select composes the PUBLISHED @rozie-ui/popover-<target>
+  leaf, so a page that also compiled Popover.rozie from source would register the
+  `rozie-popover` custom element twice on Lit (a harness-only collision — a real
+  page loads one copy of the leaf).
 -->
 
 <rozie name="AutoIdDemo">
@@ -12,7 +16,6 @@
 <components>
 {
   Select: '../../packages/ui/select/src/Select.rozie',
-  Popover: '../../packages/ui/popover/src/Popover.rozie',
 }
 </components>
 
@@ -31,14 +34,6 @@ const OPTIONS = ['One', 'Two']
 <div class="auto-id-demo">
   <Select r-model:value="$data.a" :options="OPTIONS" ariaLabel="List A" />
   <Select r-model:value="$data.b" :options="OPTIONS" ariaLabel="List B" />
-  <Popover keepMounted>
-    <template #anchor><button type="button">Popover A</button></template>
-    <p>Panel A</p>
-  </Popover>
-  <Popover keepMounted>
-    <template #anchor><button type="button">Popover B</button></template>
-    <p>Panel B</p>
-  </Popover>
 </div>
 </template>
 

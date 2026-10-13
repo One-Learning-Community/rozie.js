@@ -10,6 +10,7 @@
  */
 
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
+import { requiredPeerNote } from '../../required-peer-note.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
 // ---------------------------------------------------------------------------
@@ -317,6 +318,15 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(`Peer dependencies: \`${FRAMEWORK_PEER_LABEL[target]}\`. Install them alongside this package.`);
   lines.push('');
+
+  // Disclose non-optional peers beyond the framework (the composed
+  // @rozie-ui/popover-<target> leaf and its own @floating-ui/dom peer) —
+  // derived from this leaf's own package.json, never hardcoded.
+  const peerNote = requiredPeerNote(pkgName);
+  if (peerNote) {
+    lines.push(peerNote);
+    lines.push('');
+  }
 
   // Disclose the @rozie/runtime-* dependency this leaf actually carries.
   // Derived from its package.json — null when the leaf imports none.

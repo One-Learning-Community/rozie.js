@@ -51,6 +51,17 @@
 
 <rozie name="Select" vendorable="true">
 
+<!--
+  The popup floats through the composed @rozie-ui/popover leaf (Floating UI) —
+  the same published-leaf composition Combobox and data-table use. The stable
+  package-style specifier resolves, via @rozie/core's resolveManifestProducer, to
+  the PUBLISHED per-target `@rozie-ui/popover-<target>` package's compiled
+  manifest at compile time; that package is a runtime peerDependency of each
+  select leaf and is not re-exported. Do NOT hand-write a relative
+  `./Popover.rozie`.
+-->
+<components>{ Popover: '@rozie-ui/popover/Popover.rozie' }</components>
+
 <props>
 {
   // The option set. Each entry is either a primitive (string/number) or an
@@ -90,10 +101,11 @@
     },
   },
 
-  // Render the results list IN FLOW (static) instead of as an absolute popup.
+  // Render the results list IN FLOW (static) instead of as a floating popup.
   // Use when the select is embedded inside a fixed-size, overflow-clipped
-  // container (e.g. a command-palette panel) where an absolute popup would be
-  // culled. Off (default) keeps the standalone dropdown behavior unchanged.
+  // container (e.g. a command-palette panel) where a floating popup would be
+  // culled. Off (default) keeps the standalone dropdown behavior. Forwards
+  // `disablePositioning` + `disableDismiss` to the composed popover.
   inline:         {
     type: Boolean,
     default: false,
@@ -185,6 +197,56 @@
     },
   },
 
+  // ── Floating positioning via the composed @rozie-ui/popover leaf ──────────
+  // Forwarded straight through to the single Popover wrapper around the control
+  // and both list branches. Ignored when `inline` is set — `inline` forwards
+  // `disablePositioning` to popover instead, so the popup never floats.
+  placement: {
+    type: String,
+    default: 'bottom-start',
+    docs: {
+      description:
+        'Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control\'s left edge. Ignored when `inline` is set.',
+    },
+  },
+  offset: {
+    type: Number,
+    default: 4,
+    docs: {
+      description:
+        'Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).',
+    },
+  },
+  disableFlip: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.",
+    },
+  },
+  disableShift: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        "Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.",
+    },
+  },
+
+  // Fill the container: root display:block + width:100%; the control stretches
+  // via a `cqw` width against the root (the anchor wrapper is popover-owned +
+  // shrink-to-fit, so a plain percentage would be circular), and the
+  // width-matched popup follows.
+  block: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).',
+    },
+  },
+
   // Accessible name for the control when there is no visible <label for>.
   ariaLabel:      {
     type: String,
@@ -240,6 +302,13 @@
   // The generated id base (idRoot()), set once in $onMount when `idBase` is empty.
   autoId: '',
   open: false,
+  // The composed popover's `open` model. The popover is shown exactly while the
+  // popup is visible (popupVisible()); it writes `false` here itself when it
+  // dismisses (outside click / document-level Escape). See syncPanel() below.
+  panelOpen: false,
+  // The last value THIS component wrote to `panelOpen`. A `panelOpen` that differs
+  // from it was written by the popover.
+  panelEcho: false,
   // Virtual focus: index into the visible option list, or -1.
   activeIndex: -1,
   // Kept at '' for select-only: the shared spine's `visibleOptions` reads it (the
@@ -545,6 +614,40 @@ const popupVisible = () => {
   if (!$props.hideEmpty) return true
   return visibleOptions().length > 0
 }
+// ---- composed popover <-> open state ------------------------------------
+// The popover's `open` model is bound to $data.panelOpen, NOT to $data.open: the
+// popover emits nothing of its own, it only writes its model when it dismisses
+// (outside click, or Escape seen at the document). Binding it to a field of its own
+// makes that write visible, so a popover-initiated close is routed through the
+// spine's close() like every other close — one `open-change` per real transition and
+// the highlight reset.
+//
+// Telling the popover's write from our own is done with STATE, not a flag:
+// $data.panelEcho is written together with every $data.panelOpen write made here, so
+// in any one render/flush the pair is consistent — equal means "ours", different
+// means "the popover closed itself" (it can never open itself: `trigger="manual"`).
+// A plain variable in its place is read live while the reactive values are per-render
+// snapshots on React: when a close and a re-open land in one commit, both watchers
+// run in one pass and the second one misreads our own write as a dismissal (seen as
+// a popup that stayed shut after Enter-then-ArrowDown).
+// The echo is written FIRST, for targets whose watchers run synchronously on a write.
+const syncPanel = () => {
+  const visible = popupVisible()
+  if (visible === $data.panelOpen) return
+  $data.panelEcho = visible
+  $data.panelOpen = visible
+}
+// select -> popover: follows a derived primitive covering everything popupVisible() reads.
+$watch(() => (($data.open ? 'o' : 'c') + ($props.hideEmpty ? 'h' : 's') + ($props.options ? $props.options.length : 0) + '|' + $data.query), () => {
+  syncPanel()
+})
+// popover -> select: the popover's own write (a dismissal) goes through close().
+$watch(() => $data.panelOpen, () => {
+  if ($data.panelOpen === $data.panelEcho) return
+  $data.panelEcho = $data.panelOpen
+  if (!$data.panelOpen) close()
+})
+
 // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
 // families' generated output stay untouched).
 //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -614,127 +717,172 @@ $onUnmount(() => {
 $expose({ open, close, toggle, clear, focusControl })
 </script>
 
+<!-- The composed popover owns outside-click dismissal while it is shown. This listener
+     covers the two states it is not: `inline` (dismissal is switched off on the popover,
+     the list is in flow) and an open-but-hidden popup (`hideEmpty` with no options — the
+     popover is closed, so nothing else would reset the open state). -->
 <listeners>
-  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.open" />
+  <listener :target="document" @click.outside($refs.controlEl,$refs.listEl)="close" r-if="$data.open && ($props.inline || !popupVisible())" />
 </listeners>
 
 <template>
-<div class="rozie-select" :class="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': $props.disabled, 'rozie-select-inline': $props.inline }">
-
-  <!-- Control: a clickable wrapper around the select-only trigger. The trigger is a focusable
-       div (not a button) carrying role="combobox" per the ARIA APG "Select-Only Combobox"
-       pattern (DOM focus stays here; the active option is tracked virtually via
-       aria-activedescendant). It is a div so clear / chip buttons can nest in the control. -->
-  <div
-    class="rozie-select-control"
-    ref="controlEl"
-    @click="onControlClick($event)"
+<div
+  class="rozie-select"
+  :class="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': $props.disabled, 'rozie-select-inline': $props.inline, 'rozie-select--block': $props.block }"
+>
+  <!-- Composed popover positioning — ONE Popover wraps the control (its `#anchor`
+       fill, so Floating UI measures the control's real box and a click on the control
+       is "inside" for the popover's outside-click dismissal) and both list branches
+       (its default fill). The mechanics mirror Combobox.rozie's composition:
+         - `trigger="manual"`: the select drives the open state; the popover only
+           positions and dismisses. `r-model:open` is bound to $data.panelOpen (see
+           syncPanel() in the script), which is true exactly while the popup is
+           visible — so a `hideEmpty` select with nothing to show renders no panel and
+           arms no dismissal listeners.
+         - `bare`: no popover chrome; `.rozie-select-list` supplies the surface.
+         - `:match-width="true"`: the popup spans the control box (what `left: 0;
+           right: 0` on the list used to do).
+         - `:keep-mounted="$props.virtual"`: the windowed branch must stay mounted
+           while closed (the virtualizer holds its scroll element); the popover hides
+           its panel instead of unmounting it. Never on for the non-virtual path.
+         - `:disable-positioning` + `:disable-dismiss` under `inline`: the list renders
+           in normal flow and the popover neither positions nor dismisses it. -->
+  <Popover
+    trigger="manual"
+    r-model:open="$data.panelOpen"
+    bare
+    :match-width="true"
+    :keep-mounted="$props.virtual"
+    :disable-positioning="$props.inline"
+    :disable-dismiss="$props.inline"
+    :placement="$props.placement"
+    :offset="$props.offset"
+    :disable-flip="$props.disableFlip"
+    :disable-shift="$props.disableShift"
+    :id-base="idRoot()"
   >
-    <div
-      ref="triggerEl"
-      class="rozie-select-trigger"
-      role="combobox"
-      aria-haspopup="listbox"
-      :tabindex="triggerTabindex()"
-      :aria-expanded="!!popupVisible()"
-      :aria-controls="idRoot() + '-list'"
-      :aria-activedescendant="popupVisible() ? activeDescendant : null"
-      :aria-label="$props.ariaLabel"
-      :aria-disabled="!!$props.disabled"
-      @keydown="onTriggerKeyDown($event)"
-    >
-      <slot name="selected" :selected="selectedLabel" :value="$props.value">
-        <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
-        <span r-else class="rozie-select-placeholder">{{ $props.placeholder }}</span>
-      </slot>
-    </div>
-    <span class="rozie-select-arrow" aria-hidden="true">▾</span>
-  </div>
+    <template #anchor>
+      <!-- Control: a clickable wrapper around the select-only trigger. The trigger is a focusable
+           div (not a button) carrying role="combobox" per the ARIA APG "Select-Only Combobox"
+           pattern (DOM focus stays here; the active option is tracked virtually via
+           aria-activedescendant). It is a div so clear / chip buttons can nest in the control. -->
+      <div
+        class="rozie-select-control"
+        ref="controlEl"
+        @click="onControlClick($event)"
+      >
+        <div
+          ref="triggerEl"
+          class="rozie-select-trigger"
+          role="combobox"
+          aria-haspopup="listbox"
+          :tabindex="triggerTabindex()"
+          :aria-expanded="!!popupVisible()"
+          :aria-controls="idRoot() + '-list'"
+          :aria-activedescendant="popupVisible() ? activeDescendant : null"
+          :aria-label="$props.ariaLabel"
+          :aria-disabled="!!$props.disabled"
+          @keydown="onTriggerKeyDown($event)"
+        >
+          <slot name="selected" :selected="selectedLabel" :value="$props.value">
+            <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
+            <span r-else class="rozie-select-placeholder">{{ $props.placeholder }}</span>
+          </slot>
+        </div>
+        <span class="rozie-select-arrow" aria-hidden="true">▾</span>
+      </div>
+    </template>
 
-  <!-- Popup listbox (NON-VIRTUAL). aria-activedescendant on the control points at the
-       highlighted option id; DOM focus never leaves the control. Byte-identical to the
-       pre-windowing render — the `&& !$props.virtual` only routes virtual usage to the
-       windowed branch below; with virtual off this is exactly the prior behavior. -->
-  <div
-    r-if="popupVisible() && !$props.virtual"
-    ref="listEl"
-    class="rozie-select-list"
-    role="listbox"
-    :id="idRoot() + '-list'"
-    :aria-label="$props.ariaLabel"
-    :aria-multiselectable="$props.multiple"
-  >
-    <div
-      r-for="opt, index in visibleOptions()"
-      :key="optionId(index)"
-      :id="optionId(index)"
-      class="rozie-select-option"
-      :class="{ 'is-active': $data.activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }"
-      role="option"
-      :aria-selected="!!isSelected(opt)"
-      :aria-disabled="!!disabledOf(opt)"
-      @click="select(opt)"
-      @mousemove="onOptionPointerMove(index)"
-    >
-      <slot name="option" :option="opt" :index="index" :active="$data.activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
-        {{ labelOf(opt) }}
-      </slot>
-    </div>
+    <!-- `<template #default>` wraps the two r-if branches deliberately: several bare
+         r-if siblings passed as a component's loose default-slot children crash
+         @rozie/core's extractSlotFillers. -->
+    <template #default>
+      <!-- Popup listbox (NON-VIRTUAL). aria-activedescendant on the control points at the
+           highlighted option id; DOM focus never leaves the control. Byte-identical to the
+           pre-windowing render — the `&& !$props.virtual` only routes virtual usage to the
+           windowed branch below; with virtual off this is exactly the prior behavior. -->
+      <div
+        r-if="popupVisible() && !$props.virtual"
+        ref="listEl"
+        class="rozie-select-list"
+        role="listbox"
+        :id="idRoot() + '-list'"
+        :aria-label="$props.ariaLabel"
+        :aria-multiselectable="$props.multiple"
+      >
+        <div
+          r-for="opt, index in visibleOptions()"
+          :key="optionId(index)"
+          :id="optionId(index)"
+          class="rozie-select-option"
+          :class="{ 'is-active': $data.activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }"
+          role="option"
+          :aria-selected="!!isSelected(opt)"
+          :aria-disabled="!!disabledOf(opt)"
+          @click="select(opt)"
+          @mousemove="onOptionPointerMove(index)"
+        >
+          <slot name="option" :option="opt" :index="index" :active="$data.activeIndex === index" :selected="isSelected(opt)" :disabled="disabledOf(opt)">
+            {{ labelOf(opt) }}
+          </slot>
+        </div>
 
-    <div r-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
-      <slot name="empty" :query="$data.query">No options</slot>
-    </div>
-  </div>
+        <div r-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
+          <slot name="empty" :query="$data.query">No options</slot>
+        </div>
+      </div>
 
-  <!-- ══ WINDOWED listbox (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
-       Stays MOUNTED whenever virtual (so the .rozie-select-list scroll container exists at
-       mount for the virtualizer — ROZ123-safe) but is HIDDEN via display:none whenever the
-       listbox is closed (CR-01): unmounting would drop the virtualizer's scroll element, so
-       we hide-not-unmount to keep its scrollTop + measurements while still honoring
-       toggle()/Escape/outside-click close semantics (the non-virtual branch is gated on
-       $data.open; this branch mirrors that via the :style display toggle). display:none also
-       drops the role="listbox" from the a11y tree when collapsed, so :aria-expanded on the
-       control stays consistent. Renders a leading spacer, the windowed { vi, row } slice
-       keyed on the wrapper id (CR-02: windowSource() wraps each option into an id-bearing
-       row), and a trailing spacer; the option's full-model index is wr.vi.index. The
-       container is bounded/scrolling via the base .rozie-select-list CSS (max-height from
-       the --rozie-select-max-height token, mirrored from the maxHeight prop). -->
-  <div
-    r-if="$props.virtual"
-    ref="listEl"
-    class="rozie-select-list rozie-select-list--virtual"
-    role="listbox"
-    :id="idRoot() + '-list'"
-    :aria-label="$props.ariaLabel"
-    :aria-multiselectable="$props.multiple"
-    :style="(popupVisible() ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
-  >
-    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
+      <!-- ══ WINDOWED listbox (Phase 64 P4, SC-5) — emitted/active ONLY when $props.virtual ══
+           Stays MOUNTED whenever virtual (so the .rozie-select-list scroll container exists at
+           mount for the virtualizer — ROZ123-safe) but is HIDDEN via display:none whenever the
+           listbox is closed (CR-01): unmounting would drop the virtualizer's scroll element, so
+           we hide-not-unmount to keep its scrollTop + measurements while still honoring
+           toggle()/Escape/outside-click close semantics (the non-virtual branch is gated on
+           $data.open; this branch mirrors that via the :style display toggle). display:none also
+           drops the role="listbox" from the a11y tree when collapsed, so :aria-expanded on the
+           control stays consistent. Renders a leading spacer, the windowed { vi, row } slice
+           keyed on the wrapper id (CR-02: windowSource() wraps each option into an id-bearing
+           row), and a trailing spacer; the option's full-model index is wr.vi.index. The
+           container is bounded/scrolling via the base .rozie-select-list CSS (max-height from
+           the --rozie-select-max-height token, mirrored from the maxHeight prop). -->
+      <div
+        r-if="$props.virtual"
+        ref="listEl"
+        class="rozie-select-list rozie-select-list--virtual"
+        role="listbox"
+        :id="idRoot() + '-list'"
+        :aria-label="$props.ariaLabel"
+        :aria-multiselectable="$props.multiple"
+        :style="(popupVisible() ? '' : 'display:none;') + ($props.maxHeight ? ('height:' + $props.maxHeight + ';max-height:' + $props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + $props.maxHeight) : 'overflow-y:auto')"
+      >
+        <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
-    <div
-      r-for="wr in windowedRows()"
-      :key="wr.row.id"
-      :id="optionId(wr.vi.index)"
-      :data-index="wr.vi.index"
-      class="rozie-select-option"
-      :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }"
-      role="option"
-      :aria-selected="!!isSelected(wr.row._opt)"
-      :aria-disabled="!!disabledOf(wr.row._opt)"
-      @click="select(wr.row._opt)"
-      @mousemove="onOptionPointerMove(wr.vi.index)"
-    >
-      <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
-        {{ labelOf(wr.row._opt) }}
-      </slot>
-    </div>
+        <div
+          r-for="wr in windowedRows()"
+          :key="wr.row.id"
+          :id="optionId(wr.vi.index)"
+          :data-index="wr.vi.index"
+          class="rozie-select-option"
+          :class="{ 'is-active': $data.activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }"
+          role="option"
+          :aria-selected="!!isSelected(wr.row._opt)"
+          :aria-disabled="!!disabledOf(wr.row._opt)"
+          @click="select(wr.row._opt)"
+          @mousemove="onOptionPointerMove(wr.vi.index)"
+        >
+          <slot name="option" :option="wr.row._opt" :index="wr.vi.index" :active="$data.activeIndex === wr.vi.index" :selected="isSelected(wr.row._opt)" :disabled="disabledOf(wr.row._opt)">
+            {{ labelOf(wr.row._opt) }}
+          </slot>
+        </div>
 
-    <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
+        <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padBottom() + 'px'"></div>
 
-    <div r-if="windowSource().length === 0" class="rozie-select-empty" role="presentation">
-      <slot name="empty" :query="$data.query">No options</slot>
-    </div>
-  </div>
+        <div r-if="windowSource().length === 0" class="rozie-select-empty" role="presentation">
+          <slot name="empty" :query="$data.query">No options</slot>
+        </div>
+      </div>
+    </template>
+  </Popover>
 </div>
 </template>
 
@@ -753,10 +901,17 @@ $expose({ open, close, toggle, clear, focusControl })
   display: inline-block;
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
+  /* The popup's stacking order is the composed popover's now; keep the select's own
+     `--rozie-select-z` token steering it (custom properties inherit into the panel). */
+  --rozie-popover-z: var(--rozie-select-z, var(--rsl-z, 1000));
 }
 .rozie-select-control {
   box-sizing: border-box;
-  width: 100%;
+  /* NOT `width: 100%`: the control renders inside the popover's anchor wrapper
+     (`display: inline-block`, shrink-to-fit), so a percentage width is circular. It
+     sizes to its content with the root's own minimum, which is the box the root's
+     `inline-block` + `min-width` gave it before. `block` and `inline` stretch it. */
+  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -784,12 +939,10 @@ $expose({ open, close, toggle, clear, focusControl })
   opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
 }
 
+/* Both list branches render inside the composed popover's `.rozie-popover-floating`
+   (positioned by Floating UI, width-matched to the control), so the list carries no
+   position / top / left / right / z-index of its own — only its surface. */
 .rozie-select-list {
-  position: absolute;
-  z-index: var(--rozie-select-z, var(--rsl-z, 1000));
-  top: calc(100% + var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px)));
-  left: 0;
-  right: 0;
   margin: 0;
   padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
   max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
@@ -811,11 +964,28 @@ $expose({ open, close, toggle, clear, focusControl })
   width: 100%;
 }
 .rozie-select-inline .rozie-select-list {
-  position: static;
   margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
   border: none;
   border-radius: 0;
   box-shadow: none;
+}
+/* Inline: the root stretches to its container and the control fills it. The popover
+   does not measure the anchor here (`disablePositioning`), so `100cqw` against the
+   root is used for the same reason as `block` below. */
+.rozie-select-inline,
+.rozie-select--block {
+  container-type: inline-size;
+}
+.rozie-select-inline .rozie-select-control,
+.rozie-select--block .rozie-select-control {
+  width: 100cqw;
+}
+/* `block`: fill the container. The control takes the root's width as `100cqw` against
+   the root query container — the popover-owned anchor around it is shrink-to-fit, so a
+   percentage would be circular. The width-matched popup follows the control. */
+.rozie-select--block {
+  display: block;
+  width: 100%;
 }
 .rozie-select-option {
   padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));

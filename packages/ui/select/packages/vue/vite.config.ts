@@ -18,7 +18,10 @@ export default defineConfig({
       fileName: () => 'index.mjs',
     },
     rollupOptions: {
-      external: ['vue', /^vue\//, '@rozie/runtime-vue'],
+      // @rozie-ui/popover-vue is a runtime peerDependency (the composed popover):
+      // this list is hand-maintained, and anything missing from it is silently
+      // inlined into dist/index.mjs.
+      external: ['vue', /^vue\//, '@rozie/runtime-vue', '@rozie-ui/popover-vue'],
     },
   },
 });

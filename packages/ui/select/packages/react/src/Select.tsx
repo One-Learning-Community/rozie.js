@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRe
 import type { ReactNode } from 'react';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState, useOutsideClick } from '@rozie/runtime-react';
 import './Select.css';
+import Popover from '@rozie-ui/popover-react';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
@@ -20,7 +21,7 @@ interface OptionCtx { option: any; index: any; active: any; selected: any; disab
 
 interface EmptyCtx { query: any; }
 
-interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -78,6 +79,26 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   selectOnTab?: boolean;
   /**
+   * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
+   */
+  placement?: string;
+  /**
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   */
+  offset?: number;
+  /**
+   * Disable the popup's Floating UI `flip` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup flips above the control when it would overflow the viewport below; set this to keep it pinned to `placement` regardless. Ignored when `inline` is set.
+   */
+  disableFlip?: boolean;
+  /**
+   * Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set.
+   */
+  disableShift?: boolean;
+  /**
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   */
+  block?: boolean;
+  /**
    * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
    */
   ariaLabel?: (string) | null;
@@ -111,7 +132,7 @@ export interface SelectHandle {
 
 const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: SelectProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => [])())[0];
-  const props: Omit<SelectProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; idBase: string; hideEmpty: boolean; selectOnTab: boolean; ariaLabel: (string) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
+  const props: Omit<SelectProps, 'options' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight'> & { options: any[]; multiple: boolean; inline: boolean; disabled: boolean; placeholder: string; closeOnSelect: boolean; optionLabel: ((...args: any[]) => any) | null; optionValue: ((...args: any[]) => any) | null; optionDisabled: ((...args: any[]) => any) | null; idBase: string; hideEmpty: boolean; selectOnTab: boolean; placement: string; offset: number; disableFlip: boolean; disableShift: boolean; block: boolean; ariaLabel: (string) | null; virtual: boolean; estimateRowHeight: number; maxHeight: string } = {
     ..._props,
     options: _props.options ?? __defaultOptions,
     multiple: _props.multiple ?? false,
@@ -125,14 +146,19 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     idBase: _props.idBase ?? '',
     hideEmpty: _props.hideEmpty ?? false,
     selectOnTab: _props.selectOnTab ?? false,
+    placement: _props.placement ?? 'bottom-start',
+    offset: _props.offset ?? 4,
+    disableFlip: _props.disableFlip ?? false,
+    disableShift: _props.disableShift ?? false,
+    block: _props.block ?? false,
     ariaLabel: _props.ariaLabel ?? null,
     virtual: _props.virtual ?? false,
     estimateRowHeight: _props.estimateRowHeight ?? 36,
     maxHeight: _props.maxHeight ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderSelected, renderOption, renderEmpty, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
-    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderSelected; void renderOption; void renderEmpty; void slots;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, placement, offset, disableFlip, disableShift, block, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderSelected, renderOption, renderEmpty, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void placement; void offset; void disableFlip; void disableShift; void block; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderSelected; void renderOption; void renderEmpty; void slots;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);
@@ -158,6 +184,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   _virtualRef.current = props.virtual;
   const [autoId, setAutoId] = useState('');
   const [open$local, setOpen$local] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [panelEcho, setPanelEcho] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<any[]>([]);
@@ -185,6 +213,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     return optionId(activeIndex);
   }, [activeIndex, open$local, optionId]);
   const _watch0First = useRef(true);
+  const _watch1First = useRef(true);
+  const _watch2First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, client filter, enabled-index navigation, the keyboard
@@ -1118,11 +1148,35 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     return props.idBase || autoId || 'rozie-select';
   }
   // popupVisible(): the single gate every list branch and aria-expanded read.
-  function popupVisible() {
+  const popupVisible = useCallback(() => {
     if (!open$local) return false;
     if (!props.hideEmpty) return true;
     return visibleOptions().length > 0;
+  }, [open$local, props.hideEmpty, visibleOptions]);
+  // ---- composed popover <-> open state ------------------------------------
+  // The popover's `open` model is bound to $data.panelOpen, NOT to $data.open: the
+  // popover emits nothing of its own, it only writes its model when it dismisses
+  // (outside click, or Escape seen at the document). Binding it to a field of its own
+  // makes that write visible, so a popover-initiated close is routed through the
+  // spine's close() like every other close — one `open-change` per real transition and
+  // the highlight reset.
+  //
+  // Telling the popover's write from our own is done with STATE, not a flag:
+  // $data.panelEcho is written together with every $data.panelOpen write made here, so
+  // in any one render/flush the pair is consistent — equal means "ours", different
+  // means "the popover closed itself" (it can never open itself: `trigger="manual"`).
+  // A plain variable in its place is read live while the reactive values are per-render
+  // snapshots on React: when a close and a re-open land in one commit, both watchers
+  // run in one pass and the second one misreads our own write as a dismissal (seen as
+  // a popup that stayed shut after Enter-then-ArrowDown).
+  // The echo is written FIRST, for targets whose watchers run synchronously on a write.
+  function syncPanel() {
+    const visible = popupVisible();
+    if (visible === panelOpen) return;
+    setPanelEcho(visible);
+    setPanelOpen(visible);
   }
+  // select -> popover: follows a derived primitive covering everything popupVisible() reads.
   // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
   // families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1180,6 +1234,16 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   }, []);
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
+    syncPanel();
+  }, [open$local, props.hideEmpty, props.options, query]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch1First.current) { _watch1First.current = false; return; }
+    if (panelOpen === panelEcho) return;
+    setPanelEcho(panelOpen);
+    if (!panelOpen) close();
+  }, [panelOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
     syncRows();
     if (props.virtual && virtualizer.current) {
       gridScrollEl.current = __rozieRoot.current ? __rozieRoot.current!.querySelector('.rozie-select-list') : gridScrollEl.current;
@@ -1193,7 +1257,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   useOutsideClick(
     [controlEl, listEl],
     close,
-    () => !!(open$local),
+    () => !!(open$local && (props.inline || !popupVisible())),
   );
 
   const _rozieExposeRef = useRef({ open, close, toggle, clear, focusControl });
@@ -1202,36 +1266,38 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
 
   return (
     <>
-    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-select", { "rozie-select-open": popupVisible(), "rozie-select-disabled": props.disabled, "rozie-select-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-6e3ebfa6="">
-
+    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-select", { "rozie-select-open": popupVisible(), "rozie-select-disabled": props.disabled, "rozie-select-inline": props.inline, "rozie-select--block": props.block }), (attrs.className as string | undefined))} data-rozie-s-6e3ebfa6="">
       
-      <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
-        <div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
-          {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>)}
-        </div>
-        <span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
-      </div>
+      <Popover trigger="manual" open={panelOpen} onOpenChange={setPanelOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6="" renderAnchor={() => (<>
+          
+          <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
+            <div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+              {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>)}
+            </div>
+            <span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
+          </div>
+        </>)} children={<>
+          
+          {!!(popupVisible() && !props.virtual) && <div ref={listEl} className={"rozie-select-list"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} data-rozie-s-6e3ebfa6="">
+            {visibleOptions().map((opt, index) => <div key={optionId(index)} id={rozieAttr(optionId(index))} className={clsx("rozie-select-option", { "is-active": activeIndex === index, "is-selected": isSelected(opt), "is-disabled": disabledOf(opt) })} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6="">
+              {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) }) : (rozieDisplay(labelOf(opt)))}
+            </div>)}
 
-      
-      {!!(popupVisible() && !props.virtual) && <div ref={listEl} className={"rozie-select-list"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} data-rozie-s-6e3ebfa6="">
-        {visibleOptions().map((opt, index) => <div key={optionId(index)} id={rozieAttr(optionId(index))} className={clsx("rozie-select-option", { "is-active": activeIndex === index, "is-selected": isSelected(opt), "is-disabled": disabledOf(opt) })} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onClick={($event) => { select(opt); }} onMouseMove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6="">
-          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) }) : (rozieDisplay(labelOf(opt)))}
-        </div>)}
+            {!!(visibleOptions().length === 0) && <div className={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
+              {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
+            </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-select-list rozie-select-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6="">
+            <div className={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6="" />
 
-        {!!(visibleOptions().length === 0) && <div className={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
-          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
-        </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-select-list rozie-select-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6="">
-        <div className={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6="" />
+            {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-select-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row._opt), "is-disabled": disabledOf(wr.row._opt) })} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6="">
+              {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }) : (rozieDisplay(labelOf(wr.row._opt)))}
+            </div>)}
 
-        {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-select-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row._opt), "is-disabled": disabledOf(wr.row._opt) })} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6="">
-          {(props.renderOption ?? props.slots?.['option']) ? ((props.renderOption ?? props.slots?.['option']) as Function)({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) }) : (rozieDisplay(labelOf(wr.row._opt)))}
-        </div>)}
+            <div className={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6="" />
 
-        <div className={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6="" />
-
-        {!!(windowSource().length === 0) && <div className={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
-          {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
-        </div>}</div>}</div>
+            {!!(windowSource().length === 0) && <div className={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
+              {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
+            </div>}</div>}</>} />
+    </div>
     </>
   );
 });

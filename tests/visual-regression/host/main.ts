@@ -691,6 +691,11 @@ export const EXAMPLES = [
   // select.spec.ts. Built for all 6 targets but NOT a screenshot cell —
   // deliberately NOT in matrix.spec.ts EXAMPLES (behavioral-only; no pixel baseline).
   'SelectBehavior',
+  // @rozie-ui/select floating popup (loader → examples/demos/SelectFloatingDemo.rozie):
+  // the popup positioned by the composed @rozie-ui/popover leaf — below + width-matched,
+  // flipped above near the viewport bottom, outside-click dismissal, open-change
+  // counting. Behavioral-only (select-floating.spec.ts); NOT a screenshot cell.
+  'SelectFloating',
   // (P3/D-03: Select's editable combobox mode was retired — type-to-filter now
   // lives in @rozie-ui/combobox; the former SelectCombobox cell is removed.)
   // Phase 64 P4 (headless windowing, SC-5) — the WINDOWED long-list cells (loaders →
@@ -807,6 +812,8 @@ export const EXAMPLES = [
   // (loader → examples/demos/AutoIdDemo.rozie): default Selects/Popovers never
   // share ids. See auto-id.spec.ts. Behavioral-only; NOT in matrix.spec.ts EXAMPLES.
   'AutoId',
+  // The Popover half of the same check (loader → examples/demos/AutoIdPopoverDemo.rozie).
+  'AutoIdPopover',
   // combobox-group-cap — the BEHAVIORAL cell (loader → examples/demos/
   // ComboboxGroupCapDemo.rozie, importing packages/ui/combobox/src/Combobox.rozie)
   // proving the new opt-in `groupCap` prop: an overflowing section renders `cap`
@@ -1690,6 +1697,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // kebab of SelectBehaviorDemo (the wrapper component is name="Select" →
   // 'rozie-select'). Behavioral-only, no screenshot cell.
   SelectBehavior: 'rozie-select-behavior',
+  // 'rozie-select-floating-demo' = kebab of SelectFloatingDemo.
+  SelectFloating: 'rozie-select-floating',
   // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-select-virtual-demo'
   // / 'rozie-combobox-virtual-demo' = kebab of {Select,Combobox}VirtualDemo.
   SelectVirtual: 'rozie-select-virtual',
@@ -1736,6 +1745,7 @@ export const LIT_TAGS: Record<Example, string> = {
   ComboboxRecipient: 'rozie-combobox-recipient',
   // '-demo' appended on Lit → 'rozie-auto-id-demo'.
   AutoId: 'rozie-auto-id',
+  AutoIdPopover: 'rozie-auto-id-popover',
   // combobox-group-cap — '-demo' appended on Lit → tag
   // 'rozie-combobox-group-cap-demo' = kebab of ComboboxGroupCapDemo (the wrapper
   // component is name="Combobox" → 'rozie-combobox', matching the *Groups cell's
@@ -2253,6 +2263,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // <script> + value:null in <data> and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
   SelectBehavior: {},
+  // SelectFloatingDemo is self-contained (own options + internal r-model). No parent props.
+  SelectFloating: {},
   // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
   // 1,000-option list in $onMount and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
@@ -2305,6 +2317,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   ComboboxTokenInput: {},
   ComboboxRecipient: {},
   AutoId: {},
+  AutoIdPopover: {},
   // combobox-group-cap — ComboboxGroupCapDemo is self-contained: it seeds its
   // own OPTIONS/GROUPS + <data>.value and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props.

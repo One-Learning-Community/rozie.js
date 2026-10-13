@@ -47,7 +47,8 @@
     "@angular/core": "^19",
     "@angular/common": "^19",
     "@angular/forms": "^19",
-    "@tanstack/virtual-core": "^3"
+    "@tanstack/virtual-core": "^3",
+    "@rozie-ui/popover-angular": "^0.2.0 || ^0.3.0"
   },
   "peerDependenciesMeta": {
     "@angular/core": {
@@ -61,6 +62,9 @@
     },
     "@tanstack/virtual-core": {
       "optional": true
+    },
+    "@rozie-ui/popover-angular": {
+      "optional": false
     }
   },
   "scripts": {

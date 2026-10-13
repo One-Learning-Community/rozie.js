@@ -7,10 +7,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Per-instance default id base (oinbox 0.8.0 follow-up F6, quick 261002-ekf) on
- * all 6 targets, driven against examples/demos/AutoIdDemo.rozie: two
- * default-configured Selects and two default-configured Popovers never share an
- * id (they all used to default to one fixed string). The Combobox case is covered
- * by combobox-recipient.spec.ts.
+ * all 6 targets: two default-configured Selects (examples/demos/AutoIdDemo.rozie)
+ * and two default-configured Popovers (examples/demos/AutoIdPopoverDemo.rozie)
+ * never share an id (they all used to default to one fixed string). The Combobox
+ * case is covered by combobox-recipient.spec.ts.
+ *
+ * Two pages, not one: Select composes the published popover leaf, so a single page
+ * that also compiled Popover.rozie from source registered `rozie-popover` twice on
+ * Lit. The assertions are the ones the single page carried.
  *
  * Behavioral assertions only. CSS locators pierce Lit's open shadow roots.
  */
@@ -37,6 +41,8 @@ for (const target of TARGETS) {
     }
     expect(listControls[0]).not.toBe(listControls[1]);
 
+    await page.goto(`/?example=AutoIdPopover&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
     const panels = page.locator('.rozie-popover-floating');
     await expect(panels).toHaveCount(2, { timeout: 15_000 });
     await expect.poll(async () => (await panels.nth(0).getAttribute('id')) ?? '', POLL).toMatch(/^rozie-popover-\d+-panel$/);
