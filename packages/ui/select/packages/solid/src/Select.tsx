@@ -1230,11 +1230,17 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (!local.hideEmpty) return true;
     return visibleOptions().length > 0;
   }
-  // Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
-  // listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
-  // the sibling families' generated output stay untouched).
+  // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
+  // families' generated output stay untouched).
+  //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
+  //    internally; only the rendered/ARIA state is gated), Escape and Enter are left entirely to
+  //    the host - not preventDefault'ed, not consumed. All other keys still reach listCore.
+  //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
+  //    while the popup is actually visible.
   function onTriggerKeyDown($event: any) {
-    if ($event.key === 'Tab' && open$local() && local.selectOnTab && activeIndex() >= 0) commitActive();
+    const hidden = open$local() && !popupVisible();
+    if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+    if ($event.key === 'Tab' && open$local() && local.selectOnTab && popupVisible() && activeIndex() >= 0) commitActive();
     onControlKeyDown($event);
   }
 
@@ -1250,7 +1256,7 @@ export default function Select(_props: SelectProps): JSX.Element {
 
       
       <div class={"rozie-select-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-6e3ebfa6="">
-        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={rozieAttr(popupVisible())} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(activeDescendant())} aria-label={rozieAttr(local.ariaLabel)} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={rozieAttr(popupVisible())} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant() : null)} aria-label={rozieAttr(local.ariaLabel)} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
           {(_props.selectedSlot ?? _props.slots?.['selected'])?.({ get selected() { return selectedLabel(); }, get value() { return value(); } }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{local.placeholder}</span>}><span class={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel())}</span></Show>}
           <span class={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
         </button>

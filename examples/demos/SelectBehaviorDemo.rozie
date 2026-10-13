@@ -63,6 +63,7 @@ const pickValue = (v) => { $data.value = v }
     <span class="readout" data-testid="readout-value">{{ $data.value }}</span>
   </div>
 
+  <div data-testid="main-select">
   <Select
     :options="OPTIONS"
     r-model:value="$data.value"
@@ -73,6 +74,7 @@ const pickValue = (v) => { $data.value = v }
       <span class="opt" :class="{ 'opt-selected': selected }">{{ option.label }}</span>
     </template>
   </Select>
+  </div>
 
   <div data-testid="empty-select">
     <Select :options="NONE" hide-empty aria-label="Empty" />

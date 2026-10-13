@@ -131,7 +131,7 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 | `Enter` | Commit the active option. |
 | `Escape` | Close the popup and return focus to the control. |
 | `Space` | (Select-only) toggle the popup / commit the active option. |
-| `Tab` | Close the popup and move on. |
+| `Tab` | Close the popup and move on. With `selectOnTab`, first picks the highlighted option. |
 | _printable_ | (Select-only) type-ahead — jump to the first option whose label starts with the typed buffer. |
 
 ## Accessibility

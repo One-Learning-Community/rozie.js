@@ -4,7 +4,7 @@
 
   
   <div class="rozie-select-control" ref="controlElRef">
-    <button ref="triggerElRef" type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="(popupVisible()) ?? undefined" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(activeDescendant) ?? undefined" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onTriggerKeyDown($event)">
+    <button ref="triggerElRef" type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :aria-expanded="(popupVisible()) ?? undefined" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :disabled="props.disabled" @click="toggle" @keydown="onTriggerKeyDown($event)">
       <slot name="selected" :selected="selectedLabel" :value="value">
         <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
       <span class="rozie-select-arrow" aria-hidden="true">▾</span>
@@ -1072,11 +1072,17 @@ const popupVisible = () => {
   if (!props.hideEmpty) return true;
   return visibleOptions().length > 0;
 };
-// Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
-// listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
-// the sibling families' generated output stay untouched).
+// Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
+// families' generated output stay untouched).
+//  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
+//    internally; only the rendered/ARIA state is gated), Escape and Enter are left entirely to
+//    the host - not preventDefault'ed, not consumed. All other keys still reach listCore.
+//  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
+//    while the popup is actually visible.
 const onTriggerKeyDown = ($event: any) => {
-  if ($event.key === 'Tab' && open$local.value && props.selectOnTab && activeIndex.value >= 0) commitActive();
+  const hidden = open$local.value && !popupVisible();
+  if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if ($event.key === 'Tab' && open$local.value && props.selectOnTab && popupVisible() && activeIndex.value >= 0) commitActive();
   onControlKeyDown($event);
 };
 

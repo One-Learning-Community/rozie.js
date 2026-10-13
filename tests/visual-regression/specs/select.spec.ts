@@ -135,6 +135,28 @@ for (const target of TARGETS) {
     await page.keyboard.type('z');
     await expect(empty).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByTestId('empty-select').locator('[role="listbox"]')).toHaveCount(0);
+    // No aria-activedescendant while the popup is hidden; Escape/Enter are left to the host.
+    await expect(empty).not.toHaveAttribute('aria-activedescendant', /.+/);
+    await page.evaluate(() => {
+      const w = window as unknown as { __prevented: Record<string, boolean> };
+      w.__prevented = {};
+      document.addEventListener('keydown', (e) => { w.__prevented[e.key] = e.defaultPrevented; });
+    });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Enter');
+    const emptyPrevented = await page.evaluate(() => (window as unknown as { __prevented: Record<string, boolean> }).__prevented);
+    expect(emptyPrevented.Escape).toBe(false);
+    expect(emptyPrevented.Enter).toBe(false);
+    await expect(empty).toHaveAttribute('aria-expanded', 'false');
+    // Contrast: on a normal open select Escape IS default-prevented and closes it.
+    const main = page.getByTestId('main-select').locator('[role="combobox"]');
+    await main.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(main).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    const mainPrevented = await page.evaluate(() => (window as unknown as { __prevented: Record<string, boolean> }).__prevented);
+    expect(mainPrevented.Escape).toBe(true);
+    await expect(main).toHaveAttribute('aria-expanded', 'false');
     // --- all-disabled list never activates a row ---
     const dis = page.getByTestId('disabled-select').locator('[role="combobox"]');
     await dis.focus();
@@ -150,6 +172,14 @@ for (const target of TARGETS) {
     await page.keyboard.press('ArrowDown'); // Banana
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('readout-tab')).toHaveText('banana');
+    // --- without selectOnTab, Tab only closes: no commit ---
+    const plain = page.getByTestId('main-select').locator('[role="combobox"]');
+    const before = (await page.getByTestId('readout-value').textContent())?.trim() ?? '';
+    await plain.focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Tab');
+    await expect(page.getByTestId('readout-value')).toHaveText(before);
   });
 }
 

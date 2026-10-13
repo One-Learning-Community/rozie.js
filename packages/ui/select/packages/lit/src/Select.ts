@@ -348,7 +348,7 @@ private __rozieWatchInitial_0 = true;
 
   
   <div class="rozie-select-control" data-rozie-ref="controlEl" data-rozie-s-6e3ebfa6>
-    <button class="rozie-select-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${rozieAttr(this.popupVisible())} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.activeDescendant)} aria-label=${rozieAttr(this.ariaLabel)} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
+    <button class="rozie-select-trigger" type="button" role="combobox" aria-haspopup="listbox" aria-expanded=${rozieAttr(this.popupVisible())} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.popupVisible() ? this.activeDescendant : null)} aria-label=${rozieAttr(this.ariaLabel)} ?disabled=${this.disabled} @click=${this.toggle} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
       ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
         ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}
       <span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
@@ -1379,11 +1379,17 @@ private __rozieWatchInitial_0 = true;
   return this.visibleOptions().length > 0;
 };
 
-  // Select-local keydown wrapper: with `selectOnTab`, Tab commits the highlighted option before
-  // listCore's onControlKeyDown closes the popup (kept out of listCore so the shared partial and
-  // the sibling families' generated output stay untouched).
+  // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
+  // families' generated output stay untouched).
+  //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
+  //    internally; only the rendered/ARIA state is gated), Escape and Enter are left entirely to
+  //    the host - not preventDefault'ed, not consumed. All other keys still reach listCore.
+  //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
+  //    while the popup is actually visible.
   onTriggerKeyDown = ($event: any) => {
-  if ($event.key === 'Tab' && this._open$local.value && this.selectOnTab && this._activeIndex.value >= 0) this.commitActive();
+  const hidden = this._open$local.value && !this.popupVisible();
+  if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if ($event.key === 'Tab' && this._open$local.value && this.selectOnTab && this.popupVisible() && this._activeIndex.value >= 0) this.commitActive();
   this.onControlKeyDown($event);
 };
 
