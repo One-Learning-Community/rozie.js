@@ -122,6 +122,7 @@ handle?.open();
 
 | Slot | Params |
 | --- | --- |
+| chip | option, remove, index |
 | selected | selected, value |
 | option | option, index, active, selected, disabled |
 | empty | query |

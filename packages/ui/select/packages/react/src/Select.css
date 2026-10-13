@@ -31,6 +31,22 @@
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
+.rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; }
+.rozie-select-chip[data-rozie-s-6e3ebfa6] {
+  display: inline-flex; align-items: center; max-width: 100%;
+  gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
+  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
+  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
+  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
+  color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
+  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+}
+.rozie-select-chip__label[data-rozie-s-6e3ebfa6] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rozie-select-chip__remove[data-rozie-s-6e3ebfa6] {
+  border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
+  font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
+}
 .rozie-select-trigger[data-rozie-s-6e3ebfa6] { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }

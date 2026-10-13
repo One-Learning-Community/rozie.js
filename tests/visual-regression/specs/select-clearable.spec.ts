@@ -86,22 +86,25 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('locked').locator('.rozie-select-clear')).toHaveCount(0);
   });
 
-  runner(`select-clearable [${target}]: multiple - button clears all, Delete clears, Backspace does not`, async ({ page }) => {
+  runner(`select-clearable [${target}]: multiple - button clears all, Delete clears all, Backspace removes only the last chip`, async ({ page }) => {
     await page.goto(`/?example=SelectClearable&target=${target}`);
     const many = page.getByTestId('many');
     const trigger = many.locator('[role="combobox"]');
     await trigger.focus();
+    // Multi-select Backspace removes the LAST chip (it is not a clear): ["apple","banana"] -> ["apple"].
     await page.keyboard.press('Backspace');
+    await expect(page.getByTestId('readout-many')).toHaveText('["apple"]');
+    await expect(page.getByTestId('readout-many-changes')).toHaveText('1');
     // Follow-up positive action ordered after Backspace: ArrowDown opens, Escape closes.
     await page.keyboard.press('ArrowDown');
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByTestId('readout-many')).toHaveText('["apple","banana"]');
-    await expect(page.getByTestId('readout-many-changes')).toHaveText('0');
+    await expect(page.getByTestId('readout-many')).toHaveText('["apple"]');
+    await expect(page.getByTestId('readout-many-changes')).toHaveText('1');
     await page.keyboard.press('Escape');
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await page.keyboard.press('Delete');
     await expect(page.getByTestId('readout-many')).toHaveText('[]');
-    await expect(page.getByTestId('readout-many-changes')).toHaveText('1');
+    await expect(page.getByTestId('readout-many-changes')).toHaveText('2');
     await expect(many.locator('.rozie-select-clear')).toHaveCount(0);
   });
 }

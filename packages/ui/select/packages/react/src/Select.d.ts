@@ -8,7 +8,7 @@ export interface SelectGroup {
   label: string;
 }
 
-export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -115,6 +115,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
   maxHeight?: string;
   onOpenChange?: (...args: any[]) => void;
   onChange?: (...args: any[]) => void;
+  renderChip?: (params: { option: any; remove: () => void; index: number }) => ReactNode;
   renderSelected?: (params: { selected: unknown; value: unknown }) => ReactNode;
   renderOption?: (params: { option: unknown; index: unknown; active: unknown; selected: unknown; disabled: unknown }) => ReactNode;
   renderEmpty?: (params: { query: unknown }) => ReactNode;

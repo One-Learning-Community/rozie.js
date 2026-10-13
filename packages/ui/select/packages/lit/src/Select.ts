@@ -27,6 +27,12 @@ export interface SelectGroup {
   label: string;
 }
 
+interface RozieChipSlotCtx {
+  option: any;
+  remove: () => void;
+  index: number;
+}
+
 interface RozieSelectedSlotCtx {
   selected: any;
   value: any;
@@ -86,6 +92,22 @@ export default class Select extends SignalWatcher(LitElement) {
 .rozie-select-control[data-rozie-s-6e3ebfa6]:focus-within {
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+}
+.rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; }
+.rozie-select-chip[data-rozie-s-6e3ebfa6] {
+  display: inline-flex; align-items: center; max-width: 100%;
+  gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
+  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
+  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
+  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
+  color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
+  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+}
+.rozie-select-chip__label[data-rozie-s-6e3ebfa6] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rozie-select-chip__remove[data-rozie-s-6e3ebfa6] {
+  border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
+  font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
 }
 .rozie-select-trigger[data-rozie-s-6e3ebfa6] { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
@@ -296,6 +318,9 @@ private __rozieFirstUpdateDone = false;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
 
+  @state() private _hasSlotChip = false;
+  @queryAssignedElements({ slot: 'chip', flatten: true }) private _slotChipElements!: Element[];
+  @property({ attribute: false }) chip?: (scope: { option: any; remove: () => void; index: number }) => unknown;
   @state() private _hasSlotSelected = false;
   @queryAssignedElements({ slot: 'selected', flatten: true }) private _slotSelectedElements!: Element[];
   @property({ attribute: false }) selected?: (scope: { selected: any; value: any }) => unknown;
@@ -327,6 +352,17 @@ private __rozieFirstUpdateDone = false;
   private _armListeners(): void {
     const _u0 = attachOutsideClickListener([() => this._refControlEl, () => this._refListEl], ($event) => {  ((this.close) as (...args: any[]) => any)($event); }, () => (this._open$local.value && (this.inline || !this.popupVisible())));
     this._disconnectCleanups.push(_u0);
+
+    {
+      const slotEl = this.shadowRoot?.querySelector('slot[name="chip"]');
+      if (slotEl !== null && slotEl !== undefined) {
+        const update = () => { this._hasSlotChip = this._slotChipElements.length > 0; };
+        slotEl.addEventListener('slotchange', update);
+        // CR-05 fix: push cleanup so the listener is removed on disconnectedCallback.
+        this._disconnectCleanups.push(() => slotEl.removeEventListener('slotchange', update));
+        update();
+      }
+    }
 
     {
       const slotEl = this.shadowRoot?.querySelector('slot[name="selected"]');
@@ -375,6 +411,7 @@ private __rozieFirstUpdateDone = false;
 
   connectedCallback(): void {
     // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first render isn't deadlocked.
+    this._hasSlotChip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'chip');
     this._hasSlotSelected = Array.from(this.children).some((el) => el.getAttribute('slot') === 'selected');
     this._hasSlotOption = Array.from(this.children).some((el) => el.getAttribute('slot') === 'option');
     this._hasSlotEmpty = Array.from(this.children).some((el) => el.getAttribute('slot') === 'empty');
@@ -452,10 +489,14 @@ private __rozieFirstUpdateDone = false;
 <div class="${Object.entries({ "rozie-select": true, 'rozie-select-open': this.popupVisible(), 'rozie-select-disabled': this.disabled, 'rozie-select-inline': this.inline, 'rozie-select--block': this.block }).filter(([, v]) => v).map(([k]) => k).join(' ')}" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-6e3ebfa6>
   
   <rozie-popover trigger="manual" .open=${this._panelOpen.value} @open-change=${($event: CustomEvent) => { this._panelOpen.value = $event.detail; }} .bare=${true} .matchWidth=${true} .keepMounted=${this.virtual} .disablePositioning=${this.inline} .disableDismiss=${this.inline} .placement=${this.placement} .offset=${this.offset} .disableFlip=${this.disableFlip} .disableShift=${this.disableShift} .idBase=${this.idRoot()} data-rozie-s-6e3ebfa6><div class="rozie-select-control" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onControlClick($event); }} data-rozie-ref="controlEl" data-rozie-s-6e3ebfa6 slot="anchor">
-        <div class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex=${rozieAttr(this.triggerTabindex())} aria-expanded=${!!this.popupVisible()} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.popupVisible() && this._activeIndex.value < this.visibleOptions().length ? this.activeDescendant : null)} aria-label=${rozieAttr(this.ariaLabel)} aria-disabled=${!!this.disabled} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
-          ${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
-            ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}
-        </div>
+        ${this.multiple ? html`${repeat<any>(this.chipRows(), (row, idx) => 'chip-' + row.value, (row, idx) => html`<span class="rozie-select-chip" data-rozie-s-6e3ebfa6>
+          ${this.chip !== undefined ? this.chip({option: row.option, remove: () => this.onChipRemove(row.value), index: idx}) : html`<slot name="chip" data-rozie-params=${(() => { try { return JSON.stringify({option: row.option, index: idx}); } catch { return '{}'; } })()} @rozie-chip-remove=${($event: CustomEvent) => ((() => this.onChipRemove(row.value)) as (...args: any[]) => any)($event.detail)}>
+            <span class="rozie-select-chip__label" data-rozie-s-6e3ebfa6>${rozieDisplay(row.label)}</span>
+            <button class="rozie-select-chip__remove" type="button" tabindex="-1" ?disabled=${!!this.disabled} aria-label=${rozieAttr(this.chipRemoveLabel(row))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.noop(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onChipRemove(row.value); }} data-rozie-s-6e3ebfa6>×</button>
+          </slot>`}
+        </span>`)}` : nothing}<div class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex=${rozieAttr(this.triggerTabindex())} aria-expanded=${!!this.popupVisible()} aria-controls=${rozieAttr(this.idRoot() + '-list')} aria-activedescendant=${rozieAttr(this.popupVisible() && this._activeIndex.value < this.visibleOptions().length ? this.activeDescendant : null)} aria-label=${rozieAttr(this.ariaLabel)} aria-disabled=${!!this.disabled} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onTriggerKeyDown($event); }} data-rozie-ref="triggerEl" data-rozie-s-6e3ebfa6>
+          ${!this.multiple ? html`${this.selected !== undefined ? this.selected({selected: this.selectedLabel, value: this.value}) : html`<slot name="selected" data-rozie-params=${(() => { try { return JSON.stringify({selected: this.selectedLabel, value: this.value}); } catch { return '{}'; } })()}>
+            ${this.selectedLabel ? html`<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>${rozieDisplay(this.selectedLabel)}</span>` : html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>`}</slot>`}` : nothing}${this.multiple && this.selectedValues().length === 0 ? html`<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>${this.placeholder}</span>` : nothing}</div>
         ${this.clearable && this.hasValue() && !this.disabled ? html`<button class="rozie-select-clear" type="button" tabindex="-1" aria-label=${this.clearLabel} @mousedown=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { $event.preventDefault(); this.noop(); }} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.onClearClick(); }} data-rozie-s-6e3ebfa6>×</button>` : nothing}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>
       </div>
       
@@ -1565,6 +1606,7 @@ private __rozieFirstUpdateDone = false;
   if (this.disabled) return;
   const hidden = this._open$local.value && !this.popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if (this.onChipKey($event)) return;
   if (this.onClearKey($event)) return;
   if ($event.key === 'Tab' && this._open$local.value && this.selectOnTab && this.popupVisible() && this._activeIndex.value >= 0) this.commitActive();
   this.onControlKeyDown($event);
@@ -1596,6 +1638,62 @@ private __rozieFirstUpdateDone = false;
     return true;
   }
   return false;
+};
+
+  // ── multi-select chips ─────────────────────────────────────────────────────
+  selectedValues = () => {
+  const cur = this.value;
+  return Array.isArray(cur) ? cur : [];
+};
+
+  // One row per selected value, in value order. A value missing from `options` keeps a
+  // chip labelled by its raw value (and a null option) rather than vanishing.
+  chipRows = () => {
+  const opts = Array.isArray(this.options) ? this.options : [];
+  return this.selectedValues().map((v: any) => {
+    const found = opts.find((o: any) => this.valueOf$local(o) === v);
+    return found ? {
+      value: v,
+      label: this.labelOf(found),
+      option: found
+    } : {
+      value: v,
+      label: String(v),
+      option: null
+    };
+  });
+};
+
+  chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
+
+  removeChipValue = (v: any) => {
+  if (this.disabled) return;
+  const next = this.selectedValues().filter((x: any) => x !== v); // fresh array every commit
+  this._valueControllable.write(next);
+  this.dispatchEvent(new CustomEvent("change", {
+    detail: {
+      value: next,
+      option: null
+    },
+    bubbles: true,
+    composed: true
+  }));
+};
+
+  onChipRemove = (v: any) => {
+  this.removeChipValue(v);
+  this.focusControl();
+};
+
+  // Backspace with the popup closed removes the last chip (regardless of `clearable`).
+  // Returns true when it handled the key.
+  onChipKey = ($event: any) => {
+  if (!this.multiple || this._open$local.value || $event.key !== 'Backspace') return false;
+  const vals = this.selectedValues();
+  if (vals.length === 0) return false;
+  $event.preventDefault();
+  this.removeChipValue(vals[vals.length - 1]);
+  return true;
 };
 
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React

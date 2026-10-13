@@ -28,6 +28,13 @@ export interface SelectGroup {
   label: string;
 }
 
+interface ChipCtx {
+  $implicit: { option: any; remove: () => void; index: number };
+  option: any;
+  remove: () => void;
+  index: number;
+}
+
 interface SelectedCtx {
   $implicit: { selected: any; value: any };
   selected: any;
@@ -64,8 +71,22 @@ interface GroupHeadingCtx {
       <rozie-popover trigger="manual" [open]="panelOpen()" (openChange)="panelOpen.set($event)" [bare]="true" [matchWidth]="true" [keepMounted]="virtual()" [disablePositioning]="inline()" [disableDismiss]="inline()" [placement]="placement()" [offset]="offset()" [disableFlip]="disableFlip()" [disableShift]="disableShift()" [idBase]="idRoot()"><ng-template #anchor>
           
           <div class="rozie-select-control" #controlEl (click)="onControlClick($event)">
-            <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
-              @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
+            @if (multiple()) {
+    @for (row of chipRows(); track 'chip-' + row.value; let idx = $index) {
+    <span class="rozie-select-chip">
+              @if ((chipTpl ?? __rozieFillMap()['chip'] ?? templates()?.['chip'])) {
+    <ng-container *ngTemplateOutlet="(chipTpl ?? __rozieFillMap()['chip'] ?? templates()?.['chip']); context: _chip_ctx_2(row, idx)" />
+    } @else {
+
+                <span class="rozie-select-chip__label">{{ rozieDisplay(row.label) }}</span>
+                <button type="button" class="rozie-select-chip__remove" tabindex="-1" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); noop()" (click)="onChipRemove(row.value)">×</button>
+              
+    }
+            </span>
+    }
+    }<div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
+              @if (!multiple()) {
+    @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
 
@@ -75,7 +96,9 @@ interface GroupHeadingCtx {
     <span class="rozie-select-placeholder">{{ placeholder() }}</span>
     }
     }
-            </div>
+    }@if (multiple() && selectedValues().length === 0) {
+    <span class="rozie-select-placeholder">{{ placeholder() }}</span>
+    }</div>
             @if (clearable() && hasValue() && !(disabled() || this.__rozieCvaDisabled())) {
     <button type="button" class="rozie-select-clear" tabindex="-1" [attr.aria-label]="clearLabel()" (mousedown)="$event.preventDefault(); noop()" (click)="onClearClick()">×</button>
     }<span class="rozie-select-arrow" aria-hidden="true">▾</span>
@@ -204,6 +227,22 @@ interface GroupHeadingCtx {
     .rozie-select-control:focus-within {
       outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
       outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+    }
+    .rozie-select-control { flex-wrap: wrap; }
+    .rozie-select-chip {
+      display: inline-flex; align-items: center; max-width: 100%;
+      gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
+      padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
+      border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
+      background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
+      color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
+      font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+    }
+    .rozie-select-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .rozie-select-chip__remove {
+      border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+      color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
+      font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
     }
     .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
     .rozie-select-disabled .rozie-select-control { cursor: default; }
@@ -417,6 +456,7 @@ export class Select {
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   openChange = output<unknown>({ alias: 'open-change' });
   change = output<unknown>();
+  @ContentChild('chip', { read: TemplateRef }) chipTpl?: TemplateRef<ChipCtx>;
   @ContentChild('selected', { read: TemplateRef }) selectedTpl?: TemplateRef<SelectedCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('empty', { read: TemplateRef }) emptyTpl?: TemplateRef<EmptyCtx>;
@@ -1483,6 +1523,7 @@ export class Select {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const hidden = __open$local && !this.popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+    if (this.onChipKey($event)) return;
     if (this.onClearKey($event)) return;
     if ($event.key === 'Tab' && __open$local && this.selectOnTab() && this.popupVisible() && this.activeIndex() >= 0) this.commitActive();
     this.onControlKeyDown($event);
@@ -1510,6 +1551,53 @@ export class Select {
       return true;
     }
     return false;
+  };
+  // ── multi-select chips ─────────────────────────────────────────────────────
+  selectedValues = () => {
+    const cur = this.value();
+    return Array.isArray(cur) ? cur : [];
+  };
+  // One row per selected value, in value order. A value missing from `options` keeps a
+  // chip labelled by its raw value (and a null option) rather than vanishing.
+  chipRows = () => {
+    const __options = this.options();
+    const opts = Array.isArray(__options) ? __options : [];
+    return this.selectedValues().map((v: any) => {
+      const found = opts.find((o: any) => this.valueOf$local(o) === v);
+      return found ? {
+        value: v,
+        label: this.labelOf(found),
+        option: found
+      } : {
+        value: v,
+        label: String(v),
+        option: null
+      };
+    });
+  };
+  chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
+  removeChipValue = (v: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    const next = this.selectedValues().filter((x: any) => x !== v); // fresh array every commit
+    this.value.set(next), this.__rozieCvaOnChange(next);
+    this.change.emit({
+      value: next,
+      option: null
+    });
+  };
+  onChipRemove = (v: any) => {
+    this.removeChipValue(v);
+    this.focusControl();
+  };
+  // Backspace with the popup closed removes the last chip (regardless of `clearable`).
+  // Returns true when it handled the key.
+  onChipKey = ($event: any) => {
+    if (!this.multiple() || this.open$local() || $event.key !== 'Backspace') return false;
+    const vals = this.selectedValues();
+    if (vals.length === 0) return false;
+    $event.preventDefault();
+    this.removeChipValue(vals[vals.length - 1]);
+    return true;
   };
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
   // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
@@ -1550,7 +1638,7 @@ export class Select {
   static ngTemplateContextGuard(
     _dir: Select,
     _ctx: unknown,
-  ): _ctx is SelectedCtx | OptionCtx | EmptyCtx | GroupHeadingCtx {
+  ): _ctx is ChipCtx | SelectedCtx | OptionCtx | EmptyCtx | GroupHeadingCtx {
     return true;
   }
 
@@ -1597,6 +1685,8 @@ export class Select {
       });
     }
   });
+
+  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.onChipRemove(row.value), index: idx }, option: row.option, remove: () => this.onChipRemove(row.value), index: idx });
 
   protected get __style() {
       const __maxHeight = this.maxHeight();

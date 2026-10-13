@@ -1,0 +1,53 @@
+<!--
+  SelectMultiDemo.rozie — BEHAVIORAL consumer for Select multi-select chips
+  (select-multi.spec.ts). Four selects:
+    - main:   a clearable multiple holding a value missing from the options
+              ('ghost'), with a change counter + last-payload readout
+    - custom: fills the #chip slot and calls the provided remove()
+    - locked: disabled, holds values (chips render, nothing removes)
+    - wrap:   block-width select in a narrow box so the chips wrap to a 2nd row
+-->
+<rozie name="SelectMultiDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ value: ['banana', 'ghost'], changes: 0, payload: '', custom: ['apple', 'banana'], locked: ['apple', 'banana'], lockedChanges: 0, wrap: ['alpha', 'bravo', 'charlie', 'delta'] }</data>
+<script>
+const OPTIONS = [{ label: 'Apple', value: 'apple' }, { label: 'Banana', value: 'banana' }, { label: 'Cherry', value: 'cherry' }]
+const WRAP_OPTIONS = [
+  { label: 'Alpha value', value: 'alpha' },
+  { label: 'Bravo value', value: 'bravo' },
+  { label: 'Charlie value', value: 'charlie' },
+  { label: 'Delta value', value: 'delta' },
+  { label: 'Echo value', value: 'echo' },
+  { label: 'Foxtrot value', value: 'foxtrot' },
+]
+const joined = (v) => (Array.isArray(v) ? v.join(',') : '')
+const onChange = (detail) => {
+  $data.changes = $data.changes + 1
+  $data.payload = JSON.stringify(detail)
+}
+const onLockedChange = () => { $data.lockedChanges = $data.lockedChanges + 1 }
+const chipText = (option) => (option ? option.label : '?')
+</script>
+<template>
+<div>
+  <span data-testid="readout-value">{{ joined($data.value) }}</span>
+  <span data-testid="readout-changes">{{ $data.changes }}</span>
+  <span data-testid="readout-payload">{{ $data.payload }}</span>
+  <span data-testid="readout-custom">{{ joined($data.custom) }}</span>
+  <span data-testid="readout-locked">{{ joined($data.locked) }}</span>
+  <span data-testid="readout-locked-changes">{{ $data.lockedChanges }}</span>
+  <span data-testid="readout-wrap">{{ joined($data.wrap) }}</span>
+  <div data-testid="main"><Select :options="OPTIONS" r-model:value="$data.value" multiple clearable :close-on-select="false" placeholder="Pick fruit" aria-label="Fruit" @change="onChange($event)" /></div>
+  <div data-testid="custom">
+    <Select :options="OPTIONS" r-model:value="$data.custom" multiple :close-on-select="false" aria-label="Custom chips">
+      <template #chip="{ option, remove }">
+        <span class="custom-chip">{{ chipText(option) }}</span>
+        <button type="button" class="custom-chip__x" @click="remove()">x</button>
+      </template>
+    </Select>
+  </div>
+  <div data-testid="locked"><Select :options="OPTIONS" r-model:value="$data.locked" multiple clearable disabled aria-label="Locked" @change="onLockedChange()" /></div>
+  <div data-testid="wrap" style="width: 220px"><Select :options="WRAP_OPTIONS" r-model:value="$data.wrap" multiple block :close-on-select="false" aria-label="Wrap" /></div>
+</div>
+</template>
+</rozie>

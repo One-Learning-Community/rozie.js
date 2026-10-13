@@ -131,9 +131,10 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 
 | Slot | Params | Description |
 | --- | --- | --- |
-| `selected` | `selected, value` | Custom rendering of the select-only trigger's chosen-value display. |
+| `selected` | `selected, value` | Custom rendering of the select-only trigger's chosen-value display. Single-select only: with `multiple` the selected values render as chips (see `chip`). |
 | `option` | `option, index, active, selected, disabled` | Custom per-option rendering (the main scoped slot). |
 | `empty` | `query` | Shown when the (filtered) option list is empty. |
+| `chip` | `option, remove, index` | Custom rendering of one multi-select chip, inside the `.rozie-select-chip` wrapper (`option` is `null` for a value missing from `options`; `remove()` removes that value and refocuses the control). Defaults to a label plus a remove button. |
 | `groupHeading` | `group` | Custom rendering of a group's heading (`group` is the `{ id, label }` entry). Defaults to the group's label. |
 
 ## Theming

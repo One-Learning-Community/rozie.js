@@ -26,6 +26,8 @@ export interface SelectGroup {
   label: string;
 }
 
+interface ChipCtx { option: any; remove: () => void; index: number; }
+
 interface SelectedCtx { selected: any; value: any; }
 
 interface OptionCtx { option: any; index: any; active: any; selected: any; disabled: any; }
@@ -34,7 +36,7 @@ interface EmptyCtx { query: any; }
 
 interface GroupHeadingCtx { group: SelectGroup; }
 
-interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -141,6 +143,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
   maxHeight?: string;
   onOpenChange?: (...args: any[]) => void;
   onChange?: (...args: any[]) => void;
+  renderChip?: (ctx: ChipCtx) => ReactNode;
   renderSelected?: (ctx: SelectedCtx) => ReactNode;
   renderOption?: (ctx: OptionCtx) => ReactNode;
   renderEmpty?: (ctx: EmptyCtx) => ReactNode;
@@ -187,8 +190,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     maxHeight: _props.maxHeight ?? '',
   };
   const attrs: Record<string, unknown> = (() => {
-    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, clearable, clearLabel, placement, offset, disableFlip, disableShift, block, groups, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderSelected, renderOption, renderEmpty, renderGroupHeading, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
-    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void clearable; void clearLabel; void placement; void offset; void disableFlip; void disableShift; void block; void groups; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderSelected; void renderOption; void renderEmpty; void renderGroupHeading; void slots;
+    const { options, value, multiple, inline, disabled, placeholder, closeOnSelect, optionLabel, optionValue, optionDisabled, idBase, hideEmpty, selectOnTab, clearable, clearLabel, placement, offset, disableFlip, disableShift, block, groups, ariaLabel, virtual, estimateRowHeight, maxHeight, defaultValue, onValueChange, onOpenChange, onChange, renderChip, renderSelected, renderOption, renderEmpty, renderGroupHeading, slots, ...rest } = _props as SelectProps & Record<string, unknown>;
+    void options; void value; void multiple; void inline; void disabled; void placeholder; void closeOnSelect; void optionLabel; void optionValue; void optionDisabled; void idBase; void hideEmpty; void selectOnTab; void clearable; void clearLabel; void placement; void offset; void disableFlip; void disableShift; void block; void groups; void ariaLabel; void virtual; void estimateRowHeight; void maxHeight; void defaultValue; void onValueChange; void onOpenChange; void onChange; void renderChip; void renderSelected; void renderOption; void renderEmpty; void renderGroupHeading; void slots;
     return rest;
   })();
   const gridScrollEl = useRef<any>(null);
@@ -1248,10 +1251,11 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     if (props.disabled) return;
     const hidden = open$local && !popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+    if (onChipKey($event)) return;
     if (onClearKey($event)) return;
     if ($event.key === 'Tab' && open$local && props.selectOnTab && popupVisible() && activeIndex >= 0) commitActive();
     onControlKeyDown($event);
-  }, [activeIndex, commitActive, onClearKey, onControlKeyDown, open$local, popupVisible, props.disabled, props.selectOnTab]);
+  }, [activeIndex, commitActive, onChipKey, onClearKey, onControlKeyDown, open$local, popupVisible, props.disabled, props.selectOnTab]);
   // ── clearable ──────────────────────────────────────────────────────────────
   function hasValue() {
     const cur = value;
@@ -1275,6 +1279,55 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       return true;
     }
     return false;
+  }
+
+  // ── multi-select chips ─────────────────────────────────────────────────────
+  function selectedValues() {
+    const cur = value;
+    return Array.isArray(cur) ? cur : [];
+  }
+  // One row per selected value, in value order. A value missing from `options` keeps a
+  // chip labelled by its raw value (and a null option) rather than vanishing.
+  function chipRows() {
+    const opts = Array.isArray(props.options) ? props.options : [];
+    return selectedValues().map((v: any) => {
+      const found = opts.find((o: any) => valueOf(o) === v);
+      return found ? {
+        value: v,
+        label: labelOf(found),
+        option: found
+      } : {
+        value: v,
+        label: String(v),
+        option: null
+      };
+    });
+  }
+  function chipRemoveLabel(row: any) {
+    return 'Remove ' + String(row.label);
+  }
+  function removeChipValue(v: any) {
+    if (props.disabled) return;
+    const next = selectedValues().filter((x: any) => x !== v); // fresh array every commit
+    setValue(next);
+    props.onChange && props.onChange({
+      value: next,
+      option: null
+    });
+  }
+  const onChipRemove = useCallback((v: any) => {
+    removeChipValue(v);
+    focusControl();
+  }, [focusControl, removeChipValue]);
+  // Backspace with the popup closed removes the last chip (regardless of `clearable`).
+  // Returns true when it handled the key.
+  function onChipKey($event: any) {
+    if (!props.multiple || open$local || $event.key !== 'Backspace') return false;
+    const vals = selectedValues();
+    if (vals.length === 0) return false;
+    $event.preventDefault();
+    removeChipValue(vals[vals.length - 1]);
+    return true;
   }
 
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
@@ -1366,9 +1419,10 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       <Popover trigger="manual" open={panelOpen} onOpenChange={setPanelOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6="" renderAnchor={() => (<>
           
           <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
-            <div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
-              {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>)}
-            </div>
+            {!!(props.multiple) && (chipRows().map((row, idx) => <span key={'chip-' + row.value} className={"rozie-select-chip"} data-rozie-s-6e3ebfa6="">
+              {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => onChipRemove(row.value), index: idx }) : <><span className={"rozie-select-chip__label"} data-rozie-s-6e3ebfa6="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-select-chip__remove"} tabIndex={-1} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onChipRemove(row.value); }} data-rozie-s-6e3ebfa6="">×</button></>}
+            </span>))}<div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+              {!!(!props.multiple) && ((props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>))}{!!(props.multiple && selectedValues().length === 0) && <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>}</div>
             {!!(props.clearable && hasValue() && !props.disabled) && <button type="button" className={"rozie-select-clear"} tabIndex={-1} aria-label={props.clearLabel} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onClearClick(); }} data-rozie-s-6e3ebfa6="">×</button>}<span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
           </div>
         </>)} children={<>

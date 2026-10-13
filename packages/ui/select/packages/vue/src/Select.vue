@@ -5,10 +5,14 @@
   <Popover trigger="manual" v-model:open="panelOpen" :bare="true" :match-width="true" :keep-mounted="props.virtual" :disable-positioning="props.inline" :disable-dismiss="props.inline" :placement="props.placement" :offset="props.offset" :disable-flip="props.disableFlip" :disable-shift="props.disableShift" :id-base="idRoot()"><template #anchor>
       
       <div class="rozie-select-control" ref="controlElRef" @click="onControlClick($event)">
-        <div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
-          <slot name="selected" :selected="selectedLabel" :value="value">
-            <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot>
-        </div>
+        <template v-if="props.multiple"><span v-for="(row, idx) in chipRows()" :key="'chip-' + row.value" class="rozie-select-chip">
+          <slot name="chip" :option="row.option" :remove="() => onChipRemove(row.value)" :index="idx">
+            <span class="rozie-select-chip__label">{{ row.label }}</span>
+            <button type="button" class="rozie-select-chip__remove" tabindex="-1" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="noop()" @click="onChipRemove(row.value)">×</button>
+          </slot>
+        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+          <template v-if="!props.multiple"><slot name="selected" :selected="selectedLabel" :value="value">
+            <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot></template><span v-if="props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ props.placeholder }}</span></div>
         <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
       </div>
     </template>
@@ -193,6 +197,7 @@ const emit = defineEmits<{
 }>();
 
 defineSlots<{
+  chip(props: { option: any; remove: () => void; index: number }): any;
   selected(props: { selected: any; value: any }): any;
   option(props: { option: any; index: any; active: any; selected: any; disabled: any }): any;
   empty(props: { query: any }): any;
@@ -1193,6 +1198,7 @@ const onTriggerKeyDown = ($event: any) => {
   if (props.disabled) return;
   const hidden = open$local.value && !popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
+  if (onChipKey($event)) return;
   if (onClearKey($event)) return;
   if ($event.key === 'Tab' && open$local.value && props.selectOnTab && popupVisible() && activeIndex.value >= 0) commitActive();
   onControlKeyDown($event);
@@ -1220,6 +1226,52 @@ const onClearKey = ($event: any) => {
     return true;
   }
   return false;
+};
+// ── multi-select chips ─────────────────────────────────────────────────────
+const selectedValues = () => {
+  const cur = value.value;
+  return Array.isArray(cur) ? cur : [];
+};
+// One row per selected value, in value order. A value missing from `options` keeps a
+// chip labelled by its raw value (and a null option) rather than vanishing.
+const chipRows = () => {
+  const opts = Array.isArray(props.options) ? props.options : [];
+  return selectedValues().map((v: any) => {
+    const found = opts.find((o: any) => valueOf(o) === v);
+    return found ? {
+      value: v,
+      label: labelOf(found),
+      option: found
+    } : {
+      value: v,
+      label: String(v),
+      option: null
+    };
+  });
+};
+const chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
+const removeChipValue = (v: any) => {
+  if (props.disabled) return;
+  const next = selectedValues().filter((x: any) => x !== v); // fresh array every commit
+  value.value = next;
+  emit('change', {
+    value: next,
+    option: null
+  });
+};
+const onChipRemove = (v: any) => {
+  removeChipValue(v);
+  focusControl();
+};
+// Backspace with the popup closed removes the last chip (regardless of `clearable`).
+// Returns true when it handled the key.
+const onChipKey = ($event: any) => {
+  if (!props.multiple || open$local.value || $event.key !== 'Backspace') return false;
+  const vals = selectedValues();
+  if (vals.length === 0) return false;
+  $event.preventDefault();
+  removeChipValue(vals[vals.length - 1]);
+  return true;
 };
 // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
 // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
@@ -1322,6 +1374,22 @@ useOutsideClick(
 .rozie-select-control:focus-within {
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+}
+.rozie-select-control { flex-wrap: wrap; }
+.rozie-select-chip {
+  display: inline-flex; align-items: center; max-width: 100%;
+  gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
+  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
+  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
+  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
+  color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
+  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+}
+.rozie-select-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rozie-select-chip__remove {
+  border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
+  font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
 }
 .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
 .rozie-select-disabled .rozie-select-control { cursor: default; }

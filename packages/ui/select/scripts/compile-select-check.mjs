@@ -26,7 +26,7 @@ const EXPECT = {
   props: ['options', 'value', 'multiple', 'inline', 'disabled', 'placeholder', 'closeOnSelect', 'optionLabel', 'optionValue', 'optionDisabled', 'idBase', 'hideEmpty', 'selectOnTab', 'clearable', 'clearLabel', 'ariaLabel', 'groups', 'virtual', 'estimateRowHeight', 'maxHeight', 'placement', 'offset', 'disableFlip', 'disableShift', 'block'],
   models: ['value'],
   emits: ['change', 'open-change'],
-  slots: ['selected', 'option', 'empty', 'groupHeading'],
+  slots: ['selected', 'option', 'empty', 'groupHeading', 'chip'],
   expose: ['open', 'close', 'toggle', 'clear', 'focusControl'],
 };
 

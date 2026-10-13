@@ -813,6 +813,7 @@ const onTriggerKeyDown = ($event) => {
   if ($props.disabled) return
   const hidden = $data.open && !popupVisible()
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return
+  if (onChipKey($event)) return
   if (onClearKey($event)) return
   if ($event.key === 'Tab' && $data.open && $props.selectOnTab && popupVisible() && $data.activeIndex >= 0) commitActive()
   onControlKeyDown($event)
@@ -841,6 +842,42 @@ const onClearKey = ($event) => {
     return true
   }
   return false
+}
+
+// ── multi-select chips ─────────────────────────────────────────────────────
+const selectedValues = () => {
+  const cur = $props.value
+  return Array.isArray(cur) ? cur : []
+}
+// One row per selected value, in value order. A value missing from `options` keeps a
+// chip labelled by its raw value (and a null option) rather than vanishing.
+const chipRows = () => {
+  const opts = Array.isArray($props.options) ? $props.options : []
+  return selectedValues().map((v) => {
+    const found = opts.find((o) => valueOf(o) === v)
+    return found ? { value: v, label: labelOf(found), option: found } : { value: v, label: String(v), option: null }
+  })
+}
+const chipRemoveLabel = (row) => 'Remove ' + String(row.label)
+const removeChipValue = (v) => {
+  if ($props.disabled) return
+  const next = selectedValues().filter((x) => x !== v) // fresh array every commit
+  $model.value = next
+  $emit('change', { value: next, option: null })
+}
+const onChipRemove = (v) => {
+  removeChipValue(v)
+  focusControl()
+}
+// Backspace with the popup closed removes the last chip (regardless of `clearable`).
+// Returns true when it handled the key.
+const onChipKey = ($event) => {
+  if (!$props.multiple || $data.open || $event.key !== 'Backspace') return false
+  const vals = selectedValues()
+  if (vals.length === 0) return false
+  $event.preventDefault()
+  removeChipValue(vals[vals.length - 1])
+  return true
 }
 
 // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
@@ -965,6 +1002,25 @@ $expose({ open, close, toggle, clear, focusControl })
         ref="controlEl"
         @click="onControlClick($event)"
       >
+        <span
+          r-for="(row, idx) in chipRows()"
+          r-if="$props.multiple"
+          :key="'chip-' + row.value"
+          class="rozie-select-chip"
+        >
+          <slot name="chip" :option="row.option" :remove="() => onChipRemove(row.value)" :index="idx" :param-types="{ option: 'any', remove: '() => void', index: 'number' }">
+            <span class="rozie-select-chip__label">{{ row.label }}</span>
+            <button
+              type="button"
+              class="rozie-select-chip__remove"
+              tabindex="-1"
+              :disabled="!!$props.disabled"
+              :aria-label="chipRemoveLabel(row)"
+              @mousedown.prevent="noop()"
+              @click="onChipRemove(row.value)"
+            >×</button>
+          </slot>
+        </span>
         <div
           ref="triggerEl"
           class="rozie-select-trigger"
@@ -978,10 +1034,11 @@ $expose({ open, close, toggle, clear, focusControl })
           :aria-disabled="!!$props.disabled"
           @keydown="onTriggerKeyDown($event)"
         >
-          <slot name="selected" :selected="selectedLabel" :value="$props.value">
+          <slot r-if="!$props.multiple" name="selected" :selected="selectedLabel" :value="$props.value">
             <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
             <span r-else class="rozie-select-placeholder">{{ $props.placeholder }}</span>
           </slot>
+          <span r-if="$props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ $props.placeholder }}</span>
         </div>
         <button
           r-if="$props.clearable && hasValue() && !$props.disabled"
@@ -1176,6 +1233,22 @@ $expose({ open, close, toggle, clear, focusControl })
 .rozie-select-control:focus-within {
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+}
+.rozie-select-control { flex-wrap: wrap; }
+.rozie-select-chip {
+  display: inline-flex; align-items: center; max-width: 100%;
+  gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
+  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
+  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
+  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
+  color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
+  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+}
+.rozie-select-chip__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rozie-select-chip__remove {
+  border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
+  font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
 }
 .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
 .rozie-select-disabled .rozie-select-control { cursor: default; }
