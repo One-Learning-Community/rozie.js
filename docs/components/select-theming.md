@@ -14,7 +14,7 @@ The values listed below are exposed as `--rozie-select-*` custom properties, eac
   --rozie-select-width: 16rem;
   --rozie-select-accent: #0066cc;
   --rozie-select-color: inherit;
-  --rozie-select-focus-ring-width: 3px;
+  --rozie-select-placeholder: #757575;
 }
 ```
 
@@ -44,15 +44,19 @@ accent: the single color most consumers will set; the focus border and the selec
 | `--rozie-select-border-width` | `1px` |
 | `--rozie-select-border-color` | `rgba(0, 0, 0, 0.25)` |
 | `--rozie-select-radius` | `0.5rem` |
-| `--rozie-select-placeholder` | `rgba(0, 0, 0, 0.45)` |
 
-focus ring: the control gets a `focus-border-color` border (defaults to the accent) and an `outline` ring while focus is anywhere inside it
+the placeholder text colour; the default is the browser's own `::placeholder` grey, which is what Combobox's input renders
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-placeholder` | `#757575` |
+
+focus ring: while focus is anywhere inside the control it gets a `focus-border-color` border (defaults to the accent) and a `box-shadow` ring, as Combobox's input does
 
 | Token | Default |
 | --- | --- |
 | `--rozie-select-focus-ring-width` | `3px` |
 | `--rozie-select-focus-ring-color` | `rgba(0, 102, 204, 0.25)` |
-| `--rozie-select-ring-offset` | `0` |
 
 ### disabled
 
@@ -116,7 +120,7 @@ group heading: the label rendered above a block of options when the options are 
 | `--rozie-select-empty-color` | `rgba(0, 0, 0, 0.5)` |
 | `--rozie-select-empty-padding` | `0.5rem 0.6rem` |
 
-chips: the selected-value chips rendered inside the control when `multiple` is set. `chip-gap` is the gap between rows once the chips wrap (the spacing between chips, the trigger and the buttons on one row is `gap`); `chip-size` sets the chip's font-size, and the single `chip-remove-size` drives BOTH the width and the height of the round remove button.
+chips: the selected-value chips rendered inside the control when `multiple` is set. `chip-gap` is the gap between chips on a row and between rows once they wrap (it also spaces the trigger and the buttons while chips are shown); `chip-size` sets the chip's font-size, and the single `chip-remove-size` drives BOTH the width and the height of the round remove button.
 
 | Token | Default |
 | --- | --- |

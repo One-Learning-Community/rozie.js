@@ -243,10 +243,10 @@ interface GroupHeadingCtx {
       /* the focus border is decoupled from the ring colour, as in Combobox: a consumer can
          neutralise the border without touching the accent the check mark derives from */
       border-color: var(--rozie-select-focus-border-color, var(--rozie-select-accent, var(--rsl-accent, #0066cc)));
-      outline: var(--rozie-select-focus-ring-width, var(--rsl-focus-ring-width, 3px)) solid var(--rozie-select-focus-ring-color, var(--rsl-focus-ring-color, rgba(0, 102, 204, 0.25)));
-      outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 0));
+      box-shadow: 0 0 0 var(--rozie-select-focus-ring-width, var(--rsl-focus-ring-width, 3px)) var(--rozie-select-focus-ring-color, var(--rsl-focus-ring-color, rgba(0, 102, 204, 0.25)));
     }
-    .rozie-select-control { flex-wrap: wrap; row-gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.4rem)); }
+    .rozie-select-control { flex-wrap: wrap; transition: border-color 0.15s, box-shadow 0.15s; }
+    .rozie-select-control:has(.rozie-select-chip) { gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.4rem)); }
     .rozie-select--native .rozie-select-control { position: relative; }
     .rozie-select-native {
       position: absolute; inset: 0; width: 100%; height: 100%;
@@ -277,12 +277,12 @@ interface GroupHeadingCtx {
     .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
     .rozie-select-disabled .rozie-select-control { cursor: default; background: var(--rozie-select-disabled-bg, var(--rsl-disabled-bg, rgba(0, 0, 0, 0.04))); }
     .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.55)); pointer-events: none; }
-    .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
+    .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, #757575)); }
     .rozie-select-clear {
       flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
       color: var(--rozie-select-clear-color, var(--rsl-clear-color, currentColor));
       font-size: var(--rozie-select-clear-size, var(--rsl-clear-size, 1rem));
-      opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.6));
+      opacity: var(--rozie-select-arrow-opacity, var(--rsl-arrow-opacity, 0.7));
     }
     .rozie-select-clear:hover { opacity: 1; }
     .rozie-select-arrow {

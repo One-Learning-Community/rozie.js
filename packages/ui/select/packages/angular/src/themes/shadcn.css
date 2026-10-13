@@ -33,7 +33,6 @@ rozie-select {
   --rsl-color: var(--rozie-select-color, hsl(var(--foreground, 222.2 84% 4.9%)));
   --rsl-border-color: var(--rozie-select-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
   --rsl-radius: var(--rozie-select-radius, var(--radius, 0.5rem));
-  --rsl-placeholder: var(--rozie-select-placeholder, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
 
   --rsl-focus-ring-color: var(--rozie-select-focus-ring-color, hsl(var(--ring, 222.2 84% 4.9%) / 0.35));
 

@@ -47,13 +47,13 @@
   --rsl-border-width: var(--rozie-select-border-width, 1px);
   --rsl-border-color: var(--rozie-select-border-color, rgba(0, 0, 0, 0.25));
   --rsl-radius: var(--rozie-select-radius, 0.5rem);
-  --rsl-placeholder: var(--rozie-select-placeholder, rgba(0, 0, 0, 0.45));
+  /* the placeholder text colour; the default is the browser's own `::placeholder` grey, which is what Combobox's input renders */
+  --rsl-placeholder: var(--rozie-select-placeholder, #757575);
 
-  /* focus ring: the control gets a `focus-border-color` border (defaults to the accent) and an
-     `outline` ring while focus is anywhere inside it */
+  /* focus ring: while focus is anywhere inside the control it gets a `focus-border-color`
+     border (defaults to the accent) and a `box-shadow` ring, as Combobox's input does */
   --rsl-focus-ring-width: var(--rozie-select-focus-ring-width, 3px);
   --rsl-focus-ring-color: var(--rozie-select-focus-ring-color, rgba(0, 102, 204, 0.25));
-  --rsl-ring-offset: var(--rozie-select-ring-offset, 0);
 
   /* disabled */
   --rsl-disabled-opacity: var(--rozie-select-disabled-opacity, 0.55);
@@ -103,8 +103,8 @@
   --rsl-empty-padding: var(--rozie-select-empty-padding, 0.5rem 0.6rem);
 
   /* chips: the selected-value chips rendered inside the control when `multiple` is set.
-     `chip-gap` is the gap between rows once the chips wrap (the spacing between chips, the
-     trigger and the buttons on one row is `gap`); `chip-size` sets the chip's font-size, and
+     `chip-gap` is the gap between chips on a row and between rows once they wrap (it also
+     spaces the trigger and the buttons while chips are shown); `chip-size` sets the chip's font-size, and
      the single `chip-remove-size` drives BOTH the width and the height of the round remove button. */
   --rsl-chip-gap: var(--rozie-select-chip-gap, 0.4rem);
   --rsl-chip-bg: var(--rozie-select-chip-bg, rgba(0, 102, 204, 0.12));

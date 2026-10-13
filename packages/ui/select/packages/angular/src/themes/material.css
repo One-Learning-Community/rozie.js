@@ -31,7 +31,6 @@ rozie-select {
   --rsl-border-color: var(--rozie-select-border-color, var(--md-sys-color-outline, #79747e));
   --rsl-border-width: var(--rozie-select-border-width, 1px);
   --rsl-radius: var(--rozie-select-radius, 0.5rem);
-  --rsl-placeholder: var(--rozie-select-placeholder, var(--md-sys-color-on-surface-variant, #49454f));
 
   --rsl-focus-ring-color: var(--rozie-select-focus-ring-color, color-mix(in srgb, var(--md-sys-color-primary, #6750a4) 30%, transparent));
 

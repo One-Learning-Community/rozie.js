@@ -18,8 +18,10 @@ const theme = (family: string, name: string) => readFileSync(resolve(UI, family,
  *
  * What is deliberately NOT compared, because the families legitimately differ: the control's
  * height (Select's trigger is a div with a minimum line, Combobox's is a text input); the
- * selected option's colour (Select shows a check mark, Combobox tints the label); the
- * placeholder colour (Combobox exposes no token, its placeholder is the browser's).
+ * selected option's colour (Select shows a check mark, Combobox tints the label). The
+ * placeholder IS compared: Combobox styles none, so it renders the browser's `::placeholder`
+ * colour, and Select's placeholder must be the same colour. The focus state (border, ring) and
+ * the horizontal gap between two chips are compared as well.
  *
  * Behavioral-only (no screenshot baseline).
  */
@@ -113,6 +115,36 @@ for (const target of TARGETS) {
       // disabled: the opacity sits on the Select root and on the Combobox input; both draw the disabled background
       await compare('disabled opacity', sel('off', '.rozie-select-disabled'), cbx('off', '.rozie-combobox-input'), ['opacity']);
       await compare('disabled control', sel('off', '.rozie-select-control'), cbx('off', '.rozie-combobox-input'), ['background-color', 'border-top-color']);
+
+      // placeholder: Combobox styles none (browser default ::placeholder), Select has a token
+      const selPh = await sel('plain', '.rozie-select-placeholder').first().evaluate((el) => getComputedStyle(el).color);
+      const cbPh = await cbx('plain', '.rozie-combobox-input').first().evaluate((el) => getComputedStyle(el, '::placeholder').color);
+      if (selPh !== cbPh) mismatches.push(`placeholder.color: select=${selPh} combobox=${cbPh}`);
+
+      // chip spacing: the horizontal distance between two adjacent chips
+      const chipGap = async (chips: Locator) => {
+        const a = await chips.nth(0).boundingBox();
+        const b = await chips.nth(1).boundingBox();
+        return a && b ? Math.round((b.x - (a.x + a.width)) * 100) / 100 : NaN;
+      };
+      const selChipGap = await chipGap(sel('multi', '.rozie-select-chip'));
+      const cbChipGap = await chipGap(cbx('multi', '.rozie-combobox-chip'));
+      if (selChipGap !== cbChipGap) mismatches.push(`chip spacing: select=${selChipGap} combobox=${cbChipGap}`);
+
+      // focus state: ring and border (the Combobox draws them on the focused input, Select on :focus-within)
+      const FOCUS = ['box-shadow', 'border-top-color', 'outline-style', 'outline-width'];
+      const settle = async () => {
+        await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+        await page.waitForTimeout(300);
+      };
+      await sel('plain', '[role="combobox"]').first().focus();
+      await settle();
+      const selFocus = await read(sel('plain', '.rozie-select-control'), FOCUS);
+      await cbx('plain', '.rozie-combobox-input').first().focus();
+      await settle();
+      const cbFocus = await read(cbx('plain', '.rozie-combobox-input'), FOCUS);
+      FOCUS.forEach((p, i) => { if (selFocus[i] !== cbFocus[i]) mismatches.push(`focus.${p}: select=${selFocus[i]} combobox=${cbFocus[i]}`); });
+      await page.mouse.click(0, 0);
 
       // open both multi popups in turn; move the highlight off the selected options
       const openSelect = async (id: string) => {

@@ -31,11 +31,8 @@ rozie-select {
   --rsl-border-color: var(--rozie-select-border-color, var(--bs-border-color, #dee2e6));
   --rsl-border-width: var(--rozie-select-border-width, var(--bs-border-width, 1px));
   --rsl-radius: var(--rozie-select-radius, var(--bs-border-radius, 0.375rem));
-  --rsl-placeholder: var(--rozie-select-placeholder, var(--bs-secondary-color, #6c757d));
 
   --rsl-focus-ring-color: var(--rozie-select-focus-ring-color, rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25));
-  --rsl-focus-ring-width: var(--rozie-select-focus-ring-width, 0.25rem);
-  --rsl-ring-offset: var(--rozie-select-ring-offset, 0);
 
   --rsl-disabled-opacity: var(--rozie-select-disabled-opacity, 0.5);
   --rsl-disabled-bg: var(--rozie-select-disabled-bg, var(--bs-tertiary-bg, #e9ecef));
