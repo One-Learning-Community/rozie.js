@@ -347,3 +347,71 @@ for (const target of TARGETS) {
       .toBe(true);
   });
 }
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// B5 — End / Home: the window scrolls to the edge on the SAME key press.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`select-virtual [${target}]: End renders and highlights the last of 1000 options; Home the first`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=SelectVirtual&target=${target}`);
+    await expect
+      .poll(async () => page.getByTestId('option-count').textContent(), { timeout: 20_000 })
+      .toBe('1000');
+    await openSelect(page);
+    const control = page.locator('[role="combobox"]').first();
+    const list = page.locator(SCROLL).first();
+    // Whether the option with this data-index is rendered entirely inside the list's visible box.
+    const inView = (index: number) => async () => {
+      const l = await list.boundingBox();
+      const opt = page.locator(`[role="option"][data-index="${index}"]`);
+      if ((await opt.count()) !== 1) return false;
+      const o = await opt.boundingBox();
+      return !!l && !!o && o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+
+    // ONE key press each: nothing else is pressed before the assertions.
+    await page.keyboard.press('End');
+    await expect(control).toHaveAttribute('aria-activedescendant', /-opt-999$/);
+    await expect.poll(inView(999), { timeout: 15_000 }).toBe(true);
+    await expect(page.locator('[role="option"][data-index="999"]')).toHaveText('Option 1000');
+    await expect(page.locator('[role="option"][data-index="999"]')).toHaveClass(/is-active/);
+    expect(await page.locator('[role="option"]').count()).toBeLessThan(100);
+
+    await page.keyboard.press('Home');
+    await expect(control).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await expect.poll(inView(0), { timeout: 15_000 }).toBe(true);
+    await expect(page.locator('[role="option"][data-index="0"]')).toHaveText('Option 1');
+    await expect.poll(async () => scrollTopOf(page)).toBe(0);
+
+    // From a CLOSED list too: End opens it and lands on the last option.
+    await page.keyboard.press('Escape');
+    await expect(control).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('End');
+    await expect(control).toHaveAttribute('aria-expanded', 'true');
+    await expect(control).toHaveAttribute('aria-activedescendant', /-opt-999$/);
+    await expect.poll(inView(999), { timeout: 15_000 }).toBe(true);
+
+    // Hovering an option moves the highlight WITHOUT scrolling the list. First let the
+    // end position settle (the options that were hidden re-measure for a few frames).
+    let before: number | null = -1;
+    await expect
+      .poll(async () => { const t = await scrollTopOf(page); const same = t === before; before = t; return same; }, { intervals: [300], timeout: 15_000 })
+      .toBe(true);
+    expect(await inView(999)()).toBe(true);
+    // The TOP-most option fully in view: were hover to scroll, centring it would move the list.
+    const edge = await list.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const rows = Array.from(el.querySelectorAll('[role="option"][data-index]'));
+      const first = rows.find((r) => r.getBoundingClientRect().top >= box.top);
+      return first ? Number(first.getAttribute('data-index')) : -1;
+    });
+    expect(edge).toBeGreaterThan(900);
+    expect(edge).toBeLessThan(996);
+    await page.locator(`[role="option"][data-index="${edge}"]`).hover();
+    await expect(control).toHaveAttribute('aria-activedescendant', new RegExp(`-opt-${edge}$`));
+    await page.waitForTimeout(300);
+    expect(await scrollTopOf(page)).toBe(before);
+  });
+}

@@ -342,15 +342,6 @@ for (const target of TARGETS) {
   });
 
   runner(`select-native [${target}]: an object-valued option shows as the selected one after it is committed`, async ({ page }) => {
-    // EXPECTED FAILURE on Vue and Svelte — a known bug this test is the repro for, NOT a
-    // property of the native picker: the consumer's reactive state hands the committed
-    // object back wrapped in a proxy, and the spine's `isSelected` (listCore.rzts)
-    // compares `valueOf(opt) === $props.value` by identity, so no option counts as
-    // selected (the custom trigger shows the placeholder too). The commit itself returns
-    // the same reference on all six (asserted below and in the first test). Remove this
-    // marker when the proxy-identity bug is fixed: the test then fails as "expected to
-    // fail, but passed".
-    test.fail(target === 'vue' || target === 'svelte', 'object option values are not recognised as selected through a reactive proxy (isSelected identity compare)');
     await openCoarse(page, target);
     const native = page.getByTestId('single').locator(NATIVE);
     await native.selectOption({ label: 'Box' });

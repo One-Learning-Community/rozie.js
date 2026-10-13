@@ -37,8 +37,13 @@ const COPIED = [
 ] as const;
 /** Spine name -> the name its copy is declared under in Select, where they differ. */
 const RENAMED: Partial<Record<(typeof COPIED)[number], string>> = { open: 'openCore' };
-/** Host-local in Select: the nine copies plus Select's own `visibleOptions`. */
-const HOST_LOCAL = ['visibleOptions', ...COPIED];
+/**
+ * Select's own versions of spine functions, NOT verbatim: they compare a model value
+ * with an option value through Select's `sameValue` instead of `===` / `includes`.
+ */
+const REWRITTEN = ['isSelected', 'selectedLabel', 'select'];
+/** Host-local in Select: the nine copies, Select's own `visibleOptions`, and the rewritten three. */
+const HOST_LOCAL = ['visibleOptions', ...COPIED, ...REWRITTEN];
 
 /**
  * The source text of the top-level `const <name> = …` statement: from `const`

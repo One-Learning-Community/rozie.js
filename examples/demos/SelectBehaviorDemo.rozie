@@ -34,6 +34,7 @@
   tabValue: null,
   disabledValue: null,
   offValue: null,
+  longValue: null,
 }
 </data>
 
@@ -47,6 +48,11 @@ const OPTIONS = [
   { label: 'Date', value: 'date' },
   { label: 'Elderberry', value: 'elderberry' },
 ]
+
+// 40 options in a plain (not windowed) list: taller than the popup, so End / Home have
+// to scroll it.
+const LONG = []
+for (let i = 1; i <= 40; i++) LONG.push({ label: 'Row ' + i, value: 'row-' + i })
 
 // The uniform two-way driver: write the bound value directly. The model write
 // flows into the wrapper → the matching option gets aria-selected, and the
@@ -91,6 +97,9 @@ const pickValue = (v) => { $data.value = v }
   <div data-testid="tab-select">
     <Select :options="OPTIONS" r-model:value="$data.tabValue" select-on-tab aria-label="Tab commits" />
     <span data-testid="readout-tab">{{ $data.tabValue }}</span>
+  </div>
+  <div data-testid="long-select">
+    <Select :options="LONG" r-model:value="$data.longValue" aria-label="Long list" />
   </div>
 </div>
 </template>

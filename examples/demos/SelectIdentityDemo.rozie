@@ -1,0 +1,88 @@
+<!--
+  SelectIdentityDemo.rozie — BEHAVIORAL consumer for value identity in the Select
+  (select-identity.spec.ts). Five selects:
+
+    - one:    single-select whose option values are OBJECTS. The consumer's reactive
+              state can hand a committed object back wrapped in a proxy; the option
+              must still read as selected. `set-crate` writes the object from outside.
+    - many:   multi-select over the same object values (chips, removal).
+    - refuse: a ONE-WAY `:value` binding with a `change` handler that keeps the old
+              value when 'banana' is picked — synchronously, so the consumer's state
+              never changes at all.
+    - bounce: a TWO-WAY binding whose `change` handler writes the previous value back
+              synchronously when 'banana' is picked (the state goes banana -> apple
+              inside one handler).
+    - dupes:  a multi-select whose model holds the same value twice.
+
+  This is a BEHAVIORAL cell — no screenshot stabilization here.
+-->
+<rozie name="SelectIdentityDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ one: null, oneSame: '', many: [], refuse: 'apple', refuseChanges: 0, bounce: 'apple', bounceChanges: 0, dupes: ['apple', 'apple', 'banana'], dupeChanges: 0 }</data>
+<script>
+const BOX = { kind: 'box' }
+const CRATE = { kind: 'crate' }
+const OBJECTS = [
+  { label: 'Box', value: BOX },
+  { label: 'Crate', value: CRATE },
+  { label: 'Plain', value: 'plain' },
+]
+const FRUIT = [
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana' },
+  { label: 'Cherry', value: 'cherry' },
+]
+const kindOf = (v) => (v === null || v === undefined ? '' : typeof v === 'object' ? String(v.kind) : String(v))
+const kinds = (v) => (Array.isArray(v) ? v.map(kindOf).join(',') : '')
+const joined = (v) => (Array.isArray(v) ? v.join(',') : '')
+// The commit hands back the very object the option carries.
+const onOneChange = (detail) => { $data.oneSame = String(detail.value === BOX || detail.value === CRATE || detail.value === 'plain') }
+const setCrate = () => { $data.one = CRATE }
+
+// One-way binding: the handler IS the model. Refusing 'banana' means not writing it.
+const onRefuseChange = (detail) => {
+  $data.refuseChanges = $data.refuseChanges + 1
+  if (detail.value === 'banana') return
+  $data.refuse = detail.value
+}
+// Two-way binding: the model write has landed when `change` arrives; refusing means
+// writing the last accepted value back, here in the same handler.
+let lastGood = 'apple'
+const onBounceChange = (detail) => {
+  $data.bounceChanges = $data.bounceChanges + 1
+  if (detail.value === 'banana') $data.bounce = lastGood
+  else lastGood = detail.value
+}
+const onDupesChange = () => { $data.dupeChanges = $data.dupeChanges + 1 }
+</script>
+<template>
+<div class="select-identity-demo">
+  <button type="button" data-testid="set-crate" @click="setCrate()">set crate</button>
+  <span data-testid="readout-one">{{ kindOf($data.one) }}</span>
+  <span data-testid="readout-one-same">{{ $data.oneSame }}</span>
+  <span data-testid="readout-many">{{ kinds($data.many) }}</span>
+  <span data-testid="readout-refuse">{{ $data.refuse }}</span>
+  <span data-testid="readout-refuse-changes">{{ $data.refuseChanges }}</span>
+  <span data-testid="readout-bounce">{{ $data.bounce }}</span>
+  <span data-testid="readout-bounce-changes">{{ $data.bounceChanges }}</span>
+  <span data-testid="readout-dupes">{{ joined($data.dupes) }}</span>
+  <span data-testid="readout-dupe-changes">{{ $data.dupeChanges }}</span>
+  <div data-testid="one"><Select :options="OBJECTS" r-model:value="$data.one" placeholder="Pick one" aria-label="One" @change="onOneChange($event)" /></div>
+  <div data-testid="many"><Select :options="OBJECTS" r-model:value="$data.many" multiple :close-on-select="false" placeholder="Pick many" aria-label="Many" /></div>
+  <div data-testid="refuse"><Select :options="FRUIT" :value="$data.refuse" aria-label="Refuse" @change="onRefuseChange($event)" /></div>
+  <div data-testid="bounce"><Select :options="FRUIT" r-model:value="$data.bounce" aria-label="Bounce" @change="onBounceChange($event)" /></div>
+  <div data-testid="dupes"><Select :options="FRUIT" r-model:value="$data.dupes" multiple :close-on-select="false" aria-label="Dupes" @change="onDupesChange()" /></div>
+</div>
+</template>
+<style>
+.select-identity-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+</style>
+</rozie>

@@ -250,6 +250,38 @@ for (const target of TARGETS) {
       await expect(readout).toHaveText('');
     }
   });
+
+  runner(`select [${target}]: End and Home scroll a list taller than its popup to the highlighted option`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const wrap = page.getByTestId('long-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    // Whether the option sits entirely inside the list's own visible box.
+    const inView = (label: string) => async () => {
+      const l = await list.boundingBox();
+      const o = await wrap.locator('[role="option"]', { hasText: new RegExp(`^\\s*${label}\\s*$`) }).boundingBox();
+      return !!l && !!o && o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(list).toBeVisible();
+    await expect(wrap.locator('[role="option"]')).toHaveCount(40);
+    expect(await inView('Row 40')()).toBe(false); // the list really overflows
+
+    await page.keyboard.press('End');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-39$/);
+    await expect.poll(inView('Row 40')).toBe(true);
+    await page.keyboard.press('Home');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await expect.poll(inView('Row 1')).toBe(true);
+    // One arrow step from each edge wraps to the other and scrolls there as well.
+    await page.keyboard.press('ArrowUp');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-39$/);
+    await expect.poll(inView('Row 40')).toBe(true);
+    await page.keyboard.press('ArrowDown');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await expect.poll(inView('Row 1')).toBe(true);
+  });
 }
 
 // ---------------------------------------------------------------------------

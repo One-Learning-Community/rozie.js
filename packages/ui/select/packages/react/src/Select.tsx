@@ -8,6 +8,22 @@ import Popover from '@rozie-ui/popover-react';
 // codegen's `copyInternal` vendors it into each leaf at `./internal/groupOptions`.
 // It is a byte copy of @rozie-ui/headless-core/src/internal/groupOptions.ts.
 import { groupOptions } from './internal/groupOptions';
+
+// ── VALUE IDENTITY ─────────────────────────────────────────────────────────
+// Whether a model value and an option value are the same value. Identity first. Two
+// objects that are not identical are still the same value when they have the same
+// prototype and equal own contents: a consumer whose state is deeply reactive (Vue's
+// ref / reactive, Svelte's $state) hands a committed object back wrapped in a proxy,
+// and a proxy is never `===` to the object the option carries — with a plain `===`
+// no object-valued option ever read as selected on those two targets. (Vue's own
+// <select v-model> matches option values by content for the same reason.) An object
+// with no own keys that is neither a plain object nor an array (a Date, a Map, a
+// class instance without fields) only matches by identity.
+//
+// The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
+// `includes`, so Select owns these three (they are not imported; nothing Select still
+// imports from the spine reaches them).
+
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
 // (a peer dep); every RUNTIME reference sits behind `if ($props.virtual)` / a
@@ -38,7 +54,7 @@ interface GroupHeadingCtx { group: SelectGroup; }
 
 interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is the selected one when its value is the model value — the same reference, or, for object values, an object with the same prototype and equal contents (so a value read back through reactive state still matches).
    */
   options?: any[];
   /**
@@ -50,7 +66,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
   defaultValue?: (unknown) | null;
   onValueChange?: (value: (unknown) | null) => void;
   /**
-   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed.
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence.
    */
   multiple?: boolean;
   /**
@@ -213,6 +229,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const scrollEndPinned = useRef(false);
   const scrollEndPinnedCount = useRef(-1);
   const typeTimer = useRef<any>(null);
+  const liveActive = useRef(-1);
+  const revealPending = useRef(false);
   const typeBuffer = useRef('');
   const [value, setValue] = useControllableState({
     value: props.value,
@@ -239,23 +257,16 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const triggerEl = useRef<HTMLDivElement | null>(null);
   const listEl = useRef<HTMLDivElement | null>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
-  const selectedLabel = useMemo(() => {
-    const cur = value;
-    if (props.multiple) {
-      // Read the model value into a local before narrowing: `$props.value` lowers
-      // to a `value()` accessor on Solid, and Array.isArray() can't narrow two
-      // separate calls — narrowing one stable local works on every target.
-      const arr = Array.isArray(cur) ? cur : [];
-      if (arr.length === 0) return '';
-      return props.options.filter((o: any) => arr.includes(valueOf(o))).map(labelOf).join(', ');
-    }
-    const match = props.options.find((o: any) => valueOf(o) === cur);
-    return match === undefined ? '' : labelOf(match);
-  }, [Array, labelOf, props.multiple, props.options, value, valueOf]);
   const activeDescendant = useMemo(() => {
     if (!open$local || activeIndex < 0) return null;
     return optionId(activeIndex);
   }, [activeIndex, open$local, optionId]);
+  const selectedLabel = useMemo(() => {
+    if (props.multiple) return '';
+    const cur = value;
+    const match = props.options.find((o: any) => sameValue(valueOf(o), cur));
+    return match === undefined ? '' : labelOf(match);
+  }, [labelOf, props.multiple, props.options, sameValue, value, valueOf]);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
   const _watch2First = useRef(true);
@@ -266,16 +277,19 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const _watch7First = useRef(true);
   const _watch8First = useRef(true);
   const _watch9First = useRef(true);
+  const _watch10First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
-  // The option resolvers, single+multi selection, close/clear, and the
-  // activeDescendant derivation come from the shared list spine. It is a
-  // compile-time `.rzts` script-partial: it dissolves into this leaf via
-  // inlineScriptPartials() before IR lowering (zero runtime dep). The spine closes
-  // over this host's pieces by convention: idRoot() and the impure ref fn
-  // focusControl (below). Navigation, type-ahead and open/toggle are host-local —
-  // see HOST-LOCAL NAVIGATION below; they use the reassigned module-`let`s
-  // typeBuffer/typeTimer (above) and scrollActiveIntoView (below).
+  // The option resolvers, close/clear, and the activeDescendant derivation come from
+  // the shared list spine. It is a compile-time `.rzts` script-partial: it dissolves
+  // into this leaf via inlineScriptPartials() before IR lowering (zero runtime dep).
+  // The spine closes over this host's pieces by convention: idRoot() (below).
+  // Host-local instead of imported:
+  //  - navigation, type-ahead and open/toggle — see HOST-LOCAL NAVIGATION below; they
+  //    use the reassigned module-`let`s typeBuffer/typeTimer (above) and
+  //    scrollActiveIntoView (below);
+  //  - everything that compares a model value with an option value (`isSelected`,
+  //    `selectedLabel`, `select`) — see VALUE IDENTITY below.
   // The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount), and
   // the pending native-element sync timer (see queueNativeSync()). Reassigned
   // module-`let`s, initialised null per the timer-handle convention.
@@ -354,15 +368,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // targets — a `$computed` is a value on React but an accessor on Solid, so
   // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
   // plain function is identical everywhere.
-  // Is a given option currently selected? Multi compares array membership.
-  function isSelected(opt: any) {
-    const v = valueOf(opt);
-    const cur = value;
-    if (props.multiple) return Array.isArray(cur) && cur.includes(v);
-    return cur === v;
-  }
-
-  // First enabled visible index, preferring the currently-selected option.
   const { onOpenChange: _rozieProp_onOpenChange } = props;
     const close = useCallback(() => {
     if (!open$local) return;
@@ -372,7 +377,67 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       open: false
     });
   }, [_rozieProp_onOpenChange, open$local]);
-  // ---- selection ---------------------------------------------------------
+  function clear() {
+    const empty = props.multiple ? [] : null;
+    setValue(empty);
+    setQuery('');
+    props.onChange && props.onChange({
+      value: empty,
+      option: null
+    });
+  }
+
+  // ---- keyboard navigation over the VISIBLE list -------------------------
+  // Pointer hover sets the virtual highlight (matches native <select> feel).
+  const onOptionPointerMove = useCallback((index: any) => {
+    if (activeIndex !== index) setActiveIndex(index);
+  }, [activeIndex]);
+  // ── VALUE IDENTITY ─────────────────────────────────────────────────────────
+  // Whether a model value and an option value are the same value. Identity first. Two
+  // objects that are not identical are still the same value when they have the same
+  // prototype and equal own contents: a consumer whose state is deeply reactive (Vue's
+  // ref / reactive, Svelte's $state) hands a committed object back wrapped in a proxy,
+  // and a proxy is never `===` to the object the option carries — with a plain `===`
+  // no object-valued option ever read as selected on those two targets. (Vue's own
+  // <select v-model> matches option values by content for the same reason.) An object
+  // with no own keys that is neither a plain object nor an array (a Date, a Map, a
+  // class instance without fields) only matches by identity.
+  //
+  // The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
+  // `includes`, so Select owns these three (they are not imported; nothing Select still
+  // imports from the spine reaches them).
+  function sameContent(a: any, b: any, seen: any) {
+    if (a === b) return true;
+    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+    const proto = Object.getPrototypeOf(a);
+    if (proto !== Object.getPrototypeOf(b)) return false;
+    if (seen.includes(a)) return true; // a cycle: this object is already being compared further up
+    seen.push(a);
+    const keys = Object.keys(a);
+    if (keys.length !== Object.keys(b).length) return false;
+    if (keys.length === 0) return proto === null || proto === Object.prototype || Array.isArray(a);
+    for (const k of keys as any) {
+      if (!Object.prototype.hasOwnProperty.call(b, k) || !sameContent(a[k], b[k], seen)) return false;
+    }
+    return true;
+  }
+  function sameValue(a: any, b: any) {
+    return a === b || a !== null && b !== null && typeof a === 'object' && typeof b === 'object' && sameContent(a, b, []);
+  }
+
+  // Is a given option currently selected? Multi compares array membership.
+  function isSelected(opt: any) {
+    const v = valueOf(opt);
+    const cur = value;
+    if (props.multiple) return Array.isArray(cur) && cur.some((x: any) => sameValue(x, v));
+    return sameValue(cur, v);
+  }
+
+  // The label shown in the trigger (single-select; a multi-select shows chips instead).
+  // A real `$computed` — read bare in the template, never aliased in script.
+  // Commit an option. Single-select replaces the value; multi-select toggles membership —
+  // picking a selected option takes out EVERY occurrence of its value (a model may hold a
+  // value more than once; see chipRows()).
   const { onChange: _rozieProp_onChange } = props;
     const select = useCallback((opt: any) => {
     if (disabledOf(opt)) return;
@@ -382,7 +447,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       const arr = Array.isArray(cur) ? cur : [];
       // Fresh array on every commit — in-place mutation is dropped by the
       // React/Solid/Lit/Angular change detectors.
-      const next = arr.includes(v) ? arr.filter((x: any) => x !== v) : [...arr, v];
+      const next = arr.some((x: any) => sameValue(x, v)) ? arr.filter((x: any) => !sameValue(x, v)) : [...arr, v];
       setValue(next);
       _rozieProp_onChange && _rozieProp_onChange({
         value: next,
@@ -399,22 +464,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
         focusControl();
       }
     }
-  }, [_rozieProp_onChange, close, disabledOf, focusControl, props.closeOnSelect, props.multiple, setValue, value, valueOf]);
-  function clear() {
-    const empty = props.multiple ? [] : null;
-    setValue(empty);
-    setQuery('');
-    props.onChange && props.onChange({
-      value: empty,
-      option: null
-    });
-  }
-
-  // ---- keyboard navigation over the VISIBLE list -------------------------
-  // Pointer hover sets the virtual highlight (matches native <select> feel).
-  const onOptionPointerMove = useCallback((index: any) => {
-    if (activeIndex !== index) setActiveIndex(index);
-  }, [activeIndex]);
+  }, [_rozieProp_onChange, close, disabledOf, focusControl, props.closeOnSelect, props.multiple, sameValue, setValue, value, valueOf]);
   function groupOfOption(opt: any) {
     return opt !== null && typeof opt === 'object' && 'group' in opt ? opt.group : null;
   }
@@ -1105,6 +1155,10 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
 
   // Scroll-end pin state (see recordScrollEnd()): whether the USER left the view at the end,
   // the option count at that moment, and the last scrollTop already accounted for.
+
+  // The deferred scroll-into-view (see scrollActiveIntoView()): whether one is queued, and
+  // `$data.activeIndex` as last committed — kept by a watcher, so a callback queued from an
+  // older render still reads the current index.
   // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
   // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
   // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
@@ -1305,27 +1359,79 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     triggerEl.current?.focus();
   }
 
-  // Keep the active option visible inside the scrolling listbox. Reads $refs in
-  // a post-mount callback only (never eagerly — ROZ123). When windowing, route through
-  // the virtualizer (scrollToIndex) so an active option OUTSIDE the rendered window is
+  // Scroll option `index` into view inside the scrolling listbox. When windowing, route
+  // through the virtualizer (scrollToIndex) so an option OUTSIDE the rendered window is
   // scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
-  function scrollActiveIntoView() {
-    if (activeIndex < 0) return;
-    if (props.virtual && virtualizer.current) {
+  // Reads nothing reactive but the id base: it runs from a deferred callback (below).
+  function revealIndex(index: any) {
+    if (index < 0 || !__rozieRoot.current || !__rozieRoot.current!.isConnected) return;
+    if (virtualizer.current) {
+      // An explicit move decides the scroll-end pin (see recordScrollEnd()): going to the
+      // LAST option holds the end, so virtual-core's later compensation for options that
+      // measure smaller above the viewport cannot leave the last option cut off (measured
+      // on Angular, 25px short); going anywhere else releases a pin left by an earlier
+      // visit to the end, which otherwise scrolled the list straight back there (measured
+      // on Vue and Solid: Home after End did not move the list).
+      const count = virtualizer.current.options.count;
+      scrollEndPinned.current = index === count - 1;
+      scrollEndPinnedCount.current = count;
       // 'center' (not 'auto'): keep the active option well inside the rendered slice as the
       // window scrolls — 'auto' lands it at the viewport edge where the overscan band can
       // leave it just-unrendered for a frame on the fine-grained targets (Solid).
-      virtualizer.current.scrollToIndex(activeIndex, {
+      virtualizer.current.scrollToIndex(index, {
         align: 'center'
       });
       scheduleRemeasure();
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => settleReveal(index, 12));
       return;
     }
-    if (!listEl.current) return;
-    const el = listEl.current!.querySelector('#' + CSS.escape(optionId(activeIndex)));
+    const el = __rozieRoot.current!.querySelector('#' + CSS.escape(optionId(index)));
     el?.scrollIntoView({
       block: 'nearest'
     });
+  }
+
+  // The windowed reveal is done when the option IS in view, not when scrollToIndex ran:
+  // checked on the DOM, one frame at a time, for a bounded number of frames. A scroll can
+  // be undone after the fact — virtual-core's size compensation for options measured in
+  // the previous window writes an ABSOLUTE scrollTop from the offset it last saw, and
+  // when that lands after our scroll it puts the list back where it was (measured on
+  // Angular: Home pressed right after End left the list at the end, and virtual-core does
+  // not re-issue a scroll whose target did not change). Asking again is idempotent once
+  // the list is where it should be. Stops as soon as the highlight moves elsewhere.
+  function settleReveal(index: any, tries: any) {
+    if (!virtualizer.current || !gridScrollEl.current || !gridScrollEl.current.isConnected || liveActive.current !== index) return;
+    const el = gridScrollEl.current.querySelector('.rozie-select-option[data-index="' + index + '"]');
+    if (el) {
+      const box = gridScrollEl.current.getBoundingClientRect();
+      const row = el.getBoundingClientRect();
+      if (row.top >= box.top - 1 && row.bottom <= box.bottom + 1) return;
+    }
+    if (tries <= 0) return;
+    virtualizer.current.scrollToIndex(index, {
+      align: 'center'
+    });
+    scheduleRemeasure();
+    requestAnimationFrame(() => settleReveal(index, tries - 1));
+  }
+
+  // Keep the active option visible — called by the keyboard and type-ahead paths right
+  // after they write `$data.activeIndex` (never by pointer hover, which must not scroll).
+  // The scroll itself runs one frame later, on `liveActive`:
+  //  - right here the index just written is not readable on React (state is a per-render
+  //    snapshot): End / Home scrolled to the PREVIOUS highlight and the list only caught
+  //    up on the next key;
+  //  - and the list may not be on screen yet (End or a typed letter on a closed select
+  //    opens it in the same handler): scrolling a hidden list does nothing.
+  // One frame later every target has committed the write and the open list.
+  function scrollActiveIntoView() {
+    if (revealPending.current) return;
+    revealPending.current = true;
+    const run = () => {
+      revealPending.current = false;
+      revealIndex(liveActive.current);
+    };
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else setTimeout(run, 0);
   }
 
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
@@ -1453,29 +1559,47 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     const cur = value;
     return Array.isArray(cur) ? cur : [];
   }
-  // One row per selected value, in value order. A value missing from `options` keeps a
-  // chip labelled by its raw value (and a null option) rather than vanishing.
+  // One row per DISTINCT selected value, in value order (a value the model holds more
+  // than once shows one chip, at its first position). A value missing from `options`
+  // keeps a chip labelled by its raw value (and a null option) rather than vanishing.
+  // `key` is unique per row: an object found in `options` is keyed by its option's index
+  // (every object stringifies alike), anything else by its type and string form, and rows
+  // that still share a key (two objects missing from `options`) are numbered.
   function chipRows() {
     const opts = Array.isArray(props.options) ? props.options : [];
-    return selectedValues().map((v: any) => {
-      const found = opts.find((o: any) => valueOf(o) === v);
-      return found ? {
-        value: v,
-        label: labelOf(found),
-        option: found
-      } : {
-        value: v,
-        label: String(v),
+    const vals = selectedValues();
+    const distinct = vals.filter((v: any, i: any) => vals.findIndex((x: any) => sameValue(x, v)) === i);
+    const keyed = distinct.map((v: any) => {
+      const at = opts.findIndex((o: any) => sameValue(valueOf(o), v));
+      return {
+        v,
+        at,
+        base: at !== -1 && v !== null && typeof v === 'object' ? 'chip-@' + at : 'chip-' + typeof v + ':' + String(v)
+      };
+    });
+    return keyed.map((k: any, i: any) => {
+      const earlier = keyed.slice(0, i).filter((e: any) => e.base === k.base).length;
+      const key = earlier === 0 ? k.base : k.base + '#' + earlier;
+      return k.at === -1 ? {
+        key,
+        value: k.v,
+        label: String(k.v),
         option: null
+      } : {
+        key,
+        value: k.v,
+        label: labelOf(opts[k.at]),
+        option: opts[k.at]
       };
     });
   }
   function chipRemoveLabel(row: any) {
     return 'Remove ' + String(row.label);
   }
+  // Removes EVERY occurrence of the value: its one chip stands for all of them.
   function removeChipValue(v: any) {
     if (props.disabled) return;
-    const next = selectedValues().filter((x: any) => x !== v); // fresh array every commit
+    const next = selectedValues().filter((x: any) => !sameValue(x, v)); // fresh array every commit
     setValue(next);
     props.onChange && props.onChange({
       value: next,
@@ -1628,26 +1752,30 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch4First.current) { _watch4First.current = false; return; }
+    liveActive.current = activeIndex;
+  }, [activeIndex]);
+  useEffect(() => {
+    if (_watch5First.current) { _watch5First.current = false; return; }
     if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch6First.current) { _watch6First.current = false; return; }
     yieldToNative();
   }, [coarse]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch7First.current) { _watch7First.current = false; return; }
     yieldToNative();
   }, [props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     scheduleNativeSync();
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch8First.current) { _watch8First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     scheduleNativeSync();
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch9First.current) { _watch9First.current = false; return; }
+    if (_watch10First.current) { _watch10First.current = false; return; }
     scheduleNativeSync();
   }, [props.groups]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1668,7 +1796,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       <Popover trigger="manual" open={panelOpen} onOpenChange={setPanelOpen} bare={true} matchWidth={true} keepMounted={props.virtual} disablePositioning={props.inline} disableDismiss={props.inline} placement={props.placement} offset={props.offset} disableFlip={props.disableFlip} disableShift={props.disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6="" renderAnchor={() => (<>
           
           <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
-            {!!(props.multiple) && (chipRows().map((row, idx) => <span key={'chip-' + row.value} className={"rozie-select-chip"} data-rozie-s-6e3ebfa6="">
+            {!!(props.multiple) && (chipRows().map((row, idx) => <span key={row.key} className={"rozie-select-chip"} data-rozie-s-6e3ebfa6="">
               {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => onChipRemove(row.value), index: idx }) : <><span className={"rozie-select-chip__label"} data-rozie-s-6e3ebfa6="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-select-chip__remove"} tabIndex={-1} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onChipRemove(row.value); }} data-rozie-s-6e3ebfa6="">×</button></>}
             </span>))}<div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-hidden={(nativeActive() ? 'true' : undefined) ?? undefined} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
               {!!(!props.multiple) && ((props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>))}{!!(props.multiple && selectedValues().length === 0) && <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>}</div>
