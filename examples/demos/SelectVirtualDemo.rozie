@@ -14,7 +14,7 @@
     - `:multiple="true"` + `:close-on-select="false"` keep the popup open after a
       commit so the selection-survives-windowing behavior is observable (the checked
       option scrolls out of and back into the window and stays aria-selected).
-    - `inline` renders the list IN FLOW (bounded by --rozie-select-max-height) so
+    - `inline` renders the list IN FLOW (bounded by --rozie-select-list-max-height) so
       the windowed scroll container exists at mount (the virtualizer attaches to it
       in $onMount — ROZ123-safe).
 

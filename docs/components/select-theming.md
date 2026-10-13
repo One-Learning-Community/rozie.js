@@ -11,10 +11,10 @@ The values listed below are exposed as `--rozie-select-*` custom properties, eac
 
 ```css
 :root {
-  --rozie-select-min-width: 12rem;
-  --rozie-select-bg: #fff;
+  --rozie-select-width: 16rem;
   --rozie-select-accent: #0066cc;
-  --rozie-select-arrow-color: currentColor;
+  --rozie-select-color: inherit;
+  --rozie-select-focus-ring-width: 3px;
 }
 ```
 
@@ -24,62 +24,110 @@ The values listed below are exposed as `--rozie-select-*` custom properties, eac
 
 | Token | Default |
 | --- | --- |
-| `--rozie-select-min-width` | `12rem` |
+| `--rozie-select-width` | `16rem` |
 | `--rozie-select-font` | `inherit` |
 | `--rozie-select-gap` | `0.5rem` |
 | `--rozie-select-control-padding` | `0.5rem 0.75rem` |
 
-### control + popup surface
-
-| Token | Default |
-| --- | --- |
-| `--rozie-select-bg` | `#fff` |
-| `--rozie-select-fg` | `#1a1a1a` |
-| `--rozie-select-border` | `rgba(0, 0, 0, 0.2)` |
-| `--rozie-select-border-width` | `1px` |
-| `--rozie-select-radius` | `6px` |
-| `--rozie-select-placeholder` | `rgba(0, 0, 0, 0.45)` |
-| `--rozie-select-disabled-opacity` | `0.6` |
-
-### focus ring (defaults to accent)
+accent: the single color most consumers will set; the focus border and the selected option's check mark follow it
 
 | Token | Default |
 | --- | --- |
 | `--rozie-select-accent` | `#0066cc` |
-| `--rozie-select-ring-width` | `2px` |
-| `--rozie-select-ring-offset` | `1px` |
 
-### trailing arrow (select-only trigger)
+### control box model
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-color` | `inherit` |
+| `--rozie-select-bg` | `#fff` |
+| `--rozie-select-border-width` | `1px` |
+| `--rozie-select-border-color` | `rgba(0, 0, 0, 0.25)` |
+| `--rozie-select-radius` | `0.5rem` |
+| `--rozie-select-placeholder` | `rgba(0, 0, 0, 0.45)` |
+
+focus ring: the control gets a `focus-border-color` border (defaults to the accent) and an `outline` ring while focus is anywhere inside it
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-focus-ring-width` | `3px` |
+| `--rozie-select-focus-ring-color` | `rgba(0, 102, 204, 0.25)` |
+| `--rozie-select-ring-offset` | `0` |
+
+### disabled
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-disabled-opacity` | `0.55` |
+| `--rozie-select-disabled-bg` | `rgba(0, 0, 0, 0.04)` |
+
+### trailing arrow and clear button
 
 | Token | Default |
 | --- | --- |
 | `--rozie-select-arrow-color` | `currentColor` |
 | `--rozie-select-arrow-opacity` | `0.7` |
+| `--rozie-select-clear-color` | `currentColor` |
+| `--rozie-select-clear-size` | `1rem` |
 
-### popup
+popup listbox. `list-gap` is the in-flow gap between the control and the list of an `inline` select only; a floating popup's distance from the control is the `offset` prop. `z` is the stacking order of the floating popup: Select forwards it to the composed popover as `--rozie-popover-z`, so the popup panel follows it.
 
 | Token | Default |
 | --- | --- |
-| `--rozie-select-popup-padding` | `0.25rem` |
-| `--rozie-select-popup-offset` | `4px` |
-| `--rozie-select-shadow` | `0 6px 24px rgba(0, 0, 0, 0.12)` |
+| `--rozie-select-list-gap` | `0.25rem` |
+| `--rozie-select-list-padding` | `0.25rem` |
+| `--rozie-select-list-max-height` | `16rem` |
+| `--rozie-select-list-bg` | `#fff` |
+| `--rozie-select-list-border-color` | `rgba(0, 0, 0, 0.15)` |
+| `--rozie-select-list-shadow` | `0 10px 24px rgba(0, 0, 0, 0.16)` |
 | `--rozie-select-z` | `1000` |
-| `--rozie-select-max-height` | `16rem` |
 
-### options
+### option
 
 | Token | Default |
 | --- | --- |
 | `--rozie-select-option-padding` | `0.4rem 0.6rem` |
-| `--rozie-select-option-radius` | `4px` |
-| `--rozie-select-option-fg` | `inherit` |
-| `--rozie-select-active-bg` | `rgba(0, 102, 204, 0.12)` |
+| `--rozie-select-option-radius` | `0.375rem` |
+| `--rozie-select-option-color` | `inherit` |
+| `--rozie-select-option-active-bg` | `rgba(0, 102, 204, 0.12)` |
 | `--rozie-select-active-fg` | `inherit` |
 | `--rozie-select-selected-bg` | `transparent` |
 | `--rozie-select-selected-fg` | `inherit` |
-| `--rozie-select-selected-weight` | `600` |
+| `--rozie-select-option-selected-weight` | `600` |
+| `--rozie-select-option-disabled-opacity` | `0.45` |
 | `--rozie-select-check` | `'✓'` |
-| `--rozie-select-empty-fg` | `rgba(0, 0, 0, 0.5)` |
+
+group heading: the label rendered above a block of options when the options are grouped
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-group-heading-color` | `rgba(0, 0, 0, 0.5)` |
+| `--rozie-select-group-heading-letter-spacing` | `0.03em` |
+| `--rozie-select-group-heading-margin-top` | `0` |
+| `--rozie-select-group-heading-padding` | `0.35rem 0.6rem 0.15rem` |
+| `--rozie-select-group-heading-size` | `0.75rem` |
+| `--rozie-select-group-heading-transform` | `uppercase` |
+| `--rozie-select-group-heading-weight` | `600` |
+
+### empty state: rendered when the (filtered) options list has zero entries
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-empty-color` | `rgba(0, 0, 0, 0.5)` |
+| `--rozie-select-empty-padding` | `0.5rem 0.6rem` |
+
+chips: the selected-value chips rendered inside the control when `multiple` is set. `chip-gap` is the gap between rows once the chips wrap (the spacing between chips, the trigger and the buttons on one row is `gap`); `chip-size` sets the chip's font-size, and the single `chip-remove-size` drives BOTH the width and the height of the round remove button.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-select-chip-gap` | `0.4rem` |
+| `--rozie-select-chip-bg` | `rgba(0, 102, 204, 0.12)` |
+| `--rozie-select-chip-color` | `inherit` |
+| `--rozie-select-chip-radius` | `0.375rem` |
+| `--rozie-select-chip-padding` | `0.15rem 0.5rem` |
+| `--rozie-select-chip-size` | `0.85rem` |
+| `--rozie-select-chip-remove-color` | `currentColor` |
+| `--rozie-select-chip-remove-size` | `1.1rem` |
 
 ### Defaulted where Select reads them
 
@@ -88,10 +136,8 @@ Public, but declared nowhere by `base.css`: the fallback below applies only whil
 | Token | Default |
 | --- | --- |
 | `--rozie-select-check-color` | `var(--rozie-select-accent, #0066cc)` |
-| `--rozie-select-popup-bg` | `var(--rozie-select-bg, #fff)` |
-| `--rozie-select-popup-border` | `var(--rozie-select-border, rgba(0, 0, 0, 0.15))` |
-| `--rozie-select-popup-radius` | `var(--rozie-select-radius, 6px)` |
-| `--rozie-select-ring` | `var(--rozie-select-accent, #0066cc)` |
+| `--rozie-select-focus-border-color` | `var(--rozie-select-accent, #0066cc)` |
+| `--rozie-select-popup-radius` | `var(--rozie-select-radius, 0.5rem)` |
 
 ## Design-system bridges
 

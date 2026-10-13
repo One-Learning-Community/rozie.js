@@ -123,9 +123,9 @@ const FAMILIES: Family[] = [
     example: 'SelectBehavior',
     root: '.rozie-select',
     derived: {
-      '--rozie-select-ring': '--rozie-select-accent',
-      '--rozie-select-popup-bg': '--rozie-select-bg',
-      '--rozie-select-popup-border': '--rozie-select-border',
+      '--rozie-select-focus-border-color': '--rozie-select-accent',
+      '--rozie-select-list-bg': '--rozie-select-bg',
+      '--rozie-select-list-border-color': '--rozie-select-border-color',
       '--rozie-select-popup-radius': '--rozie-select-radius',
       '--rozie-select-check-color': '--rozie-select-accent',
     },

@@ -63,7 +63,7 @@ export default class Select extends SignalWatcher(LitElement) {
 .rozie-select[data-rozie-s-6e3ebfa6] {
   position: relative;
   display: inline-block;
-  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
+  width: var(--rozie-select-width, var(--rsl-width, 16rem));
   font: var(--rozie-select-font, inherit);
   /* The popup's stacking order is the composed popover's now; keep the select's own
      \`--rozie-select-z\` token steering it (custom properties inherit into the panel). */
@@ -72,10 +72,10 @@ export default class Select extends SignalWatcher(LitElement) {
 .rozie-select-control[data-rozie-s-6e3ebfa6] {
   box-sizing: border-box;
   /* NOT \`width: 100%\`: the control renders inside the popover's anchor wrapper
-     (\`display: inline-block\`, shrink-to-fit), so a percentage width is circular. It
-     sizes to its content with the root's own minimum, which is the box the root's
-     \`inline-block\` + \`min-width\` gave it before. \`block\` and \`inline\` stretch it. */
-  min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
+     (\`display: inline-block\`, shrink-to-fit), so a percentage width is circular. It reads
+     the SAME \`--rozie-select-width\` token the root does (the Combobox sizing rule), so the
+     rendered width is the token's. \`block\` and \`inline\` stretch it to the container. */
+  width: var(--rozie-select-width, var(--rsl-width, 16rem));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -84,16 +84,19 @@ export default class Select extends SignalWatcher(LitElement) {
   font: inherit;
   text-align: left;
   background: var(--rozie-select-bg, var(--rsl-bg, #fff));
-  color: var(--rozie-select-fg, var(--rsl-fg, #1a1a1a));
-  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-border, var(--rsl-border, rgba(0, 0, 0, 0.2)));
-  border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
+  color: var(--rozie-select-color, var(--rsl-color, inherit));
+  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-border-color, var(--rsl-border-color, rgba(0, 0, 0, 0.25)));
+  border-radius: var(--rozie-select-radius, var(--rsl-radius, 0.5rem));
   cursor: pointer;
 }
 .rozie-select-control[data-rozie-s-6e3ebfa6]:focus-within {
-  outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
-  outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
+  /* the focus border is decoupled from the ring colour, as in Combobox: a consumer can
+     neutralise the border without touching the accent the check mark derives from */
+  border-color: var(--rozie-select-focus-border-color, var(--rozie-select-accent, var(--rsl-accent, #0066cc)));
+  outline: var(--rozie-select-focus-ring-width, var(--rsl-focus-ring-width, 3px)) solid var(--rozie-select-focus-ring-color, var(--rsl-focus-ring-color, rgba(0, 102, 204, 0.25)));
+  outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 0));
 }
-.rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; }
+.rozie-select-control[data-rozie-s-6e3ebfa6] { flex-wrap: wrap; row-gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.4rem)); }
 .rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { position: relative; }
 .rozie-select-native[data-rozie-s-6e3ebfa6] {
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -105,22 +108,25 @@ export default class Select extends SignalWatcher(LitElement) {
 .rozie-select--native[data-rozie-s-6e3ebfa6] .rozie-select-clear[data-rozie-s-6e3ebfa6] { position: relative; z-index: 1; }
 .rozie-select-chip[data-rozie-s-6e3ebfa6] {
   display: inline-flex; align-items: center; max-width: 100%;
-  gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));
-  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.1rem 0.4rem));
-  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 4px));
-  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 0, 0, 0.08)));
-  color: var(--rozie-select-chip-color, var(--rsl-chip-color, inherit));
-  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.875em));
+  gap: 0.3rem;
+  padding: var(--rozie-select-chip-padding, var(--rsl-chip-padding, 0.15rem 0.5rem));
+  border-radius: var(--rozie-select-chip-radius, var(--rsl-chip-radius, 0.375rem));
+  background: var(--rozie-select-chip-bg, var(--rsl-chip-bg, rgba(0, 102, 204, 0.12)));
+  color: var(--rozie-select-chip-color, inherit);
+  font-size: var(--rozie-select-chip-size, var(--rsl-chip-size, 0.85rem));
 }
 .rozie-select-chip__label[data-rozie-s-6e3ebfa6] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rozie-select-chip__remove[data-rozie-s-6e3ebfa6] {
-  border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1.1rem));
+  height: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1.1rem));
+  border: 0; background: transparent; padding: 0; cursor: pointer; line-height: 1;
+  font: inherit; border-radius: 50%;
   color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
-  font-size: var(--rozie-select-chip-remove-size, var(--rsl-chip-remove-size, 1em));
 }
 .rozie-select-trigger[data-rozie-s-6e3ebfa6] { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
-.rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
-.rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
+.rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; background: var(--rozie-select-disabled-bg, var(--rsl-disabled-bg, rgba(0, 0, 0, 0.04))); }
+.rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.55)); pointer-events: none; }
 .rozie-select-placeholder[data-rozie-s-6e3ebfa6] { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
 .rozie-select-clear[data-rozie-s-6e3ebfa6] {
   flex: none; border: 0; background: none; padding: 0; cursor: pointer; line-height: 1;
@@ -136,22 +142,22 @@ export default class Select extends SignalWatcher(LitElement) {
 }
 .rozie-select-list[data-rozie-s-6e3ebfa6] {
   margin: 0;
-  padding: var(--rozie-select-popup-padding, var(--rsl-popup-padding, 0.25rem));
-  max-height: var(--rozie-select-max-height, var(--rsl-max-height, 16rem));
+  padding: var(--rozie-select-list-padding, var(--rsl-list-padding, 0.25rem));
+  max-height: var(--rozie-select-list-max-height, var(--rsl-list-max-height, 16rem));
   overflow-y: auto;
   list-style: none;
-  background: var(--rozie-select-popup-bg, var(--rozie-select-bg, var(--rsl-popup-bg, var(--rsl-bg, #fff))));
-  color: var(--rozie-select-fg, var(--rsl-fg, #1a1a1a));
-  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-popup-border, var(--rozie-select-border, var(--rsl-popup-border, var(--rsl-border, rgba(0, 0, 0, 0.15)))));
-  border-radius: var(--rozie-select-popup-radius, var(--rozie-select-radius, var(--rsl-popup-radius, var(--rsl-radius, 6px))));
-  box-shadow: var(--rozie-select-shadow, var(--rsl-shadow, 0 6px 24px rgba(0, 0, 0, 0.12)));
+  background: var(--rozie-select-list-bg, var(--rozie-select-bg, var(--rsl-list-bg, #fff)));
+  color: var(--rozie-select-color, var(--rsl-color, inherit));
+  border: var(--rozie-select-border-width, var(--rsl-border-width, 1px)) solid var(--rozie-select-list-border-color, var(--rozie-select-border-color, var(--rsl-list-border-color, rgba(0, 0, 0, 0.15))));
+  border-radius: var(--rozie-select-popup-radius, var(--rozie-select-radius, var(--rsl-popup-radius, var(--rsl-radius, 0.5rem))));
+  box-shadow: var(--rozie-select-list-shadow, var(--rsl-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16)));
 }
 .rozie-select-inline[data-rozie-s-6e3ebfa6] {
   display: block;
   width: 100%;
 }
 .rozie-select-inline[data-rozie-s-6e3ebfa6] .rozie-select-list[data-rozie-s-6e3ebfa6] {
-  margin-top: var(--rozie-select-popup-offset, var(--rsl-popup-offset, 4px));
+  margin-top: var(--rozie-select-list-gap, var(--rsl-list-gap, 0.25rem));
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -170,8 +176,8 @@ export default class Select extends SignalWatcher(LitElement) {
 }
 .rozie-select-option[data-rozie-s-6e3ebfa6] {
   padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.4rem 0.6rem));
-  border-radius: var(--rozie-select-option-radius, var(--rsl-option-radius, 4px));
-  color: var(--rozie-select-option-fg, inherit);
+  border-radius: var(--rozie-select-option-radius, var(--rsl-option-radius, 0.375rem));
+  color: var(--rozie-select-option-color, inherit);
   cursor: pointer;
   user-select: none;
   display: flex;
@@ -180,26 +186,31 @@ export default class Select extends SignalWatcher(LitElement) {
   gap: var(--rozie-select-gap, var(--rsl-gap, 0.5rem));
 }
 .rozie-select-option.is-active[data-rozie-s-6e3ebfa6] {
-  background: var(--rozie-select-active-bg, var(--rsl-active-bg, rgba(0, 102, 204, 0.12)));
+  background: var(--rozie-select-option-active-bg, var(--rsl-option-active-bg, rgba(0, 102, 204, 0.12)));
   color: var(--rozie-select-active-fg, var(--rsl-active-fg, inherit));
 }
 .rozie-select-option.is-selected[data-rozie-s-6e3ebfa6] {
   background: var(--rozie-select-selected-bg, var(--rsl-selected-bg, transparent));
   color: var(--rozie-select-selected-fg, var(--rsl-selected-fg, inherit));
-  font-weight: var(--rozie-select-selected-weight, var(--rsl-selected-weight, 600));
+  font-weight: var(--rozie-select-option-selected-weight, var(--rsl-option-selected-weight, 600));
 }
 .rozie-select-option.is-selected[data-rozie-s-6e3ebfa6]::after {
   content: var(--rozie-select-check, var(--rsl-check, '✓'));
   color: var(--rozie-select-check-color, var(--rozie-select-accent, var(--rsl-check-color, var(--rsl-accent, #0066cc))));
 }
-.rozie-select-option.is-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.45)); cursor: not-allowed; }
+.rozie-select-option.is-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-option-disabled-opacity, var(--rsl-option-disabled-opacity, 0.45)); cursor: not-allowed; }
 .rozie-select-group-heading[data-rozie-s-6e3ebfa6] {
-  padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.25rem 0.6rem));
+  /* section separation: default 0 = unchanged; a consumer-set value separates the leading
+     ungrouped block from the first group heading */
+  margin-top: var(--rozie-select-group-heading-margin-top, var(--rsl-group-heading-margin-top, 0));
+  padding: var(--rozie-select-group-heading-padding, var(--rsl-group-heading-padding, 0.35rem 0.6rem 0.15rem));
   font-size: var(--rozie-select-group-heading-size, var(--rsl-group-heading-size, 0.75rem));
   font-weight: var(--rozie-select-group-heading-weight, var(--rsl-group-heading-weight, 600));
-  color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.55)));
+  text-transform: var(--rozie-select-group-heading-transform, var(--rsl-group-heading-transform, uppercase));
+  letter-spacing: var(--rozie-select-group-heading-letter-spacing, var(--rsl-group-heading-letter-spacing, 0.03em));
+  color: var(--rozie-select-group-heading-color, var(--rsl-group-heading-color, rgba(0, 0, 0, 0.5)));
 }
-.rozie-select-empty[data-rozie-s-6e3ebfa6] { padding: var(--rozie-select-option-padding, var(--rsl-option-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-fg, var(--rsl-empty-fg, rgba(0, 0, 0, 0.5))); }
+.rozie-select-empty[data-rozie-s-6e3ebfa6] { padding: var(--rozie-select-empty-padding, var(--rsl-empty-padding, 0.5rem 0.6rem)); color: var(--rozie-select-empty-color, var(--rsl-empty-color, rgba(0, 0, 0, 0.5))); }
 .rozie-select-spacer[data-rozie-s-6e3ebfa6] { margin: 0; padding: 0; border: 0; flex: none; }
 .rozie-select-list--virtual[data-rozie-s-6e3ebfa6] { overflow-anchor: none; }
 `;
@@ -276,7 +287,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true }) placement: string = 'bottom-start';
   /**
-   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-list-gap` token).
    */
   @property({ type: Number, reflect: true }) offset: number = 4;
   /**
@@ -288,7 +299,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-shift' }) disableShift: boolean = false;
   /**
-   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the fixed-width control (`--rozie-select-width`, `16rem` by default).
    */
   @property({ type: Boolean, reflect: true }) block: boolean = false;
   /**
@@ -308,7 +319,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true, attribute: 'estimate-row-height' }) estimateRowHeight: number = 36;
   /**
-   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   @property({ type: String, reflect: true, attribute: 'max-height' }) maxHeight: string = '';
   private _autoId = signal('');
@@ -588,7 +599,7 @@ private __rozieFirstUpdateDone = false;
         </div>`)}
         ${this.visibleOptions().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
           ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-        </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+        </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
         <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-6e3ebfa6></div>
 
         ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row._opt), 'is-disabled': this.disabledOf(wr.row._opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row._opt)} aria-disabled=${!!this.disabledOf(wr.row._opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(wr.row._opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>

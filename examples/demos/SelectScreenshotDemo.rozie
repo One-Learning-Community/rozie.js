@@ -1,0 +1,55 @@
+<!--
+  SelectScreenshotDemo.rozie — token-parity fixture for @rozie-ui/select against the sibling
+  @rozie-ui/combobox (select-screenshot.spec.ts). The same options, placeholder and values are
+  rendered by both families, stacked in a 320px column, so the spec can compare their computed
+  styles element by element: control, chips, option rows, popup surface, group headings,
+  disabled state and the empty state. `block` instances fill the column; the two `plain` ones
+  keep the family's own default width.
+
+  Behavioral-only: no screenshot is taken here.
+-->
+<rozie name="SelectScreenshotDemo">
+<components>
+{
+  Select: '../../packages/ui/select/src/Select.rozie',
+  Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
+}
+</components>
+<data>{ single: 'banana', multi: ['apple', 'banana'], plain: null, plainC: null, off: 'banana', offC: 'banana', none: null, noneC: null }</data>
+<script>
+const OPTIONS = [
+  { label: 'Apple', value: 'apple', group: 'fruit' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Carrot', value: 'carrot', group: 'veg' },
+  { label: 'Water', value: 'water' },
+]
+const GROUPS = [{ id: 'fruit', label: 'Fruit' }, { id: 'veg', label: 'Vegetables' }]
+const NONE = []
+</script>
+<template>
+<div class="select-screenshot-demo">
+  <div data-testid="sel-single"><Select :options="OPTIONS" r-model:value="$data.single" block placeholder="Pick one" aria-label="Select single" /></div>
+  <div data-testid="cb-single"><Combobox :options="OPTIONS" r-model:value="$data.single" block placeholder="Pick one" ariaLabel="Combobox single" idBase="shot-cb-single" /></div>
+  <div data-testid="sel-multi"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.multi" multiple block :close-on-select="false" placeholder="Pick some" aria-label="Select multi" /></div>
+  <div data-testid="cb-multi"><Combobox :options="OPTIONS" :groups="GROUPS" r-model:value="$data.multi" multiple block placeholder="Pick some" ariaLabel="Combobox multi" idBase="shot-cb-multi" /></div>
+  <div data-testid="sel-plain"><Select :options="OPTIONS" r-model:value="$data.plain" placeholder="Pick one" aria-label="Select plain" /></div>
+  <div data-testid="cb-plain"><Combobox :options="OPTIONS" r-model:value="$data.plainC" placeholder="Pick one" ariaLabel="Combobox plain" idBase="shot-cb-plain" /></div>
+  <div data-testid="sel-off"><Select :options="OPTIONS" r-model:value="$data.off" block disabled aria-label="Select disabled" /></div>
+  <div data-testid="cb-off"><Combobox :options="OPTIONS" r-model:value="$data.offC" block disabled ariaLabel="Combobox disabled" idBase="shot-cb-off" /></div>
+  <div data-testid="sel-none"><Select :options="NONE" r-model:value="$data.none" block placeholder="Nothing" aria-label="Select empty" /></div>
+  <div data-testid="cb-none"><Combobox :options="NONE" r-model:value="$data.noneC" block placeholder="Nothing" ariaLabel="Combobox empty" idBase="shot-cb-none" /></div>
+</div>
+</template>
+<style>
+.select-screenshot-demo {
+  box-sizing: border-box;
+  width: 320px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+}
+</style>
+</rozie>

@@ -120,9 +120,9 @@ On a phone the operating system's own picker (the iOS wheel, the Android dialog)
 | `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; ungrouped options come first, and groups present on options but absent here follow in first-appearance order. Keyboard navigation and type-ahead follow that visual order. Empty (the default) renders a flat list. Ignored when `virtual` is on. |
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight`. Grouping is not applied while `virtual` is on. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
-| `maxHeight` | `String` | `''` | yes | A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
+| `maxHeight` | `String` | `''` | yes | A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
 | `placement` | `String` | `"bottom-start"` | yes | Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Ignored when `inline` is set. |
-| `offset` | `Number` | `4` | yes | Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token). |
+| `offset` | `Number` | `4` | yes | Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-list-gap` token). |
 | `disableFlip` | `Boolean` | `false` | yes | Disable the popup's Floating UI `flip` middleware: by default the popup flips above the control when there is no room below. Ignored when `inline` is set. |
 | `disableShift` | `Boolean` | `false` | yes | Disable the popup's Floating UI `shift` middleware: by default the popup shifts to stay within the viewport. Ignored when `inline` is set. |
 | `block` | `Boolean` | `false` | yes | Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. |
@@ -165,7 +165,7 @@ Every value the component renders is a `--rozie-select-*` CSS custom property wi
   --rozie-select-accent: #16a34a;
   --rozie-select-radius: 10px;
   --rozie-select-bg: #0b1220;
-  --rozie-select-fg: #e5e7eb;
+  --rozie-select-color: #e5e7eb;
 }
 ```
 

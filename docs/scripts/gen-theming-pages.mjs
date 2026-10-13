@@ -248,7 +248,7 @@ function readSiteFallbacks(css, names, srcTexts = []) {
   return out;
 }
 
-/** A read-site fallback with every PRIVATE wiring layer unwrapped: `var(--rlb-accent, #0066cc)`
+/** A read-site fallback with every PRIVATE wiring layer unwrapped: `var(--rsl-accent, #0066cc)`
  * → `#0066cc`. A family whose component reads each token public-first and then its private
  * `--r<x>-*` wiring (which base.css and the design-system bridges declare) documents the
  * public chain and the literal default; the private names are internal. Design-system

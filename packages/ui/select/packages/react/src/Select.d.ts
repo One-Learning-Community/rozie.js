@@ -82,7 +82,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   placement?: string;
   /**
-   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-list-gap` token).
    */
   offset?: number;
   /**
@@ -94,7 +94,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   disableShift?: boolean;
   /**
-   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the fixed-width control (`--rozie-select-width`, `16rem` by default).
    */
   block?: boolean;
   /**
@@ -114,7 +114,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   estimateRowHeight?: number;
   /**
-   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight?: string;
   onOpenChange?: (...args: any[]) => void;

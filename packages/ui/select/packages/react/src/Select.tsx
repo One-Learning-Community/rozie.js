@@ -110,7 +110,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   placement?: string;
   /**
-   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-popup-offset` token).
+   * Gap in pixels between the control and the popup, forwarded to the composed `@rozie-ui/popover` leaf. Default `4`. Ignored when `inline` is set (the in-flow gap is the `--rozie-select-list-gap` token).
    */
   offset?: number;
   /**
@@ -122,7 +122,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   disableShift?: boolean;
   /**
-   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the content-sized control (at least `--rozie-select-min-width`).
+   * Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the fixed-width control (`--rozie-select-width`, `16rem` by default).
    */
   block?: boolean;
   /**
@@ -142,7 +142,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   estimateRowHeight?: number;
   /**
-   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
+   * A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off.
    */
   maxHeight?: string;
   onOpenChange?: (...args: any[]) => void;
@@ -1689,7 +1689,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
             </div>)}
             {!!(visibleOptions().length === 0) && <div className={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
               {(props.renderEmpty ?? props.slots?.['empty']) ? ((props.renderEmpty ?? props.slots?.['empty']) as Function)({ query }) : "No options"}
-            </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-select-list rozie-select-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6="">
+            </div>}</div>}{!!(props.virtual) && <div ref={listEl} className={"rozie-select-list rozie-select-list--virtual"} role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={rozieAttr(props.ariaLabel)} aria-multiselectable={props.multiple} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + props.maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6="">
             <div className={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6="" />
 
             {windowedRows().map((wr) => <div key={wr.row.id} id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} className={clsx("rozie-select-option", { "is-active": activeIndex === wr.vi.index, "is-selected": isSelected(wr.row._opt), "is-disabled": disabledOf(wr.row._opt) })} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onClick={($event) => { select(wr.row._opt); }} onMouseMove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6="">

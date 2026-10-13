@@ -27,22 +27,25 @@
 :root,
 .rozie-select,
 rozie-select {
-  --rsl-bg: var(--rozie-select-bg, hsl(var(--popover, var(--background, 0 0% 100%))));
-  --rsl-fg: var(--rozie-select-fg, hsl(var(--popover-foreground, var(--foreground, 222.2 47.4% 11.2%))));
-  --rsl-border: var(--rozie-select-border, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rsl-accent: var(--rozie-select-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
+
+  --rsl-bg: var(--rozie-select-bg, hsl(var(--background, 0 0% 100%)));
+  --rsl-color: var(--rozie-select-color, hsl(var(--foreground, 222.2 84% 4.9%)));
+  --rsl-border-color: var(--rozie-select-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
   --rsl-radius: var(--rozie-select-radius, var(--radius, 0.5rem));
   --rsl-placeholder: var(--rozie-select-placeholder, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
 
-  --rsl-accent: var(--rozie-select-accent, hsl(var(--primary, 222.2 47.4% 11.2%)));
-  --rsl-ring: var(--rozie-select-ring, hsl(var(--ring, 215 20.2% 65.1%)));
+  --rsl-focus-ring-color: var(--rozie-select-focus-ring-color, hsl(var(--ring, 222.2 84% 4.9%) / 0.35));
 
-  --rsl-active-bg: var(--rozie-select-active-bg, hsl(var(--accent, 210 40% 96.1%)));
+  --rsl-disabled-bg: var(--rozie-select-disabled-bg, hsl(var(--muted, 210 40% 96.1%)));
+
+  --rsl-list-bg: var(--rozie-select-list-bg, hsl(var(--popover, 0 0% 100%)));
+  --rsl-list-border-color: var(--rozie-select-list-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rsl-popup-radius: var(--rozie-select-popup-radius, var(--radius, 0.5rem));
+
+  --rsl-option-active-bg: var(--rozie-select-option-active-bg, hsl(var(--accent, 210 40% 96.1%)));
   --rsl-active-fg: var(--rozie-select-active-fg, hsl(var(--accent-foreground, 222.2 47.4% 11.2%)));
   --rsl-selected-bg: var(--rozie-select-selected-bg, transparent);
   --rsl-selected-fg: var(--rozie-select-selected-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
   --rsl-check-color: var(--rozie-select-check-color, hsl(var(--primary, 222.2 47.4% 11.2%)));
-
-  --rsl-shadow: var(--rozie-select-shadow, 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1));
-  --rsl-popup-radius: var(--rozie-select-popup-radius, var(--radius, 0.5rem));
-  --rsl-empty-fg: var(--rozie-select-empty-fg, hsl(var(--muted-foreground, 215.4 16.3% 46.9%)));
 }
