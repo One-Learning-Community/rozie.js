@@ -170,7 +170,13 @@ const FAMILIES: FamilySpec[] = [
         // emitter-annotated `(b: any)` callback (+1). The same Class-6 leaf-body
         // noise combobox/react records for its `$memo` (see above); the consumer
         // surface (Select.d.ts) is untouched.
-        TS7006: 4,
+        // 4 → 5 (select native picker): the native <select>'s `<optgroup>` rows are
+        // `blk.items.map((row) => …)` over the same `groupBlocks()` result as the
+        // grouped listbox branch above — `items` comes out of the emitter-annotated
+        // `(b: any)` callback, so `row` has no contextual type. One more site of that
+        // Class-6 leaf-body shape, not a new class; Select.d.ts only gains the
+        // `nativePicker?: boolean` prop.
+        TS7006: 5,
       },
     },
   },

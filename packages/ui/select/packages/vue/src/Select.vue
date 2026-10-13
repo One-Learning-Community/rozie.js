@@ -10,11 +10,17 @@
             <span class="rozie-select-chip__label">{{ row.label }}</span>
             <button type="button" class="rozie-select-chip__remove" tabindex="-1" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="noop()" @click="onChipRemove(row.value)">×</button>
           </slot>
-        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-hidden="(nativeActive() ? 'true' : undefined) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
           <template v-if="!props.multiple"><slot name="selected" :selected="selectedLabel" :value="value">
             <span v-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot></template><span v-if="props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ props.placeholder }}</span></div>
         <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
-      </div>
+        
+        <select v-if="nativeActive()" class="rozie-select-native" :multiple="!!props.multiple" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change.stop="onNativeChange($event)">
+          <option v-if="!props.multiple" value="">{{ props.placeholder }}</option><option v-for="row in nativeLoose()" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
+          <optgroup v-for="blk in nativeGrouped()" :key="'ng-' + blk.group.id" :label="blk.group.label">
+            <option v-for="row in blk.items" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
+          </optgroup>
+        </select></div>
     </template>
       
       <div v-if="popupVisible() && !props.virtual && !isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined">
@@ -141,6 +147,10 @@ const props = withDefaults(
      */
     clearLabel?: string;
     /**
+     * On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. In single-select the picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value, without `clearable` choosing it changes nothing. Interactive content in a custom `chip` fill needs `position: relative; z-index: 1` to stay tappable above the picker overlay. Has no effect with a mouse, with `virtual`, or with `inline`.
+     */
+    nativePicker?: boolean;
+    /**
      * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
      */
     placement?: string;
@@ -181,7 +191,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, clearable: false, clearLabel: 'Clear', placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
+  { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, clearable: false, clearLabel: 'Clear', nativePicker: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
 /**
@@ -210,6 +220,7 @@ defineSlots<{
 
 const autoId = ref('');
 const open$local = ref(false);
+const coarse = ref(false);
 const panelOpen = ref(false);
 const panelEcho = ref(false);
 const activeIndex = ref(-1);
@@ -248,6 +259,10 @@ const activeDescendant = computed(() => {
 // module-`let`s + sigils live in the host; the partial only closes over them.
 let typeBuffer = '';
 let typeTimer: any = null;
+// The `(pointer: coarse)` MediaQueryList and its `change` listener (see $onMount).
+// Reassigned module-`let`s, initialised null per the timer-handle convention.
+let coarseQuery: any = null;
+let coarseListener: any = null;
 // ══ Shared headless LIST SPINE (Phase 64, D-06) — the target-agnostic list-core bridge ══
 // Lifted verbatim from Listbox.rozie's <script> (the monolithic pure-Rozie list logic). This
 // partial holds ONLY the PURE list spine — option resolvers, the client-side filter, enabled-index
@@ -405,6 +420,101 @@ const groupBlocks = () => {
       index: i++
     }))
   }));
+};
+// ── native mobile picker (`nativePicker`) ──────────────────────────────────
+// Active only for the opt-in prop on a coarse primary pointer, and never together
+// with `virtual` or `inline`. While active the native <select> IS the control: the
+// custom trigger is aria-hidden and out of the tab order, and the host entry points
+// (onControlClick / onTriggerKeyDown) never open the custom popup.
+const nativeActive = () => !!props.nativePicker && coarse.value && !props.virtual && !props.inline;
+// The <option> rows in visual order: the ungrouped options first as direct children,
+// then one <optgroup> per listed group. Each row carries its index in visibleOptions().
+const nativeBlocks = () => isGrouped() ? groupBlocks() : [{
+  group: null,
+  items: visibleOptions().map((opt: any, index: any) => ({
+    opt,
+    index
+  }))
+}];
+const nativeGrouped = () => nativeBlocks().filter((b: any) => b.group);
+const nativeLoose = () => nativeBlocks().filter((b: any) => !b.group).flatMap((b: any) => b.items);
+// Option values can be any type and the native element only carries strings, so each
+// <option> carries its INDEX in visibleOptions() and a commit resolves back to the option.
+const nativeSingleValue = () => {
+  const i = visibleOptions().findIndex((o: any) => isSelected(o));
+  return i === -1 ? '' : String(i);
+};
+// The rendered native element, or null. Looked up from the root (a ref on a
+// conditionally rendered node is null on Solid and Lit), by tag name so it is typed.
+const nativeEl = () => {
+  if (!__rozieRootRef.value) return null;
+  for (const el of __rozieRootRef.value!.querySelectorAll('select') as any) {
+    if (el.classList.contains('rozie-select-native')) return el;
+  }
+  return null;
+};
+// Write the model into the native element. Imperative on purpose: a <select>'s
+// selection is DOM state, and the declarative shape — `:value` on the <select> (null
+// for `multiple`) plus `:selected` on each <option> — did not hold on six targets
+// (measured: wrong first paint for `multiple` on Vue and Solid; the options stopped
+// following the model after a user change on Svelte and Lit; and `selected` on an
+// <option> is a dev-mode console error on React). It is also the only way to put the
+// element back when a choice is refused (the placeholder entry without `clearable`),
+// where nothing reactive changes.
+const syncNative = () => {
+  const el = nativeEl();
+  if (!el) return;
+  if (!props.multiple) {
+    const v = nativeSingleValue();
+    if (el.value !== v) el.value = v;
+    return;
+  }
+  const opts = visibleOptions();
+  for (let i = 0; i < el.options.length; i++) {
+    const o = el.options[i];
+    const on = o.value !== '' && !!isSelected(opts[Number(o.value)]);
+    if (o.selected !== on) o.selected = on;
+  }
+};
+// Now, and once more after the framework has rendered: on some targets the watchers
+// below run before the <select> / <option> elements are committed.
+const scheduleNativeSync = () => {
+  syncNative();
+  setTimeout(() => syncNative(), 0);
+};
+const onNativeChange = ($event: any) => {
+  const el = $event.target;
+  const opts = visibleOptions();
+  if (props.multiple) {
+    // Values the model holds that no option carries cannot be shown (or deselected) in
+    // the OS picker: keep them, ahead of the picked values in visual order.
+    const known = opts.map((o: any) => valueOf(o));
+    const picked = selectedValues().filter((v: any) => !known.includes(v));
+    for (let i = 0; i < el.options.length; i++) {
+      const o = el.options[i];
+      if (o.selected && o.value !== '') picked.push(valueOf(opts[Number(o.value)]));
+    }
+    value.value = picked;
+    emit('change', {
+      value: picked,
+      option: null
+    });
+    return;
+  }
+  if (el.value === '') {
+    // The placeholder entry: clears when `clearable`; otherwise it is not a choice, so
+    // the element goes back to the real selection.
+    if (props.clearable && hasValue()) clear();else syncNative();
+    return;
+  }
+  const opt = opts[Number(el.value)];
+  if (opt !== undefined) select(opt);
+};
+// The native picker takes over: an open custom popup closes through the normal close()
+// path (one `open-change`), and the native element picks up the model.
+const yieldToNative = () => {
+  if (nativeActive()) close();
+  scheduleNativeSync();
 };
 // ══ HOST-LOCAL NAVIGATION (begin) ═════════════════════════════════════════
 // These ten functions are defined here instead of imported from listCore.rzts.
@@ -1093,6 +1203,15 @@ const remeasureWindow = () => {
 // only closes over them). Named `focusControl` (not `focus`): a `focus` $expose
 // verb would override the inherited HTMLElement.focus method on the Lit element.
 const focusControl = () => {
+  // While the native picker is active the native <select> is the control (the custom
+  // trigger is aria-hidden), so that is what takes focus.
+  if (nativeActive()) {
+    const el = nativeEl();
+    if (el) {
+      el.focus();
+      return;
+    }
+  }
   triggerElRef.value?.focus();
 };
 // Keep the active option visible inside the scrolling listbox. Reads $refs in
@@ -1196,6 +1315,7 @@ const syncPanel = () => {
 //    while the popup is actually visible.
 const onTriggerKeyDown = ($event: any) => {
   if (props.disabled) return;
+  if (nativeActive()) return;
   const hidden = open$local.value && !popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
   if (onChipKey($event)) return;
@@ -1275,11 +1395,13 @@ const onChipKey = ($event: any) => {
 };
 // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
 // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
-const triggerTabindex = () => props.disabled ? -1 : 0;
+const triggerTabindex = () => props.disabled || nativeActive() ? -1 : 0;
 // One click handler on the whole control: the arrow, padding and (later) the chip
 // row all open the popup; the buttons inside stop propagation themselves.
 const onControlClick = ($event: any) => {
   if (props.disabled) return;
+  // The native picker owns every tap on the control (the overlay receives it).
+  if (nativeActive()) return;
   // React, Svelte and Solid delegate events at the root, so stopPropagation in a
   // button handler cannot keep the click from here: decide from the event target
   // instead (one code path on all six targets). The clear button never toggles; an
@@ -1318,6 +1440,21 @@ const onControlClick = ($event: any) => {
 
 onMounted(() => {
   if (!props.idBase) autoId.value = 'rozie-select-' + nextAutoId();
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    coarseQuery = window.matchMedia('(pointer: coarse)');
+    coarse.value = !!coarseQuery.matches;
+    // Only records the new state: this closure is the mount-time one, so the reaction
+    // (closing the custom popup) lives in the `$data.coarse` watcher below.
+    coarseListener = (e: any) => {
+      coarse.value = !!e.matches;
+    };
+    coarseQuery.addEventListener('change', coarseListener);
+    // The first paint of the native element. Not left to the `$data.coarse` watcher:
+    // on Svelte and Solid a write made here in $onMount lands before that watcher's
+    // (skipped) first run, so it never fires — a select mounted with a value showed
+    // the placeholder on those two.
+    scheduleNativeSync();
+  }
   syncRows();
   if (props.virtual) {
     // The list renders at mount when virtual, so the .rozie-select-list scroll container
@@ -1333,6 +1470,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   if (typeTimer !== null) clearTimeout(typeTimer);
+  if (coarseQuery && coarseListener) coarseQuery.removeEventListener('change', coarseListener);
   // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
   if (virtualizerCleanup) virtualizerCleanup();
 });
@@ -1357,6 +1495,21 @@ watch(() => (props.options ? props.options.length : 0) + '|' + query.value, () =
 }, { flush: 'post' });
 watch(() => props.options ? props.options.length : 0, () => {
   if (activeIndex.value >= visibleOptions().length) activeIndex.value = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
+}, { flush: 'post' });
+watch(() => coarse.value, () => {
+  yieldToNative();
+}, { flush: 'post' });
+watch(() => (props.nativePicker ? 'n' : '-') + (props.virtual ? 'v' : '-') + (props.inline ? 'i' : '-') + (props.multiple ? 'm' : '-'), () => {
+  yieldToNative();
+}, { flush: 'post' });
+watch(() => value.value, () => {
+  scheduleNativeSync();
+}, { flush: 'post' });
+watch(() => props.options, () => {
+  scheduleNativeSync();
+}, { flush: 'post' });
+watch(() => props.groups, () => {
+  scheduleNativeSync();
 }, { flush: 'post' });
 
 defineExpose({ open, close, toggle, clear, focusControl });
@@ -1403,6 +1556,14 @@ useOutsideClick(
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
 .rozie-select-control { flex-wrap: wrap; }
+.rozie-select-control { position: relative; }
+.rozie-select-native {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; margin: 0; border: 0; padding: 0; cursor: pointer;
+  font-size: 16px; /* iOS zooms the page for form controls under 16px */
+  appearance: none;
+}
+.rozie-select-clear, .rozie-select-chip__remove { position: relative; z-index: 1; }
 .rozie-select-chip {
   display: inline-flex; align-items: center; max-width: 100%;
   gap: var(--rozie-select-chip-gap, var(--rsl-chip-gap, 0.25rem));

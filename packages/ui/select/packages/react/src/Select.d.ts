@@ -8,7 +8,7 @@ export interface SelectGroup {
   label: string;
 }
 
-export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
+export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`.
    */
@@ -73,6 +73,10 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    * Accessible name of the clear button (`aria-label`). Localise it.
    */
   clearLabel?: string;
+  /**
+   * On touch devices (primary pointer coarse), open the operating system's own picker instead of the custom popup. Custom `option`, `groupHeading` and `empty` slot content does not appear in the OS picker. In single-select the picker lists the `placeholder` as its first entry: with `clearable` choosing it clears the value, without `clearable` choosing it changes nothing. Interactive content in a custom `chip` fill needs `position: relative; z-index: 1` to stay tappable above the picker overlay. Has no effect with a mouse, with `virtual`, or with `inline`.
+   */
+  nativePicker?: boolean;
   /**
    * Floating UI placement of the popup relative to the control, forwarded to the composed `@rozie-ui/popover` leaf — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end`. Default `"bottom-start"` keeps the popup flush with the control's left edge. Ignored when `inline` is set.
    */

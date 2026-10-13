@@ -79,6 +79,7 @@ import '@rozie-ui/select-solid/themes/shadcn.css';    // or material.css, bootst
 | `selectOnTab` | `Boolean` | `false` |  |  |
 | `clearable` | `Boolean` | `false` |  |  |
 | `clearLabel` | `String` | `"Clear"` |  |  |
+| `nativePicker` | `Boolean` | `false` |  |  |
 | `placement` | `String` | `"bottom-start"` |  |  |
 | `offset` | `Number` | `4` |  |  |
 | `disableFlip` | `Boolean` | `false` |  |  |

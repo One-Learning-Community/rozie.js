@@ -71,6 +71,7 @@ import '@rozie-ui/select-svelte/themes/shadcn.css';    // or material.css, boots
 | `selectOnTab` | `Boolean` | `false` |  |  |
 | `clearable` | `Boolean` | `false` |  |  |
 | `clearLabel` | `String` | `"Clear"` |  |  |
+| `nativePicker` | `Boolean` | `false` |  |  |
 | `placement` | `String` | `"bottom-start"` |  |  |
 | `offset` | `Number` | `4` |  |  |
 | `disableFlip` | `Boolean` | `false` |  |  |

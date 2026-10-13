@@ -1,0 +1,82 @@
+<!--
+  SelectNativeDemo.rozie — BEHAVIORAL consumer for the Select's opt-in `nativePicker`
+  (select-native.spec.ts). The spec overrides `matchMedia('(pointer: coarse)')` so the
+  primary pointer reads as coarse. Seven selects:
+    - single: grouped + clearable + nativePicker, with change / open-change counters,
+              the last change payload and an object-identity readout
+    - plain:  nativePicker, NOT clearable, holds a value (placeholder snap-back)
+    - multi:  nativePicker + multiple (chips above the overlay)
+    - off:    no nativePicker (the custom popup, used to compare change payloads)
+    - virt / inl: nativePicker + `virtual` / `inline` (the custom popup is kept)
+    - locked: nativePicker + disabled
+-->
+<rozie name="SelectNativeDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ value: null, plain: 'banana', multi: ['apple'], off: null, virt: null, inl: null, locked: 'apple', changes: 0, payload: '', same: '', opens: 0, plainChanges: 0, multiChanges: 0, multiPayload: '', offPayload: '' }</data>
+<script>
+const GROUPS = [{ id: 'fruit', label: 'Fruit' }]
+// An object-valued option: the commit must hand back this very reference.
+const BOX = { kind: 'box' }
+const OPTIONS = [
+  { label: 'Apple', value: 'apple', group: 'fruit' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Water', value: 'water', disabled: true },
+  { label: 'Seven', value: 7 },
+  { label: 'Box', value: BOX },
+]
+const FLAT = [
+  { label: 'Apple', value: 'apple' },
+  { label: 'Banana', value: 'banana' },
+  { label: 'Water', value: 'water', disabled: true },
+  { label: 'Seven', value: 7 },
+]
+const onChange = (detail) => {
+  $data.changes = $data.changes + 1
+  $data.payload = JSON.stringify(detail)
+  $data.same = String(detail.value === BOX)
+}
+const onOpenChange = () => { $data.opens = $data.opens + 1 }
+const onPlainChange = () => { $data.plainChanges = $data.plainChanges + 1 }
+const onMultiChange = (detail) => {
+  $data.multiChanges = $data.multiChanges + 1
+  $data.multiPayload = JSON.stringify(detail)
+}
+const onOffChange = (detail) => { $data.offPayload = JSON.stringify(detail) }
+const joined = () => (Array.isArray($data.multi) ? $data.multi.join(',') : '')
+const typeOfValue = () => typeof $data.value
+const shown = () => {
+  const v = $data.value
+  if (v === null || v === undefined) return ''
+  return typeof v === 'object' ? 'object' : String(v)
+}
+const setApple = () => { $data.value = 'apple' }
+const setNone = () => { $data.value = null }
+</script>
+<template>
+<div>
+  <span data-testid="readout-value">{{ shown() }}</span>
+  <span data-testid="readout-type">{{ typeOfValue() }}</span>
+  <span data-testid="readout-changes">{{ $data.changes }}</span>
+  <span data-testid="readout-payload">{{ $data.payload }}</span>
+  <span data-testid="readout-same">{{ $data.same }}</span>
+  <span data-testid="readout-opens">{{ $data.opens }}</span>
+  <span data-testid="readout-plain">{{ $data.plain }}</span>
+  <span data-testid="readout-plain-changes">{{ $data.plainChanges }}</span>
+  <span data-testid="readout-multi">{{ joined() }}</span>
+  <span data-testid="readout-multi-changes">{{ $data.multiChanges }}</span>
+  <span data-testid="readout-multi-payload">{{ $data.multiPayload }}</span>
+  <span data-testid="readout-off-payload">{{ $data.offPayload }}</span>
+  <span data-testid="readout-virt">{{ $data.virt }}</span>
+  <span data-testid="readout-inl">{{ $data.inl }}</span>
+  <button type="button" data-testid="set-apple" @click="setApple()">set apple</button>
+  <button type="button" data-testid="set-none" @click="setNone()">set none</button>
+  <div data-testid="single"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.value" native-picker clearable placeholder="Pick" aria-label="Drink" @change="onChange($event)" @open-change="onOpenChange()" /></div>
+  <div data-testid="plain"><Select :options="FLAT" r-model:value="$data.plain" native-picker placeholder="Choose" aria-label="Plain" @change="onPlainChange()" /></div>
+  <div data-testid="multi"><Select :options="FLAT" r-model:value="$data.multi" multiple native-picker aria-label="Many" @change="onMultiChange($event)" /></div>
+  <div data-testid="off"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.off" aria-label="Custom only" @change="onOffChange($event)" /></div>
+  <div data-testid="virt"><Select :options="FLAT" r-model:value="$data.virt" native-picker virtual max-height="160px" aria-label="Windowed" /></div>
+  <div data-testid="locked"><Select :options="FLAT" r-model:value="$data.locked" native-picker disabled aria-label="Locked" /></div>
+  <div data-testid="inl"><Select :options="FLAT" r-model:value="$data.inl" native-picker inline aria-label="Inline" /></div>
+</div>
+</template>
+</rozie>

@@ -706,6 +706,10 @@ export const EXAMPLES = [
   // @rozie-ui/select multi-select chips (loader → examples/demos/SelectMultiDemo.rozie): inline
   // removable chips, the `chip` slot, Backspace removing the last chip. Behavioral-only (select-multi.spec.ts).
   'SelectMulti',
+  // @rozie-ui/select opt-in native OS picker (loader → examples/demos/SelectNativeDemo.rozie):
+  // `nativePicker` on a coarse primary pointer lays an invisible native <select> over the
+  // control. Behavioral-only (select-native.spec.ts); the spec overrides matchMedia.
+  'SelectNative',
   // (P3/D-03: Select's editable combobox mode was retired — type-to-filter now
   // lives in @rozie-ui/combobox; the former SelectCombobox cell is removed.)
   // Phase 64 P4 (headless windowing, SC-5) — the WINDOWED long-list cells (loaders →
@@ -1715,6 +1719,8 @@ export const LIT_TAGS: Record<Example, string> = {
   SelectClearable: 'rozie-select-clearable',
   // 'rozie-select-multi-demo' = kebab of SelectMultiDemo.
   SelectMulti: 'rozie-select-multi',
+  // 'rozie-select-native-demo' = kebab of SelectNativeDemo.
+  SelectNative: 'rozie-select-native',
   // Phase 64 P4 windowing — '-demo' appended on Lit → tags 'rozie-select-virtual-demo'
   // / 'rozie-combobox-virtual-demo' = kebab of {Select,Combobox}VirtualDemo.
   SelectVirtual: 'rozie-select-virtual',
@@ -2287,6 +2293,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SelectClearable: {},
   // SelectMultiDemo is self-contained (own options + internal r-models). No parent props.
   SelectMulti: {},
+  // SelectNativeDemo is self-contained (own options + internal r-models). No parent props.
+  SelectNative: {},
   // Phase 64 P4 windowing — both VirtualDemos are self-contained: each seeds its own
   // 1,000-option list in $onMount and binds r-model:value internally (not
   // parent-supplied), so no MODEL_PROPS entry. No parent props needed.
