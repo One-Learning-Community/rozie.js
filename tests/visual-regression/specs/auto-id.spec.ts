@@ -29,7 +29,7 @@ for (const target of TARGETS) {
 
     const listControls: string[] = [];
     for (const label of ['List A', 'List B']) {
-      const trigger = page.locator(`button[role="combobox"][aria-label="${label}"]`);
+      const trigger = page.locator(`[role="combobox"][aria-label="${label}"]`);
       await expect
         .poll(async () => (await trigger.getAttribute('aria-controls')) ?? '', POLL)
         .toMatch(/^rozie-select-\d+-list$/);

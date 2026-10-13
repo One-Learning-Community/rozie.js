@@ -125,7 +125,7 @@ let windowVer = $state(0);
 let editVer = $state(0);
 
 let controlEl = $state<HTMLElement | undefined>(undefined);
-let triggerEl = $state<HTMLButtonElement | undefined>(undefined);
+let triggerEl = $state<HTMLElement | undefined>(undefined);
 let listEl = $state<HTMLElement | undefined>(undefined);
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
@@ -1046,10 +1046,21 @@ const popupVisible = () => {
 //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
 //    while the popup is actually visible.
 const onTriggerKeyDown = ($event: any) => {
+  if (disabled) return;
   const hidden = open$local && !popupVisible();
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
   if ($event.key === 'Tab' && open$local && selectOnTab && popupVisible() && activeIndex >= 0) commitActive();
   onControlKeyDown($event);
+};
+// A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
+// (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
+const triggerTabindex = () => disabled ? -1 : 0;
+// One click handler on the whole control: the arrow, padding and (later) the chip
+// row all open the popup; the buttons inside stop propagation themselves.
+const onControlClick = ($event: any) => {
+  if (disabled) return;
+  toggle();
+  focusControl();
 };
 
 const selectedLabel = $derived.by(() => {
@@ -1125,7 +1136,7 @@ $effect(() => {
 });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': open$local, 'rozie-select-disabled': disabled, 'rozie-select-inline': inline }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><div class="rozie-select-control" bind:this={controlEl} data-rozie-s-6e3ebfa6><button bind:this={triggerEl} type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" aria-expanded={rozieAttr(popupVisible())} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : null)} aria-label={ariaLabel} disabled={disabled} onclick={toggle} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span></button></div>{#if popupVisible() && !virtual}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-6e3ebfa6>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-select-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onclick={($event) => { select(wr.row._opt); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) })}{:else}{rozieDisplay(labelOf(wr.row._opt))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': disabled, 'rozie-select-inline': inline }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><div class="rozie-select-control" bind:this={controlEl} onclick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6><div bind:this={triggerEl} class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex={rozieAttr(triggerTabindex())} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : null)} aria-label={ariaLabel} aria-disabled={!!disabled} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if selected}{@render selected({ selected: selectedLabel, value })}{:else}{#if selectedLabel}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel)}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}</div><span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span></div>{#if popupVisible() && !virtual}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} data-rozie-s-6e3ebfa6>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-select-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-max-height:' + maxHeight : 'overflow-y:auto'))} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(wr.row._opt), 'is-disabled': disabledOf(wr.row._opt) }]} role="option" aria-selected={!!isSelected(wr.row._opt)} aria-disabled={!!disabledOf(wr.row._opt)} onclick={($event) => { select(wr.row._opt); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: wr.row._opt, index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(wr.row._opt), disabled: disabledOf(wr.row._opt) })}{:else}{rozieDisplay(labelOf(wr.row._opt))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</div>
 
 <style>
 :global {
@@ -1135,9 +1146,7 @@ $effect(() => {
     min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
     font: var(--rozie-select-font, inherit);
   }
-  .rozie-select-control[data-rozie-s-6e3ebfa6] { display: block; }
-  .rozie-select-input[data-rozie-s-6e3ebfa6],
-  .rozie-select-trigger[data-rozie-s-6e3ebfa6] {
+  .rozie-select-control[data-rozie-s-6e3ebfa6] {
     box-sizing: border-box;
     width: 100%;
     display: flex;
@@ -1153,14 +1162,12 @@ $effect(() => {
     border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
     cursor: pointer;
   }
-  .rozie-select-input[data-rozie-s-6e3ebfa6] { cursor: text; }
-  .rozie-select-input[data-rozie-s-6e3ebfa6]:focus-visible,
-  .rozie-select-input[data-rozie-s-6e3ebfa6]:focus,
-  .rozie-select-trigger[data-rozie-s-6e3ebfa6]:focus-visible,
-  .rozie-select-trigger[data-rozie-s-6e3ebfa6]:focus {
+  .rozie-select-control[data-rozie-s-6e3ebfa6]:focus-within {
     outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
     outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
   }
+  .rozie-select-trigger[data-rozie-s-6e3ebfa6] { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
+  .rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
   .rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
   .rozie-select-placeholder[data-rozie-s-6e3ebfa6] { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
   .rozie-select-arrow[data-rozie-s-6e3ebfa6] {

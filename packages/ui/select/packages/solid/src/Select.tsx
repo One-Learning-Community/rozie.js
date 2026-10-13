@@ -20,9 +20,7 @@ __rozieInjectStyle('Select-6e3ebfa6', `.rozie-select[data-rozie-s-6e3ebfa6] {
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
 }
-.rozie-select-control[data-rozie-s-6e3ebfa6] { display: block; }
-.rozie-select-input[data-rozie-s-6e3ebfa6],
-.rozie-select-trigger[data-rozie-s-6e3ebfa6] {
+.rozie-select-control[data-rozie-s-6e3ebfa6] {
   box-sizing: border-box;
   width: 100%;
   display: flex;
@@ -38,14 +36,12 @@ __rozieInjectStyle('Select-6e3ebfa6', `.rozie-select[data-rozie-s-6e3ebfa6] {
   border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
   cursor: pointer;
 }
-.rozie-select-input[data-rozie-s-6e3ebfa6] { cursor: text; }
-.rozie-select-input[data-rozie-s-6e3ebfa6]:focus-visible,
-.rozie-select-input[data-rozie-s-6e3ebfa6]:focus,
-.rozie-select-trigger[data-rozie-s-6e3ebfa6]:focus-visible,
-.rozie-select-trigger[data-rozie-s-6e3ebfa6]:focus {
+.rozie-select-control[data-rozie-s-6e3ebfa6]:focus-within {
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
+.rozie-select-trigger[data-rozie-s-6e3ebfa6] { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
+.rozie-select-disabled[data-rozie-s-6e3ebfa6] .rozie-select-control[data-rozie-s-6e3ebfa6] { cursor: default; }
 .rozie-select-disabled[data-rozie-s-6e3ebfa6] { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
 .rozie-select-placeholder[data-rozie-s-6e3ebfa6] { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
 .rozie-select-arrow[data-rozie-s-6e3ebfa6] {
@@ -1238,10 +1234,24 @@ export default function Select(_props: SelectProps): JSX.Element {
   //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
   //    while the popup is actually visible.
   function onTriggerKeyDown($event: any) {
+    if (local.disabled) return;
     const hidden = open$local() && !popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
     if ($event.key === 'Tab' && open$local() && local.selectOnTab && popupVisible() && activeIndex() >= 0) commitActive();
     onControlKeyDown($event);
+  }
+
+  // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
+  // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
+  function triggerTabindex() {
+    return local.disabled ? -1 : 0;
+  }
+  // One click handler on the whole control: the arrow, padding and (later) the chip
+  // row all open the popup; the buttons inside stop propagation themselves.
+  function onControlClick($event: any) {
+    if (local.disabled) return;
+    toggle();
+    focusControl();
   }
 
   createOutsideClick(
@@ -1252,14 +1262,14 @@ export default function Select(_props: SelectProps): JSX.Element {
 
   return (
     <>
-    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-select" + " " + rozieClass({ 'rozie-select-open': open$local(), 'rozie-select-disabled': local.disabled, 'rozie-select-inline': local.inline }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-6e3ebfa6="">
+    <div ref={(el) => { __rozieRootRef = el as HTMLElement; }} {...attrs} class={"rozie-select" + " " + rozieClass({ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': local.disabled, 'rozie-select-inline': local.inline }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-6e3ebfa6="">
 
       
-      <div class={"rozie-select-control"} ref={(el) => { controlElRef = el as HTMLElement; }} data-rozie-s-6e3ebfa6="">
-        <button type="button" role="combobox" aria-haspopup="listbox" aria-expanded={rozieAttr(popupVisible())} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant() : null)} aria-label={rozieAttr(local.ariaLabel)} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} disabled={local.disabled} onClick={toggle} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+      <div class={"rozie-select-control"} ref={(el) => { controlElRef = el as HTMLElement; }} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
+        <div role="combobox" aria-haspopup="listbox" aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant() : null)} aria-label={rozieAttr(local.ariaLabel)} aria-disabled={!!local.disabled} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} tabIndex={rozieAttr(triggerTabindex())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
           {(_props.selectedSlot ?? _props.slots?.['selected'])?.({ get selected() { return selectedLabel(); }, get value() { return value(); } }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{local.placeholder}</span>}><span class={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel())}</span></Show>}
-          <span class={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
-        </button>
+        </div>
+        <span class={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
       </div>
 
       

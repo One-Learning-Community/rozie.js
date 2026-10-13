@@ -164,7 +164,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const [windowVer, setWindowVer] = useState(0);
   const [editVer, setEditVer] = useState(0);
   const controlEl = useRef<HTMLDivElement | null>(null);
-  const triggerEl = useRef<HTMLButtonElement | null>(null);
+  const triggerEl = useRef<HTMLDivElement | null>(null);
   const listEl = useRef<HTMLDivElement | null>(null);
   const __rozieRoot = useRef<HTMLDivElement | null>(null);
   const selectedLabel = useMemo(() => {
@@ -326,9 +326,10 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       open: false
     });
   }, [_rozieProp_onOpenChange, open$local]);
-  const toggle = useCallback(() => {
+  function toggle() {
     if (open$local) close();else open();
-  }, [close, open, open$local]);
+  }
+
   // ---- selection ---------------------------------------------------------
   const { onChange: _rozieProp_onChange } = props;
     const select = useCallback((opt: any) => {
@@ -1130,11 +1131,24 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
   //    while the popup is actually visible.
   const onTriggerKeyDown = useCallback(($event: any) => {
+    if (props.disabled) return;
     const hidden = open$local && !popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
     if ($event.key === 'Tab' && open$local && props.selectOnTab && popupVisible() && activeIndex >= 0) commitActive();
     onControlKeyDown($event);
-  }, [activeIndex, commitActive, onControlKeyDown, open$local, popupVisible, props.selectOnTab]);
+  }, [activeIndex, commitActive, onControlKeyDown, open$local, popupVisible, props.disabled, props.selectOnTab]);
+  // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
+  // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
+  function triggerTabindex() {
+    return props.disabled ? -1 : 0;
+  }
+  // One click handler on the whole control: the arrow, padding and (later) the chip
+  // row all open the popup; the buttons inside stop propagation themselves.
+  const onControlClick = useCallback(($event: any) => {
+    if (props.disabled) return;
+    toggle();
+    focusControl();
+  }, [focusControl, props.disabled, toggle]);
 
   const _kickWindowRef = useRef(kickWindow);
   _kickWindowRef.current = kickWindow;
@@ -1188,14 +1202,14 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
 
   return (
     <>
-    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-select", { "rozie-select-open": open$local, "rozie-select-disabled": props.disabled, "rozie-select-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-6e3ebfa6="">
+    <div ref={__rozieRoot} {...attrs} className={clsx(clsx("rozie-select", { "rozie-select-open": popupVisible(), "rozie-select-disabled": props.disabled, "rozie-select-inline": props.inline }), (attrs.className as string | undefined))} data-rozie-s-6e3ebfa6="">
 
       
-      <div className={"rozie-select-control"} ref={controlEl} data-rozie-s-6e3ebfa6="">
-        <button ref={triggerEl} type="button" className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" aria-expanded={rozieAttr(popupVisible())} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} disabled={props.disabled} onClick={toggle} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+      <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
+        <div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
           {(props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel, value }) : ((selectedLabel) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel)}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>)}
-          <span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
-        </button>
+        </div>
+        <span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
       </div>
 
       

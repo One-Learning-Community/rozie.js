@@ -181,6 +181,30 @@ for (const target of TARGETS) {
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('readout-value')).toHaveText(before);
   });
+
+  runner(`select [${target}]: div trigger keeps button semantics (click, Space, Enter, disabled)`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const root = page.getByTestId('main-select');
+    const trigger = root.locator('[role="combobox"]');
+    await expect(trigger).toHaveJSProperty('tagName', 'DIV');
+    await expect(trigger).toHaveAttribute('tabindex', '0');
+    // click on the control's padding/arrow (not the trigger text) opens
+    await root.locator('.rozie-select-arrow').click();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    // Space opens, Enter commits
+    await page.keyboard.press(' ');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('readout-value')).not.toHaveText('');
+    // disabled: not focusable, not openable
+    const dis = page.getByTestId('off-select').locator('[role="combobox"]');
+    await expect(dis).toHaveAttribute('aria-disabled', 'true');
+    await expect(dis).toHaveAttribute('tabindex', '-1');
+    await page.getByTestId('off-select').locator('.rozie-select-control').click({ force: true });
+    await expect(dis).toHaveAttribute('aria-expanded', 'false');
+  });
 }
 
 // ---------------------------------------------------------------------------

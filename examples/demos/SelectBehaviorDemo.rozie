@@ -83,6 +83,9 @@ const pickValue = (v) => { $data.value = v }
     <Select :options="ALL_DISABLED" r-model:value="$data.disabledValue" aria-label="All disabled" />
     <span data-testid="readout-disabled">{{ $data.disabledValue }}</span>
   </div>
+  <div data-testid="off-select">
+    <Select :options="OPTIONS" disabled aria-label="Disabled" />
+  </div>
   <div data-testid="tab-select">
     <Select :options="OPTIONS" r-model:value="$data.tabValue" select-on-tab aria-label="Tab commits" />
     <span data-testid="readout-tab">{{ $data.tabValue }}</span>

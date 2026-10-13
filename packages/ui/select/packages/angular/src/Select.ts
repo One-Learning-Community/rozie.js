@@ -41,11 +41,11 @@ interface EmptyCtx {
   imports: [NgTemplateOutlet, NgClass],
   template: `
 
-    <div class="rozie-select" [ngClass]="{ 'rozie-select-open': open$local(), 'rozie-select-disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-select-inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
+    <div class="rozie-select" [ngClass]="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-select-inline': inline() }" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
 
       
-      <div class="rozie-select-control" #controlEl>
-        <button #triggerEl type="button" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.aria-expanded]="rozieAttr(popupVisible())" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [disabled]="(disabled() || this.__rozieCvaDisabled())" (click)="toggle()" (keydown)="onTriggerKeyDown($event)">
+      <div class="rozie-select-control" #controlEl (click)="onControlClick($event)">
+        <div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
           @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
     } @else {
@@ -56,8 +56,8 @@ interface EmptyCtx {
     <span class="rozie-select-placeholder">{{ placeholder() }}</span>
     }
     }
-          <span class="rozie-select-arrow" aria-hidden="true">▾</span>
-        </button>
+        </div>
+        <span class="rozie-select-arrow" aria-hidden="true">▾</span>
       </div>
 
       
@@ -122,9 +122,7 @@ interface EmptyCtx {
       min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
       font: var(--rozie-select-font, inherit);
     }
-    .rozie-select-control { display: block; }
-    .rozie-select-input,
-    .rozie-select-trigger {
+    .rozie-select-control {
       box-sizing: border-box;
       width: 100%;
       display: flex;
@@ -140,14 +138,12 @@ interface EmptyCtx {
       border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
       cursor: pointer;
     }
-    .rozie-select-input { cursor: text; }
-    .rozie-select-input:focus-visible,
-    .rozie-select-input:focus,
-    .rozie-select-trigger:focus-visible,
-    .rozie-select-trigger:focus {
+    .rozie-select-control:focus-within {
       outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
       outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
     }
+    .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
+    .rozie-select-disabled .rozie-select-control { cursor: default; }
     .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
     .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
     .rozie-select-arrow {
@@ -300,7 +296,7 @@ export class Select {
   windowVer = signal(0);
   editVer = signal(0);
   controlEl = viewChild<ElementRef<HTMLDivElement>>('controlEl');
-  triggerEl = viewChild<ElementRef<HTMLButtonElement>>('triggerEl');
+  triggerEl = viewChild<ElementRef<HTMLDivElement>>('triggerEl');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   openChange = output<unknown>({ alias: 'open-change' });
@@ -1305,10 +1301,21 @@ export class Select {
   //    while the popup is actually visible.
   onTriggerKeyDown = ($event: any) => {
     const __open$local = this.open$local();
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const hidden = __open$local && !this.popupVisible();
     if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return;
     if ($event.key === 'Tab' && __open$local && this.selectOnTab() && this.popupVisible() && this.activeIndex() >= 0) this.commitActive();
     this.onControlKeyDown($event);
+  };
+  // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
+  // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
+  triggerTabindex = () => (this.disabled() || this.__rozieCvaDisabled()) ? -1 : 0;
+  // One click handler on the whole control: the arrow, padding and (later) the chip
+  // row all open the popup; the buttons inside stop propagation themselves.
+  onControlClick = ($event: any) => {
+    if ((this.disabled() || this.__rozieCvaDisabled())) return;
+    this.toggle();
+    this.focusControl();
   };
 
   private __rozieCvaOnChange: (v: unknown) => void = () => {};

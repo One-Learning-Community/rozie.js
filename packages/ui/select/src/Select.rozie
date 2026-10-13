@@ -553,10 +553,22 @@ const popupVisible = () => {
 //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
 //    while the popup is actually visible.
 const onTriggerKeyDown = ($event) => {
+  if ($props.disabled) return
   const hidden = $data.open && !popupVisible()
   if (hidden && ($event.key === 'Escape' || $event.key === 'Enter')) return
   if ($event.key === 'Tab' && $data.open && $props.selectOnTab && popupVisible() && $data.activeIndex >= 0) commitActive()
   onControlKeyDown($event)
+}
+
+// A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
+// (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
+const triggerTabindex = () => ($props.disabled ? -1 : 0)
+// One click handler on the whole control: the arrow, padding and (later) the chip
+// row all open the popup; the buttons inside stop propagation themselves.
+const onControlClick = ($event) => {
+  if ($props.disabled) return
+  toggle()
+  focusControl()
 }
 
 $onMount(() => {
@@ -607,32 +619,36 @@ $expose({ open, close, toggle, clear, focusControl })
 </listeners>
 
 <template>
-<div class="rozie-select" :class="{ 'rozie-select-open': $data.open, 'rozie-select-disabled': $props.disabled, 'rozie-select-inline': $props.inline }">
+<div class="rozie-select" :class="{ 'rozie-select-open': popupVisible(), 'rozie-select-disabled': $props.disabled, 'rozie-select-inline': $props.inline }">
 
-  <!-- Control: the select-only trigger button. It carries role="combobox" per the
-       ARIA APG "Select-Only Combobox" pattern (DOM focus stays here; the active
-       option is tracked virtually via aria-activedescendant). -->
-  <div class="rozie-select-control" ref="controlEl">
-    <button
+  <!-- Control: a clickable wrapper around the select-only trigger. The trigger is a focusable
+       div (not a button) carrying role="combobox" per the ARIA APG "Select-Only Combobox"
+       pattern (DOM focus stays here; the active option is tracked virtually via
+       aria-activedescendant). It is a div so clear / chip buttons can nest in the control. -->
+  <div
+    class="rozie-select-control"
+    ref="controlEl"
+    @click="onControlClick($event)"
+  >
+    <div
       ref="triggerEl"
-      type="button"
       class="rozie-select-trigger"
       role="combobox"
       aria-haspopup="listbox"
-      :aria-expanded="popupVisible()"
+      :tabindex="triggerTabindex()"
+      :aria-expanded="!!popupVisible()"
       :aria-controls="idRoot() + '-list'"
       :aria-activedescendant="popupVisible() ? activeDescendant : null"
       :aria-label="$props.ariaLabel"
-      :disabled="$props.disabled"
-      @click="toggle"
+      :aria-disabled="!!$props.disabled"
       @keydown="onTriggerKeyDown($event)"
     >
       <slot name="selected" :selected="selectedLabel" :value="$props.value">
         <span r-if="selectedLabel" class="rozie-select-selected">{{ selectedLabel }}</span>
         <span r-else class="rozie-select-placeholder">{{ $props.placeholder }}</span>
       </slot>
-      <span class="rozie-select-arrow" aria-hidden="true">▾</span>
-    </button>
+    </div>
+    <span class="rozie-select-arrow" aria-hidden="true">▾</span>
   </div>
 
   <!-- Popup listbox (NON-VIRTUAL). aria-activedescendant on the control points at the
@@ -738,10 +754,7 @@ $expose({ open, close, toggle, clear, focusControl })
   min-width: var(--rozie-select-min-width, var(--rsl-min-width, 12rem));
   font: var(--rozie-select-font, inherit);
 }
-.rozie-select-control { display: block; }
-
-.rozie-select-input,
-.rozie-select-trigger {
+.rozie-select-control {
   box-sizing: border-box;
   width: 100%;
   display: flex;
@@ -757,14 +770,12 @@ $expose({ open, close, toggle, clear, focusControl })
   border-radius: var(--rozie-select-radius, var(--rsl-radius, 6px));
   cursor: pointer;
 }
-.rozie-select-input { cursor: text; }
-.rozie-select-input:focus-visible,
-.rozie-select-input:focus,
-.rozie-select-trigger:focus-visible,
-.rozie-select-trigger:focus {
+.rozie-select-control:focus-within {
   outline: var(--rozie-select-ring-width, var(--rsl-ring-width, 2px)) solid var(--rozie-select-ring, var(--rozie-select-accent, var(--rsl-ring, var(--rsl-accent, #0066cc))));
   outline-offset: var(--rozie-select-ring-offset, var(--rsl-ring-offset, 1px));
 }
+.rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
+.rozie-select-disabled .rozie-select-control { cursor: default; }
 .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.6)); pointer-events: none; }
 .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, rgba(0, 0, 0, 0.45))); }
 .rozie-select-arrow {
