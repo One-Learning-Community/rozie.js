@@ -1,6 +1,6 @@
 # @rozie-ui/select-lit
 
-Idiomatic **lit** `Select` — a headless, fully-accessible (WAI-ARIA) select-only select (single + multi-select, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **lit** `Select` — a headless, fully-accessible (WAI-ARIA) select (single + multi-select, groups, clearable, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -32,10 +32,15 @@ import '@rozie-ui/select-lit';
 // listen for the `value-change` event to receive the new selection.
 const el = document.querySelector('rozie-select');
 el.options = [
-    { label: 'Apple', value: 'apple' },
-    { label: 'Banana', value: 'banana' },
-    { label: 'Cherry', value: 'cherry' },
+    { label: 'Apple', value: 'apple', group: 'fruit' },
+    { label: 'Banana', value: 'banana', group: 'fruit' },
+    { label: 'Carrot', value: 'carrot', group: 'veg' },
   ];
+el.groups = [
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'veg', label: 'Vegetables' },
+  ];
+el.clearable = true;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });
@@ -96,8 +101,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `open` | Open the popup (no-op when disabled or already open). |
 | `close` | Close the popup. |
 | `toggle` | Toggle the popup open/closed. |
-| `clear` | Clear the selection (`null`, or `[]` in multi-select) and reset the combobox query. |
-| `focusControl` | Move DOM focus to the control (the combobox input, or the select-only trigger button). |
+| `clear` | Clear the selection (`null`, or `[]` in multi-select). |
+| `focusControl` | Move DOM focus to the control (the select trigger). |
 
 ```ts
 // The custom element IS the handle — exposed methods are public element

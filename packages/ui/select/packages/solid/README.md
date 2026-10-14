@@ -1,6 +1,6 @@
 # @rozie-ui/select-solid
 
-Idiomatic **solid** `Select` — a headless, fully-accessible (WAI-ARIA) select-only select (single + multi-select, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **solid** `Select` — a headless, fully-accessible (WAI-ARIA) select (single + multi-select, groups, clearable, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -32,15 +32,21 @@ import { Select } from '@rozie-ui/select-solid';
 export function Demo() {
   const [value, setValue] = createSignal<string | null>(null);
   const options = [
-    { label: 'Apple', value: 'apple' },
-    { label: 'Banana', value: 'banana' },
-    { label: 'Cherry', value: 'cherry' },
+    { label: 'Apple', value: 'apple', group: 'fruit' },
+    { label: 'Banana', value: 'banana', group: 'fruit' },
+    { label: 'Carrot', value: 'carrot', group: 'veg' },
+  ];
+  const groups = [
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'veg', label: 'Vegetables' },
   ];
   return (
     <Select
       value={value()}
       onValueChange={setValue}
       options={options}
+      groups={groups}
+      clearable
       placeholder="Pick a fruit…"
       // Custom option render via the optionSlot prop (Solid's scoped slots
       // are props, not children); the ctx fields are plain values, not
@@ -107,8 +113,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `open` | Open the popup (no-op when disabled or already open). |
 | `close` | Close the popup. |
 | `toggle` | Toggle the popup open/closed. |
-| `clear` | Clear the selection (`null`, or `[]` in multi-select) and reset the combobox query. |
-| `focusControl` | Move DOM focus to the control (the combobox input, or the select-only trigger button). |
+| `clear` | Clear the selection (`null`, or `[]` in multi-select). |
+| `focusControl` | Move DOM focus to the control (the select trigger). |
 
 ```tsx
 import { Select, type SelectHandle } from '@rozie-ui/select-solid';

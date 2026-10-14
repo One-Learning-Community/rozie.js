@@ -49,7 +49,8 @@ const FAMILIES = [
   // real on-disk workspace (headless-core is a real pnpm-workspace package).
   { family: 'headless-core', demo: 'HeadlessCoreSmokeDemo' },
   { family: 'combobox', demo: 'ComboboxBehaviorDemo' },
-  { family: 'select', demo: 'SelectVirtualDemo' },
+  { family: 'select', demo: 'SelectPlaygroundDemo' },
+  { family: 'select:virtual', demo: 'SelectVirtualDemo' },
   { family: 'command-palette', demo: 'CommandPaletteBehaviorDemo' },
   // Phase 68-04 — the single-engine-library families. Their engine libs
   // (embla-carousel, @codemirror/*, cropperjs, pdfjs-dist) were added to the six

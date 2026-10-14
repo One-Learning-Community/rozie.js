@@ -71,9 +71,14 @@ function slotParams(slot) {
 // ---------------------------------------------------------------------------
 
 const FRUITS = `[
-    { label: 'Apple', value: 'apple' },
-    { label: 'Banana', value: 'banana' },
-    { label: 'Cherry', value: 'cherry' },
+    { label: 'Apple', value: 'apple', group: 'fruit' },
+    { label: 'Banana', value: 'banana', group: 'fruit' },
+    { label: 'Carrot', value: 'carrot', group: 'veg' },
+  ]`;
+
+const GROUPS = `[
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'veg', label: 'Vegetables' },
   ]`;
 
 export const USAGE = {
@@ -85,11 +90,14 @@ import { Select } from '@rozie-ui/select-react';
 export function Demo() {
   const [value, setValue] = useState<string | null>(null);
   const options = ${FRUITS};
+  const groups = ${GROUPS};
   return (
     <Select
       value={value}
       onValueChange={setValue}
       options={options}
+      groups={groups}
+      clearable
       placeholder="Pick a fruit…"
       // Custom option render via the renderOption render-prop (React's scoped
       // slots are props, not children); the equivalent form is
@@ -109,10 +117,11 @@ import Select from '@rozie-ui/select-vue';
 
 const value = ref<string | null>(null);
 const options = ${FRUITS};
+const groups = ${GROUPS};
 </script>
 
 <template>
-  <Select v-model:value="value" :options="options" placeholder="Pick a fruit…">
+  <Select v-model:value="value" :options="options" :groups="groups" clearable placeholder="Pick a fruit…">
     <template #option="{ option, active, selected }">
       <span :class="{ active, selected }">{{ option.label }}</span>
     </template>
@@ -126,9 +135,10 @@ const options = ${FRUITS};
 
   let value = $state<string | null>(null);
   const options = ${FRUITS};
+  const groups = ${GROUPS};
 </script>
 
-<Select bind:value {options} placeholder="Pick a fruit…">
+<Select bind:value {options} {groups} clearable placeholder="Pick a fruit…">
   {#snippet option({ option, active, selected })}
     <span class:active class:selected>{option.label}</span>
   {/snippet}
@@ -144,7 +154,7 @@ import { Select } from '@rozie-ui/select-angular';
   standalone: true,
   imports: [Select],
   template: \`
-    <Select [(value)]="value" [options]="options" placeholder="Pick a fruit…">
+    <Select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
       <ng-template #option let-option="option" let-selected="selected">
         <span [class.selected]="selected">{{ option.label }}</span>
       </ng-template>
@@ -154,6 +164,7 @@ import { Select } from '@rozie-ui/select-angular';
 export class DemoComponent {
   value: string | null = null;
   options = ${FRUITS};
+  groups = ${GROUPS};
 }`,
   },
   solid: {
@@ -164,11 +175,14 @@ import { Select } from '@rozie-ui/select-solid';
 export function Demo() {
   const [value, setValue] = createSignal<string | null>(null);
   const options = ${FRUITS};
+  const groups = ${GROUPS};
   return (
     <Select
       value={value()}
       onValueChange={setValue}
       options={options}
+      groups={groups}
+      clearable
       placeholder="Pick a fruit…"
       // Custom option render via the optionSlot prop (Solid's scoped slots
       // are props, not children); the ctx fields are plain values, not
@@ -187,6 +201,8 @@ export function Demo() {
 // listen for the \`value-change\` event to receive the new selection.
 const el = document.querySelector('rozie-select');
 el.options = ${FRUITS};
+el.groups = ${GROUPS};
+el.clearable = true;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });`,
@@ -302,7 +318,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('');
   lines.push(
     `Idiomatic **${target}** \`Select\` — a headless, fully-accessible (WAI-ARIA) ` +
-      `select-only select (single + multi-select, type-ahead, full keyboard navigation) ` +
+      `select (single + multi-select, groups, clearable, type-ahead, full keyboard navigation) ` +
       `compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. ` +
       `No third-party engine; every value is a CSS custom property, so it re-skins to any ` +
       `design system. This package is generated; do not edit \`src/\` by hand.`,

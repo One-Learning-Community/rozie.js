@@ -2,6 +2,8 @@
 
 `Combobox` is a headless, fully-accessible combobox / autocomplete with no third-party engine behind it. It covers the whole behaviour surface: the text input + popup listbox, `aria-activedescendant` keyboard navigation, client-side filtering, async/server-side mode, the selection model, and dismissal. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
+For choosing from a fixed list with no typing, use [Select](/components/select).
+
 The WAI-ARIA combobox pattern — a `role="combobox"` input paired with a `role="listbox"` popup, navigated by `ArrowUp` / `ArrowDown` / `Home` / `End` with the active option tracked via `aria-activedescendant` and committed on `Enter` — is re-implemented (and frequently re-implemented *inaccessibly*) in every framework. Rozie owns the author-side API: the two-way `r-model:value` (the sole `model: true` prop, so a combobox **is** a form control), the internal query + open + active-descendant state, built-in client filtering with an async escape hatch (`disableFilter` + the `search` event), the keyboard model, and the token-themed skin.
 
 Every visual value is a CSS custom property, so the control re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.

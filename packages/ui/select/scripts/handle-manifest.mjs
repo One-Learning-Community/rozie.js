@@ -20,8 +20,8 @@ export const handleManifest = {
   open: 'Open the popup (no-op when disabled or already open).',
   close: 'Close the popup.',
   toggle: 'Toggle the popup open/closed.',
-  clear: 'Clear the selection (`null`, or `[]` in multi-select) and reset the combobox query.',
-  focusControl: 'Move DOM focus to the control (the combobox input, or the select-only trigger button).',
+  clear: 'Clear the selection (`null`, or `[]` in multi-select).',
+  focusControl: 'Move DOM focus to the control (the select trigger).',
 };
 
 export default handleManifest;

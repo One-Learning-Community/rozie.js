@@ -1,6 +1,6 @@
 # @rozie-ui/select-angular
 
-Idiomatic **angular** `Select` — a headless, fully-accessible (WAI-ARIA) select-only select (single + multi-select, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
+Idiomatic **angular** `Select` — a headless, fully-accessible (WAI-ARIA) select (single + multi-select, groups, clearable, type-ahead, full keyboard navigation) compiled from one [Rozie](https://github.com/One-Learning-Community/rozie.js) source. No third-party engine; every value is a CSS custom property, so it re-skins to any design system. This package is generated; do not edit `src/` by hand.
 
 ## Install
 
@@ -34,7 +34,7 @@ import { Select } from '@rozie-ui/select-angular';
   standalone: true,
   imports: [Select],
   template: `
-    <Select [(value)]="value" [options]="options" placeholder="Pick a fruit…">
+    <Select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
       <ng-template #option let-option="option" let-selected="selected">
         <span [class.selected]="selected">{{ option.label }}</span>
       </ng-template>
@@ -44,9 +44,13 @@ import { Select } from '@rozie-ui/select-angular';
 export class DemoComponent {
   value: string | null = null;
   options = [
-    { label: 'Apple', value: 'apple' },
-    { label: 'Banana', value: 'banana' },
-    { label: 'Cherry', value: 'cherry' },
+    { label: 'Apple', value: 'apple', group: 'fruit' },
+    { label: 'Banana', value: 'banana', group: 'fruit' },
+    { label: 'Carrot', value: 'carrot', group: 'veg' },
+  ];
+  groups = [
+    { id: 'fruit', label: 'Fruit' },
+    { id: 'veg', label: 'Vegetables' },
   ];
 }
 ```
@@ -80,9 +84,9 @@ import { Select } from '@rozie-ui/select-angular';
 export class PickFormComponent {
   fruit = new FormControl<string | null>(null);
   options = [
-    { label: 'Apple', value: 'apple' },
-    { label: 'Banana', value: 'banana' },
-    { label: 'Cherry', value: 'cherry' },
+    { label: 'Apple', value: 'apple', group: 'fruit' },
+    { label: 'Banana', value: 'banana', group: 'fruit' },
+    { label: 'Carrot', value: 'carrot', group: 'veg' },
   ];
 }
 
@@ -137,8 +141,8 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | `open` | Open the popup (no-op when disabled or already open). |
 | `close` | Close the popup. |
 | `toggle` | Toggle the popup open/closed. |
-| `clear` | Clear the selection (`null`, or `[]` in multi-select) and reset the combobox query. |
-| `focusControl` | Move DOM focus to the control (the combobox input, or the select-only trigger button). |
+| `clear` | Clear the selection (`null`, or `[]` in multi-select). |
+| `focusControl` | Move DOM focus to the control (the select trigger). |
 
 ```ts
 @Component({ /* ... */ })

@@ -1,0 +1,25 @@
+<!--
+  SelectPlaygroundDemo.rozie — the playground's Select entry: option groups, a
+  clearable control and two-way `value`. Pick a food, then clear it with the
+  button in the control (or Delete while the popup is closed).
+-->
+<rozie name="SelectPlaygroundDemo">
+<components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
+<data>{ food: null }</data>
+<script>
+const OPTIONS = [
+  { label: 'Apple', value: 'apple', group: 'fruit' },
+  { label: 'Banana', value: 'banana', group: 'fruit' },
+  { label: 'Carrot', value: 'carrot', group: 'veg' },
+  { label: 'Leek', value: 'leek', group: 'veg', disabled: true },
+  { label: 'Water', value: 'water' },
+]
+const GROUPS = [{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]
+</script>
+<template>
+<div>
+  <Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.food" clearable placeholder="Pick a food…" aria-label="Food" />
+  <p>Selected: {{ $data.food ?? 'nothing' }}</p>
+</div>
+</template>
+</rozie>

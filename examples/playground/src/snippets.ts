@@ -563,6 +563,14 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/combobox/src/Combobox.rozie'],
   },
   {
+    // Select with option groups + a clearable control (floats via the composed
+    // @rozie-ui/popover leaf, resolved the same way Combobox's is).
+    key: 'bundle/SelectPlaygroundDemo',
+    label: 'bundle/SelectPlaygroundDemo',
+    entryGlobPath: '../../demos/SelectPlaygroundDemo.rozie',
+    dependencyGlobPaths: ['../../../packages/ui/select/src/Select.rozie'],
+  },
+  {
     key: 'bundle/SelectVirtualDemo',
     label: 'bundle/SelectVirtualDemo',
     entryGlobPath: '../../demos/SelectVirtualDemo.rozie',
