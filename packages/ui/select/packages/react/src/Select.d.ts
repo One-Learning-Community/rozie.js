@@ -10,7 +10,7 @@ export interface SelectGroup {
 
 export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is the selected one when its value is the model value — the same reference, or, for object values, an object with the same prototype and equal contents (so a value read back through reactive state still matches).
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value; only when no option is identical does an object value match by content (same prototype, equal own properties), which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Known limit: on Vue and Svelte two options whose object values have equal contents cannot be told apart — give them distinct contents, or map them to a primitive with `optionValue`.
    */
   options?: unknown[];
   /**
@@ -22,7 +22,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
   defaultValue?: (unknown) | null;
   onValueChange?: (next: (unknown) | null) => void;
   /**
-   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence.
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence. Backspace removes the last chip shown.
    */
   multiple?: boolean;
   /**
@@ -106,7 +106,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   ariaLabel?: (string) | null;
   /**
-   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on.
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height). Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on.
    */
   virtual?: boolean;
   /**

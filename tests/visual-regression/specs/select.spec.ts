@@ -189,7 +189,7 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('tab-none-select').locator('[role="listbox"]')).toHaveCount(0);
     await expect(page.getByTestId('readout-tab-none')).toHaveText('');
     await expect(tabNone).not.toBeFocused();
-    await expect(page.getByTestId('long-select').locator('[role="combobox"]')).toBeFocused();
+    await expect(page.getByTestId('pick-far')).toBeFocused(); // the next control in the page
     // --- without selectOnTab, Tab only closes: no commit ---
     const plain = page.getByTestId('main-select').locator('[role="combobox"]');
     const before = (await page.getByTestId('readout-value').textContent())?.trim() ?? '';
@@ -301,6 +301,111 @@ for (const target of TARGETS) {
     await page.keyboard.press('ArrowDown');
     await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
     await expect.poll(inView('Row 1')).toBe(true);
+  });
+
+  runner(`select [${target}]: a long list opened by End, by a typed letter, or with a far-down selection shows the highlighted option`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const wrap = page.getByTestId('long-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const inView = (label: string) => async () => {
+      const l = await list.boundingBox();
+      const o = await wrap.locator('[role="option"]', { hasText: new RegExp(`^\\s*${label}\\s*$`) }).boundingBox();
+      return !!l && !!o && o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+    // (a) CLOSED, then End: the list opens on its last option.
+    await trigger.focus();
+    await page.keyboard.press('End');
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-39$/);
+    await expect.poll(inView('Row 40')).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    // (a) CLOSED, then a typed letter: opens on the match, far down the list.
+    await page.keyboard.type('z');
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-29$/);
+    await expect.poll(inView('Zebra')).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    // (b) a selection far down: opening shows it — by key and by click.
+    await page.getByTestId('pick-far').click();
+    await expect(trigger).toContainText('Row 35');
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-34$/);
+    await expect.poll(inView('Row 35')).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await expect.poll(inView('Row 35')).toBe(true);
+    expect(await inView('Row 1')()).toBe(false); // the list really is scrolled
+  });
+
+  runner(`select [${target}]: a text field inside an option takes focus by mouse and can be typed into; a plain option leaves focus on the trigger`, async ({ page }) => {
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const wrap = page.getByTestId('slot-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const field = wrap.locator('input.slot-field');
+    await trigger.click();
+    await expect(wrap.locator('[role="option"]')).toHaveCount(3);
+    await expect(trigger).toBeFocused();
+    // A press on a plain option (its text) picks it and leaves focus on the trigger.
+    await wrap.locator('.slot-label', { hasText: 'Plain' }).click();
+    await expect(page.getByTestId('readout-slot')).toHaveText('plain');
+    await expect(trigger).toBeFocused();
+    // A press on the field focuses the field…
+    await field.click();
+    await expect(field).toBeFocused();
+    await expect(trigger).not.toBeFocused();
+    // …and typing goes into it (not into the select's type-ahead).
+    await page.keyboard.type('hello');
+    await expect(field).toHaveValue('hello');
+    await expect(page.getByTestId('readout-note')).toHaveText('hello');
+    await expect(wrap.locator('[role="listbox"]')).toBeVisible();
+    // A press on the padding of the list still leaves focus where it is not taken away
+    // from the trigger: click the trigger back, then press the last plain option.
+    await trigger.focus();
+    await wrap.locator('.slot-label', { hasText: 'Last' }).click();
+    await expect(page.getByTestId('readout-slot')).toHaveText(/last/);
+    await expect(trigger).toBeFocused();
+  });
+
+  // Scrollbars cannot be driven by a synthetic mouse in headless Chromium (a control page
+  // with no handler at all does not scroll either), so this runs only with `--headed`:
+  //   pnpm exec playwright test --workers=1 --headed specs/select.spec.ts -g scrollbar
+  runner(`select [${target}]: the list's scrollbar still drags and pages although a press in the popup keeps focus on the trigger (headed only)`, async ({ page, headless }) => {
+    test.skip(headless, 'scrollbars are not driven by a synthetic mouse in headless Chromium');
+    await page.goto(`/?example=SelectBehavior&target=${target}`);
+    const wrap = page.getByTestId('long-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    await trigger.click();
+    await expect(list).toBeVisible();
+    // A classic 16px scrollbar, styled into the list's own tree (a shadow root on Lit).
+    await list.evaluate((el) => {
+      const style = document.createElement('style');
+      style.textContent = '.rozie-select-list::-webkit-scrollbar{width:16px}.rozie-select-list::-webkit-scrollbar-thumb{background:#888}.rozie-select-list::-webkit-scrollbar-track{background:#ddd}';
+      const root = el.getRootNode();
+      (root instanceof ShadowRoot ? root : document.head).appendChild(style);
+    });
+    const box = (await list.boundingBox())!;
+    const x = box.x + box.width - 9;
+    await page.mouse.move(x, box.y + box.height - 20); // the track, below the thumb
+    await page.mouse.down();
+    await page.waitForTimeout(150);
+    await page.mouse.up();
+    await expect.poll(async () => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+    await list.evaluate((el) => { el.scrollTop = 0; });
+    await page.mouse.move(x, box.y + 8); // the thumb
+    await page.mouse.down();
+    for (let i = 1; i <= 8; i++) { await page.mouse.move(x, box.y + 8 + i * 6); await page.waitForTimeout(20); }
+    await page.mouse.up();
+    await expect.poll(async () => list.evaluate((el) => el.scrollTop)).toBeGreaterThan(50);
+    await expect(trigger).toBeFocused();
+    await expect(list).toBeVisible();
   });
 }
 

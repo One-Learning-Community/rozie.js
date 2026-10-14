@@ -38,8 +38,26 @@ const COPIED = [
 /** Spine name -> the name its copy is declared under in Select, where they differ. */
 const RENAMED: Partial<Record<(typeof COPIED)[number], string>> = { open: 'openCore' };
 /**
- * Select's own versions of spine functions, NOT verbatim: they compare a model value
- * with an option value through Select's `sameValue` instead of `===` / `includes`.
+ * Select's own versions of three spine functions. They are NOT copies and are not
+ * derived from the spine's text; each differs like this:
+ *
+ *  - `isSelected(opt)`: the spine compares `valueOf(opt)` with the model (`===`, or
+ *    `includes` for an array). Select's is a lookup in `selection()`, the memoised match
+ *    of the model against the options made by src/internal/valueMatch.ts — identity
+ *    first, equal object contents only when no option is identical.
+ *  - `selectedLabel`: the spine's is a `$computed` that finds the option with `=== cur`
+ *    and, for `multiple`, joins the labels of every selected option. Select's is a plain
+ *    function (a `$computed` cannot read a `$memo` on React) that reads the first option the
+ *    single value matched in `selection()`, and returns '' for `multiple`: the multi
+ *    branch has no reader here — the only use is the `selected` slot, which the
+ *    template renders under `r-if="!$props.multiple"` (a multi-select shows chips).
+ *  - `select(opt)`: the single-select branch is the spine's, line for line. The
+ *    multi-select branch decides "already selected" and what to remove from
+ *    `selection()` (every model position of the value(s) that select this option)
+ *    instead of `arr.includes(v)` / `arr.filter((x) => x !== v)`.
+ *
+ * What ties them to the spine is SPINE_REWRITTEN_FROM below: the spine's text for the
+ * three is pinned, so a change there fails this file until it is looked at.
  */
 const REWRITTEN = ['isSelected', 'selectedLabel', 'select'] as const;
 /** Host-local in Select: the nine copies, Select's own `visibleOptions`, and the rewritten three. */
@@ -145,8 +163,9 @@ const NOT_NEEDED: Record<string, string> = {
 /**
  * The spine's text for the three functions Select rewrote (REWRITTEN). They are not
  * verbatim copies, so they cannot be compared with Select's; instead the spine's own
- * text is pinned here. When this fails the spine changed one of them: port the change
- * to Select's version in src/Select.rozie (keeping `sameValue`), then update the text.
+ * text is pinned here. When this fails the spine changed one of them: decide whether
+ * the change applies to Select's version in src/Select.rozie (see REWRITTEN for how
+ * each differs), port it if so, then update the text.
  */
 const SPINE_REWRITTEN_FROM: Record<(typeof REWRITTEN)[number], string> = {
   isSelected: [
@@ -244,7 +263,8 @@ describe('Select host-local navigation is a verbatim copy of the list spine', ()
 
   it('open is a host gate in front of openCore: inert while the native picker is active', () => {
     const gate = statementText(select, 'open');
-    expect(gate).toBe(['const open = () => {', '  if (nativeActive()) return', '  openCore()', '}'].join('\n'));
+    // …and asks for the highlighted (selected) option to be scrolled into view (non-windowed lists).
+    expect(gate).toBe(['const open = () => {', '  if (nativeActive()) return', '  openCore()', '  if (!$props.virtual) scrollActiveIntoView()', '}'].join('\n'));
     // …and nothing else reaches the spine's body directly.
     expect(select.split('openCore()').length - 1).toBe(1);
   });
@@ -286,4 +306,23 @@ describe("Select's rewritten value-identity functions follow the spine's", () =>
       expect(statementText(select, name).startsWith(`const ${name} = `)).toBe(true);
     });
   }
+
+  it("select: the single-select branch is the spine's, line for line", () => {
+    const branch = (text: string) => text.slice(text.indexOf('  } else {'));
+    expect(branch(SPINE_REWRITTEN_FROM.select)).toContain('$model.value = v');
+    expect(branch(statementText(select, 'select'))).toBe(branch(SPINE_REWRITTEN_FROM.select));
+  });
+
+  it('selectedLabel is only read where a multi-select never renders it', () => {
+    // The multi branch was dropped on the strength of this: every template use sits in
+    // the `selected` slot, which is rendered under `r-if="!$props.multiple"`.
+    const template = select.slice(select.indexOf('<template>'));
+    const lines = template.split('\n').filter((l) => /\bselectedLabel\b/.test(l));
+    expect(lines.length).toBeGreaterThan(0);
+    const slotOpen = template.split('\n').findIndex((l) => l.includes('name="selected"'));
+    const slotClose = template.split('\n').findIndex((l, i) => i > slotOpen && l.includes('</slot>'));
+    expect(template.split('\n')[slotOpen]).toContain('r-if="!$props.multiple"');
+    const all = template.split('\n');
+    all.forEach((l, i) => { if (/\bselectedLabel\b/.test(l)) expect(i >= slotOpen && i <= slotClose, l.trim()).toBe(true); });
+  });
 });

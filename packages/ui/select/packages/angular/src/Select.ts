@@ -12,19 +12,24 @@ import { Popover } from '@rozie-ui/popover-angular';
 import { groupOptions } from './internal/groupOptions';
 
 // ── VALUE IDENTITY ─────────────────────────────────────────────────────────
-// Whether a model value and an option value are the same value. Identity first. Two
-// objects that are not identical are still the same value when they have the same
-// prototype and equal own contents: a consumer whose state is deeply reactive (Vue's
-// ref / reactive, Svelte's $state) hands a committed object back wrapped in a proxy,
-// and a proxy is never `===` to the object the option carries — with a plain `===`
-// no object-valued option ever read as selected on those two targets. (Vue's own
-// <select v-model> matches option values by content for the same reason.) An object
-// with no own keys that is neither a plain object nor an array (a Date, a Map, a
-// class instance without fields) only matches by identity.
+// Which options the model selects is decided in ONE place, src/internal/valueMatch.ts
+// (a pure, unit-tested helper vendored into every leaf — the groupOptions.ts pattern),
+// IDENTITY FIRST: a model value selects the options whose value is identical to it, and
+// only when no option is identical do objects fall back to equal contents. The fallback
+// is what makes an object value read back through a reactive proxy (Vue's ref /
+// reactive, Svelte's $state) show as selected at all; see that file for the rule and
+// its one limit.
 //
 // The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
 // `includes`, so Select owns these three (they are not imported; nothing Select still
 // imports from the spine reaches them).
+import { matchValues } from './internal/valueMatch';
+
+// The match of the current model against the current options, computed once per change
+// of either (never per option): `rows` is one entry per DISTINCT model value —
+// `members` its positions in the model, `at` the indices of the options it selects —
+// and `picked` the set of selected option entries. The model's length is part of the
+// key so an array a consumer grew in place is seen where the framework reports it.
 
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
@@ -95,7 +100,7 @@ interface GroupHeadingCtx {
     } @else {
 
                 <span class="rozie-select-chip__label">{{ rozieDisplay(row.label) }}</span>
-                <button type="button" class="rozie-select-chip__remove" tabindex="-1" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); noop()" (click)="onChipRemove(row.value)">×</button>
+                <button type="button" class="rozie-select-chip__remove" tabindex="-1" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(chipRemoveLabel(row))" (mousedown)="$event.preventDefault(); noop()" (click)="onChipRemove(row)">×</button>
               
     }
             </span>
@@ -194,7 +199,7 @@ interface GroupHeadingCtx {
             </div>
     }</div>
     }@if (virtual()) {
-    <div #listEl class="rozie-select-list rozie-select-list--virtual" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()" [attr.style]="__style" (mousedown)="onListMouseDown($event)">
+    <div #listEl class="rozie-select-list rozie-select-list--virtual" role="listbox" [attr.id]="rozieAttr(idRoot() + '-list')" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-multiselectable]="multiple()" [attr.style]="__style" (mousedown)="onListMouseDown($event)" (wheel)="cancelReveal()" (touchmove)="cancelReveal()">
             <div class="rozie-select-spacer" aria-hidden="true" [attr.style]="'height:' + padTop() + 'px'"></div>
 
             @for (wr of windowedRows(); track wr.row.id) {
@@ -391,7 +396,7 @@ interface GroupHeadingCtx {
 })
 export class Select {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is the selected one when its value is the model value — the same reference, or, for object values, an object with the same prototype and equal contents (so a value read back through reactive state still matches).
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value; only when no option is identical does an object value match by content (same prototype, equal own properties), which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Known limit: on Vue and Svelte two options whose object values have equal contents cannot be told apart — give them distinct contents, or map them to a primitive with `optionValue`.
    */
   options = input<any[]>((() => [])());
   /**
@@ -401,7 +406,7 @@ export class Select {
    */
   value = model<(unknown) | null>(null);
   /**
-   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence.
+   * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence. Backspace removes the last chip shown.
    */
   multiple = input<boolean>(false);
   /**
@@ -485,7 +490,7 @@ export class Select {
    */
   ariaLabel = input<(string) | null>(null);
   /**
-   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on.
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height). Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on.
    */
   virtual = input<boolean>(false);
   /**
@@ -558,6 +563,9 @@ export class Select {
       });
 
     inject(DestroyRef).onDestroy(() => {
+      // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
+      // this and does nothing.
+      this.disposed = true;
       if (this.typeTimer !== null) clearTimeout(this.typeTimer);
       if (this.nativeSyncTimer !== null) clearTimeout(this.nativeSyncTimer);
       if (this.coarseQuery && this.coarseListener) {
@@ -565,6 +573,8 @@ export class Select {
       }
       // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
       if (this.virtualizerCleanup) this.virtualizerCleanup();
+      this.virtualizerCleanup = null;
+      this.virtualizer = null;
     });
     effect(() => { const __watchVal = (() => this.open$local())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.syncPanel();
@@ -612,6 +622,8 @@ export class Select {
   }
 
   ngAfterViewInit() {
+    this.disposed = false; // a remount of the same instance (React StrictMode) starts clean
+    // a remount of the same instance (React StrictMode) starts clean
     if (!this.idBase()) this.autoId.set('rozie-select-' + this.nextAutoId());
     // The coarse-pointer probe must never throw out of $onMount (the windowing setup
     // below runs for every Select), and older engines only have addListener().
@@ -656,12 +668,6 @@ export class Select {
     const __activeIndex = this.activeIndex();
     if (!this.open$local() || __activeIndex < 0) return null;
     return this.optionId(__activeIndex);
-  });
-  selectedLabel = computed(() => {
-    if (this.multiple()) return '';
-    const cur = this.value();
-    const match = this.options().find((o: any) => this.sameValue(this.valueOf$local(o), cur));
-    return match === undefined ? '' : this.labelOf(match);
   });
 
   // Type-ahead buffer for the select-only trigger. Module-scope
@@ -772,41 +778,59 @@ export class Select {
   onOptionPointerMove = (index: any) => {
     if (this.activeIndex() !== index) this.activeIndex.set(index);
   };
-  sameContent = (a: any, b: any, seen: any) => {
-    if (a === b) return true;
-    if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
-    const proto = Object.getPrototypeOf(a);
-    if (proto !== Object.getPrototypeOf(b)) return false;
-    if (seen.includes(a)) return true; // a cycle: this object is already being compared further up
-    seen.push(a);
-    const keys = Object.keys(a);
-    if (keys.length !== Object.keys(b).length) return false;
-    if (keys.length === 0) return proto === null || proto === Object.prototype || Array.isArray(a);
-    for (const k of keys as any) {
-      if (!Object.prototype.hasOwnProperty.call(b, k) || !this.sameContent(a[k], b[k], seen)) return false;
-    }
-    return true;
+  selectionCache = {
+    keys: null as any[] | null,
+    val: null as any
   };
-  sameValue = (a: any, b: any) => a === b || a !== null && b !== null && typeof a === 'object' && typeof b === 'object' && this.sameContent(a, b, []);
-  // Is a given option currently selected? Multi compares array membership.
-  isSelected = (opt: any) => {
-    const v = this.valueOf$local(opt);
-    const cur = this.value();
-    if (this.multiple()) return Array.isArray(cur) && cur.some((x: any) => this.sameValue(x, v));
-    return this.sameValue(cur, v);
+  selection = () => {
+    const __value = this.value();
+    const __rozieMemoKey = [__value, Array.isArray(__value) ? __value.length : -1, this.options(), this.multiple(), this.optionValue()];
+    const __rozieMemoPrev = this.selectionCache.keys;
+    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
+      return this.selectionCache.val;
+    }
+    const __rozieMemoVal = (() => {
+      const __options = this.options();
+      const opts = Array.isArray(__options) ? __options : [];
+      const cur = __value;
+      const model = this.multiple() ? Array.isArray(cur) ? cur : [] : [cur];
+      const res = matchValues(model, opts.map((o: any) => this.valueOf$local(o)));
+      return {
+        opts,
+        model,
+        rows: res.rows,
+        picked: new Set(opts.filter((o: any, i: any) => res.picked[i]))
+      };
+    })();
+    this.selectionCache.keys = __rozieMemoKey;
+    this.selectionCache.val = __rozieMemoVal;
+    return __rozieMemoVal;
+  };
+  // Is a given option currently selected?
+  isSelected = (opt: any) => this.selection().picked.has(opt);
+  // The label shown in the trigger (single-select; a multi-select shows chips instead).
+  // A plain function, called in the template — NOT a `$computed`: on React a `$computed`
+  // is a `useMemo` hoisted above the `$memo` cache it would read here (`selection`), and
+  // evaluating it threw "Cannot access … before initialization" on the first render.
+  selectedLabel = () => {
+    if (this.multiple()) return '';
+    const sel = this.selection();
+    const at = sel.rows.length > 0 ? sel.rows[0].at : [];
+    return at.length > 0 ? this.labelOf(sel.opts[at[0]]) : '';
   };
   // Commit an option. Single-select replaces the value; multi-select toggles membership —
-  // picking a selected option takes out EVERY occurrence of its value (a model may hold a
-  // value more than once; see chipRows()).
+  // picking a selected option takes out the model value(s) that select it, every
+  // occurrence (a model may hold a value more than once; see chipRows()).
   select = (opt: any) => {
     if (this.disabledOf(opt)) return;
     const v = this.valueOf$local(opt);
     if (this.multiple()) {
-      const cur = this.value();
-      const arr = Array.isArray(cur) ? cur : [];
+      const sel = this.selection();
+      const i = sel.opts.indexOf(opt);
+      const drop = sel.rows.filter((r: any) => r.at.includes(i)).flatMap((r: any) => r.members);
       // Fresh array on every commit — in-place mutation is dropped by the
       // React/Solid/Lit/Angular change detectors.
-      const next = arr.some((x: any) => this.sameValue(x, v)) ? arr.filter((x: any) => !this.sameValue(x, v)) : [...arr, v];
+      const next = drop.length > 0 ? sel.model.filter((x: any, j: any) => !drop.includes(j)) : [...sel.model, v];
       this.value.set(next), this.__rozieCvaOnChange(next);
       this.change.emit({
         value: next,
@@ -824,8 +848,6 @@ export class Select {
       }
     }
   };
-  // An option's group id: its `group` as text (so a numeric id reads the same as the
-  // `groups` entry that lists it), or null when it has none — the Combobox rule.
   groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt && opt.group != null ? String(opt.group) : null;
   // Grouping is active only for a non-empty `groups` list, and never while windowing.
   isGrouped = () => !this.virtual() && Array.isArray(this.groups()) && this.groups().length > 0;
@@ -1108,9 +1130,16 @@ export class Select {
   // through it, so the custom popup can never open while the native picker is active.
   // It carries the public name because `$expose` binds a verb to the script binding of
   // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  // It also asks for the highlighted option to be scrolled into view once the list is
+  // there: opening starts the highlight on the SELECTED option, which in a long list
+  // can be far below the fold (the spine's own open() leaves the list at its top).
+  // Not for a windowed list: that one keeps its scroll position across close and open,
+  // and its reveal re-asserts itself for a few frames (settleReveal()), which would
+  // override a scroll made right after opening.
   open = () => {
     if (this.nativeActive()) return;
     this.openCore();
+    if (!this.virtual()) this.scrollActiveIntoView();
   };
   // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
   // The PURE windowing math (the windowed slice + spacer geometry) is the SAME
@@ -1514,28 +1543,32 @@ export class Select {
   scrollEndPinned = false;
   scrollEndPinnedCount = -1;
   scrollEndPinnedTop = -1;
-  // The deferred scroll-into-view (see scrollActiveIntoView()): whether one is queued, and
-  // `$data.activeIndex` as last committed — kept by a watcher, so a callback queued from an
-  // older render still reads the current index.
-  revealPending = false;
+  // The deferred scroll-into-view (see scrollActiveIntoView()): its generation — every
+  // new request and every scroll the USER makes takes the next number, and a callback
+  // holding an older one does nothing — and `$data.activeIndex` as last committed, kept by
+  // a watcher so a callback queued from an older render still reads the current index.
+  revealGen = 0;
   liveActive = -1;
-  // windowSource(): the windowing.rzts host-contract row source — the FILTERED option
-  // set. CR-02: the shared windowing contract requires each row to carry a STABLE `.id`
-  // (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
-  // wr.row.id). A raw Select option is a primitive or a bare { label, value, disabled }
-  // — NOT guaranteed to have `.id` — so an unwrapped raw set keyed on wr.row.id collapses
-  // every framework :key (and every virtual-core measurement key) to `undefined`, which
-  // recycles the wrong DOM node as the window scrolls. Wrap each option into an id-bearing
-  // row the way the sibling Combobox's filteredOptions() does — `id` is the resolved
-  // value, `_opt` the original option (read via wr.row._opt in the windowed template),
-  // `_i` the source index. Kept === $data.rows so the math's rowList[vi.index] resolves to
-  // the same wrapped row the count windows over.
+  // Set in $onUnmount: every deferred callback (the reveal, its settle, the re-measure
+  // passes, the first-paint kick) checks it and does nothing on an unmounted select.
+  disposed = false;
+  // windowSource(): the windowing.rzts host-contract row source — the option set in
+  // visual order. CR-02: the shared windowing contract requires each row to carry a STABLE
+  // `.id` (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
+  // wr.row.id), so each option is wrapped into an id-bearing row: `_opt` the original option
+  // (read via wr.row._opt in the windowed template), `_i` its index. Kept === $data.rows so
+  // the math's rowList[vi.index] resolves to the same wrapped row the count windows over.
+  //
+  // `id` is a UNIQUE PRIMITIVE, built the way the chip keys are: an object value is keyed
+  // by its position (every object stringifies alike — as a framework key the raw value
+  // gave every row the key "[object Object]", and React rebuilt the rows on each change of
+  // the window), anything else by its type and string form, and options that share a value
+  // are numbered.
   //
   // $memo, keyed on the TRUE inputs. The key covers everything the map reads:
   // options ref + virtual + groups while grouping is in effect (visibleOptions' inputs —
   // with `virtual` on grouping is off, the order is source order, and a new `groups`
   // array changes nothing here) and the optionValue resolver (valueOf in the map body).
-  // Same reference-stability contract the sibling Combobox's filteredOptions carries —
   // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
   // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
   windowSourceCache = {
@@ -1548,11 +1581,20 @@ export class Select {
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return this.windowSourceCache.val;
     }
-    const __rozieMemoVal = this.visibleOptions().map((o: any, i: any) => ({
-      id: this.valueOf$local(o),
-      _opt: o,
-      _i: i
-    }));
+    const __rozieMemoVal = (() => {
+      const seen = new Map();
+      return this.visibleOptions().map((o: any, i: any) => {
+        const v = this.valueOf$local(o);
+        const base = v !== null && typeof v === 'object' ? '@' + i : typeof v + ':' + String(v);
+        const n = seen.get(base) || 0;
+        seen.set(base, n + 1);
+        return {
+          id: n === 0 ? base : base + '#' + n,
+          _opt: o,
+          _i: i
+        };
+      });
+    })();
     this.windowSourceCache.keys = __rozieMemoKey;
     this.windowSourceCache.val = __rozieMemoVal;
     return __rozieMemoVal;
@@ -1644,7 +1686,7 @@ export class Select {
     this.remeasurePending = true;
     let ranMicro = false;
     const microPass = () => {
-      this.remeasureWindow();
+      if (!this.disposed) this.remeasureWindow();
     };
     // N-05 (quick 260923-rrr): key the rAF pass on the OUTCOME. React and Angular commit the
     // recycled window AFTER the first rAF, so one pass measured the OLD options and the new ones
@@ -1653,6 +1695,7 @@ export class Select {
     // committed options cover the virtualizer's window, bounded (the data-table host twin).
     let rafAttempts = 0;
     const rafPass = () => {
+      if (this.disposed) return;
       const covered = this.remeasureWindow();
       rafAttempts = rafAttempts + 1;
       if (!covered && rafAttempts < 10 && typeof requestAnimationFrame === 'function') {
@@ -1704,12 +1747,18 @@ export class Select {
     }
     this.triggerEl()?.nativeElement?.focus();
   };
-  // Scroll option `index` into view inside the scrolling listbox. When windowing, route
-  // through the virtualizer (scrollToIndex) so an option OUTSIDE the rendered window is
-  // scrolled into view (the windowed-arrow-nav seam); else the native scrollIntoView.
-  // Reads nothing reactive but the id base: it runs from a deferred callback (below).
-  revealIndex = (index: any) => {
-    if (index < 0 || !this.__rozieRoot()?.nativeElement || !this.__rozieRoot()!.nativeElement.isConnected) return;
+  // The user scrolled the list (wheel, touch, a press on the scrollbar): any reveal still
+  // in flight is theirs to override.
+  cancelReveal = () => {
+    this.revealGen = this.revealGen + 1;
+  };
+  // Scroll option `index` into view inside the scrolling listbox, for reveal `gen`. When
+  // windowing, route through the virtualizer (scrollToIndex) so an option OUTSIDE the
+  // rendered window is scrolled into view (the windowed-arrow-nav seam); else the native
+  // scrollIntoView. Reads nothing reactive but the id base: it runs from a deferred
+  // callback (below).
+  revealIndex = (index: any, gen: any, tries: any) => {
+    if (this.disposed || gen !== this.revealGen || index < 0 || !this.__rozieRoot()?.nativeElement || !this.__rozieRoot()!.nativeElement.isConnected) return;
     if (this.virtualizer) {
       // An explicit move decides the scroll-end pin (see recordScrollEnd()): going to the
       // LAST option holds the end, so virtual-core's later compensation for options that
@@ -1727,13 +1776,19 @@ export class Select {
         align: 'center'
       });
       this.scheduleRemeasure();
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.settleReveal(index, 12));
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.settleReveal(index, gen, 12));
       return;
     }
     const el = this.__rozieRoot()!.nativeElement.querySelector('#' + CSS.escape(this.optionId(index)));
-    el?.scrollIntoView({
-      block: 'nearest'
-    });
+    if (el) {
+      el.scrollIntoView({
+        block: 'nearest'
+      });
+      return;
+    }
+    // The list is not in the DOM yet (the popup is opening in this same turn): look again
+    // next frame, a bounded number of times.
+    if (tries > 0 && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.revealIndex(index, gen, tries - 1));
   };
   // The windowed reveal is done when the option IS in view, not when scrollToIndex ran:
   // checked on the DOM, one frame at a time, for a bounded number of frames. A scroll can
@@ -1742,9 +1797,10 @@ export class Select {
   // when that lands after our scroll it puts the list back where it was (measured on
   // Angular: Home pressed right after End left the list at the end, and virtual-core does
   // not re-issue a scroll whose target did not change). Asking again is idempotent once
-  // the list is where it should be. Stops as soon as the highlight moves elsewhere.
-  settleReveal = (index: any, tries: any) => {
-    if (!this.virtualizer || !this.gridScrollEl || !this.gridScrollEl.isConnected || this.liveActive !== index) return;
+  // the list is where it should be. Stops as soon as the highlight moves elsewhere, a
+  // newer reveal starts, the user scrolls (cancelReveal()), or the select unmounts.
+  settleReveal = (index: any, gen: any, tries: any) => {
+    if (this.disposed || gen !== this.revealGen || !this.virtualizer || !this.gridScrollEl || !this.gridScrollEl.isConnected || this.liveActive !== index) return;
     const el = this.gridScrollEl.querySelector('.rozie-select-option[data-index="' + index + '"]');
     if (el) {
       const box = this.gridScrollEl.getBoundingClientRect();
@@ -1756,24 +1812,23 @@ export class Select {
       align: 'center'
     });
     this.scheduleRemeasure();
-    requestAnimationFrame(() => this.settleReveal(index, tries - 1));
+    requestAnimationFrame(() => this.settleReveal(index, gen, tries - 1));
   };
   // Keep the active option visible — called by the keyboard and type-ahead paths right
-  // after they write `$data.activeIndex` (never by pointer hover, which must not scroll).
-  // The scroll itself runs one frame later, on `liveActive`:
+  // after they write `$data.activeIndex`, and by open() (never by pointer hover, which
+  // must not scroll). The scroll itself runs one frame later, on `liveActive`:
   //  - right here the index just written is not readable on React (state is a per-render
   //    snapshot): End / Home scrolled to the PREVIOUS highlight and the list only caught
   //    up on the next key;
   //  - and the list may not be on screen yet (End or a typed letter on a closed select
   //    opens it in the same handler): scrolling a hidden list does nothing.
-  // One frame later every target has committed the write and the open list.
+  // One frame later every target has committed the write and the open list. Each call
+  // takes a new generation, so of several requests in one frame only the last one acts,
+  // and a user scroll in between (cancelReveal()) leaves none.
   scrollActiveIntoView = () => {
-    if (this.revealPending) return;
-    this.revealPending = true;
-    const run = () => {
-      this.revealPending = false;
-      this.revealIndex(this.liveActive);
-    };
+    this.revealGen = this.revealGen + 1;
+    const gen = this.revealGen;
+    const run = () => this.revealIndex(this.liveActive, gen, 6);
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else setTimeout(run, 0);
   };
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
@@ -1783,7 +1838,11 @@ export class Select {
   // because (a) virtual-core measures the scroll rect asynchronously (D-09 Solid rAF-defer —
   // a synchronous kick sees rectH 0 → empty window) and (b) Solid/Lit recreate the list node
   // between mount and first commit (leaving virtual-core's scrollElement stale). Stops once
-  // the window paints (or attempts run out) — idempotent + loop-free.
+  // the virtualizer has items for the window (or attempts run out) — idempotent +
+  // loop-free. The stop condition is read from the virtualizer itself: this chain keeps
+  // the closure it started in, and a reactive read (`$data.rows`, through windowedRows())
+  // was the mount-time one on React, so there it never saw the window and always ran
+  // every retry.
   //
   // It does NOT feed options or the option count: on React this rAF chain runs in the
   // closure of the render it started from, so anything it reads from props is that
@@ -1791,12 +1850,12 @@ export class Select {
   // replaced within the chain's few frames (measured: the old rows stayed). The `options`
   // watcher below owns the feed on every target; $onMount covers the mount-time set.
   kickWindow = (attempts: any) => {
-    if (!this.virtualizer) return;
+    if (this.disposed || !this.virtualizer) return;
     this.gridScrollEl = this.__rozieRoot()?.nativeElement ? this.__rozieRoot()!.nativeElement.querySelector('.rozie-select-list') : this.gridScrollEl;
     this.virtualizer._willUpdate();
     this.windowVer.set(this.windowVer() + 1);
     this.remeasureWindow();
-    if (this.windowedRows().length === 0 && attempts > 0) {
+    if (this.virtualizer.getVirtualItems().length === 0 && attempts > 0) {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(attempts - 1));else setTimeout(() => this.kickWindow(attempts - 1), 16);
     }
   };
@@ -1852,13 +1911,14 @@ export class Select {
   // reads only $data, one whose getter reads only props. A getter that mixes the two is
   // routed through a signal effect on Lit, which a plain property change does not re-run
   // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
-  // Select-local keydown wrapper (kept out of listCore so the shared partial and the sibling
-  // families' generated output stay untouched).
+  // Select-local keydown wrapper in front of the key reducer (kept out of listCore so the
+  // shared partial and the sibling families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
   //    internally; only the rendered/ARIA state is gated), Escape and Enter are left entirely to
-  //    the host - not preventDefault'ed, not consumed. All other keys still reach listCore.
-  //  - selectOnTab: Tab commits the highlighted option before listCore closes the popup, only
-  //    while the popup is actually visible.
+  //    the host - not preventDefault'ed, not consumed. All other keys still reach the key
+  //    reducer (onControlKeyDown, the host-local copy above).
+  //  - selectOnTab: Tab commits the highlighted option before the reducer closes the popup,
+  //    only while the popup is actually visible.
   onTriggerKeyDown = ($event: any) => {
     const __open$local = this.open$local();
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
@@ -1900,21 +1960,29 @@ export class Select {
     return Array.isArray(cur) ? cur : [];
   };
   // One row per DISTINCT selected value, in value order (a value the model holds more
-  // than once shows one chip, at its first position). A value missing from `options`
+  // than once shows one chip, at its first position). A value that matches no option
   // keeps a chip labelled by its raw value (and a null option) rather than vanishing.
-  // `key` is unique per row: an object found in `options` is keyed by its option's index
-  // (every object stringifies alike), anything else by its type and string form, and rows
-  // that still share a key (two objects missing from `options`) are numbered.
+  // `members` are the value's positions in the model — what removing the chip removes.
+  // `key` is unique per row: an object that matched an option is keyed by that option's
+  // index (every object stringifies alike), anything else by its type and string form,
+  // and rows that still share a key (two objects matching no option) are numbered.
   chipRows = () => {
-    const __options = this.options();
-    const opts = Array.isArray(__options) ? __options : [];
-    const vals = this.selectedValues();
-    const distinct = vals.filter((v: any, i: any) => vals.findIndex((x: any) => this.sameValue(x, v)) === i);
-    const keyed = distinct.map((v: any) => {
-      const at = opts.findIndex((o: any) => this.sameValue(this.valueOf$local(o), v));
+    const sel = this.selection();
+    // Walk the model itself and keep each value's FIRST position (the row that starts
+    // there): the rows then carry the model array's own element typing into the leaves,
+    // which a walk over the memoised `sel.rows` does not.
+    const firsts = this.selectedValues().map((v: any, j: any) => ({
+      v,
+      row: sel.rows.find((r: any) => r.members[0] === j)
+    })).filter((x: any) => x.row);
+    const keyed = firsts.map((x: any) => {
+      const at = x.row.at.length > 0 ? Number(x.row.at[0]) : -1;
+      const v = x.v;
+      const members = this.selectedValues().map((m: any, j: any) => j).filter((j: any) => x.row.members.includes(j));
       return {
         v,
         at,
+        members,
         base: at !== -1 && v !== null && typeof v === 'object' ? 'chip-@' + at : 'chip-' + typeof v + ':' + String(v)
       };
     });
@@ -1924,49 +1992,72 @@ export class Select {
       return k.at === -1 ? {
         key,
         value: k.v,
+        members: k.members,
         label: String(k.v),
         option: null
       } : {
         key,
         value: k.v,
-        label: this.labelOf(opts[k.at]),
-        option: opts[k.at]
+        members: k.members,
+        label: this.labelOf(sel.opts[k.at]),
+        option: sel.opts[k.at]
       };
     });
   };
   chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
-  // Removes EVERY occurrence of the value: its one chip stands for all of them.
-  removeChipValue = (v: any) => {
+  // Removes EVERY occurrence of the chip's value: its one chip stands for all of them.
+  removeChip = (row: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
-    const next = this.selectedValues().filter((x: any) => !this.sameValue(x, v)); // fresh array every commit
+    const next = this.selectedValues().filter((x: any, j: any) => !row.members.includes(j)); // fresh array every commit
     this.value.set(next), this.__rozieCvaOnChange(next);
     this.change.emit({
       value: next,
       option: null
     });
   };
-  onChipRemove = (v: any) => {
-    this.removeChipValue(v);
+  onChipRemove = (row: any) => {
+    this.removeChip(row);
     this.focusControl();
   };
   // Backspace with the popup closed removes the last chip (regardless of `clearable`).
   // Returns true when it handled the key.
   onChipKey = ($event: any) => {
     if (!this.multiple() || this.popupVisible() || $event.key !== 'Backspace') return false;
-    const vals = this.selectedValues();
-    if (vals.length === 0) return false;
+    const rows = this.chipRows();
+    if (rows.length === 0) return false;
     $event.preventDefault();
-    this.removeChipValue(vals[vals.length - 1]);
+    this.removeChip(rows[rows.length - 1]);
     return true;
   };
-  // A primary-button press anywhere inside the popup never takes DOM focus: focus stays
-  // on the trigger (the APG select-only model — the popup is driven through
+  // A primary-button press inside the popup does not take DOM focus: focus stays on the
+  // trigger (the APG select-only model — the popup is driven through
   // aria-activedescendant), so the keyboard keeps working after a pointer pick in a
-  // multi-select, or after a press on a disabled option, a group heading or the padding.
-  // Without this the press moved focus to <body> and every key went nowhere. Only the
-  // default action of mousedown is cancelled: the click still arrives.
+  // multi-select, or after a press on a disabled option, a group heading, the padding or
+  // the empty state. Without this the press moved focus to <body> and every key went
+  // nowhere. Only the default action of mousedown is cancelled: the click still arrives,
+  // and the scrollbar still drags.
+  //
+  // NOT cancelled when the press lands on something focusable or editable that a slot
+  // fill brought into the popup (a field or a button in an `option`, `groupHeading` or
+  // `empty` slot): that control takes focus as it would anywhere. The composed path is
+  // walked up to the list (the onControlClick() approach) — on Lit a slot fill lives in the
+  // light DOM while the list is in the shadow root, and `closest()` does not cross that.
   onListMouseDown = ($event: any) => {
-    if ($event.button === 0) $event.preventDefault();
+    if ($event.button !== 0) return;
+    this.cancelReveal(); // a press here may be the start of a scrollbar drag
+    const focusable = 'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [tabindex]';
+    const path = typeof $event.composedPath === 'function' ? $event.composedPath() : [];
+    if (path.length > 0) {
+      for (const el of path as any) {
+        if (el === $event.currentTarget) break;
+        if (el && typeof el.matches === 'function' && el.matches(focusable)) return;
+      }
+    } else {
+      const t = $event.target;
+      const hit = t && typeof t.closest === 'function' ? t.closest(focusable) : null;
+      if (hit && hit !== $event.currentTarget && $event.currentTarget.contains(hit)) return;
+    }
+    $event.preventDefault();
   };
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React
   // (`?? undefined` on a provably non-null operand) - the data-table cellTabindex precedent.
@@ -2084,7 +2175,7 @@ export class Select {
     }
   });
 
-  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.onChipRemove(row.value), index: idx }, option: row.option, remove: () => this.onChipRemove(row.value), index: idx });
+  private _chip_ctx_2 = (row: any, idx: any) => ({ $implicit: { option: row.option, remove: () => this.onChipRemove(row), index: idx }, option: row.option, remove: () => this.onChipRemove(row), index: idx });
 
   protected get __attr_aria_label() {
       const __ariaLabel = this.ariaLabel();

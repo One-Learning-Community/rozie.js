@@ -36,6 +36,8 @@
   offValue: null,
   longValue: null,
   tabNoneValue: null,
+  slotValue: [],
+  note: '',
 }
 </data>
 
@@ -52,8 +54,15 @@ const OPTIONS = [
 
 // 40 options in a plain (not windowed) list: taller than the popup, so End / Home have
 // to scroll it.
-const LONG = []
-for (let i = 1; i <= 40; i++) LONG.push({ label: 'Row ' + i, value: 'row-' + i })
+// Built in ONE expression (not a top-level loop pushing into the array: on React the
+// loop runs again on every render of this demo and the list grew by 40 each time).
+const LONG = Array.from({ length: 40 }, (unused, k) => ({ label: k === 29 ? 'Zebra' : 'Row ' + (k + 1), value: 'row-' + (k + 1) }))
+const pickFar = () => { $data.longValue = 'row-35' }
+// An option that carries a text field (the `option` slot): the field must take focus
+// by mouse and be typed into.
+const SLOTTED = [{ label: 'Plain', value: 'plain' }, { label: 'With note', value: 'note', field: true }, { label: 'Last', value: 'last' }]
+const onNoteInput = (e) => { $data.note = e.target.value }
+const slotJoined = () => (Array.isArray($data.slotValue) ? $data.slotValue.join(',') : '')
 
 // The uniform two-way driver: write the bound value directly. The model write
 // flows into the wrapper → the matching option gets aria-selected, and the
@@ -104,7 +113,18 @@ const pickValue = (v) => { $data.value = v }
     <span data-testid="readout-tab-none">{{ $data.tabNoneValue }}</span>
   </div>
   <div data-testid="long-select">
+    <button type="button" data-testid="pick-far" @click="pickFar()">Select Row 35</button>
     <Select :options="LONG" r-model:value="$data.longValue" aria-label="Long list" />
+  </div>
+  <div data-testid="slot-select">
+    <span data-testid="readout-note">{{ $data.note }}</span>
+    <span data-testid="readout-slot">{{ slotJoined() }}</span>
+    <Select :options="SLOTTED" r-model:value="$data.slotValue" multiple :close-on-select="false" aria-label="Slotted">
+      <template #option="{ option }">
+        <span class="slot-label">{{ option.label }}</span>
+        <input r-if="option.field" class="slot-field" type="text" aria-label="Note" @input="onNoteInput($event)" />
+      </template>
+    </Select>
   </div>
 </div>
 </template>

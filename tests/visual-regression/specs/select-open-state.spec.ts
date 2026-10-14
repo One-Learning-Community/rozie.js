@@ -249,4 +249,28 @@ for (const target of TARGETS) {
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await settled(page, log, 'TFTF');
   });
+
+  runner(`select-open-state [${target}]: the handle's toggle(), called from a click outside while the popup is OPEN, leaves it closed`, async ({ page }) => {
+    await page.goto(`/?example=SelectOpenState&target=${target}`);
+    const wrap = page.getByTestId('api-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const log = page.getByTestId('readout-api-log');
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await settled(page, log, 'T');
+
+    // ONE click: an outside click (a dismissal) on the button that calls toggle().
+    await page.getByTestId('api-toggle').click();
+    await expect(list).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await settled(page, log, 'TF'); // closed once — not closed and reopened ('TFT'), not closed twice
+    await expect(list).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    // The next toggle() opens it again: the select is closed, not stuck.
+    await page.getByTestId('api-toggle').click();
+    await expect(list).toBeVisible();
+    await settled(page, log, 'TFT');
+  });
 }

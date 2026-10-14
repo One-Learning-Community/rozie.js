@@ -1,6 +1,6 @@
 <!--
   SelectIdentityDemo.rozie — BEHAVIORAL consumer for value identity in the Select
-  (select-identity.spec.ts). Five selects:
+  (select-identity.spec.ts). Nine selects:
 
     - one:    single-select whose option values are OBJECTS. The consumer's reactive
               state can hand a committed object back wrapped in a proxy; the option
@@ -13,12 +13,18 @@
               synchronously when 'banana' is picked (the state goes banana -> apple
               inside one handler).
     - dupes:  a multi-select whose model holds the same value twice.
+    - twins / twins-many: two options whose values are DIFFERENT objects with EQUAL
+              contents (single and multi). Matching is identity-first, so where the
+              consumer's state hands the committed object back as-is the second twin
+              is the second twin.
+    - nums:   a multi-select with a NaN option value (NaN is the same value as NaN).
+    - virt-objects: a windowed (`virtual`) select whose 40 option values are objects.
 
   This is a BEHAVIORAL cell — no screenshot stabilization here.
 -->
 <rozie name="SelectIdentityDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ one: null, oneSame: '', many: [], refuse: 'apple', refuseChanges: 0, bounce: 'apple', bounceChanges: 0, dupes: ['apple', 'apple', 'banana'], dupeChanges: 0 }</data>
+<data>{ one: null, oneSame: '', many: [], refuse: 'apple', refuseChanges: 0, bounce: 'apple', bounceChanges: 0, dupes: ['apple', 'apple', 'banana'], dupeChanges: 0, twin: null, twinPicked: '', twinMany: [], nums: [], virt: null, virtPicked: '' }</data>
 <script>
 const BOX = { kind: 'box' }
 const CRATE = { kind: 'crate' }
@@ -54,6 +60,24 @@ const onBounceChange = (detail) => {
   else lastGood = detail.value
 }
 const onDupesChange = () => { $data.dupeChanges = $data.dupeChanges + 1 }
+
+const TWIN_A = { kind: 'twin' }
+const TWIN_B = { kind: 'twin' }
+const TWINS = [
+  { label: 'First twin', value: TWIN_A },
+  { label: 'Second twin', value: TWIN_B },
+  { label: 'Other', value: { kind: 'other' } },
+]
+// Which object the commit handed over (the payload is the option's own value).
+const onTwinChange = (detail) => { $data.twinPicked = detail.value === TWIN_A ? 'a' : detail.value === TWIN_B ? 'b' : 'other' }
+const NUMS = [
+  { label: 'Not a number', value: NaN },
+  { label: 'One', value: 1 },
+]
+// One expression, not a top-level loop pushing into the array (that loop runs again on
+// every render of this demo on React).
+const VIRT = Array.from({ length: 40 }, (unused, k) => ({ label: 'Thing ' + (k + 1), value: { n: k + 1 } }))
+const onVirtChange = (detail) => { $data.virtPicked = detail.option ? String(detail.option.label) : '' }
 </script>
 <template>
 <div class="select-identity-demo">
@@ -67,10 +91,18 @@ const onDupesChange = () => { $data.dupeChanges = $data.dupeChanges + 1 }
   <span data-testid="readout-bounce-changes">{{ $data.bounceChanges }}</span>
   <span data-testid="readout-dupes">{{ joined($data.dupes) }}</span>
   <span data-testid="readout-dupe-changes">{{ $data.dupeChanges }}</span>
+  <span data-testid="readout-twin-picked">{{ $data.twinPicked }}</span>
+  <span data-testid="readout-twin-many">{{ $data.twinMany.length }}</span>
+  <span data-testid="readout-nums">{{ $data.nums.length }}</span>
+  <span data-testid="readout-virt-picked">{{ $data.virtPicked }}</span>
   <div data-testid="one"><Select :options="OBJECTS" r-model:value="$data.one" placeholder="Pick one" aria-label="One" @change="onOneChange($event)" /></div>
   <div data-testid="many"><Select :options="OBJECTS" r-model:value="$data.many" multiple :close-on-select="false" placeholder="Pick many" aria-label="Many" /></div>
   <div data-testid="refuse"><Select :options="FRUIT" :value="$data.refuse" aria-label="Refuse" @change="onRefuseChange($event)" /></div>
   <div data-testid="bounce"><Select :options="FRUIT" r-model:value="$data.bounce" aria-label="Bounce" @change="onBounceChange($event)" /></div>
+  <div data-testid="twins"><Select :options="TWINS" r-model:value="$data.twin" placeholder="Pick a twin" aria-label="Twins" @change="onTwinChange($event)" /></div>
+  <div data-testid="twins-many"><Select :options="TWINS" r-model:value="$data.twinMany" multiple :close-on-select="false" aria-label="Twins many" /></div>
+  <div data-testid="nums"><Select :options="NUMS" r-model:value="$data.nums" multiple :close-on-select="false" aria-label="Numbers" /></div>
+  <div data-testid="virt-objects"><Select :options="VIRT" r-model:value="$data.virt" :virtual="true" maxHeight="200px" aria-label="Windowed objects" @change="onVirtChange($event)" /></div>
   <div data-testid="dupes"><Select :options="FRUIT" r-model:value="$data.dupes" multiple :close-on-select="false" aria-label="Dupes" @change="onDupesChange()" /></div>
 </div>
 </template>

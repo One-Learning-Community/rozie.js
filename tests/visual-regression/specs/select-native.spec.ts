@@ -350,6 +350,22 @@ for (const target of TARGETS) {
     await expect(native.locator('option:checked')).toHaveText('Box');
   });
 
+  runner(`select-native [${target}]: of two options with equal-content object values the native element shows the one that was picked`, async ({ page }) => {
+    await openCoarse(page, target);
+    const native = page.getByTestId('twins').locator(NATIVE);
+    await expect(native.locator('option')).toHaveText(['Twin', 'First twin', 'Second twin']);
+    await native.selectOption({ label: 'Second twin' });
+    // The model comes back and the element is written from it. Where the value comes back
+    // as the same object the second twin stays checked; on vue and svelte it comes back in
+    // a reactive proxy, identical to neither option, and the first content match wins (the
+    // limit stated in the `options` prop description).
+    await page.waitForTimeout(250);
+    await expect(native.locator('option:checked')).toHaveText(target === 'vue' || target === 'svelte' ? 'First twin' : 'Second twin');
+    await native.selectOption({ label: 'First twin' });
+    await page.waitForTimeout(250);
+    await expect(native.locator('option:checked')).toHaveText('First twin');
+  });
+
   runner(`select-native [${target}]: swapping options or groups at runtime keeps the native element on the same logical option`, async ({ page }) => {
     await openCoarse(page, target);
     const native = page.getByTestId('dyn').locator(NATIVE);

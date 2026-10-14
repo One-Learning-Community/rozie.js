@@ -11,10 +11,11 @@
     - off:    no nativePicker (the custom popup, used to compare change payloads)
     - virt / inl: nativePicker + `virtual` / `inline` (the custom popup is kept)
     - locked: nativePicker + disabled
+    - twins:  nativePicker over two options whose values are different objects with equal contents
 -->
 <rozie name="SelectNativeDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ value: null, plain: 'banana', multi: ['apple'], off: null, virt: null, inl: null, locked: 'apple', changes: 0, payload: '', same: '', opens: 0, plainChanges: 0, multiChanges: 0, multiPayload: '', offPayload: '', guarded: 'apple', guardedChanges: 0, rejected: 0, dyn: null, dynChanges: 0, dynOpens: 0, dynSet: 'a', dynGroupSet: 'a', dynNative: true, dynVirtual: false }</data>
+<data>{ value: null, plain: 'banana', multi: ['apple'], off: null, virt: null, inl: null, locked: 'apple', changes: 0, payload: '', same: '', opens: 0, plainChanges: 0, multiChanges: 0, multiPayload: '', offPayload: '', guarded: 'apple', guardedChanges: 0, rejected: 0, dyn: null, dynChanges: 0, dynOpens: 0, dynSet: 'a', dynGroupSet: 'a', dynNative: true, dynVirtual: false, twin: null }</data>
 <script>
 const GROUPS = [{ id: 'fruit', label: 'Fruit' }]
 // An object-valued option: the commit must hand back this very reference.
@@ -96,6 +97,9 @@ const shown = () => {
   if (v === null || v === undefined) return ''
   return typeof v === 'object' ? 'object' : String(v)
 }
+const TWIN_A = { kind: 'twin' }
+const TWIN_B = { kind: 'twin' }
+const TWINS = [{ label: 'First twin', value: TWIN_A }, { label: 'Second twin', value: TWIN_B }]
 // The imperative handle of the `single` select.
 const handleOpen = () => { $refs.singleRef.open() }
 const handleToggle = () => { $refs.singleRef.toggle() }
@@ -140,6 +144,7 @@ const setNone = () => { $data.value = null }
   <div data-testid="off"><Select :options="OPTIONS" :groups="GROUPS" r-model:value="$data.off" aria-label="Custom only" @change="onOffChange($event)" /></div>
   <div data-testid="virt"><Select :options="FLAT" r-model:value="$data.virt" native-picker virtual max-height="160px" aria-label="Windowed" /></div>
   <div data-testid="locked"><Select :options="FLAT" r-model:value="$data.locked" native-picker disabled aria-label="Locked" /></div>
+  <div data-testid="twins"><Select :options="TWINS" r-model:value="$data.twin" native-picker placeholder="Twin" aria-label="Twins" /></div>
   <div data-testid="inl"><Select :options="FLAT" r-model:value="$data.inl" native-picker inline aria-label="Inline" /></div>
 </div>
 </template>

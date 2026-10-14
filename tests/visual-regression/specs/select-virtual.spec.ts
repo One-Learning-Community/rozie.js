@@ -349,7 +349,7 @@ for (const target of TARGETS) {
 }
 
 // ════════════════════════════════════════════════════════════════════════════════════
-// B5 — End / Home: the window scrolls to the edge on the SAME key press.
+// B1 (cleanup task) — End / Home: the window scrolls to the edge on the SAME key press.
 // ════════════════════════════════════════════════════════════════════════════════════
 for (const target of TARGETS) {
   runnerFor(target)(`select-virtual [${target}]: End renders and highlights the last of 1000 options; Home the first`, async ({
@@ -422,5 +422,56 @@ for (const target of TARGETS) {
     await page.waitForTimeout(500);
     expect(await scrollTopOf(page)).toBe(0);
     expect(await inView(0)()).toBe(true);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════════════════
+// A user scroll right after a key press wins over the keyboard's scroll-into-view.
+// ════════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`select-virtual [${target}]: a wheel scroll right after End is not pulled back to the highlighted option`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=SelectVirtual&target=${target}`);
+    await expect
+      .poll(async () => page.getByTestId('option-count').textContent(), { timeout: 20_000 })
+      .toBe('1000');
+    await openSelect(page);
+    const control = page.locator('[role="combobox"]').first();
+    await expect.poll(async () => scrollTopOf(page)).toBe(0);
+    await page.waitForTimeout(300); // the freshly opened window has settled
+
+    // In ONE task, so nothing runs in between: the End key on the trigger, then a wheel
+    // on the list that scrolls it a little. (Dispatched events: a real key press and a real
+    // wheel cannot be put inside one frame from outside the page.)
+    await page.evaluate((sel) => {
+      const find = (root: Document | ShadowRoot, q: string): Element | null => {
+        const direct = root.querySelector(q);
+        if (direct) return direct;
+        for (const el of Array.from(root.querySelectorAll('*'))) {
+          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+          if (sr) {
+            const inner = find(sr, q);
+            if (inner) return inner;
+          }
+        }
+        return null;
+      };
+      const trigger = find(document, '.rozie-select-trigger[role="combobox"]')!;
+      const list = find(document, sel) as HTMLElement;
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true, composed: true }));
+      list.dispatchEvent(new WheelEvent('wheel', { deltaY: 300, bubbles: true, cancelable: true, composed: true }));
+      list.scrollTop = 300;
+    }, SCROLL);
+
+    // The key was handled (the highlight is the last option)…
+    await expect(control).toHaveAttribute('aria-activedescendant', /-opt-999$/);
+    // …and the list stays where the user put it.
+    await page.waitForTimeout(600);
+    expect(await scrollTopOf(page)).toBeLessThan(1000);
+    expect(await scrollTopOf(page)).toBeGreaterThan(100);
+    // The next key press scrolls again as usual.
+    await page.keyboard.press('End');
+    await expect.poll(async () => scrollTopOf(page), { timeout: 15_000 }).toBeGreaterThan(30_000);
   });
 }

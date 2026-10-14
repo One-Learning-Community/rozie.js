@@ -119,16 +119,6 @@ for (const target of TARGETS) {
 
   // ── B3 ────────────────────────────────────────────────────────────────────
   runner(`select-identity [${target}]: a one-way binding whose consumer keeps the old value — the control shows the consumer's value`, async ({ page }) => {
-    // EXPECTED FAILURE on Vue, Svelte and Angular — the repro for a known gap, not a
-    // property of this demo. On those three the compiled Select holds `value` in the
-    // framework's own two-way primitive (Vue `defineModel`, Svelte `$bindable`, Angular
-    // `model()`), and each of them keeps a value the component wrote itself when the
-    // parent binds one-way and never sends a different value: there is no "controlled"
-    // mode to fall back to. React, Solid and Lit go through Rozie's controllable-state
-    // helpers, which treat a supplied prop as controlled. Nothing in Select.rozie can
-    // tell the two apart (its only handle is `$model.value`), so this needs the emitters.
-    // Remove the marker when it is fixed: the test then fails as "expected to fail, but passed".
-    test.fail(target === 'vue' || target === 'svelte' || target === 'angular', 'a one-way bound model prop keeps the value the component wrote (defineModel / $bindable / model() are uncontrolled without a two-way binding)');
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('refuse');
     const trigger = wrap.locator('[role="combobox"]');
@@ -139,6 +129,19 @@ for (const target of TARGETS) {
     await options.nth(1).click(); // Banana: refused
     await expect(page.getByTestId('readout-refuse-changes')).toHaveText('1');
     await expect(page.getByTestId('readout-refuse')).toHaveText('apple');
+
+    // Everything above holds on all six: the page loaded, the initial value showed, the
+    // pick reached the consumer and the consumer kept 'apple'. Only what follows is the gap.
+    // EXPECTED FAILURE on Vue, Svelte and Angular — the repro for a known gap, not a
+    // property of this demo. On those three the compiled Select holds `value` in the
+    // framework's own two-way primitive (Vue `defineModel`, Svelte `$bindable`, Angular
+    // `model()`), and each of them keeps a value the component wrote itself when the
+    // parent binds one-way and never sends a different value: there is no "controlled"
+    // mode to fall back to. React, Solid and Lit go through Rozie's controllable-state
+    // helpers, which treat a supplied prop as controlled. Nothing in Select.rozie can
+    // tell the two apart (its only handle is `$model.value`), so this needs the emitters.
+    // Remove the marker when it is fixed: the test then fails as "expected to fail, but passed".
+    test.fail(target === 'vue' || target === 'svelte' || target === 'angular', 'a one-way bound model prop keeps the value the component wrote (defineModel / $bindable / model() are uncontrolled without a two-way binding)');
     await page.waitForTimeout(250);
     await expect(wrap.locator('.rozie-select-selected')).toHaveText('Apple');
     await trigger.click();
@@ -151,14 +154,6 @@ for (const target of TARGETS) {
   });
 
   runner(`select-identity [${target}]: a two-way binding whose consumer writes the old value back in its change handler — the control shows the consumer's value`, async ({ page }) => {
-    // EXPECTED FAILURE on Angular — the repro for a known gap. The parent's two-way
-    // binding goes apple -> banana -> apple inside ONE handler; at the next change
-    // detection the binding holds the value it last pushed down ('apple'), so Angular
-    // does not write the input again and the Select's own `model()` stays on 'banana'.
-    // The consumer-side remedy is to write the old value back a task later (the
-    // SelectNativeDemo `guarded` select does). Nothing in Select.rozie can see the
-    // parent's value, so this needs the Angular emitter. Remove the marker when fixed.
-    test.fail(target === 'angular', 'a two-way binding written back to its previous value in the same handler is not pushed to the model() input again');
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('bounce');
     const trigger = wrap.locator('[role="combobox"]');
@@ -169,6 +164,16 @@ for (const target of TARGETS) {
     await options.nth(1).click(); // Banana: written back
     await expect(page.getByTestId('readout-bounce-changes')).toHaveText('1');
     await expect(page.getByTestId('readout-bounce')).toHaveText('apple');
+
+    // Everything above holds on all six; only what follows is the gap.
+    // EXPECTED FAILURE on Angular — the repro for a known gap. The parent's two-way
+    // binding goes apple -> banana -> apple inside ONE handler; at the next change
+    // detection the binding holds the value it last pushed down ('apple'), so Angular
+    // does not write the input again and the Select's own `model()` stays on 'banana'.
+    // The consumer-side remedy is to write the old value back a task later (the
+    // SelectNativeDemo `guarded` select does). Nothing in Select.rozie can see the
+    // parent's value, so this needs the Angular emitter. Remove the marker when fixed.
+    test.fail(target === 'angular', 'a two-way binding written back to its previous value in the same handler is not pushed to the model() input again');
     await page.waitForTimeout(250);
     await expect(wrap.locator('.rozie-select-selected')).toHaveText('Apple');
     await trigger.click();
@@ -185,6 +190,147 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('readout-bounce')).toHaveText('cherry');
     await page.waitForTimeout(250);
     await expect(wrap.locator('.rozie-select-selected')).toHaveText('Cherry');
+  });
+
+  // ── identity first ────────────────────────────────────────────────────────
+  // Two options carry DIFFERENT objects with EQUAL contents. Where the consumer's state
+  // hands the committed object back as-is (react, solid, lit, angular) the second twin is
+  // the second twin. On vue and svelte the value comes back wrapped in a reactive proxy:
+  // it is identical to NO option, so content decides and both twins match — a known
+  // limit, stated in the `options` prop description, pinned here so a change is noticed.
+  const PROXIED = target === 'vue' || target === 'svelte';
+
+  runner(`select-identity [${target}]: two options with equal-content object values — picking the second selects ${PROXIED ? 'both twins (reactive-proxy limit)' : 'the second only'}`, async ({ page }) => {
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('twins');
+    const trigger = wrap.locator('[role="combobox"]');
+    const options = wrap.locator('[role="option"]');
+    await trigger.click();
+    await expect(options).toHaveText(['First twin', 'Second twin', 'Other']);
+    await options.nth(1).click();
+    await expect(page.getByTestId('readout-twin-picked')).toHaveText('b'); // the commit is the second twin's own object, on all six
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await trigger.click();
+    await expect(options).toHaveCount(3);
+    await expect(options.nth(2)).toHaveAttribute('aria-selected', 'false');
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+    if (PROXIED) {
+      await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+      await expect(wrap.locator('.rozie-select-selected')).toHaveText('First twin');
+      await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    } else {
+      await expect(options.nth(0)).toHaveAttribute('aria-selected', 'false');
+      await expect(wrap.locator('.rozie-select-selected')).toHaveText('Second twin');
+      await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-1$/); // the highlight starts on it
+    }
+    // Picking the first twin moves the selection on every target.
+    await options.nth(0).click();
+    await expect(page.getByTestId('readout-twin-picked')).toHaveText('a');
+    await expect(wrap.locator('.rozie-select-selected')).toHaveText('First twin');
+  });
+
+  runner(`select-identity [${target}]: multi-select over equal-content object values — ${PROXIED ? 'the twins toggle together (reactive-proxy limit)' : 'each twin is its own value'}`, async ({ page }) => {
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('twins-many');
+    const trigger = wrap.locator('[role="combobox"]');
+    const options = wrap.locator('[role="option"]');
+    const labels = wrap.locator('.rozie-select-chip__label');
+    const count = page.getByTestId('readout-twin-many');
+    await trigger.click();
+    await options.nth(1).click(); // Second twin
+    await expect(count).toHaveText('1');
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'true');
+    if (PROXIED) {
+      await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+      await expect(labels).toHaveText(['First twin']);
+      // The first twin reads as selected, so picking it takes the value out.
+      await options.nth(0).click();
+      await expect(count).toHaveText('0');
+      await expect(labels).toHaveCount(0);
+    } else {
+      await expect(options.nth(0)).toHaveAttribute('aria-selected', 'false');
+      await expect(labels).toHaveText(['Second twin']);
+      await options.nth(0).click(); // First twin: added next to the second
+      await expect(count).toHaveText('2');
+      await expect(labels).toHaveText(['Second twin', 'First twin']);
+      await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+      // Removing the SECOND twin's chip leaves the first.
+      await page.keyboard.press('Escape');
+      await wrap.locator('.rozie-select-chip').nth(0).locator('.rozie-select-chip__remove').click();
+      await expect(count).toHaveText('1');
+      await expect(labels).toHaveText(['First twin']);
+      // Backspace removes the remaining one.
+      await trigger.focus();
+      await page.keyboard.press('Backspace');
+      await expect(count).toHaveText('0');
+    }
+  });
+
+  runner(`select-identity [${target}]: a NaN option value is the same value as NaN — picking it twice takes it out again`, async ({ page }) => {
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('nums');
+    const options = wrap.locator('[role="option"]');
+    const count = page.getByTestId('readout-nums');
+    await wrap.locator('[role="combobox"]').click();
+    await options.nth(0).click();
+    await expect(count).toHaveText('1');
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
+    await expect(wrap.locator('.rozie-select-chip__label')).toHaveText(['Not a number']);
+    await options.nth(0).click();
+    await expect(count).toHaveText('0');
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'false');
+  });
+
+  // ── windowed rows keyed uniquely ──────────────────────────────────────────
+  runner(`select-identity [${target}]: a windowed list of object-valued options renders each row once, in order, through scrolling`, async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.text()); });
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('virt-objects');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const options = wrap.locator('[role="option"]');
+    await expect(trigger).toBeVisible();
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await expect.poll(async () => options.count(), { timeout: 15_000 }).toBeGreaterThan(3);
+    // Every rendered row shows the label that belongs to its index, exactly once.
+    const rows = () => options.evaluateAll((els) => els.map((e) => ({ index: Number(e.getAttribute('data-index')), text: (e.textContent || '').trim() })));
+    const coherent = async () => {
+      const r = await rows();
+      const indices = r.map((x) => x.index);
+      return r.length > 3 && new Set(indices).size === indices.length && r.every((x) => x.text === 'Thing ' + (x.index + 1)) && indices.every((v, i) => i === 0 || v === indices[i - 1]! + 1);
+    };
+    await expect.poll(coherent, { timeout: 15_000 }).toBe(true);
+    expect((await rows())[0]!.index).toBe(0);
+    // A row keeps its DOM node while it stays in the window: mark the node of option 12,
+    // bring more options in, and the same node is still option 12. (With one shared key
+    // for every row a keyed renderer rebuilds the rows on each change of the window.)
+    const marked = wrap.locator('[role="option"][data-index="12"]');
+    await list.evaluate((el) => { el.scrollTop = 150; });
+    await expect(marked).toHaveCount(1, { timeout: 15_000 });
+    await expect.poll(coherent, { timeout: 15_000 }).toBe(true);
+    await page.waitForTimeout(300); // the window has settled
+    await marked.evaluate((el) => { (el as HTMLElement & { __kept?: string }).__kept = 'yes'; });
+    const lastBefore = Math.max(...(await rows()).map((x) => x.index));
+    await list.evaluate((el) => { el.scrollTop = 330; });
+    await expect.poll(async () => Math.max(...(await rows()).map((x) => x.index)), { timeout: 15_000 }).toBeGreaterThan(lastBefore);
+    await expect.poll(coherent, { timeout: 15_000 }).toBe(true);
+    await expect(marked).toHaveCount(1);
+    expect(await marked.evaluate((el) => (el as HTMLElement & { __kept?: string }).__kept)).toBe('yes');
+    // Scroll the window away and back: recycled rows still match their index.
+    await list.evaluate((el) => { el.scrollTop = 700; });
+    await expect.poll(async () => (await rows()).some((x) => x.index >= 30), { timeout: 15_000 }).toBe(true);
+    await expect.poll(coherent, { timeout: 15_000 }).toBe(true);
+    await list.evaluate((el) => { el.scrollTop = 0; });
+    await expect.poll(async () => (await rows())[0]?.index, { timeout: 15_000 }).toBe(0);
+    await expect.poll(coherent, { timeout: 15_000 }).toBe(true);
+    // Rows are live: pick the third.
+    await wrap.locator('[role="option"][data-index="2"]').click();
+    await expect(page.getByTestId('readout-virt-picked')).toHaveText('Thing 3');
+    await expect(trigger).toContainText('Thing 3');
+    expect(errors.filter((e) => /key|duplicate/i.test(e))).toEqual([]);
   });
 
   // ── B4 ────────────────────────────────────────────────────────────────────
