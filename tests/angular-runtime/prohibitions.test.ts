@@ -104,8 +104,18 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced during the release-0.8.0 prep to `d75d6777df434d8c240f6c1caf2def7d1bdc9b7d`
- * (d75d6777d), the audit commit that made Angular's `.outside` listeners
+ * 4b). Advanced to `cf49212a9b23cdd68a6f6fa6c7fadc38dcbba7a9`
+ * (cf49212a9), the compiler-fixes-from-select commit: two-way props lower to
+ * `rozieModel` over an aliased input + `<name>Change` output (was `model()`),
+ * `$onUpdate` to `ngAfterViewChecked()`, an output named `change`/`submit`/
+ * `reset`/`select` gains a host native-event guard. The owed prohibition-5
+ * hand-diff (performed, not deferred): `git diff d75d6777d cf49212a9` over the
+ * three tracked globs changed 15 of 132 fixtures, each carrying one of those
+ * shapes; none of the 117 unchanged fixtures still contains `= model<`, an
+ * `effect(() => () =>`, a `change`/`submit`/`reset`/`select` output, or a
+ * top-level `return` in `ngAfterViewInit()`. The next advance owes the same.
+ * Previously advanced during the release-0.8.0 prep to
+ * `d75d6777df434d8c240f6c1caf2def7d1bdc9b7d` (d75d6777d), the audit commit that made Angular's `.outside` listeners
  * capture-phase (`renderer.listen('document', 'click', handler)` →
  * `listenTarget.addEventListener('click', handler, true)`). It re-blessed the
  * Dropdown fixture in the same commit but did not run this suite, so 4b went
@@ -157,7 +167,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'd75d6777d';
+const BASELINE_COMMIT = 'cf49212a9';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
