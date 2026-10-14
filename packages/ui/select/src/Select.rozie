@@ -183,7 +183,7 @@ export interface SelectGroup { id: string; label: string }
     default: '',
     docs: {
       description:
-        'Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
+        'Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.',
     },
   },
 
@@ -294,13 +294,14 @@ export interface SelectGroup { id: string; label: string }
     },
   },
 
-  // Accessible name for the control when there is no visible <label for>.
+  // Accessible name for the control. The focus target is a div[role=combobox],
+  // which a <label for> cannot name, so this prop is the naming mechanism.
   ariaLabel:      {
     type: String,
     default: null,
     docs: {
       description:
-        'Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).',
+        'Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.',
     },
   },
 
@@ -1254,6 +1255,12 @@ $watch(() => $data.session, () => {
 })
 $watch(() => (($props.hideEmpty ? 'h' : 's') + ($props.options ? $props.options.length : 0)), () => {
   syncPanel()
+})
+// `disabled` turned on while the popup is open: close it (one `open-change`). The
+// pointer-events cut and the trigger's key gate would otherwise leave it stranded.
+// Props-only getter, for the Lit reason above.
+$watch(() => !!$props.disabled, () => {
+  if ($props.disabled) close()
 })
 // popover -> select: the popover's own write.
 const takePanelWrite = () => {

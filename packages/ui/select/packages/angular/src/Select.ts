@@ -449,7 +449,7 @@ export class Select {
    */
   optionDisabled = input<((...args: any[]) => any) | null>(null);
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase = input<string>('');
   /**
@@ -497,7 +497,7 @@ export class Select {
    */
   groups = input<any[]>((() => [])());
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   ariaLabel = input<(string) | null>(null);
   /**
@@ -564,6 +564,7 @@ export class Select {
   private __rozieWatchInitial_13 = true;
   private __rozieWatchInitial_14 = true;
   private __rozieWatchInitial_15 = true;
+  private __rozieWatchInitial_16 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -612,43 +613,46 @@ export class Select {
     effect(() => { const __watchVal = (() => (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0))(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => !!(this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+      if ((this.disabled() || this.__rozieCvaDisabled())) this.close();
+    })(); }); });
+    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
       this.takePanelWrite();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.panelEcho())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.panelEcho())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
       if (!this.panelOpen() && this.panelEcho()) this.takePanelWrite();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.resync())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.resync())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
       this.refeedWindow();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
       this.refeedWindow();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.activeIndex())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.activeIndex())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
       this.liveActive = this.activeIndex();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => {
       if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
     })(); }); });
-    effect(() => { const __watchVal = (() => this.coarse())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.coarse())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
       this.yieldToNative();
     })(); }); });
-    effect(() => { const __watchVal = (() => (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
       this.yieldToNative();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
   }

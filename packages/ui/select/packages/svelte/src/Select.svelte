@@ -56,7 +56,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -104,7 +104,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   groups?: any[];
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   ariaLabel?: (string) | null;
   /**
@@ -1891,55 +1891,59 @@ $effect(() => { (() => (hideEmpty ? 'h' : 's') + (options ? options.length : 0))
   syncPanel();
 })(); }); });
 let __rozieWatchInitial_3 = true;
-$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
-  takePanelWrite();
+$effect(() => { (() => !!disabled)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  if (disabled) close();
 })(); }); });
 let __rozieWatchInitial_4 = true;
-$effect(() => { (() => panelEcho)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
-  if (!panelOpen && panelEcho) takePanelWrite();
+$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
+  takePanelWrite();
 })(); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { (() => resync)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
-  syncPanel();
+$effect(() => { (() => panelEcho)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
+  if (!panelOpen && panelEcho) takePanelWrite();
 })(); }); });
 let __rozieWatchInitial_6 = true;
-$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
-  refeedWindow();
+$effect(() => { (() => resync)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
+  syncPanel();
 })(); }); });
 let __rozieWatchInitial_7 = true;
-$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
   refeedWindow();
 })(); }); });
 let __rozieWatchInitial_8 = true;
-$effect(() => { (() => activeIndex)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
-  liveActive = activeIndex;
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
+  refeedWindow();
 })(); }); });
 let __rozieWatchInitial_9 = true;
-$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
-  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
+$effect(() => { (() => activeIndex)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
+  liveActive = activeIndex;
 })(); }); });
 let __rozieWatchInitial_10 = true;
-$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => {
-  yieldToNative();
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => {
+  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 })(); }); });
 let __rozieWatchInitial_11 = true;
-$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => {
+$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => {
   yieldToNative();
 })(); }); });
 let __rozieWatchInitial_12 = true;
-$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => {
-  scheduleNativeSync();
+$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => {
+  yieldToNative();
 })(); }); });
 let __rozieWatchInitial_13 = true;
-$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => {
+$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 let __rozieWatchInitial_14 = true;
-$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } (() => {
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 let __rozieWatchInitial_15 = true;
-$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => {
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => {
+  scheduleNativeSync();
+})(); }); });
+let __rozieWatchInitial_16 = true;
+$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_16) { __rozieWatchInitial_16 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 

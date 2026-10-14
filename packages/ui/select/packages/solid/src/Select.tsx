@@ -268,7 +268,7 @@ interface SelectProps extends Omit<import('solid-js').ComponentProps<'div'>, 'op
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -316,7 +316,7 @@ interface SelectProps extends Omit<import('solid-js').ComponentProps<'div'>, 'op
    */
   groups?: any[];
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   ariaLabel?: (string) | null;
   /**
@@ -450,6 +450,9 @@ export default function Select(_props: SelectProps): JSX.Element {
   })()), { defer: true }));
   createEffect(on(() => (() => (local.hideEmpty ? 'h' : 's') + (local.options ? local.options.length : 0))(), (v) => untrack(() => (() => {
     syncPanel();
+  })()), { defer: true }));
+  createEffect(on(() => (() => !!local.disabled)(), (v) => untrack(() => (() => {
+    if (local.disabled) close();
   })()), { defer: true }));
   createEffect(on(() => (() => panelOpen())(), (v) => untrack(() => (() => {
     takePanelWrite();

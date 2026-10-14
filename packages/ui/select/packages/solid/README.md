@@ -13,12 +13,13 @@ Peer dependencies: `solid-js`. Install them alongside this package.
 **Required peers** — beyond the framework peer above, this package requires these non-optional peers to actually render:
 
 - `@rozie-ui/popover-solid` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/select-solid`
+- `@tanstack/virtual-core` `^3` — required by `@rozie-ui/select-solid`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-solid`
 
 Install the whole chain in one line:
 
 ```bash
-npm i @rozie-ui/select-solid @rozie-ui/popover-solid @floating-ui/dom
+npm i @rozie-ui/select-solid @rozie-ui/popover-solid @tanstack/virtual-core @floating-ui/dom
 ```
 
 Also installed: `@rozie/runtime-solid` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).

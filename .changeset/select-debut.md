@@ -7,12 +7,13 @@
 "@rozie-ui/select-lit": patch
 ---
 
-New family: `@rozie-ui/select`, the simple select. It replaces `@rozie-ui/listbox` (only `listbox-solid` was ever published; it is deprecated in favour of `select-solid`).
+New family: `@rozie-ui/select`, the simple select. It replaces `@rozie-ui/listbox` (only `listbox-solid` was ever published; it will be deprecated in favour of `select-solid` after this release).
 
 Compared with `listbox-solid`:
 
 - The component is `Select`, the element `rozie-select`, classes `.rozie-select-*`, tokens `--rozie-select-*`.
 - The popup is positioned by `@rozie-ui/popover` (a required peer): `placement`, `offset`, `disableFlip`, `disableShift`, `block`.
+- `@tanstack/virtual-core` is now a required peer (it was optional on `listbox-solid`, but the component imports it whether or not `virtual` is set).
 - Option groups: `groups` and a `groupHeading` slot.
 - `clearable` (with `clearLabel`), and multi-select values shown as removable chips with a `chip` slot.
 - `nativePicker`: opt-in OS picker on touch devices.

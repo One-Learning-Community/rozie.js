@@ -112,7 +112,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -160,7 +160,7 @@ interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div
    */
   groups?: any[];
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   ariaLabel?: (string) | null;
   /**
@@ -297,6 +297,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const _watch13First = useRef(true);
   const _watch14First = useRef(true);
   const _watch15First = useRef(true);
+  const _watch16First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, close/clear, and the activeDescendant derivation come from
@@ -2027,54 +2028,58 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   }, [props.hideEmpty, props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch3First.current) { _watch3First.current = false; return; }
+    if (props.disabled) close();
+  }, [props.disabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch4First.current) { _watch4First.current = false; return; }
     takePanelWrite();
   }, [panelOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch5First.current) { _watch5First.current = false; return; }
     if (!panelOpen && panelEcho) takePanelWrite();
   }, [panelEcho]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch6First.current) { _watch6First.current = false; return; }
     syncPanel();
   }, [resync]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
-    refeedWindow();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch7First.current) { _watch7First.current = false; return; }
     refeedWindow();
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
+    refeedWindow();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch9First.current) { _watch9First.current = false; return; }
     liveActive.current = activeIndex;
   }, [activeIndex]);
   useEffect(() => {
-    if (_watch9First.current) { _watch9First.current = false; return; }
+    if (_watch10First.current) { _watch10First.current = false; return; }
     if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch10First.current) { _watch10First.current = false; return; }
+    if (_watch11First.current) { _watch11First.current = false; return; }
     yieldToNative();
   }, [coarse]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch11First.current) { _watch11First.current = false; return; }
+    if (_watch12First.current) { _watch12First.current = false; return; }
     yieldToNative();
   }, [props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch12First.current) { _watch12First.current = false; return; }
-    scheduleNativeSync();
-  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
     if (_watch13First.current) { _watch13First.current = false; return; }
     scheduleNativeSync();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch14First.current) { _watch14First.current = false; return; }
     scheduleNativeSync();
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch15First.current) { _watch15First.current = false; return; }
+    scheduleNativeSync();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch16First.current) { _watch16First.current = false; return; }
     scheduleNativeSync();
   }, [props.groups]); // eslint-disable-line react-hooks/exhaustive-deps
 

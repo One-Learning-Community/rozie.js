@@ -75,6 +75,36 @@ for (const target of TARGETS) {
     await settled(page, log, 'TFTF');
   });
 
+  // ── disabled while open ────────────────────────────────────────────────────
+  runner(`select-open-state [${target}]: turning disabled on while the popup is open closes it, once`, async ({ page }) => {
+    await page.goto(`/?example=SelectOpenState&target=${target}`);
+    const wrap = page.getByTestId('dis-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const log = page.getByTestId('readout-dis-log');
+    const keys = page.getByTestId('dis-keys');
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await settled(page, log, 'T');
+
+    // A key, not a click: a click outside the popup would dismiss it on its own.
+    await keys.focus();
+    await page.keyboard.press('d');
+    await expect(page.getByTestId('readout-dis')).toHaveText('on');
+    await expect(list).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await settled(page, log, 'TF');
+    await expect(list).toHaveCount(0);
+
+    // Enabled again, it is closed, not stuck: it opens normally.
+    await page.keyboard.press('e');
+    await expect(page.getByTestId('readout-dis')).toHaveText('off');
+    await settled(page, log, 'TF');
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await settled(page, log, 'TFT');
+  });
+
   // ── A2: virtual — only the `options` prop changes ──────────────────────────
   runner(`select-open-state [${target}]: virtual — replacing the options array while OPEN re-renders the rows (longer, shorter, same length)`, async ({ page }) => {
     await page.goto(`/?example=SelectOpenState&target=${target}`);

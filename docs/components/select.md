@@ -21,13 +21,11 @@ There is no vanilla-JS dependency: selection state, keyboard navigation, type-ah
 
 Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` — composed internally for the floating popup — which in turn requires `@floating-ui/dom`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
 
-In practice, install the target's `Select` package together with its `@rozie-ui/popover` peer:
+The leaves also require `@tanstack/virtual-core` (`^3`), the windowing engine behind `virtual`. Select imports it whether or not you set `virtual`, so install it in every project. In practice, install the target's `Select` package together with its peers:
 
 ```bash
-npm i @rozie-ui/select-<target> @rozie-ui/popover-<target>
+npm i @rozie-ui/select-<target> @rozie-ui/popover-<target> @floating-ui/dom @tanstack/virtual-core
 ```
-
-If you use `virtual` (long lists), also install the optional peer `@tanstack/virtual-core` (`^3`); nothing else needs it.
 
 ## Quick start
 
@@ -154,7 +152,7 @@ It also stays off with a mouse or trackpad, whatever the props.
 
 ## Long lists
 
-Set `virtual` to window a long option list. It needs the optional peer `@tanstack/virtual-core` (`^3`) installed in your project: only the visible slice renders inside a bounded scrolling list, with spacers keeping the total scroll height. Bound the list with `maxHeight` (for example `'320px'`) and, if your rows are not about 36px tall, seed `estimateRowHeight`. Windowing works in the floating popup and with `inline` alike. Groups are ignored while `virtual` is on: the options render flat, in source order.
+Set `virtual` to window a long option list. It uses the `@tanstack/virtual-core` (`^3`) peer every Select install already includes: only the visible slice renders inside a bounded scrolling list, with spacers keeping the total scroll height. Bound the list with `maxHeight` (for example `'320px'`) and, if your rows are not about 36px tall, seed `estimateRowHeight`. Windowing works in the floating popup and with `inline` alike. Groups are ignored while `virtual` is on: the options render flat, in source order.
 
 ```rozie
 <template>
@@ -197,7 +195,7 @@ How a value is matched to an option decides which options show as selected.
 | `optionLabel` | `Function` | `null` | yes | Resolver override for an object option's display label — `(option) => string`. Falls back to the option's `.label` property. |
 | `optionValue` | `Function` | `null` | yes | Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. Returning a primitive (an id) is the robust way to use object options; see `options` for how values are matched. |
 | `optionDisabled` | `Function` | `null` | yes | Resolver override marking an option non-selectable — `(option) => boolean`. Falls back to the option's `.disabled` property. |
-| `idBase` | `String` | `''` | yes | Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
+| `idBase` | `String` | `''` | yes | Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
 | `hideEmpty` | `Boolean` | `false` | yes | Show nothing instead of the empty state: when there are no options the popup is not shown, the control reports `aria-expanded="false"`, and Escape is left to the host. |
 | `selectOnTab` | `Boolean` | `false` | yes | Tab picks the highlighted option while the popup is open and an option is highlighted, then moves focus normally. Default `false` (Tab only closes the popup). |
 | `clearable` | `Boolean` | `false` | yes | Show a clear button in the control whenever there is a value, and let Delete clear it from the keyboard while the popup is closed. In single-select Backspace clears too; in multi-select Delete clears every value while Backspace removes only the last chip. |
@@ -209,7 +207,7 @@ How a value is matched to an option decides which options show as selected.
 | `disableShift` | `Boolean` | `false` | yes | Disable the popup's Floating UI `shift` middleware (forwarded to the composed `@rozie-ui/popover` leaf). By default the popup shifts to stay within the viewport; set this to keep it strictly aligned to the control. Ignored when `inline` is set. |
 | `block` | `Boolean` | `false` | yes | Fill the container: the root becomes `display: block; width: 100%`, the control stretches to that width, and the width-matched popup follows. Adds the `rozie-select--block` modifier class on the root. Default `false` keeps the fixed-width control (`--rozie-select-width`, `16rem` by default). |
 | `groups` | `Array` | `[]` | yes | Ordered section list `[{ id, label }]` setting group order and heading text. Options are partitioned by their optional `group` string; groups present on options but absent here follow in first-appearance order. Empty (the default) renders a flat list. Ignored when `virtual` is on. |
-| `ariaLabel` | `String` | `null` | yes | Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`). |
+| `ariaLabel` | `String` | `null` | yes | Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label. |
 | `virtual` | `Boolean` | `false` | yes | Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height). Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on. |
 | `estimateRowHeight` | `Number` | `36` | yes | Estimated option row height (px) seeding the windowing engine before `measureElement` refines actual heights. Only consulted when `virtual` is on. |
 | `maxHeight` | `String` | `''` | yes | A CSS length string bounding the list scroll container when `virtual` is on (e.g. `'320px'`). Mirrored to the `--rozie-select-list-max-height` custom property; the prop wins, the token is the fallback. Ignored when `virtual` is off. |
@@ -276,5 +274,5 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 
 - The control carries `role="combobox"`, `aria-expanded`, `aria-controls`, and `aria-activedescendant`; the popup is `role="listbox"` (with `aria-multiselectable` in multi-select); each option is `role="option"` with `aria-selected` / `aria-disabled`.
 - The popup is positioned by composing the published [`@rozie-ui/popover`](/components/popover) leaf (Floating UI): it opens below the control at the control's width, flips above when there is no room below, and shifts to stay on-screen. A click outside, or Escape, closes it; `open-change` fires once per open or close whichever way it happened. `inline` switches the floating off and renders the list in normal flow.
-- Supply an accessible name via a visible `<label for>` pointing at the control's `id`, or the `ariaLabel` prop.
+- Name the select with the `ariaLabel` prop. The focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it; when you show a visible label, pass the same text as `ariaLabel`.
 - Each instance generates a unique id base after mount, so several selects on one page never share option ids or `aria-activedescendant` references. Set `idBase` yourself only when you need stable ids.

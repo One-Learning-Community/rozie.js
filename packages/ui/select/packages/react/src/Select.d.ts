@@ -54,7 +54,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   optionDisabled?: ((...args: any[]) => any) | null;
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   idBase?: string;
   /**
@@ -102,7 +102,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   groups?: unknown[];
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   ariaLabel?: (string) | null;
   /**

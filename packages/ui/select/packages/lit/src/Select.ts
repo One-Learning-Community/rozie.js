@@ -291,7 +291,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Function, attribute: 'option-disabled' }) optionDisabled: ((...args: any[]) => any) | null = null;
   /**
-   * Id base for the popup, option and control elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
+   * Id base for the popup and option elements — `aria-activedescendant` needs real ids. Option ids are `idBase + "-opt-" + i`, the popup id is `idBase + "-list"`. Leave it empty (the default) and each instance generates a unique id base after mount (`rozie-select-<n>`). Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.
    */
   @property({ type: String, reflect: true, attribute: 'id-base' }) idBase: string = '';
   /**
@@ -339,7 +339,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Array }) groups: any[] = [];
   /**
-   * Accessible name for the control when there is no visible `<label for>` pointing at its `id` (`aria-label`).
+   * Accessible name for the control (`aria-label`). This is how you name the select: the focusable control is a `role="combobox"` element, not a form input, so a `<label for>` cannot point at it. Set it to the text of your visible label.
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
@@ -373,12 +373,12 @@ export default class Select extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
 private __rozieWatchInitial_1 = true;
-private __rozieWatchInitial_3 = true;
 private __rozieWatchInitial_4 = true;
 private __rozieWatchInitial_5 = true;
-private __rozieWatchInitial_8 = true;
-private __rozieWatchInitial_10 = true;
-private __rozieWatchInitial_12 = true;
+private __rozieWatchInitial_6 = true;
+private __rozieWatchInitial_9 = true;
+private __rozieWatchInitial_11 = true;
+private __rozieWatchInitial_13 = true;
 private __rozieFirstUpdateDone = false;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
@@ -494,22 +494,22 @@ private __rozieFirstUpdateDone = false;
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._session.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       this.syncPanel();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._panelOpen.value)(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._panelOpen.value)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
       this.takePanelWrite();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._panelEcho.value)(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._panelEcho.value)(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
       if (!this._panelOpen.value && this._panelEcho.value) this.takePanelWrite();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._resync.value)(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._resync.value)(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
       this.syncPanel();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._activeIndex.value)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._activeIndex.value)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
       this.liveActive = this._activeIndex.value;
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._coarse.value)(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this._coarse.value)(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
       this.yieldToNative();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); }));
 
@@ -565,6 +565,9 @@ private __rozieFirstUpdateDone = false;
   updated(changedProperties: Map<string, unknown>): void {
     if (this.__rozieFirstUpdateDone && (changedProperties.has('hideEmpty') || changedProperties.has('options'))) { const __watchVal = (() => (this.hideEmpty ? 'h' : 's') + (this.options ? this.options.length : 0))(); (() => {
       this.syncPanel();
+    })(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled'))) { const __watchVal = (() => !!this.disabled)(); (() => {
+      if (this.disabled) this.close();
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('options'))) { const __watchVal = (() => this.options)(); (() => {
       this.refeedWindow();

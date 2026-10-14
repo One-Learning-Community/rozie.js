@@ -10,6 +10,8 @@
       (`fill` / `drain`); every `open-change` it emits is logged.
     - api-select: driven through its handle by buttons that sit OUTSIDE it and act on
       CLICK (`api-open` / `api-toggle`) — an outside click that opens the popup.
+    - dis-select: its `disabled` prop is switched on / off by a KEY (`dis-keys`: d / e)
+      while the popup is open; every `open-change` it emits is logged.
 
   The swap / fill / drain buttons act on a KEY as well as on click: a click outside an
   open popup is a dismissal by design, so the spec presses the key when the popup has
@@ -21,7 +23,7 @@
 -->
 <rozie name="SelectOpenStateDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ swap: 'a', swapValue: null, filled: false, hideValue: null, hideLog: '', apiValue: null, apiLog: '' }</data>
+<data>{ swap: 'a', swapValue: null, filled: false, hideValue: null, hideLog: '', apiValue: null, apiLog: '', dis: false, disValue: null, disLog: '' }</data>
 <script>
 const make = (word, n) => {
   const out = []
@@ -61,6 +63,15 @@ let apiSeen = ''
 const onApiOpenChange = (e) => {
   apiSeen = apiSeen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
   $data.apiLog = apiSeen
+}
+let disSeen = ''
+const onDisOpenChange = (e) => {
+  disSeen = disSeen + (e.open === true ? 'T' : e.open === false ? 'F' : '?')
+  $data.disLog = disSeen
+}
+const onDisKey = (e) => {
+  if (e.key === 'd') $data.dis = true
+  if (e.key === 'e') $data.dis = false
 }
 const apiOpen = () => { $refs.apiSelect.open() }
 const apiToggle = () => { $refs.apiSelect.toggle() }
@@ -122,6 +133,15 @@ const apiReopenLater = () => {
   </div>
   <div data-testid="api-select">
     <Select ref="apiSelect" :options="FRUIT" r-model:value="$data.apiValue" aria-label="Api" @open-change="onApiOpenChange($event)" />
+  </div>
+
+  <div class="row">
+    <button type="button" data-testid="dis-keys" @keydown="onDisKey($event)">Disable / enable (press d / e)</button>
+    <span data-testid="readout-dis">{{ $data.dis ? 'on' : 'off' }}</span>
+    <span data-testid="readout-dis-log">{{ $data.disLog }}</span>
+  </div>
+  <div data-testid="dis-select">
+    <Select :options="FRUIT" r-model:value="$data.disValue" :disabled="$data.dis" aria-label="Disable" @open-change="onDisOpenChange($event)" />
   </div>
 </div>
 </template>

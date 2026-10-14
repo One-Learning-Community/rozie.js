@@ -65,7 +65,7 @@
       "optional": false
     },
     "@tanstack/virtual-core": {
-      "optional": true
+      "optional": false
     },
     "@rozie-ui/popover-lit": {
       "optional": false
