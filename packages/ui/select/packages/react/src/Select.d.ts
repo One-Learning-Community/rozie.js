@@ -10,11 +10,11 @@ export interface SelectGroup {
 
 export interface SelectProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'renderChip' | 'renderSelected' | 'renderOption' | 'renderEmpty' | 'renderGroupHeading' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array (equal own properties, compared up to 32 levels deep) — which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Any other object (a `Date`, a `Map`, a class instance) matches by identity only. Known limit: on Vue and Svelte two options whose plain-object values have equal contents cannot be told apart. Mapping options to a primitive with `optionValue` is the robust choice.
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array: equal own properties, compared up to 32 levels deep and 2,000 nested objects, beyond which values count as different. That is how a plain-object value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Every other object matches by identity only — a class instance, a `Map`, a `Set`, and a plain object created in another realm (an iframe). On Vue that means a class-instance or `Map` value held in reactive state never shows as selected. Two options whose plain-object values have equal contents cannot be told apart on Vue and Svelte. Mapping options to a primitive with `optionValue` is the robust choice. The list may grow or shrink in place (`push`, `splice`); to change an option, pass a new array.
    */
   options?: unknown[];
   /**
-   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
+   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). How a value is matched to an option is described under `options`.
    * @example
    * <Select value={fruit} onValueChange={setFruit} options={fruits} />
    */
@@ -46,7 +46,7 @@ export interface SelectProps extends Omit<import('react').ComponentPropsWithoutR
    */
   optionLabel?: ((...args: any[]) => any) | null;
   /**
-   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. Returning a primitive (an id) is the robust way to use object options; see `options` for how values are matched.
    */
   optionValue?: ((...args: any[]) => any) | null;
   /**

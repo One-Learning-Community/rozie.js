@@ -14,11 +14,11 @@ import { onDestroy, onMount, untrack } from 'svelte';
 
 interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'options' | 'value' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'chip' | 'selected' | 'option' | 'empty' | 'groupHeading' | 'snippets' | 'onopenchange' | 'onchange' | 'children'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array (equal own properties, compared up to 32 levels deep) — which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Any other object (a `Date`, a `Map`, a class instance) matches by identity only. Known limit: on Vue and Svelte two options whose plain-object values have equal contents cannot be told apart. Mapping options to a primitive with `optionValue` is the robust choice.
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array: equal own properties, compared up to 32 levels deep and 2,000 nested objects, beyond which values count as different. That is how a plain-object value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Every other object matches by identity only — a class instance, a `Map`, a `Set`, and a plain object created in another realm (an iframe). On Vue that means a class-instance or `Map` value held in reactive state never shows as selected. Two options whose plain-object values have equal contents cannot be told apart on Vue and Svelte. Mapping options to a primitive with `optionValue` is the robust choice. The list may grow or shrink in place (`push`, `splice`); to change an option, pass a new array.
    */
   options?: any[];
   /**
-   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
+   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). How a value is matched to an option is described under `options`.
    * @example
    * <Select bind:value={fruit} options={fruits} />
    */
@@ -48,7 +48,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
    */
   optionLabel?: ((...args: any[]) => any) | null;
   /**
-   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. Returning a primitive (an id) is the robust way to use object options; see `options` for how values are matched.
    */
   optionValue?: ((...args: any[]) => any) | null;
   /**
@@ -317,14 +317,22 @@ import { groupOptions } from './internal/groupOptions';
 // NOTHING HERE IS CACHED. Every answer is computed from `$props.value` and
 // `$props.options` as they are when asked, so a model or an option list the consumer
 // changed in place is shown as it is now. For primitive values that costs what the
-// spine's code cost (`===` / `includes` per option); the scan over the options
-// (hasIdenticalOption) only runs for a model value and an option value that are
-// different objects with equal contents.
+// spine's code cost (`===` / `includes` per option). For object values the list rows
+// get their state from ONE selection test per render (flatRows() / groupedRows(),
+// O(options + model)), which is built by that call and dropped with it; the scan over
+// the options (hasIdenticalOption) only runs for a model value and an option value
+// that are different objects with equal contents.
 //
 // The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
 // `includes`, so Select owns these three (they are not imported; nothing Select still
 // imports from the spine reaches them).
-import { identical, selects, selectedIn, toggleIn, distinctValues, uniqueKeys, keyBase } from './internal/valueMatch';
+import { identical, selects, selectedIn, selectionTest, toggleIn, distinctValues, uniqueKeys, keyBase } from './internal/valueMatch';
+// A selection test held for the length of ONE open() call, so the initial-highlight
+// search (`resolveInitialActive`, which asks isSelected() of option after option) is
+// O(options + model) for object values too. Set and cleared synchronously around that
+// call (try / finally) — it never outlives it — and only used for the very model array
+// (same reference, same length) it was made from.
+let scopedSelection: any = null;
 // Is some option's value identical to this model value?
 const hasIdenticalOption = (m: any) => {
   const opts = Array.isArray(options) ? options : [];
@@ -336,8 +344,48 @@ const hasIdenticalOption = (m: any) => {
 const isSelected = (opt: any) => {
   const v = valueOf(opt);
   const cur = value;
-  if (multiple) return Array.isArray(cur) && selectedIn(cur, v, hasIdenticalOption);
+  if (multiple) return Array.isArray(cur) && selectedInModel(cur, v);
   return selects(cur, v, hasIdenticalOption);
+};
+// One option against a multi-select model. Inside open() (see `scopedSelection`) the
+// answer comes from that call's own selection test; otherwise it is the plain per-option
+// comparison — for a primitive value the spine's `includes`.
+const selectedInModel = (cur: any, v: any) => {
+  if (scopedSelection !== null && scopedSelection.model === cur && scopedSelection.length === cur.length) return scopedSelection.test(v);
+  return selectedIn(cur, v, hasIdenticalOption);
+};
+// A "selected?" test for one pass over the options (the rows of one render): built
+// here, used by that pass, dropped with it. O(options + model) for the pass, where one
+// isSelected() per row would be O(options × model) for object values.
+const selectionFor = () => {
+  const cur = value;
+  if (!multiple) return (v: any) => selects(cur, v, hasIdenticalOption);
+  if (!Array.isArray(cur)) return (v: any) => false;
+  const opts = Array.isArray(options) ? options : [];
+  return selectionTest(cur, () => opts.map((o: any) => valueOf(o)));
+};
+// The flat list's rows, each with its selected state, from one selection test.
+const flatRows = () => {
+  const opts = visibleOptions();
+  const test = selectionFor();
+  return opts.map((opt: any, index: any) => ({
+    opt,
+    index,
+    selected: test(valueOf(opt))
+  }));
+};
+// The grouped list's blocks, each row with its selected state, from one selection test.
+const groupedRows = () => {
+  const test = selectionFor();
+  return groupBlocks().map((blk: any) => ({
+    key: blk.key,
+    group: blk.group,
+    items: blk.items.map((row: any) => ({
+      opt: row.opt,
+      index: row.index,
+      selected: test(valueOf(row.opt))
+    }))
+  }));
 };
 // The label shown in the trigger (single-select; a multi-select shows chips instead).
 // A plain function, called in the template — not a `$computed` (the spine's is one).
@@ -387,12 +435,18 @@ const isGrouped = () => !virtual && Array.isArray(groups) && groups.length > 0;
 // Each block carries its render key and each item its index in visibleOptions(). The
 // ungrouped block's key cannot be produced by a group id: named blocks are all `grp-…`.
 const groupsKey = () => isGrouped() ? groups : null;
+// The option list's length, as a memo key next to its reference: an option list the
+// consumer GREW or SHRANK in place (push / splice on a reactive array) is a new option
+// set although the reference is the same. An option REPLACED in place at the same
+// length is not seen by these memos — to change an option, pass a new array (stated in
+// the `options` prop description).
+const optionCount = () => Array.isArray(options) ? options.length : 0;
 const groupingCache = {
   keys: null as any[] | null,
   val: null as any
 };
 const grouping = () => {
-  const __rozieMemoKey = [options, groupsKey(), virtual];
+  const __rozieMemoKey = [options, optionCount(), groupsKey(), virtual];
   const __rozieMemoPrev = groupingCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return groupingCache.val;
@@ -440,7 +494,7 @@ const nativeRowsCache = {
   val: null as any
 };
 const nativeRows = () => {
-  const __rozieMemoKey = [options, groupsKey(), virtual];
+  const __rozieMemoKey = [options, optionCount(), groupsKey(), virtual];
   const __rozieMemoPrev = nativeRowsCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return nativeRowsCache.val;
@@ -666,7 +720,17 @@ const onControlKeyDown = ($event: any) => {
 export const open = () => {
   if (nativeActive()) return;
   if (!disabled && !open$local) session = session + 1;
-  openCore();
+  const cur = value;
+  if (multiple && Array.isArray(cur)) scopedSelection = {
+    model: cur,
+    length: cur.length,
+    test: selectionFor()
+  };
+  try {
+    openCore();
+  } finally {
+    scopedSelection = null;
+  }
   scrollActiveIntoView();
 };
 // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
@@ -1115,7 +1179,7 @@ const windowSourceCache = {
   val: null as any
 };
 const windowSource = () => {
-  const __rozieMemoKey = [options, groupsKey(), virtual, optionValue];
+  const __rozieMemoKey = [options, optionCount(), groupsKey(), virtual, optionValue];
   const __rozieMemoPrev = windowSourceCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return windowSourceCache.val;
@@ -1288,8 +1352,8 @@ export const focusControl = () => {
   triggerEl?.focus();
 };
 // The user is scrolling the list: any reveal still in flight is theirs to override.
-// Called for a wheel, a touch move, and a press of any mouse button inside the list (a
-// scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
+// Called — on all three list branches — for a wheel, a touch move, and a press of any
+// mouse button inside the list (a scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
 // DOM focus stays on the trigger.
 const cancelReveal = () => {
   revealGen = revealGen + 1;
@@ -1446,7 +1510,6 @@ const popupVisible = () => {
 // snapshots on React: when a close and a re-open land in one commit, both watchers
 // run in one pass and the second one misreads our own write as a dismissal (seen as
 // a popup that stayed shut after Enter-then-ArrowDown).
-// The echo is written FIRST, for targets whose watchers run synchronously on a write.
 //
 // WHICH popup the popover closed is state too. `$data.session` counts the opens (the
 // open() gate) and `$data.panelSession` is the session the panel was last shown for.
@@ -1465,15 +1528,45 @@ const syncPanel = () => {
   // The watcher takes it and brings this function back with the pair equal.
   if (panelOpen !== panelEcho) return;
   const visible = popupVisible();
+  // The panel is showing (or about to) for the CURRENT open, whether or not `panelOpen`
+  // has to change for it: a shown popup closed and opened again inside one flush leaves
+  // `panelOpen` where it was while the session moved on. Recording the session only on
+  // a false -> true flip left it behind there, and the next real dismissal was then
+  // taken for a leftover (the popup hid, came back, and needed a second dismissal).
+  if (visible && panelSession !== session) panelSession = session;
   if (visible === panelOpen) return;
-  panelEcho = visible;
-  if (visible) panelSession = session;
-  panelOpen = visible;
+  // The two writes are ordered so that, between them, the pair can only read
+  // "panelOpen true, echo false" — a state no watcher takes for a dismissal (the popover
+  // only ever writes `false`). That matters where watchers run synchronously on a write.
+  if (visible) {
+    panelOpen = true;
+    panelEcho = true;
+  } else {
+    panelEcho = false;
+    panelOpen = false;
+  }
 };
 // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
 // reads only $data, one whose getter reads only props. A getter that mixes the two is
 // routed through a signal effect on Lit, which a plain property change does not re-run
 // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
+// popover -> select: the popover's own write.
+const takePanelWrite = () => {
+  if (panelOpen === panelEcho) return;
+  panelEcho = panelOpen;
+  if (panelOpen) return;
+  // A dismissal of the popup that is showing goes through close().
+  if (panelSession === session) {
+    close();
+    return;
+  }
+  // A leftover from the popup before this one: nothing to close. The panel has to be
+  // shown again for the current session — but NOT in this same flush: the popover holds
+  // `false` because it wrote it, and Angular only pushes a bound value down when it
+  // differs from the one it pushed last (`true`), so `panelOpen` must be seen `false`
+  // by one flush before it goes back to `true`. Hence a task later, through state.
+  queueResync();
+};
 // The later look: nothing is remembered across the wait — the timer only bumps a
 // counter, and syncPanel() decides from the state as it is then.
 const queueResync = () => {
@@ -1655,6 +1748,33 @@ const onControlClick = ($event: any) => {
   toggle();
   focusControl();
 };
+// Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
+// options into the virtualizer and re-pull the window (the data-table
+// setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
+// nothing else:
+//  - the reference, not its length: an array replaced by another of the SAME length is a
+//    new option set too (a length-keyed getter kept the old rows on Vue);
+//  - props only: mixed with a $data read, the getter is routed through a signal effect on
+//    Lit, which a plain property change does not re-run (the windowed list kept the old
+//    rows there until something else re-rendered it).
+// Nothing in a select-only host writes `$data.query`, so there is no query to follow.
+//
+// A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+// place keeps its reference. And because a watcher only hears what the framework
+// reports — an in-place change is reported on Vue and Svelte, not on the other four —
+// the post-render hook below re-feeds too, whenever the virtualizer's count is not the
+// option count any more: whatever made the select render again, the windowed rows then
+// agree with what the label, the chips and the keyboard read.
+const refeedWindow = () => {
+  syncRows();
+  if (virtual && virtualizer) {
+    gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
+    virtualizer.setOptions(virtualizerOptions());
+    virtualizer._willUpdate();
+    windowVer = windowVer + 1;
+    scheduleRemeasure();
+  }
+};
 
 const activeDescendant = $derived.by(() => {
   if (!open$local || activeIndex < 0) return null;
@@ -1662,8 +1782,13 @@ const activeDescendant = $derived.by(() => {
 });
 
 onMount(() => {
-  // A remount of the same instance (React StrictMode) starts clean: frames queued by the
-  // first mount were dropped at its unmount, so no re-measure is in flight.
+  // A remount of the SAME instance (React StrictMode mounts, unmounts and mounts again
+  // synchronously). Frames the first mount queued are still queued: the unmount set
+  // `disposed`, this line clears it again before any of them has run, so they do run —
+  // against this remounted instance. That is harmless (the re-measure sweep, the kick
+  // and the reveal are idempotent and read live state). What must not carry over is the
+  // re-measure latch: the unmount already cleared it, and it is cleared here as well so
+  // that a mount never starts with a sweep believed to be in flight.
   disposed = false;
   remeasurePending = false;
   if (!idBase) autoId = 'rozie-select-' + nextAutoId();
@@ -1703,6 +1828,12 @@ onMount(() => {
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
   }
 });
+$effect(() => (() => {
+  if (virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
+  // The native element's selection is DOM state: after any render that may have added
+  // or removed <option>s, write the model into it again (a no-op when it already shows it).
+  if (nativeActive()) syncNative();
+})());
 onDestroy(() => (() => {
   // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
   // this and does nothing.
@@ -1725,67 +1856,63 @@ $effect(() => { (() => open$local)(); untrack(() => { if (__rozieWatchInitial_0)
   syncPanel();
 })(); }); });
 let __rozieWatchInitial_1 = true;
-$effect(() => { (() => (hideEmpty ? 'h' : 's') + (options ? options.length : 0))(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+$effect(() => { (() => session)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
   syncPanel();
 })(); }); });
 let __rozieWatchInitial_2 = true;
-$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
-  if (panelOpen === panelEcho) return;
-  panelEcho = panelOpen;
-  if (panelOpen) return;
-  // A dismissal of the popup that is showing goes through close().
-  if (panelSession === session) {
-    close();
-    return;
-  }
-  // A leftover from the popup before this one: nothing to close. The panel has to be
-  // shown again for the current session — but NOT in this same flush: the popover holds
-  // `false` because it wrote it, and Angular only pushes a bound value down when it
-  // differs from the one it pushed last (`true`), so `panelOpen` must be seen `false`
-  // by one flush before it goes back to `true`. Hence a task later, through state.
-  queueResync();
-})(); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { (() => resync)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+$effect(() => { (() => (hideEmpty ? 'h' : 's') + (options ? options.length : 0))(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
   syncPanel();
 })(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => panelOpen)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  takePanelWrite();
+})(); }); });
 let __rozieWatchInitial_4 = true;
-$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
-  syncRows();
-  if (virtual && virtualizer) {
-    gridScrollEl = __rozieRoot ? __rozieRoot!.querySelector('.rozie-select-list') : gridScrollEl;
-    virtualizer.setOptions(virtualizerOptions());
-    virtualizer._willUpdate();
-    windowVer = windowVer + 1;
-    scheduleRemeasure();
-  }
+$effect(() => { (() => panelEcho)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
+  if (!panelOpen && panelEcho) takePanelWrite();
 })(); }); });
 let __rozieWatchInitial_5 = true;
-$effect(() => { (() => activeIndex)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
-  liveActive = activeIndex;
+$effect(() => { (() => resync)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } (() => {
+  syncPanel();
 })(); }); });
 let __rozieWatchInitial_6 = true;
-$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
-  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } (() => {
+  refeedWindow();
 })(); }); });
 let __rozieWatchInitial_7 = true;
-$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
-  yieldToNative();
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } (() => {
+  refeedWindow();
 })(); }); });
 let __rozieWatchInitial_8 = true;
-$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
-  yieldToNative();
+$effect(() => { (() => activeIndex)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
+  liveActive = activeIndex;
 })(); }); });
 let __rozieWatchInitial_9 = true;
-$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
-  scheduleNativeSync();
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } (() => {
+  if (activeIndex >= visibleOptions().length) activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 })(); }); });
 let __rozieWatchInitial_10 = true;
-$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => {
-  scheduleNativeSync();
+$effect(() => { (() => coarse)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => {
+  yieldToNative();
 })(); }); });
 let __rozieWatchInitial_11 = true;
-$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => {
+$effect(() => { (() => (nativePicker ? 'n' : '-') + (virtual ? 'v' : '-') + (inline ? 'i' : '-') + (multiple ? 'm' : '-'))(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => {
+  yieldToNative();
+})(); }); });
+let __rozieWatchInitial_12 = true;
+$effect(() => { (() => value)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => {
+  scheduleNativeSync();
+})(); }); });
+let __rozieWatchInitial_13 = true;
+$effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => {
+  scheduleNativeSync();
+})(); }); });
+let __rozieWatchInitial_14 = true;
+$effect(() => { (() => options ? options.length : 0)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } (() => {
+  scheduleNativeSync();
+})(); }); });
+let __rozieWatchInitial_15 = true;
+$effect(() => { (() => groups)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => {
   scheduleNativeSync();
 })(); }); });
 
@@ -1811,7 +1938,7 @@ $effect(() => {
 });
 </script>
 
-<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': disabled, 'rozie-select-inline': inline, 'rozie-select--block': block, 'rozie-select--native': nativeActive() }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><Popover trigger="manual" bind:open={panelOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} disableDismiss={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6>{#snippet anchor()}<div class="rozie-select-control" bind:this={controlEl} onclick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6>{#if multiple}{#each chipRows() as row, idx (row.key)}<span class="rozie-select-chip" data-rozie-s-6e3ebfa6>{#if chip}{@render chip({ option: row.option, remove: () => onChipRemove(row), index: idx })}{:else}<span class="rozie-select-chip__label" data-rozie-s-6e3ebfa6>{rozieDisplay(row.label)}</span><button type="button" class="rozie-select-chip__remove" tabindex="-1" disabled={!!disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onmousedown={($event) => { $event.preventDefault(); noop(); }} onclick={($event) => { onChipRemove(row); }} data-rozie-s-6e3ebfa6>×</button>{/if}</span>{/each}{/if}<div bind:this={triggerEl} class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex={rozieAttr(triggerTabindex())} aria-hidden={rozieAttr(nativeActive() ? 'true' : null)} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : null)} aria-label={ariaLabel} aria-disabled={!!disabled} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if !multiple}{#if selected}{@render selected({ selected: selectedLabel(), value })}{:else}{#if selectedLabel()}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel())}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}{/if}{#if multiple && selectedValues().length === 0}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}</div>{#if clearable && hasValue() && !disabled}<button type="button" class="rozie-select-clear" tabindex="-1" aria-label={clearLabel} onmousedown={($event) => { $event.preventDefault(); noop(); }} onclick={($event) => { onClearClick(); }} data-rozie-s-6e3ebfa6>×</button>{/if}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>{#if nativeActive()}<select class="rozie-select-native" disabled={!!disabled} aria-label={rozieAttr(ariaLabel ? ariaLabel : null)} onchange={($event) => { $event.stopPropagation(); onNativeChange($event); }} data-rozie-s-6e3ebfa6><option value="" disabled={!!nativePlaceholderDisabled()} data-rozie-s-6e3ebfa6>{placeholder}</option>{#each nativeRows().loose as row ('n-' + row.index)}<option value={rozieAttr(row.index)} disabled={!!disabledOf(row.opt)} data-rozie-s-6e3ebfa6>{rozieDisplay(labelOf(row.opt))}</option>{/each}{#each nativeRows().grouped as blk ('ng-' + blk.group.id)}<optgroup label={rozieAttr(blk.group.label)} data-rozie-s-6e3ebfa6>{#each blk.items as row ('n-' + row.index)}<option value={rozieAttr(row.index)} disabled={!!disabledOf(row.opt)} data-rozie-s-6e3ebfa6>{rozieDisplay(labelOf(row.opt))}</option>{/each}</optgroup>{/each}</select>{/if}</div>{/snippet}{#if popupVisible() && !virtual && !isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} onmousedown={($event) => { onListMouseDown($event); }} data-rozie-s-6e3ebfa6>{#each visibleOptions() as opt, index (optionId(index))}<div id={rozieAttr(optionId(index))} class={["rozie-select-option", { 'is-active': activeIndex === index, 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) }]} role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} onclick={($event) => { select(opt); }} onmousemove={($event) => { onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: opt, index, active: activeIndex === index, selected: isSelected(opt), disabled: disabledOf(opt) })}{:else}{rozieDisplay(labelOf(opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if popupVisible() && !virtual && isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} onmousedown={($event) => { onListMouseDown($event); }} data-rozie-s-6e3ebfa6>{#each groupBlocks() as blk (blk.key)}<div class="rozie-select-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-6e3ebfa6>{#if blk.group}<div class="rozie-select-group-heading" role="presentation" data-rozie-s-6e3ebfa6>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as row (optionId(row.index))}<div id={rozieAttr(optionId(row.index))} class={["rozie-select-option", { 'is-active': activeIndex === row.index, 'is-selected': isSelected(row.opt), 'is-disabled': disabledOf(row.opt) }]} role="option" aria-selected={!!isSelected(row.opt)} aria-disabled={!!disabledOf(row.opt)} onclick={($event) => { select(row.opt); }} onmousemove={($event) => { onOptionPointerMove(row.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: row.opt, index: row.index, active: activeIndex === row.index, selected: isSelected(row.opt), disabled: disabledOf(row.opt) })}{:else}{rozieDisplay(labelOf(row.opt))}{/if}</div>{/each}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + maxHeight : 'overflow-y:auto'))} onmousedown={($event) => { onListMouseDown($event); }} onwheel={($event) => { cancelReveal(); }} ontouchmove={($event) => { cancelReveal(); }} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(rowOption(wr)), 'is-disabled': disabledOf(rowOption(wr)) }]} role="option" aria-selected={!!isSelected(rowOption(wr))} aria-disabled={!!disabledOf(rowOption(wr))} onclick={($event) => { select(rowOption(wr)); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: rowOption(wr), index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(rowOption(wr)), disabled: disabledOf(rowOption(wr)) })}{:else}{rozieDisplay(labelOf(rowOption(wr)))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</Popover></div>
+<div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-select", { 'rozie-select-open': popupVisible(), 'rozie-select-disabled': disabled, 'rozie-select-inline': inline, 'rozie-select--block': block, 'rozie-select--native': nativeActive() }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-6e3ebfa6><Popover trigger="manual" bind:open={panelOpen} bare={true} matchWidth={true} keepMounted={virtual} disablePositioning={inline} disableDismiss={inline} placement={placement} offset={offset} disableFlip={disableFlip} disableShift={disableShift} idBase={idRoot()} data-rozie-s-6e3ebfa6>{#snippet anchor()}<div class="rozie-select-control" bind:this={controlEl} onclick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6>{#if multiple}{#each chipRows() as row, idx (row.key)}<span class="rozie-select-chip" data-rozie-s-6e3ebfa6>{#if chip}{@render chip({ option: row.option, remove: () => onChipRemove(row), index: idx })}{:else}<span class="rozie-select-chip__label" data-rozie-s-6e3ebfa6>{rozieDisplay(row.label)}</span><button type="button" class="rozie-select-chip__remove" tabindex="-1" disabled={!!disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onmousedown={($event) => { $event.preventDefault(); noop(); }} onclick={($event) => { onChipRemove(row); }} data-rozie-s-6e3ebfa6>×</button>{/if}</span>{/each}{/if}<div bind:this={triggerEl} class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" tabindex={rozieAttr(triggerTabindex())} aria-hidden={rozieAttr(nativeActive() ? 'true' : null)} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : null)} aria-label={ariaLabel} aria-disabled={!!disabled} onkeydown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6>{#if !multiple}{#if selected}{@render selected({ selected: selectedLabel(), value })}{:else}{#if selectedLabel()}<span class="rozie-select-selected" data-rozie-s-6e3ebfa6>{rozieDisplay(selectedLabel())}</span>{:else}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}{/if}{/if}{#if multiple && selectedValues().length === 0}<span class="rozie-select-placeholder" data-rozie-s-6e3ebfa6>{placeholder}</span>{/if}</div>{#if clearable && hasValue() && !disabled}<button type="button" class="rozie-select-clear" tabindex="-1" aria-label={clearLabel} onmousedown={($event) => { $event.preventDefault(); noop(); }} onclick={($event) => { onClearClick(); }} data-rozie-s-6e3ebfa6>×</button>{/if}<span class="rozie-select-arrow" aria-hidden="true" data-rozie-s-6e3ebfa6>▾</span>{#if nativeActive()}<select class="rozie-select-native" disabled={!!disabled} aria-label={rozieAttr(ariaLabel ? ariaLabel : null)} onchange={($event) => { $event.stopPropagation(); onNativeChange($event); }} data-rozie-s-6e3ebfa6><option value="" disabled={!!nativePlaceholderDisabled()} data-rozie-s-6e3ebfa6>{placeholder}</option>{#each nativeRows().loose as row ('n-' + row.index)}<option value={rozieAttr(row.index)} disabled={!!disabledOf(row.opt)} data-rozie-s-6e3ebfa6>{rozieDisplay(labelOf(row.opt))}</option>{/each}{#each nativeRows().grouped as blk ('ng-' + blk.group.id)}<optgroup label={rozieAttr(blk.group.label)} data-rozie-s-6e3ebfa6>{#each blk.items as row ('n-' + row.index)}<option value={rozieAttr(row.index)} disabled={!!disabledOf(row.opt)} data-rozie-s-6e3ebfa6>{rozieDisplay(labelOf(row.opt))}</option>{/each}</optgroup>{/each}</select>{/if}</div>{/snippet}{#if popupVisible() && !virtual && !isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} onmousedown={($event) => { onListMouseDown($event); }} onwheel={($event) => { cancelReveal(); }} ontouchmove={($event) => { cancelReveal(); }} data-rozie-s-6e3ebfa6>{#each flatRows() as row (optionId(row.index))}<div id={rozieAttr(optionId(row.index))} class={["rozie-select-option", { 'is-active': activeIndex === row.index, 'is-selected': row.selected, 'is-disabled': disabledOf(row.opt) }]} role="option" aria-selected={!!row.selected} aria-disabled={!!disabledOf(row.opt)} onclick={($event) => { select(row.opt); }} onmousemove={($event) => { onOptionPointerMove(row.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: row.opt, index: row.index, active: activeIndex === row.index, selected: row.selected, disabled: disabledOf(row.opt) })}{:else}{rozieDisplay(labelOf(row.opt))}{/if}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if popupVisible() && !virtual && isGrouped()}<div bind:this={listEl} class="rozie-select-list" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} onmousedown={($event) => { onListMouseDown($event); }} onwheel={($event) => { cancelReveal(); }} ontouchmove={($event) => { cancelReveal(); }} data-rozie-s-6e3ebfa6>{#each groupedRows() as blk (blk.key)}<div class="rozie-select-group" role="group" aria-label={rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-6e3ebfa6>{#if blk.group}<div class="rozie-select-group-heading" role="presentation" data-rozie-s-6e3ebfa6>{#if groupHeading}{@render groupHeading({ group: blk.group })}{:else}{rozieDisplay(blk.group.label)}{/if}</div>{/if}{#each blk.items as row (optionId(row.index))}<div id={rozieAttr(optionId(row.index))} class={["rozie-select-option", { 'is-active': activeIndex === row.index, 'is-selected': row.selected, 'is-disabled': disabledOf(row.opt) }]} role="option" aria-selected={!!row.selected} aria-disabled={!!disabledOf(row.opt)} onclick={($event) => { select(row.opt); }} onmousemove={($event) => { onOptionPointerMove(row.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: row.opt, index: row.index, active: activeIndex === row.index, selected: row.selected, disabled: disabledOf(row.opt) })}{:else}{rozieDisplay(labelOf(row.opt))}{/if}</div>{/each}</div>{/each}{#if visibleOptions().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}{#if virtual}<div bind:this={listEl} class="rozie-select-list rozie-select-list--virtual" role="listbox" id={rozieAttr(idRoot() + '-list')} aria-label={ariaLabel} aria-multiselectable={multiple} style={rozieStyle((popupVisible() ? '' : 'display:none;') + (maxHeight ? 'height:' + maxHeight + ';max-height:' + maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + maxHeight : 'overflow-y:auto'))} onmousedown={($event) => { onListMouseDown($event); }} onwheel={($event) => { cancelReveal(); }} ontouchmove={($event) => { cancelReveal(); }} data-rozie-s-6e3ebfa6><div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6></div>{#each windowedRows() as wr (wr.row.id)}<div id={rozieAttr(optionId(wr.vi.index))} data-index={rozieAttr(wr.vi.index)} class={["rozie-select-option", { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(rowOption(wr)), 'is-disabled': disabledOf(rowOption(wr)) }]} role="option" aria-selected={!!isSelected(rowOption(wr))} aria-disabled={!!disabledOf(rowOption(wr))} onclick={($event) => { select(rowOption(wr)); }} onmousemove={($event) => { onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>{#if option}{@render option({ option: rowOption(wr), index: wr.vi.index, active: activeIndex === wr.vi.index, selected: isSelected(rowOption(wr)), disabled: disabledOf(rowOption(wr)) })}{:else}{rozieDisplay(labelOf(rowOption(wr)))}{/if}</div>{/each}<div class="rozie-select-spacer" aria-hidden="true" style={rozieStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6></div>{#if windowSource().length === 0}<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>{#if empty}{@render empty({ query })}{:else}No options{/if}</div>{/if}</div>{/if}</Popover></div>
 
 <style>
 :global {

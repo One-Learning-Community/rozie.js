@@ -3,7 +3,7 @@
  * and option values with (src/internal/valueMatch.ts, vendored into every leaf).
  */
 import { describe, expect, it } from 'vitest';
-import { distinctValues, identical, keyBase, sameContent, selectedIn, selects, toggleIn, uniqueKeys } from '../src/internal/valueMatch';
+import { buildMatchIndex, distinctValues, identical, keyBase, sameContent, selectedByIndex, selectedIn, selectionTest, selects, toggleIn, uniqueKeys } from '../src/internal/valueMatch';
 
 describe('identical — the spine rule (=== / includes)', () => {
   it('is === plus NaN matching NaN', () => {
@@ -142,6 +142,90 @@ describe('sameContent', () => {
     expect(ms).toBeLessThan(200);
     // A small shared structure is still compared in full.
     expect(sameContent(dag(6), dag(6))).toBe(true);
+  });
+});
+
+describe('sameContent never throws', () => {
+  it('a throwing getter on a plain-object value means "not equal", either way round', () => {
+    const bomb = { a: 1, get b(): number { throw new Error('boom'); } };
+    const calm = { a: 1, b: 2 };
+    expect(() => sameContent(bomb, calm)).not.toThrow();
+    expect(sameContent(bomb, calm)).toBe(false);
+    expect(sameContent(calm, bomb)).toBe(false);
+    expect(sameContent({ x: bomb }, { x: calm })).toBe(false);
+    expect(sameContent(bomb, bomb)).toBe(true); // identity needs no reading
+    // …and the paths that go through it do not throw either.
+    expect(() => distinctValues([bomb], [calm])).not.toThrow();
+    expect(distinctValues([bomb], [calm]).map((r) => r.at)).toEqual([-1]);
+    const index = buildMatchIndex([bomb], [calm]);
+    expect(selectedByIndex(index, [bomb], calm)).toBe(false);
+    expect(selectedByIndex(index, [bomb], bomb)).toBe(true);
+  });
+  it('a proxy whose traps throw is "not equal" too', () => {
+    const hostile = new Proxy({ a: 1 }, { ownKeys() { throw new Error('no'); } });
+    expect(sameContent(hostile, { a: 1 })).toBe(false);
+    expect(sameContent({ a: 1 }, hostile)).toBe(false);
+  });
+});
+
+describe('buildMatchIndex / selectedByIndex — the same answers as selectedIn, in one pass', () => {
+  const A = { kind: 'twin' };
+  const B = { kind: 'twin' };
+  const C = { kind: 'other' };
+  const D = { kind: 'deep', inner: { n: 1 } };
+  const date = new Date(5);
+  const options: unknown[] = [A, B, C, D, date, 'a', 1, NaN, null, { kind: 'deep', inner: { n: 2 } }];
+  const has = (m: unknown) => options.some((v) => identical(v, m));
+  const models: unknown[][] = [
+    [],
+    [B],
+    [A, B],
+    [new Proxy(B, {})],
+    [{ kind: 'twin' }],
+    [{ kind: 'deep', inner: { n: 1 } }],
+    [{ kind: 'deep', inner: { n: 2 } }, C],
+    [new Date(5)],
+    [date, 'a', NaN],
+    ['a', 'ghost', 1, null],
+    [B, { kind: 'twin' }, new Proxy(C, {})],
+    [{ kind: 'nothing' }, [1, 2], []],
+  ];
+  it('agrees with selectedIn for every option, over a spread of models', () => {
+    for (const model of models) {
+      const index = buildMatchIndex(model, options);
+      options.forEach((v, i) => {
+        expect(selectedByIndex(index, model, v), `model #${models.indexOf(model)}, option #${i}`).toBe(selectedIn(model, v, has));
+      });
+    }
+  });
+  it('a model value identical to an option never selects another option by content', () => {
+    const index = buildMatchIndex([B], options);
+    expect(index.loose.size).toBe(0);
+    expect(selectedByIndex(index, [B], A)).toBe(false);
+    expect(selectedByIndex(index, [B], B)).toBe(true);
+  });
+});
+
+describe('selectionTest — one pass, one index, nothing kept', () => {
+  const opts = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  it('agrees with selectedIn, and builds the index once, only for object values', () => {
+    let builds = 0;
+    const model: unknown[] = [opts[1], 'p'];
+    const has = (m: unknown) => opts.some((v) => v === m);
+    const test = selectionTest(model, () => { builds++; return opts; });
+    expect(test('p')).toBe(true);
+    expect(test('q')).toBe(false);
+    expect(builds).toBe(0); // primitives never build it
+    for (const v of opts) expect(test(v)).toBe(selectedIn(model, v, has));
+    expect(builds).toBe(1);
+  });
+  it('a new test after an in-place change sees the change (each pass reads the model anew)', () => {
+    const model: unknown[] = [opts[0]];
+    expect(selectionTest(model, () => opts)(opts[0])).toBe(true);
+    model[0] = opts[1];
+    const again = selectionTest(model, () => opts);
+    expect(again(opts[0])).toBe(false);
+    expect(again(opts[1])).toBe(true);
   });
 });
 

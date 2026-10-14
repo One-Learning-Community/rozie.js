@@ -1,6 +1,6 @@
 <!--
   SelectIdentityDemo.rozie — BEHAVIORAL consumer for value identity in the Select
-  (select-identity.spec.ts). Fourteen selects:
+  (select-identity.spec.ts). Seventeen selects:
 
     - one:    single-select whose option values are OBJECTS. The consumer's reactive
               state can hand a committed object back wrapped in a proxy; the option
@@ -24,8 +24,9 @@
               values, single and multi. Inside the Select the windowed rows live in
               reactive state, so on some targets the row's option is a proxy of the
               consumer's object.
-    - live-many / live-one: a multi and a single select over an option list and a model
-              that the SPEC changes in place. A `.rozie` file may not mutate nested
+    - live-many / live-one / live-grouped / live-native / live-virtual: a multi select
+              and four single selects (flat, grouped, native picker, windowed) over ONE
+              option list and a model that the SPEC changes in place. A `.rozie` file may not mutate nested
               `$data` in place (ROZ207: it is not reactive on four of the six targets),
               so the demo hands the two bound arrays to the page (`__selectIdentityDemo`)
               and the spec changes them from there — what a consumer writing plain Vue
@@ -35,7 +36,7 @@
 -->
 <rozie name="SelectIdentityDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ one: null, oneSame: '', many: [], refuse: 'apple', refuseChanges: 0, bounce: 'apple', bounceChanges: 0, dupes: ['apple', 'apple', 'banana'], dupeChanges: 0, twin: null, twinPicked: '', twinMany: [], nums: [], virt: null, virtPicked: '', virtMany: [], virtPrim: null, virtPrimMany: [], liveOpts: [{ label: 'A', value: 'a' }, { label: 'B', value: 'b' }, { label: 'C', value: 'c' }], liveMany: ['a', 'b', 'd'], liveOne: 'd', liveTick: 0 }</data>
+<data>{ one: null, oneSame: '', many: [], refuse: 'apple', refuseChanges: 0, bounce: 'apple', bounceChanges: 0, dupes: ['apple', 'apple', 'banana'], dupeChanges: 0, twin: null, twinPicked: '', twinMany: [], nums: [], virt: null, virtPicked: '', virtMany: [], virtPrim: null, virtPrimMany: [], liveOpts: [{ label: 'A', value: 'a', group: 'g' }, { label: 'B', value: 'b', group: 'g' }, { label: 'C', value: 'c', group: 'g' }], liveMany: ['a', 'b', 'd'], liveOne: 'd', liveTick: 0 }</data>
 <script>
 const BOX = { kind: 'box' }
 const CRATE = { kind: 'crate' }
@@ -97,6 +98,7 @@ const virtPrimJoined = () => (Array.isArray($data.virtPrimMany) ? $data.virtPrim
 $onMount(() => {
   Reflect.set(globalThis, '__selectIdentityDemo', { model: $data.liveMany, options: $data.liveOpts })
 })
+const LIVE_GROUPS = [{ id: 'g', label: 'Letters' }]
 const bumpTick = () => { $data.liveTick = $data.liveTick + 1 }
 const liveJoined = () => (Array.isArray($data.liveMany) ? $data.liveMany.join(',') : '')
 </script>
@@ -136,6 +138,9 @@ const liveJoined = () => (Array.isArray($data.liveMany) ? $data.liveMany.join(',
   <div data-testid="virt-prim-many"><Select :options="VIRT_PRIM" r-model:value="$data.virtPrimMany" :virtual="true" multiple :close-on-select="false" maxHeight="200px" aria-label="Windowed primitives many" /></div>
   <div data-testid="live-many"><Select :options="$data.liveOpts" r-model:value="$data.liveMany" multiple :close-on-select="false" aria-label="Live many" /></div>
   <div data-testid="live-one"><Select :options="$data.liveOpts" r-model:value="$data.liveOne" placeholder="Nothing" aria-label="Live one" /></div>
+  <div data-testid="live-grouped"><Select :options="$data.liveOpts" :groups="LIVE_GROUPS" r-model:value="$data.liveOne" placeholder="Nothing" aria-label="Live grouped" /></div>
+  <div data-testid="live-native"><Select :options="$data.liveOpts" r-model:value="$data.liveOne" native-picker placeholder="Nothing" aria-label="Live native" /></div>
+  <div data-testid="live-virtual"><Select :options="$data.liveOpts" r-model:value="$data.liveOne" :virtual="true" maxHeight="200px" placeholder="Nothing" aria-label="Live virtual" /></div>
   <div data-testid="dupes"><Select :options="FRUIT" r-model:value="$data.dupes" multiple :close-on-select="false" aria-label="Dupes" @change="onDupesChange()" /></div>
 </div>
 </template>

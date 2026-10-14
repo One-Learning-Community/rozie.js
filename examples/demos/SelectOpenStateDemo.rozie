@@ -64,12 +64,28 @@ const onApiOpenChange = (e) => {
 }
 const apiOpen = () => { $refs.apiSelect.open() }
 const apiToggle = () => { $refs.apiSelect.toggle() }
-// Three handle calls in ONE tick, on a key (so no outside click is involved).
+// Handle calls in ONE tick, on a key (so no outside click is involved):
+// "x" -> open(), close(), open();  "y" -> close(), open().
 const onBurstKey = (e) => {
-  if (e.key !== 'x') return
-  $refs.apiSelect.open()
+  if (e.key === 'x') {
+    $refs.apiSelect.open()
+    $refs.apiSelect.close()
+    $refs.apiSelect.open()
+  }
+  if (e.key === 'y') {
+    $refs.apiSelect.close()
+    $refs.apiSelect.open()
+  }
+}
+// The same from a CLICK outside the select (the click is also an outside click for the
+// open popup): close() then open() at once, and close() then open() a microtask later.
+const apiReopen = () => {
   $refs.apiSelect.close()
   $refs.apiSelect.open()
+}
+const apiReopenLater = () => {
+  $refs.apiSelect.close()
+  Promise.resolve().then(() => { $refs.apiSelect.open() })
 }
 </script>
 <template>
@@ -99,7 +115,9 @@ const onBurstKey = (e) => {
   <div class="row">
     <button type="button" data-testid="api-open" @click="apiOpen()">open()</button>
     <button type="button" data-testid="api-toggle" @click="apiToggle()">toggle()</button>
-    <button type="button" data-testid="api-burst" @keydown="onBurstKey($event)">open() close() open() (press x)</button>
+    <button type="button" data-testid="api-burst" @keydown="onBurstKey($event)">handle bursts (press x / y)</button>
+    <button type="button" data-testid="api-reopen" @click="apiReopen()">close() open()</button>
+    <button type="button" data-testid="api-reopen-later" @click="apiReopenLater()">close() … open()</button>
     <span data-testid="readout-api-log">{{ $data.apiLog }}</span>
   </div>
   <div data-testid="api-select">

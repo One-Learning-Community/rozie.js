@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,7 +118,16 @@ for (const target of TARGETS) {
   });
 
   // ── B3 ────────────────────────────────────────────────────────────────────
+  // KNOWN GAP, pinned exactly (no blanket expected-failure): on the targets named in
+  // each test the control keeps the value the component wrote itself. The compiled Select
+  // holds `value` in the framework's own two-way primitive there (Vue `defineModel`,
+  // Svelte `$bindable`, Angular `model()`), which has no "controlled" mode to fall back
+  // to; React, Solid and Lit go through Rozie's controllable-state helpers. Nothing in
+  // Select.rozie can tell the two apart (its only handle is `$model.value`), so closing
+  // the gap needs the emitters — and when they close it, the pinned branch fails.
   runner(`select-identity [${target}]: a one-way binding whose consumer keeps the old value — the control shows the consumer's value`, async ({ page }) => {
+    // The parent binds one-way and never sends a different value.
+    const KEEPS_OWN_WRITE = target === 'vue' || target === 'svelte' || target === 'angular';
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('refuse');
     const trigger = wrap.locator('[role="combobox"]');
@@ -128,32 +137,30 @@ for (const target of TARGETS) {
     await trigger.click();
     await options.nth(1).click(); // Banana: refused
     await expect(page.getByTestId('readout-refuse-changes')).toHaveText('1');
-    await expect(page.getByTestId('readout-refuse')).toHaveText('apple');
-
-    // Everything above holds on all six: the page loaded, the initial value showed, the
-    // pick reached the consumer and the consumer kept 'apple'. Only what follows is the gap.
-    // EXPECTED FAILURE on Vue, Svelte and Angular — the repro for a known gap, not a
-    // property of this demo. On those three the compiled Select holds `value` in the
-    // framework's own two-way primitive (Vue `defineModel`, Svelte `$bindable`, Angular
-    // `model()`), and each of them keeps a value the component wrote itself when the
-    // parent binds one-way and never sends a different value: there is no "controlled"
-    // mode to fall back to. React, Solid and Lit go through Rozie's controllable-state
-    // helpers, which treat a supplied prop as controlled. Nothing in Select.rozie can
-    // tell the two apart (its only handle is `$model.value`), so this needs the emitters.
-    // Remove the marker when it is fixed: the test then fails as "expected to fail, but passed".
-    test.fail(target === 'vue' || target === 'svelte' || target === 'angular', 'a one-way bound model prop keeps the value the component wrote (defineModel / $bindable / model() are uncontrolled without a two-way binding)');
+    await expect(page.getByTestId('readout-refuse')).toHaveText('apple'); // the consumer kept 'apple', on all six
     await page.waitForTimeout(250);
-    await expect(wrap.locator('.rozie-select-selected')).toHaveText('Apple');
+    await expect(wrap.locator('.rozie-select-selected')).toHaveText(KEEPS_OWN_WRITE ? 'Banana' : 'Apple');
     await trigger.click();
-    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
-    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'false');
+    await expect(options).toHaveCount(3);
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', KEEPS_OWN_WRITE ? 'false' : 'true');
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', KEEPS_OWN_WRITE ? 'true' : 'false');
 
+    // An accepted pick is shown on all six.
     await options.nth(2).click(); // Cherry: accepted
+    await expect(page.getByTestId('readout-refuse-changes')).toHaveText('2');
     await expect(page.getByTestId('readout-refuse')).toHaveText('cherry');
     await expect(wrap.locator('.rozie-select-selected')).toHaveText('Cherry');
+    await trigger.click();
+    await expect(options.nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'false');
   });
 
   runner(`select-identity [${target}]: a two-way binding whose consumer writes the old value back in its change handler — the control shows the consumer's value`, async ({ page }) => {
+    // Angular only: the parent's value goes apple -> banana -> apple inside ONE handler;
+    // at the next change detection the binding holds the value it last pushed down
+    // ('apple'), so the input is not written again and the Select's `model()` stays on
+    // 'banana'. (Consumer-side remedy: write the old value back a task later.)
+    const KEEPS_OWN_WRITE = target === 'angular';
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('bounce');
     const trigger = wrap.locator('[role="combobox"]');
@@ -163,33 +170,26 @@ for (const target of TARGETS) {
     await trigger.click();
     await options.nth(1).click(); // Banana: written back
     await expect(page.getByTestId('readout-bounce-changes')).toHaveText('1');
-    await expect(page.getByTestId('readout-bounce')).toHaveText('apple');
-
-    // Everything above holds on all six; only what follows is the gap.
-    // EXPECTED FAILURE on Angular — the repro for a known gap. The parent's two-way
-    // binding goes apple -> banana -> apple inside ONE handler; at the next change
-    // detection the binding holds the value it last pushed down ('apple'), so Angular
-    // does not write the input again and the Select's own `model()` stays on 'banana'.
-    // The consumer-side remedy is to write the old value back a task later (the
-    // SelectNativeDemo `guarded` select does). Nothing in Select.rozie can see the
-    // parent's value, so this needs the Angular emitter. Remove the marker when fixed.
-    test.fail(target === 'angular', 'a two-way binding written back to its previous value in the same handler is not pushed to the model() input again');
+    await expect(page.getByTestId('readout-bounce')).toHaveText('apple'); // on all six
     await page.waitForTimeout(250);
-    await expect(wrap.locator('.rozie-select-selected')).toHaveText('Apple');
+    await expect(wrap.locator('.rozie-select-selected')).toHaveText(KEEPS_OWN_WRITE ? 'Banana' : 'Apple');
     await trigger.click();
-    await expect(options.nth(0)).toHaveAttribute('aria-selected', 'true');
-    await expect(options.nth(1)).toHaveAttribute('aria-selected', 'false');
+    await expect(options).toHaveCount(3);
+    await expect(options.nth(0)).toHaveAttribute('aria-selected', KEEPS_OWN_WRITE ? 'false' : 'true');
+    await expect(options.nth(1)).toHaveAttribute('aria-selected', KEEPS_OWN_WRITE ? 'true' : 'false');
 
+    // An accepted pick is shown on all six.
     await options.nth(2).click(); // Cherry: accepted
+    await expect(page.getByTestId('readout-bounce-changes')).toHaveText('2');
     await expect(page.getByTestId('readout-bounce')).toHaveText('cherry');
     await expect(wrap.locator('.rozie-select-selected')).toHaveText('Cherry');
-    // …and a refusal after an accepted commit goes back to the accepted value.
+    // …and a refusal after an accepted commit: the consumer is back on the accepted value.
     await trigger.click();
     await options.nth(1).click();
     await expect(page.getByTestId('readout-bounce-changes')).toHaveText('3');
     await expect(page.getByTestId('readout-bounce')).toHaveText('cherry');
     await page.waitForTimeout(250);
-    await expect(wrap.locator('.rozie-select-selected')).toHaveText('Cherry');
+    await expect(wrap.locator('.rozie-select-selected')).toHaveText(KEEPS_OWN_WRITE ? 'Banana' : 'Cherry');
   });
 
   // ── identity first ────────────────────────────────────────────────────────
@@ -399,40 +399,80 @@ for (const target of TARGETS) {
   // ── the bound arrays changed IN PLACE ─────────────────────────────────────
   // Whatever makes the framework render again must show the truth. The demo hands its two
   // bound arrays to the page and the spec changes them there (a `.rozie` file may not:
-  // ROZ207). Only vue and svelte render again for a change made INSIDE a bound array —
-  // their state is deeply reactive — so only they run this; on the other four the
-  // consumer has to assign a new array, which the rest of this file covers.
-  const DEEP = target === 'vue' || target === 'svelte';
-  (DEEP ? runner : test.skip)(`select-identity [${target}]: a model and an option list changed in place are shown as they are now`, async ({ page }) => {
+  // ROZ207 — an in-place change is reported by the framework only on Vue and Svelte).
+  //
+  // What each target can see of a change made inside a bound array:
+  //  - vue, svelte: everything (their state is deeply reactive).
+  //  - react: after the demo renders again (`live-tick`), which renders the select again.
+  //  - angular: after `live-tick` the template is checked again, so what the template
+  //    computes is current; but no watcher and no post-render hook runs (an in-place
+  //    change is not an input change, and the compiled `$onUpdate` never runs its body
+  //    on Angular — see the report), so the windowed rows and the native element's
+  //    checked option, which are kept by those, stay as they were.
+  //  - lit: the select is not rendered again by its parent (same property values); it is
+  //    by anything of its own — opening its popup refreshes it (refresh() below).
+  //  - solid: nothing renders again; only a list mounted AFTER the change (the popup, on
+  //    open) reads the arrays anew.
+  // Assertions are skipped exactly where a target cannot see the change.
+  const ON_SCREEN = target !== 'solid'; // the label, the chips
+  const DEMO_RENDERS = target !== 'solid'; // the demo's own readouts
+  const WINDOWED = target === 'vue' || target === 'svelte' || target === 'react' || target === 'lit';
+  const NATIVE = target === 'vue' || target === 'svelte' || target === 'react';
+  const refresh = async (wrap: Locator) => {
+    if (target !== 'lit') return;
+    await wrap.locator('[role="combobox"]').click();
+    await expect(wrap.locator('[role="listbox"]')).toBeVisible();
+    await wrap.page().keyboard.press('Escape');
+    await expect(wrap.locator('[role="listbox"]')).toHaveCount(0);
+  };
+  type Hook = { model: unknown[]; options: unknown[] };
+  const inPlace = async (page: Page, src: string) => {
+    await page.evaluate((code) => {
+      const h = (globalThis as unknown as { __selectIdentityDemo: Hook }).__selectIdentityDemo;
+      new Function('h', code)(h);
+    }, src);
+    const tick = page.getByTestId('readout-live-tick');
+    const before = Number(await tick.textContent());
+    await page.getByTestId('live-tick').click();
+    if (target !== 'solid') await expect(tick).toHaveText(String(before + 1));
+  };
+  const D = `{ label: 'D', value: 'd', group: 'g' }`;
+
+  runner(`select-identity [${target}]: a model and an option list changed in place are shown as they are now`, async ({ page }) => {
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const many = page.getByTestId('live-many');
     const one = page.getByTestId('live-one');
     const labels = many.locator('.rozie-select-chip__label');
     const readout = page.getByTestId('readout-live-many');
-    type Hook = { model: unknown[]; options: unknown[] };
-    const hook = (fn: string) => page.evaluate((src) => {
-      const h = (globalThis as unknown as { __selectIdentityDemo: Hook }).__selectIdentityDemo;
-      new Function('h', src)(h);
-    }, fn);
     const opt = (wrap: typeof many, label: string) => wrap.locator('[role="option"]', { hasText: new RegExp(`^\\s*${label}\\s*$`) });
+    const chips = async (want: string[]) => {
+      if (!ON_SCREEN) return;
+      await refresh(many);
+      await expect(labels).toHaveText(want);
+    };
+    const readoutIs = async (want: string) => { if (DEMO_RENDERS) await expect(readout).toHaveText(want); };
     await expect(readout).toHaveText('a,b,d');
     await expect(labels).toHaveText(['A', 'B', 'd']); // 'd' matches no option yet: its raw value
     await expect(one.locator('.rozie-select-placeholder')).toHaveText('Nothing');
 
     // An option pushed for a value already in the model: both selects pick it up.
-    await hook(`h.options.push({ label: 'D', value: 'd' })`);
-    await expect(page.getByTestId('readout-live-opts')).toHaveText('4');
-    await expect(labels).toHaveText(['A', 'B', 'D']);
-    await expect(one.locator('.rozie-select-selected')).toHaveText('D');
+    await inPlace(page, `h.options.push(${D})`);
+    if (DEMO_RENDERS) await expect(page.getByTestId('readout-live-opts')).toHaveText('4');
+    await chips(['A', 'B', 'D']);
+    if (ON_SCREEN) {
+      await refresh(one);
+      await expect(one.locator('.rozie-select-selected')).toHaveText('D');
+    }
     await one.locator('[role="combobox"]').click();
+    await expect(one.locator('[role="option"]')).toHaveText(['A', 'B', 'C', 'D']);
     await expect(opt(one, 'D')).toHaveAttribute('aria-selected', 'true');
     await expect(one.locator('[role="combobox"]')).toHaveAttribute('aria-activedescendant', /-opt-3$/);
     await page.keyboard.press('Escape');
 
     // One model element replaced in place: b -> c.
-    await hook(`h.model[1] = 'c'`);
-    await expect(readout).toHaveText('a,c,d');
-    await expect(labels).toHaveText(['A', 'C', 'D']);
+    await inPlace(page, `h.model[1] = 'c'`);
+    await readoutIs('a,c,d');
+    await chips(['A', 'C', 'D']);
     await many.locator('[role="combobox"]').click();
     await expect(opt(many, 'C')).toHaveAttribute('aria-selected', 'true');
     await expect(opt(many, 'B')).toHaveAttribute('aria-selected', 'false');
@@ -440,28 +480,126 @@ for (const target of TARGETS) {
     await page.keyboard.press('Escape');
 
     // The same element replaced through splice.
-    await hook(`h.model.splice(1, 1, 'b')`);
-    await expect(readout).toHaveText('a,b,d');
-    await expect(labels).toHaveText(['A', 'B', 'D']);
+    await inPlace(page, `h.model.splice(1, 1, 'b')`);
+    await readoutIs('a,b,d');
+    await chips(['A', 'B', 'D']);
 
-    // Reordered in place: labels follow their values, and removing a chip removes ITS value.
-    await hook(`h.model.reverse()`);
-    await expect(readout).toHaveText('d,b,a');
-    await expect(labels).toHaveText(['D', 'B', 'A']);
-    await hook(`h.model.sort()`);
-    await expect(readout).toHaveText('a,b,d');
-    await expect(labels).toHaveText(['A', 'B', 'D']);
-    await hook(`h.model.reverse()`);
-    await expect(labels).toHaveText(['D', 'B', 'A']);
-    await many.locator('.rozie-select-chip').nth(0).locator('.rozie-select-chip__remove').click();
-    await expect(readout).toHaveText('b,a');
-    await expect(labels).toHaveText(['B', 'A']);
+    // Reordered in place: labels follow their values.
+    await inPlace(page, `h.model.reverse()`);
+    await readoutIs('d,b,a');
+    await chips(['D', 'B', 'A']);
+    await inPlace(page, `h.model.sort()`);
+    await readoutIs('a,b,d');
+    await chips(['A', 'B', 'D']);
+    await inPlace(page, `h.model.reverse()`);
+    await chips(['D', 'B', 'A']);
+    // Removing a chip removes ITS value (the chips are not on screen-current on Solid).
+    if (ON_SCREEN) {
+      await many.locator('.rozie-select-chip').nth(0).locator('.rozie-select-chip__remove').click();
+      await expect(readout).toHaveText('b,a');
+      await expect(labels).toHaveText(['B', 'A']);
+    }
     // Picking a selected option takes out exactly that value.
     await many.locator('[role="combobox"]').click();
+    await expect(opt(many, 'B')).toHaveAttribute('aria-selected', 'true');
     await opt(many, 'B').click();
-    await expect(readout).toHaveText('a');
+    await expect(readout).toHaveText(ON_SCREEN ? 'a' : 'd,a'); // a commit is a new array: the demo shows it everywhere
     await expect(opt(many, 'B')).toHaveAttribute('aria-selected', 'false');
     await expect(opt(many, 'A')).toHaveAttribute('aria-selected', 'true');
+  });
+
+  // The grouped, native-picker and windowed branches must agree with the label, the chips
+  // and the keyboard after the option list grew or shrank in place.
+  runner(`select-identity [${target}]: grouped list — an option pushed or removed in place shows in the groups, selected and navigable`, async ({ page }) => {
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('live-grouped');
+    const trigger = wrap.locator('[role="combobox"]');
+    const options = wrap.locator('[role="option"]');
+    await expect(wrap.locator('.rozie-select-placeholder')).toHaveText('Nothing'); // model 'd', no such option yet
+    await inPlace(page, `h.options.push(${D})`);
+    if (ON_SCREEN) {
+      await refresh(wrap);
+      await expect(wrap.locator('.rozie-select-selected')).toHaveText('D');
+    }
+    await trigger.click();
+    await expect(wrap.locator('[role="group"]')).toHaveCount(1);
+    await expect(options).toHaveText(['A', 'B', 'C', 'D']);
+    await expect(options.nth(3)).toHaveAttribute('aria-selected', 'true');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-3$/); // the highlight starts on the selection
+    await page.keyboard.press('Escape');
+    await expect(wrap.locator('[role="listbox"]')).toHaveCount(0);
+
+    await inPlace(page, `h.options.splice(0, 1)`); // A removed
+    await trigger.click();
+    await expect(options).toHaveText(['B', 'C', 'D']);
+    await expect(options.nth(2)).toHaveAttribute('aria-selected', 'true');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-2$/);
+    // The keyboard walks the same three rows.
+    await page.keyboard.press('Home');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await expect(options.nth(0)).toHaveClass(/is-active/);
+    await page.keyboard.press('End');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-2$/);
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await expect(trigger).toContainText('B');
+  });
+
+  (NATIVE ? runner : test.skip)(`select-identity [${target}]: native picker — an option pushed or removed in place shows in the native element, checked`, async ({ page }) => {
+    // Not on angular, lit, solid: see the list above the first in-place test. The native
+    // element is on screen from the start, cannot be refreshed by opening a popup (it has
+    // none), and its checked option is written after a render only where a post-render
+    // hook runs.
+    await page.addInitScript(() => {
+      const real = window.matchMedia.bind(window);
+      window.matchMedia = ((q: string) =>
+        q === '(pointer: coarse)'
+          ? ({ matches: true, media: q, onchange: null, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {}, dispatchEvent: () => true } as unknown as MediaQueryList)
+          : real(q)) as typeof window.matchMedia;
+    });
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const native = page.getByTestId('live-native').locator('select.rozie-select-native');
+    await expect(native.locator('option')).toHaveText(['Nothing', 'A', 'B', 'C']);
+    await expect(native.locator('option:checked')).toHaveText('Nothing');
+    await inPlace(page, `h.options.push(${D})`);
+    await expect(native.locator('option')).toHaveText(['Nothing', 'A', 'B', 'C', 'D']);
+    await expect(native.locator('option:checked')).toHaveText('D');
+    await inPlace(page, `h.options.splice(0, 1)`);
+    await expect(native.locator('option')).toHaveText(['Nothing', 'B', 'C', 'D']);
+    await expect(native.locator('option:checked')).toHaveText('D');
+    // The element is live: choosing B commits B.
+    await native.selectOption({ label: 'B' });
+    await expect(page.getByTestId('live-one').locator('.rozie-select-selected')).toHaveText('B');
+  });
+
+  (WINDOWED ? runner : test.skip)(`select-identity [${target}]: windowed list — an option pushed or removed in place shows as a row, selected and navigable`, async ({ page }) => {
+    // Not on angular, solid: the rows are re-fed by a watcher or the post-render hook,
+    // neither of which runs there for an in-place change (see the list above).
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const wrap = page.getByTestId('live-virtual');
+    const trigger = wrap.locator('[role="combobox"]');
+    const options = wrap.locator('[role="option"]');
+    await expect(trigger).toBeVisible();
+    await inPlace(page, `h.options.push(${D})`);
+    await trigger.click();
+    await expect(options).toHaveText(['A', 'B', 'C', 'D'], { timeout: 15_000 });
+    await expect(options.nth(3)).toHaveAttribute('aria-selected', 'true');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-3$/);
+    await page.keyboard.press('Escape');
+
+    await inPlace(page, `h.options.splice(0, 1)`); // A removed
+    await trigger.click();
+    await expect(options).toHaveText(['B', 'C', 'D'], { timeout: 15_000 });
+    await expect(options.nth(2)).toHaveAttribute('aria-selected', 'true');
+    // The keyboard walks the same three rows: End does not run past the last one.
+    await page.keyboard.press('Home');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await page.keyboard.press('End');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-2$/);
+    await expect(wrap.locator('[role="option"][data-index="2"]')).toHaveClass(/is-active/);
+    await page.keyboard.press('Home');
+    await page.keyboard.press('Enter');
+    await expect(trigger).toContainText('B');
   });
 
   // ── B4 ────────────────────────────────────────────────────────────────────

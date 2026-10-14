@@ -91,12 +91,20 @@ function compare(a: unknown, b: unknown, path: [unknown, unknown][], budget: { l
  * equal own enumerable contents (recursively). Symmetric; never true for values
  * whose contents differ. Anything that is not a plain object or an array is equal
  * only to itself. Values nested deeper than 32 levels, or needing more than 2,000
- * object comparisons, count as different.
+ * object comparisons, count as different; so do values whose contents cannot be
+ * read (a throwing getter). "Plain" is judged by prototype, so a plain object from
+ * another realm (an iframe) is not plain here and matches by identity only.
  */
 export function sameContent(a: unknown, b: unknown): boolean {
   if (identical(a, b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
-  return compare(a, b, [], { left: MAX_PAIRS });
+  try {
+    return compare(a, b, [], { left: MAX_PAIRS });
+  } catch {
+    // A getter (or a proxy trap) that throws while the contents are read: the values
+    // cannot be shown to be equal, so they are not — and nothing escapes into a render.
+    return false;
+  }
 }
 
 /**
@@ -144,15 +152,133 @@ export function toggleIn(model: readonly unknown[], v: unknown, hasIdentical: (m
  */
 function fingerprint(v: unknown): string | null {
   if (!isObject(v)) return null;
-  const kind = plainKind(v);
-  if (kind === 0) return null;
-  const keys = Object.keys(v).sort();
-  let out = kind === 2 ? 'a' + (v as unknown as unknown[]).length : 'o';
-  for (const k of keys) {
-    const m = v[k];
-    out += '|' + k.length + ':' + k + '=' + (isObject(m) || typeof m === 'function' ? '#' : typeof m + ':' + String(m));
+  try {
+    const kind = plainKind(v);
+    if (kind === 0) return null;
+    const keys = Object.keys(v).sort();
+    let out = kind === 2 ? 'a' + (v as unknown as unknown[]).length : 'o';
+    for (const k of keys) {
+      const m = v[k];
+      out += '|' + k.length + ':' + k + '=' + (isObject(m) || typeof m === 'function' ? '#' : typeof m + ':' + String(m));
+    }
+    return out;
+  } catch {
+    return null; // unreadable contents: identity only
   }
-  return out;
+}
+
+/**
+ * What a multi-select model selects among object-valued options, prepared once so
+ * that each option is then answered in O(1) instead of by a walk over the model:
+ *
+ *   - `identity`: every object in the model. An option whose value is one of them is
+ *     selected.
+ *   - `loose`: the model's plain objects / arrays that are identical to NO option,
+ *     bucketed by fingerprint. Only these can select an option by content — a model
+ *     value that IS some option's value never matches another option by content
+ *     (identity first), so it is not in here.
+ *
+ * Building it is O(options + model). It describes the two arrays as they were when
+ * it was built and must not outlive them: see `selectionTest`, which holds one for a
+ * single pass.
+ */
+export interface MatchIndex {
+  identity: Set<unknown>;
+  loose: Map<string, unknown[]>;
+}
+
+export function buildMatchIndex(model: readonly unknown[], optionValues: readonly unknown[]): MatchIndex {
+  const optionObjects = new Set<unknown>();
+  for (const v of optionValues) if (isObject(v)) optionObjects.add(v);
+  const identity = new Set<unknown>();
+  const loose = new Map<string, unknown[]>();
+  for (const m of model) {
+    if (!isObject(m) || identity.has(m)) continue;
+    identity.add(m);
+    if (optionObjects.has(m)) continue;
+    const print = fingerprint(m);
+    if (print === null) continue;
+    const bucket = loose.get(print);
+    if (bucket) bucket.push(m);
+    else loose.set(print, [m]);
+  }
+  return { identity, loose };
+}
+
+/**
+ * `selectedIn(model, v, …)` answered from a prepared index: the same result, for an
+ * index built from that model and the option list `v` belongs to.
+ */
+export function selectedByIndex(index: MatchIndex, model: readonly unknown[], v: unknown): boolean {
+  if (!isObject(v)) return model.includes(v);
+  if (index.identity.has(v)) return true;
+  if (index.loose.size === 0) return false;
+  const print = fingerprint(v);
+  if (print === null) return false;
+  const bucket = index.loose.get(print);
+  return bucket !== undefined && bucket.some((m) => sameContent(m, v));
+}
+
+/**
+ * A "is this option value selected?" test for ONE pass over the options (the rows of
+ * one render, or one search for the first selected option), so the pass costs
+ * O(options + model) in total instead of O(options × model).
+ *
+ * It is not a cache. It lives as long as the caller holds it — one function call —
+ * and reads the model and the option values it was given then. Primitive option
+ * values never touch the index: they are the spine's `model.includes(v)`. The index
+ * for object values is built on the first object value asked about; `valuesOf()` is
+ * only called then.
+ */
+export function selectionTest(model: readonly unknown[], valuesOf: () => readonly unknown[]): (v: unknown) => boolean {
+  let index: MatchIndex | null = null;
+  return (v) => {
+    if (!isObject(v)) return model.includes(v);
+    if (index === null) index = buildMatchIndex(model, valuesOf());
+    return selectedByIndex(index, model, v);
+  };
+}
+
+/**
+ * Holds ONE `MatchIndex` for the length of a synchronous burst of questions (the rows
+ * of one render), so the burst costs O(options + model) in total.
+ *
+ * It is not a cache of what is selected across time. The index is thrown away:
+ *
+ *   - by a microtask queued when it is built — it never reaches a later task, where
+ *     the consumer may have changed the model or the options in place;
+ *   - whenever it is asked about another model array or option array, or one whose
+ *     length changed (every write Select makes to the model is a fresh array);
+ *   - by `drop()`, which Select calls around each of its own writes and emits.
+ *
+ * `valuesOf()` is only called when an index has to be built.
+ */
+export interface MatchCache {
+  index(model: readonly unknown[], options: readonly unknown[], valuesOf: () => readonly unknown[]): MatchIndex;
+  drop(): void;
+}
+
+export function createMatchCache(): MatchCache {
+  let held: { model: readonly unknown[]; modelLength: number; options: readonly unknown[]; optionsLength: number; index: MatchIndex } | null = null;
+  const drop = () => {
+    held = null;
+  };
+  return {
+    index(model, options, valuesOf) {
+      if (held !== null && held.model === model && held.modelLength === model.length && held.options === options && held.optionsLength === options.length) {
+        return held.index;
+      }
+      const index = buildMatchIndex(model, valuesOf());
+      // Without a microtask queue nothing can be held safely: build every time.
+      if (typeof queueMicrotask !== 'function') return index;
+      held = { model, modelLength: model.length, options, optionsLength: options.length, index };
+      queueMicrotask(() => {
+        if (held !== null && held.index === index) held = null;
+      });
+      return index;
+    },
+    drop,
+  };
 }
 
 export interface ValueRow {
@@ -170,17 +296,20 @@ export interface ValueRow {
  * neither is identical to any option and their contents are equal.
  *
  * Primitive values are matched through one index built over the options, so the
- * cost is O(options + model). Object values are matched by identity first (a scan
- * of the object-valued options per value); the ones identical to no option are
- * then matched by content through a fingerprint index, built once and only if
- * such a value exists, so they do not each walk every option.
+ * cost is O(options + model). Object values are matched by identity first, through
+ * a second index; the ones identical to no option are then matched by content
+ * through a fingerprint index, built once and only if such a value exists — no
+ * model value walks the option list.
  */
 export function distinctValues(model: readonly unknown[], optionValues: readonly unknown[]): ValueRow[] {
   const primitiveAt = new Map<unknown, number>();
+  const objectFirstAt = new Map<unknown, number>();
   const objectAt: number[] = [];
   optionValues.forEach((v, i) => {
-    if (isObject(v)) objectAt.push(i);
-    else if (!primitiveAt.has(v)) primitiveAt.set(v, i);
+    if (isObject(v)) {
+      objectAt.push(i);
+      if (!objectFirstAt.has(v)) objectFirstAt.set(v, i);
+    } else if (!primitiveAt.has(v)) primitiveAt.set(v, i);
   });
   const rows: ValueRow[] = [];
   const primitiveRow = new Map<unknown, ValueRow>();
@@ -207,7 +336,7 @@ export function distinctValues(model: readonly unknown[], optionValues: readonly
       same.members.push(j);
       return;
     }
-    const exactAt = objectAt.find((i) => optionValues[i] === m);
+    const exactAt = objectFirstAt.get(m);
     if (exactAt !== undefined) {
       const row: ValueRow = { value: m, members: [j], at: exactAt };
       identityRow.set(m, row);

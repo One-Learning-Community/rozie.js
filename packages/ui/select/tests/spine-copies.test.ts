@@ -43,8 +43,10 @@ const RENAMED: Partial<Record<(typeof COPIED)[number], string>> = { open: 'openC
  *
  *  - `isSelected(opt)`: the spine compares `valueOf(opt)` with the model (`===`, or
  *    `includes` for an array). Select's makes the same two comparisons through
- *    src/internal/valueMatch.ts (`selects` / `selectedIn`) — identity first, equal
- *    contents of plain objects only when no option is identical. Nothing is cached.
+ *    src/internal/valueMatch.ts — identity first, equal contents of plain objects only
+ *    when no option is identical; for a primitive option value it is still
+ *    `cur.includes(v)`. (The list rows do not call it: they get their selected state
+ *    from one selection test per render — `flatRows()` / `groupedRows()`.)
  *  - `selectedLabel`: the spine's is a `$computed` that finds the option with `=== cur`
  *    and, for `multiple`, joins the labels of every selected option. Select's is a plain
  *    function that finds the option with `selects(cur, …)` and returns '' for
@@ -269,7 +271,13 @@ describe('Select host-local navigation is a verbatim copy of the list spine', ()
       'const open = () => {',
       '  if (nativeActive()) return',
       '  if (!$props.disabled && !$data.open) $data.session = $data.session + 1',
-      '  openCore()',
+      '  const cur = $props.value',
+      '  if ($props.multiple && Array.isArray(cur)) scopedSelection = { model: cur, length: cur.length, test: selectionFor() }',
+      '  try {',
+      '    openCore()',
+      '  } finally {',
+      '    scopedSelection = null',
+      '  }',
       '  scrollActiveIntoView()',
       '}',
     ].join('\n'));
@@ -318,16 +326,21 @@ describe("Select's rewritten value-identity functions follow the spine's", () =>
   it("select: the spine's text with ONE line replaced", () => {
     const spineLine = '    const next = arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]';
     const hostLine = '    const next = toggleIn(arr, v, hasIdenticalOption)';
+    const emitLine = "    $emit('change', { value: next, option: opt })";
     expect(SPINE_REWRITTEN_FROM.select.split(spineLine).length).toBe(2);
+    expect(SPINE_REWRITTEN_FROM.select.split(emitLine).length).toBe(2);
     expect(statementText(select, 'select')).toBe(SPINE_REWRITTEN_FROM.select.replace(spineLine, hostLine));
   });
 
   it("isSelected: the spine's text with its two comparisons replaced", () => {
     const expected = SPINE_REWRITTEN_FROM.isSelected
-      .replace('Array.isArray(cur) && cur.includes(v)', 'Array.isArray(cur) && selectedIn(cur, v, hasIdenticalOption)')
+      .replace('Array.isArray(cur) && cur.includes(v)', 'Array.isArray(cur) && selectedInModel(cur, v)')
       .replace('  return cur === v', '  return selects(cur, v, hasIdenticalOption)');
     expect(expected).not.toBe(SPINE_REWRITTEN_FROM.isSelected);
     expect(statementText(select, 'isSelected')).toBe(expected);
+    // …and outside open() `selectedInModel` is the per-option comparison, whose primitive
+    // path is the spine's `includes` (valueMatch.ts `selectedIn`, unit-tested).
+    expect(statementText(select, 'selectedInModel')).toContain('return selectedIn(cur, v, hasIdenticalOption)');
   });
 
   it('selectedLabel is only read where a multi-select never renders it', () => {

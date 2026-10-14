@@ -184,7 +184,10 @@ const FAMILIES: FamilySpec[] = [
         // iterates a `val: any` too (+1; its inner `blk.items.map((row) => …)` was
         // already counted). Same Class-6 leaf-body shape; Select.d.ts changes are
         // JSDoc text only.
-        TS7006: 8,
+        // 8 → 7 (select cleanup, selection per render): the flat list now iterates
+        // `flatRows()` with ONE callback parameter (`row`) where it iterated a `$memo`
+        // result with two (`opt, index`): one implicit `any` fewer, same Class-6 shape.
+        TS7006: 7,
       },
     },
   },

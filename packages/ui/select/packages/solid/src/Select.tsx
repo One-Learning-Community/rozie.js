@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { For, Show, createEffect, createMemo, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { Show, createEffect, createMemo, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
 import { __rozieInjectStyle, createControllableSignal, createOutsideClick, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import Popover from '@rozie-ui/popover-solid';
@@ -21,16 +21,22 @@ import { groupOptions } from './internal/groupOptions';
 // NOTHING HERE IS CACHED. Every answer is computed from `$props.value` and
 // `$props.options` as they are when asked, so a model or an option list the consumer
 // changed in place is shown as it is now. For primitive values that costs what the
-// spine's code cost (`===` / `includes` per option); the scan over the options
-// (hasIdenticalOption) only runs for a model value and an option value that are
-// different objects with equal contents.
+// spine's code cost (`===` / `includes` per option). For object values the list rows
+// get their state from ONE selection test per render (flatRows() / groupedRows(),
+// O(options + model)), which is built by that call and dropped with it; the scan over
+// the options (hasIdenticalOption) only runs for a model value and an option value
+// that are different objects with equal contents.
 //
 // The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
 // `includes`, so Select owns these three (they are not imported; nothing Select still
 // imports from the spine reaches them).
-import { identical, selects, selectedIn, toggleIn, distinctValues, uniqueKeys, keyBase } from './internal/valueMatch';
+import { identical, selects, selectedIn, selectionTest, toggleIn, distinctValues, uniqueKeys, keyBase } from './internal/valueMatch';
 
-// Is some option's value identical to this model value?
+// A selection test held for the length of ONE open() call, so the initial-highlight
+// search (`resolveInitialActive`, which asks isSelected() of option after option) is
+// O(options + model) for object values too. Set and cleared synchronously around that
+// call (try / finally) — it never outlives it — and only used for the very model array
+// (same reference, same length) it was made from.
 
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
@@ -216,11 +222,11 @@ interface GroupHeadingSlotCtx { group: SelectGroup; }
 
 interface SelectProps extends Omit<import('solid-js').ComponentProps<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'chipSlot' | 'selectedSlot' | 'optionSlot' | 'emptySlot' | 'groupHeadingSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array (equal own properties, compared up to 32 levels deep) — which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Any other object (a `Date`, a `Map`, a class instance) matches by identity only. Known limit: on Vue and Svelte two options whose plain-object values have equal contents cannot be told apart. Mapping options to a primitive with `optionValue` is the robust choice.
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array: equal own properties, compared up to 32 levels deep and 2,000 nested objects, beyond which values count as different. That is how a plain-object value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Every other object matches by identity only — a class instance, a `Map`, a `Set`, and a plain object created in another realm (an iframe). On Vue that means a class-instance or `Map` value held in reactive state never shows as selected. Two options whose plain-object values have equal contents cannot be told apart on Vue and Svelte. Mapping options to a primitive with `optionValue` is the robust choice. The list may grow or shrink in place (`push`, `splice`); to change an option, pass a new array.
    */
   options?: any[];
   /**
-   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
+   * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). How a value is matched to an option is described under `options`.
    * @example
    * <Select value={fruit()} onValueChange={setFruit} options={fruits} />
    */
@@ -252,7 +258,7 @@ interface SelectProps extends Omit<import('solid-js').ComponentProps<'div'>, 'op
    */
   optionLabel?: ((...args: any[]) => any) | null;
   /**
-   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property.
+   * Resolver override for an object option's committed value — `(option) => value`. Falls back to the option's `.value` property. Returning a primitive (an id) is the robust way to use object options; see `options` for how values are matched.
    */
   optionValue?: ((...args: any[]) => any) | null;
   /**
@@ -366,8 +372,13 @@ export default function Select(_props: SelectProps): JSX.Element {
     return optionId(activeIndex());
   });
   onMount(() => {
-    // A remount of the same instance (React StrictMode) starts clean: frames queued by the
-    // first mount were dropped at its unmount, so no re-measure is in flight.
+    // A remount of the SAME instance (React StrictMode mounts, unmounts and mounts again
+    // synchronously). Frames the first mount queued are still queued: the unmount set
+    // `disposed`, this line clears it again before any of them has run, so they do run —
+    // against this remounted instance. That is harmless (the re-measure sweep, the kick
+    // and the reveal are idempotent and read live state). What must not carry over is the
+    // re-measure latch: the unmount already cleared it, and it is cleared here as well so
+    // that a mount never starts with a sweep believed to be in flight.
     disposed = false;
     remeasurePending = false;
     if (!local.idBase) setAutoId('rozie-select-' + nextAutoId());
@@ -407,6 +418,12 @@ export default function Select(_props: SelectProps): JSX.Element {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
     }
   });
+  createEffect(() => {
+    if (local.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
+    // The native element's selection is DOM state: after any render that may have added
+    // or removed <option>s, write the model into it again (a no-op when it already shows it).
+    if (nativeActive()) syncNative();
+  });
   onCleanup(() => {
     // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
     // this and does nothing.
@@ -426,37 +443,26 @@ export default function Select(_props: SelectProps): JSX.Element {
   createEffect(on(() => (() => open$local())(), (v) => untrack(() => (() => {
     syncPanel();
   })()), { defer: true }));
+  createEffect(on(() => (() => session())(), (v) => untrack(() => (() => {
+    syncPanel();
+  })()), { defer: true }));
   createEffect(on(() => (() => (local.hideEmpty ? 'h' : 's') + (local.options ? local.options.length : 0))(), (v) => untrack(() => (() => {
     syncPanel();
   })()), { defer: true }));
   createEffect(on(() => (() => panelOpen())(), (v) => untrack(() => (() => {
-    if (panelOpen() === panelEcho()) return;
-    setPanelEcho(panelOpen());
-    if (panelOpen()) return;
-    // A dismissal of the popup that is showing goes through close().
-    if (panelSession() === session()) {
-      close();
-      return;
-    }
-    // A leftover from the popup before this one: nothing to close. The panel has to be
-    // shown again for the current session — but NOT in this same flush: the popover holds
-    // `false` because it wrote it, and Angular only pushes a bound value down when it
-    // differs from the one it pushed last (`true`), so `panelOpen` must be seen `false`
-    // by one flush before it goes back to `true`. Hence a task later, through state.
-    queueResync();
+    takePanelWrite();
+  })()), { defer: true }));
+  createEffect(on(() => (() => panelEcho())(), (v) => untrack(() => (() => {
+    if (!panelOpen() && panelEcho()) takePanelWrite();
   })()), { defer: true }));
   createEffect(on(() => (() => resync())(), (v) => untrack(() => (() => {
     syncPanel();
   })()), { defer: true }));
   createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
-    syncRows();
-    if (local.virtual && virtualizer) {
-      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-select-list') : gridScrollEl;
-      virtualizer.setOptions(virtualizerOptions());
-      virtualizer._willUpdate();
-      setWindowVer(windowVer() + 1);
-      scheduleRemeasure();
-    }
+    refeedWindow();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.options ? local.options.length : 0)(), (v) => untrack(() => (() => {
+    refeedWindow();
   })()), { defer: true }));
   createEffect(on(() => (() => activeIndex())(), (v) => untrack(() => (() => {
     liveActive = activeIndex();
@@ -474,6 +480,9 @@ export default function Select(_props: SelectProps): JSX.Element {
     scheduleNativeSync();
   })()), { defer: true }));
   createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
+    scheduleNativeSync();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.options ? local.options.length : 0)(), (v) => untrack(() => (() => {
     scheduleNativeSync();
   })()), { defer: true }));
   createEffect(on(() => (() => local.groups)(), (v) => untrack(() => (() => {
@@ -605,6 +614,13 @@ export default function Select(_props: SelectProps): JSX.Element {
   function onOptionPointerMove(index: any) {
     if (activeIndex() !== index) setActiveIndex(index);
   }
+  // A selection test held for the length of ONE open() call, so the initial-highlight
+  // search (`resolveInitialActive`, which asks isSelected() of option after option) is
+  // O(options + model) for object values too. Set and cleared synchronously around that
+  // call (try / finally) — it never outlives it — and only used for the very model array
+  // (same reference, same length) it was made from.
+  let scopedSelection: any = null;
+
   // Is some option's value identical to this model value?
   function hasIdenticalOption(m: any) {
     const opts = Array.isArray(local.options) ? local.options : [];
@@ -617,8 +633,48 @@ export default function Select(_props: SelectProps): JSX.Element {
   function isSelected(opt: any) {
     const v = valueOf(opt);
     const cur = value();
-    if (local.multiple) return Array.isArray(cur) && selectedIn(cur, v, hasIdenticalOption);
+    if (local.multiple) return Array.isArray(cur) && selectedInModel(cur, v);
     return selects(cur, v, hasIdenticalOption);
+  }
+  // One option against a multi-select model. Inside open() (see `scopedSelection`) the
+  // answer comes from that call's own selection test; otherwise it is the plain per-option
+  // comparison — for a primitive value the spine's `includes`.
+  function selectedInModel(cur: any, v: any) {
+    if (scopedSelection !== null && scopedSelection.model === cur && scopedSelection.length === cur.length) return scopedSelection.test(v);
+    return selectedIn(cur, v, hasIdenticalOption);
+  }
+  // A "selected?" test for one pass over the options (the rows of one render): built
+  // here, used by that pass, dropped with it. O(options + model) for the pass, where one
+  // isSelected() per row would be O(options × model) for object values.
+  function selectionFor() {
+    const cur = value();
+    if (!local.multiple) return (v: any) => selects(cur, v, hasIdenticalOption);
+    if (!Array.isArray(cur)) return (v: any) => false;
+    const opts = Array.isArray(local.options) ? local.options : [];
+    return selectionTest(cur, () => opts.map((o: any) => valueOf(o)));
+  }
+  // The flat list's rows, each with its selected state, from one selection test.
+  function flatRows() {
+    const opts = visibleOptions();
+    const test = selectionFor();
+    return opts.map((opt: any, index: any) => ({
+      opt,
+      index,
+      selected: test(valueOf(opt))
+    }));
+  }
+  // The grouped list's blocks, each row with its selected state, from one selection test.
+  function groupedRows() {
+    const test = selectionFor();
+    return groupBlocks().map((blk: any) => ({
+      key: blk.key,
+      group: blk.group,
+      items: blk.items.map((row: any) => ({
+        opt: row.opt,
+        index: row.index,
+        selected: test(valueOf(row.opt))
+      }))
+    }));
   }
 
   // The label shown in the trigger (single-select; a multi-select shows chips instead).
@@ -676,12 +732,20 @@ export default function Select(_props: SelectProps): JSX.Element {
   function groupsKey() {
     return isGrouped() ? local.groups : null;
   }
+  // The option list's length, as a memo key next to its reference: an option list the
+  // consumer GREW or SHRANK in place (push / splice on a reactive array) is a new option
+  // set although the reference is the same. An option REPLACED in place at the same
+  // length is not seen by these memos — to change an option, pass a new array (stated in
+  // the `options` prop description).
+  function optionCount() {
+    return Array.isArray(local.options) ? local.options.length : 0;
+  }
   const groupingCache = {
     keys: null as any[] | null,
     val: null as any
   };
   function grouping() {
-    const __rozieMemoKey = [local.options, groupsKey(), local.virtual];
+    const __rozieMemoKey = [local.options, optionCount(), groupsKey(), local.virtual];
     const __rozieMemoPrev = groupingCache.keys;
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return groupingCache.val;
@@ -736,7 +800,7 @@ export default function Select(_props: SelectProps): JSX.Element {
     val: null as any
   };
   function nativeRows() {
-    const __rozieMemoKey = [local.options, groupsKey(), local.virtual];
+    const __rozieMemoKey = [local.options, optionCount(), groupsKey(), local.virtual];
     const __rozieMemoPrev = nativeRowsCache.keys;
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return nativeRowsCache.val;
@@ -969,7 +1033,17 @@ export default function Select(_props: SelectProps): JSX.Element {
   function open() {
     if (nativeActive()) return;
     if (!local.disabled && !open$local()) setSession(session() + 1);
-    openCore();
+    const cur = value();
+    if (local.multiple && Array.isArray(cur)) scopedSelection = {
+      model: cur,
+      length: cur.length,
+      test: selectionFor()
+    };
+    try {
+      openCore();
+    } finally {
+      scopedSelection = null;
+    }
     scrollActiveIntoView();
   }
 
@@ -1435,7 +1509,7 @@ export default function Select(_props: SelectProps): JSX.Element {
     val: null as any
   };
   function windowSource() {
-    const __rozieMemoKey = [local.options, groupsKey(), local.virtual, local.optionValue];
+    const __rozieMemoKey = [local.options, optionCount(), groupsKey(), local.virtual, local.optionValue];
     const __rozieMemoPrev = windowSourceCache.keys;
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
       return windowSourceCache.val;
@@ -1625,8 +1699,8 @@ export default function Select(_props: SelectProps): JSX.Element {
   }
 
   // The user is scrolling the list: any reveal still in flight is theirs to override.
-  // Called for a wheel, a touch move, and a press of any mouse button inside the list (a
-  // scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
+  // Called — on all three list branches — for a wheel, a touch move, and a press of any
+  // mouse button inside the list (a scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
   // DOM focus stays on the trigger.
   function cancelReveal() {
     revealGen = revealGen + 1;
@@ -1791,7 +1865,6 @@ export default function Select(_props: SelectProps): JSX.Element {
   // snapshots on React: when a close and a re-open land in one commit, both watchers
   // run in one pass and the second one misreads our own write as a dismissal (seen as
   // a popup that stayed shut after Enter-then-ArrowDown).
-  // The echo is written FIRST, for targets whose watchers run synchronously on a write.
   //
   // WHICH popup the popover closed is state too. `$data.session` counts the opens (the
   // open() gate) and `$data.panelSession` is the session the panel was last shown for.
@@ -1810,16 +1883,46 @@ export default function Select(_props: SelectProps): JSX.Element {
     // The watcher takes it and brings this function back with the pair equal.
     if (panelOpen() !== panelEcho()) return;
     const visible = popupVisible();
+    // The panel is showing (or about to) for the CURRENT open, whether or not `panelOpen`
+    // has to change for it: a shown popup closed and opened again inside one flush leaves
+    // `panelOpen` where it was while the session moved on. Recording the session only on
+    // a false -> true flip left it behind there, and the next real dismissal was then
+    // taken for a leftover (the popup hid, came back, and needed a second dismissal).
+    if (visible && panelSession() !== session()) setPanelSession(session());
     if (visible === panelOpen()) return;
-    setPanelEcho(visible);
-    if (visible) setPanelSession(session());
-    setPanelOpen(visible);
+    // The two writes are ordered so that, between them, the pair can only read
+    // "panelOpen true, echo false" — a state no watcher takes for a dismissal (the popover
+    // only ever writes `false`). That matters where watchers run synchronously on a write.
+    if (visible) {
+      setPanelOpen(true);
+      setPanelEcho(true);
+    } else {
+      setPanelEcho(false);
+      setPanelOpen(false);
+    }
   }
   // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
   // reads only $data, one whose getter reads only props. A getter that mixes the two is
   // routed through a signal effect on Lit, which a plain property change does not re-run
   // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
 
+  // popover -> select: the popover's own write.
+  function takePanelWrite() {
+    if (panelOpen() === panelEcho()) return;
+    setPanelEcho(panelOpen());
+    if (panelOpen()) return;
+    // A dismissal of the popup that is showing goes through close().
+    if (panelSession() === session()) {
+      close();
+      return;
+    }
+    // A leftover from the popup before this one: nothing to close. The panel has to be
+    // shown again for the current session — but NOT in this same flush: the popover holds
+    // `false` because it wrote it, and Angular only pushes a bound value down when it
+    // differs from the one it pushed last (`true`), so `panelOpen` must be seen `false`
+    // by one flush before it goes back to `true`. Hence a task later, through state.
+    queueResync();
+  }
   // The later look: nothing is remembered across the wait — the timer only bumps a
   // counter, and syncPanel() decides from the state as it is then.
   function queueResync() {
@@ -2009,6 +2112,33 @@ export default function Select(_props: SelectProps): JSX.Element {
     toggle();
     focusControl();
   }
+  // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
+  // options into the virtualizer and re-pull the window (the data-table
+  // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
+  // nothing else:
+  //  - the reference, not its length: an array replaced by another of the SAME length is a
+  //    new option set too (a length-keyed getter kept the old rows on Vue);
+  //  - props only: mixed with a $data read, the getter is routed through a signal effect on
+  //    Lit, which a plain property change does not re-run (the windowed list kept the old
+  //    rows there until something else re-rendered it).
+  // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
+  //
+  // A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+  // place keeps its reference. And because a watcher only hears what the framework
+  // reports — an in-place change is reported on Vue and Svelte, not on the other four —
+  // the post-render hook below re-feeds too, whenever the virtualizer's count is not the
+  // option count any more: whatever made the select render again, the windowed rows then
+  // agree with what the label, the chips and the keyboard read.
+  function refeedWindow() {
+    syncRows();
+    if (local.virtual && virtualizer) {
+      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-select-list') : gridScrollEl;
+      virtualizer.setOptions(virtualizerOptions());
+      virtualizer._willUpdate();
+      setWindowVer(windowVer() + 1);
+      scheduleRemeasure();
+    }
+  }
 
   createOutsideClick(
     [() => controlElRef, () => listElRef],
@@ -2038,19 +2168,19 @@ export default function Select(_props: SelectProps): JSX.Element {
             </select></Show>}</div>
         </>)}>
           
-          {<Show when={popupVisible() && !local.virtual && !isGrouped()}><div role="listbox" aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-select-list"} id={rozieAttr(idRoot() + '-list')} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onListMouseDown($event); }} data-rozie-s-6e3ebfa6="">
-            <For each={visibleOptions()}>{(opt, index) => <div role="option" aria-selected={!!isSelected(opt)} aria-disabled={!!disabledOf(opt)} id={rozieAttr(optionId(index()))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === index(), 'is-selected': isSelected(opt), 'is-disabled': disabledOf(opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(index()); }} data-rozie-s-6e3ebfa6="">
-              {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return opt; }, get index() { return index(); }, get active() { return activeIndex() === index(); }, get selected() { return isSelected(opt); }, get disabled() { return disabledOf(opt); } }) ?? rozieDisplay(labelOf(opt))}
-            </div>}</For>
+          {<Show when={popupVisible() && !local.virtual && !isGrouped()}><div role="listbox" aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-select-list"} id={rozieAttr(idRoot() + '-list')} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onListMouseDown($event); }} onWheel={($event: WheelEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} onTouchMove={($event: TouchEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} data-rozie-s-6e3ebfa6="">
+            <Key each={flatRows() as readonly any[]} by={(row) => optionId(row.index)}>{(row) => <div role="option" aria-selected={!!row().selected} aria-disabled={!!disabledOf(row().opt)} id={rozieAttr(optionId(row().index))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === row().index, 'is-selected': row().selected, 'is-disabled': disabledOf(row().opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(row().opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(row().index); }} data-rozie-s-6e3ebfa6="">
+              {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return row().opt; }, get index() { return row().index; }, get active() { return activeIndex() === row().index; }, get selected() { return row().selected; }, get disabled() { return disabledOf(row().opt); } }) ?? rozieDisplay(labelOf(row().opt))}
+            </div>}</Key>
 
             {<Show when={visibleOptions().length === 0}><div class={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
               {(_props.emptySlot ?? _props.slots?.['empty'])?.({ get query() { return query(); } }) ?? "No options"}
-            </div></Show>}</div></Show>}{<Show when={popupVisible() && !local.virtual && isGrouped()}><div role="listbox" aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-select-list"} id={rozieAttr(idRoot() + '-list')} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onListMouseDown($event); }} data-rozie-s-6e3ebfa6="">
-            <Key each={groupBlocks() as readonly any[]} by={(blk) => blk.key}>{(blk) => <div class={"rozie-select-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-6e3ebfa6="">
+            </div></Show>}</div></Show>}{<Show when={popupVisible() && !local.virtual && isGrouped()}><div role="listbox" aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-select-list"} id={rozieAttr(idRoot() + '-list')} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onListMouseDown($event); }} onWheel={($event: WheelEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} onTouchMove={($event: TouchEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} data-rozie-s-6e3ebfa6="">
+            <Key each={groupedRows() as readonly any[]} by={(blk) => blk.key}>{(blk) => <div class={"rozie-select-group"} role="group" aria-label={rozieAttr(blk().group ? blk().group.label : null)} data-rozie-s-6e3ebfa6="">
               {<Show when={blk().group}><div class={"rozie-select-group-heading"} role="presentation" data-rozie-s-6e3ebfa6="">
                 {(_props.groupHeadingSlot ?? _props.slots?.['groupHeading'])?.({ get group() { return blk().group; } }) ?? rozieDisplay(blk().group.label)}
-              </div></Show>}<Key each={blk().items as readonly any[]} by={(row) => optionId(row.index)}>{(row) => <div role="option" aria-selected={!!isSelected(row().opt)} aria-disabled={!!disabledOf(row().opt)} id={rozieAttr(optionId(row().index))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === row().index, 'is-selected': isSelected(row().opt), 'is-disabled': disabledOf(row().opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(row().opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(row().index); }} data-rozie-s-6e3ebfa6="">
-                {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return row().opt; }, get index() { return row().index; }, get active() { return activeIndex() === row().index; }, get selected() { return isSelected(row().opt); }, get disabled() { return disabledOf(row().opt); } }) ?? rozieDisplay(labelOf(row().opt))}
+              </div></Show>}<Key each={blk().items as readonly any[]} by={(row) => optionId(row.index)}>{(row) => <div role="option" aria-selected={!!row().selected} aria-disabled={!!disabledOf(row().opt)} id={rozieAttr(optionId(row().index))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === row().index, 'is-selected': row().selected, 'is-disabled': disabledOf(row().opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(row().opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(row().index); }} data-rozie-s-6e3ebfa6="">
+                {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return row().opt; }, get index() { return row().index; }, get active() { return activeIndex() === row().index; }, get selected() { return row().selected; }, get disabled() { return disabledOf(row().opt); } }) ?? rozieDisplay(labelOf(row().opt))}
               </div>}</Key>
             </div>}</Key>
             {<Show when={visibleOptions().length === 0}><div class={"rozie-select-empty"} role="presentation" data-rozie-s-6e3ebfa6="">
