@@ -10,6 +10,13 @@
       options render flat in source order.
     - flat: no `groups` — options that carry a `group` still render flat in
       source order.
+    - plain: `groups` set and NO #groupHeading slot — the default heading text.
+    - multi: `groups` + `multiple` (the popup stays open after a pick).
+    - hide: `groups` + `hideEmpty`; `empty` takes every option away and `refill`
+      brings them back (both also on a KEY, "e" / "r", for the open popup).
+    - clash: a group whose id is the literal `_ungrouped` next to really
+      ungrouped options, and a NUMERIC option `group` matched by a group listed
+      under the same id as text.
 
   `shrink` cuts the option list to its first two entries (the active-index guard).
   It acts on the "s" KEY as well as on click: a click outside an open popup is a
@@ -23,7 +30,7 @@
 -->
 <rozie name="SelectGroupsDemo">
 <components>{ Select: '../../packages/ui/select/src/Select.rozie' }</components>
-<data>{ value: null, short: false, mode: 'grouped', log: '' }</data>
+<data>{ value: null, multi: [], short: false, none: false, mode: 'grouped', log: '' }</data>
 <script>
 const GROUPS = [{ id: 'veg', label: 'Vegetables' }, { id: 'fruit', label: 'Fruit' }]
 const ALL = [
@@ -34,7 +41,20 @@ const ALL = [
   { label: 'Leek', value: 'leek', group: 'veg', disabled: true },
   { label: 'Oat', value: 'oat', group: 'grain' },
 ]
-const options = () => ($data.short ? ALL.slice(0, 2) : ALL)
+const NONE = []
+const options = () => ($data.none ? NONE : $data.short ? ALL.slice(0, 2) : ALL)
+const setNone = (next) => { $data.none = next }
+const onEmptyKey = (e) => {
+  if (e.key === 'e') setNone(true)
+  if (e.key === 'r') setNone(false)
+}
+const joined = () => (Array.isArray($data.multi) ? $data.multi.join(',') : '')
+const GROUPS_CLASH = [{ id: '_ungrouped', label: 'Odd' }, { id: '7', label: 'Numbered' }]
+const CLASH = [
+  { label: 'Water', value: 'water' },
+  { label: 'Kiwi', value: 'kiwi', group: '_ungrouped' },
+  { label: 'Seven-up', value: 'seven-up', group: 7 },
+]
 const shrink = () => { $data.short = true }
 const onShrinkKey = (e) => {
   if (e.key === 's') shrink()
@@ -53,6 +73,13 @@ const onOpenChange = (e) => {
   <button type="button" data-testid="shrink" @click="shrink()" @keydown="onShrinkKey($event)">Shrink (click, or press s)</button>
   <button type="button" data-testid="mode-virtual" @click="setMode('virtual')">Virtual</button>
   <button type="button" data-testid="mode-flat" @click="setMode('flat')">Flat</button>
+  <button type="button" data-testid="mode-plain" @click="setMode('plain')">Plain</button>
+  <button type="button" data-testid="mode-multi" @click="setMode('multi')">Multi</button>
+  <button type="button" data-testid="mode-hide" @click="setMode('hide')">Hide empty</button>
+  <button type="button" data-testid="mode-clash" @click="setMode('clash')">Clash</button>
+  <button type="button" data-testid="empty" @click="setNone(true)" @keydown="onEmptyKey($event)">Empty (click, or press e; r refills)</button>
+  <button type="button" data-testid="refill" @click="setNone(false)">Refill</button>
+  <span data-testid="readout-multi">{{ joined() }}</span>
   <span data-testid="readout-value">{{ $data.value }}</span>
   <span data-testid="readout-mode">{{ $data.mode }}</span>
   <span data-testid="readout-log">{{ $data.log }}</span>
@@ -61,6 +88,10 @@ const onOpenChange = (e) => {
   </Select>
   <Select r-if="$data.mode === 'virtual'" :options="options()" :groups="GROUPS" :virtual="true" maxHeight="320px" r-model:value="$data.value" aria-label="Food" />
   <Select r-if="$data.mode === 'flat'" :options="options()" r-model:value="$data.value" aria-label="Food" />
+  <Select r-if="$data.mode === 'plain'" :options="options()" :groups="GROUPS" r-model:value="$data.value" aria-label="Food" />
+  <Select r-if="$data.mode === 'multi'" :options="options()" :groups="GROUPS" r-model:value="$data.multi" multiple :close-on-select="false" aria-label="Food" />
+  <Select r-if="$data.mode === 'hide'" :options="options()" :groups="GROUPS" r-model:value="$data.value" hide-empty aria-label="Food" />
+  <Select r-if="$data.mode === 'clash'" :options="CLASH" :groups="GROUPS_CLASH" r-model:value="$data.value" aria-label="Food" />
 </div>
 </template>
 </rozie>

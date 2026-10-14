@@ -247,7 +247,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true }) multiple: boolean = false;
   /**
-   * Render the results list in normal flow (static) rather than as an absolutely-positioned popup. Use when embedding the select inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
+   * Render the results list in normal flow (static) rather than as a floating popup. Use when embedding the select inside an `overflow:hidden` container (e.g. a command palette) so the list is not clipped. Defaults `false` (standalone dropdown behavior).
    */
   @property({ type: Boolean, reflect: true }) inline: boolean = false;
   /**
@@ -327,7 +327,7 @@ export default class Select extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'aria-label' }) ariaLabel: string | null = null;
   /**
-   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` is byte-identical to a non-windowed select. Pair with `inline` + `maxHeight` so the windowed scroll container is bounded. Grouping is not applied while `virtual` is on.
+   * Opt-in vertical **option windowing** for long lists. When `true`, only the visible slice of options renders inside a bounded scrolling list (leading/trailing spacers preserve the total scroll height), windowing over the filtered option set. Default `false` renders every option. Set `maxHeight` to bound the scrolling list; windowing works in the floating popup and with `inline` alike. Grouping is not applied while `virtual` is on.
    */
   @property({ type: Boolean, reflect: true }) virtual: boolean = false;
   /**
@@ -600,7 +600,7 @@ private __rozieFirstUpdateDone = false;
           </optgroup>`)}
         </select>` : nothing}</div>
       
-      ${this.popupVisible() && !this.virtual && !this.isGrouped() ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+      ${this.popupVisible() && !this.virtual && !this.isGrouped() ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onListMouseDown($event); }} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
         ${repeat<any>(this.visibleOptions(), (opt, index) => this.optionId(index), (opt, index) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === index, 'is-selected': this.isSelected(opt), 'is-disabled': this.disabledOf(opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(index))} role="option" aria-selected=${!!this.isSelected(opt)} aria-disabled=${!!this.disabledOf(opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(index); }} data-rozie-s-6e3ebfa6>
           ${this.option !== undefined ? this.option({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}) : html`<slot name="option" data-rozie-params=${(() => { try { return JSON.stringify({option: opt, index: index, active: this._activeIndex.value === index, selected: this.isSelected(opt), disabled: this.disabledOf(opt)}); } catch { return '{}'; } })()}>
             ${rozieDisplay(this.labelOf(opt))}
@@ -609,8 +609,8 @@ private __rozieFirstUpdateDone = false;
 
         ${this.visibleOptions().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
           ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-        </div>` : nothing}</div>` : nothing}${this.popupVisible() && !this.virtual && this.isGrouped() ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
-        ${repeat<any>(this.groupBlocks(), (blk, _idx) => 'grp-' + (blk.group ? blk.group.id : '_ungrouped'), (blk, _idx) => html`<div class="rozie-select-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-6e3ebfa6>
+        </div>` : nothing}</div>` : nothing}${this.popupVisible() && !this.virtual && this.isGrouped() ? html`<div class="rozie-select-list" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onListMouseDown($event); }} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+        ${repeat<any>(this.groupBlocks(), (blk, _idx) => blk.key, (blk, _idx) => html`<div class="rozie-select-group" role="group" aria-label=${rozieAttr(blk.group ? blk.group.label : null)} data-rozie-s-6e3ebfa6>
           ${blk.group ? html`<div class="rozie-select-group-heading" role="presentation" data-rozie-s-6e3ebfa6>
             ${this.groupHeading !== undefined ? this.groupHeading({group: blk.group}) : html`<slot name="groupHeading" data-rozie-params=${(() => { try { return JSON.stringify({group: blk.group}); } catch { return '{}'; } })()}>${rozieDisplay(blk.group.label)}</slot>`}
           </div>` : nothing}${repeat<any>(blk.items, (row, _idx) => this.optionId(row.index), (row, _idx) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === row.index, 'is-selected': this.isSelected(row.opt), 'is-disabled': this.disabledOf(row.opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(row.index))} role="option" aria-selected=${!!this.isSelected(row.opt)} aria-disabled=${!!this.disabledOf(row.opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(row.opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(row.index); }} data-rozie-s-6e3ebfa6>
@@ -621,7 +621,7 @@ private __rozieFirstUpdateDone = false;
         </div>`)}
         ${this.visibleOptions().length === 0 ? html`<div class="rozie-select-empty" role="presentation" data-rozie-s-6e3ebfa6>
           ${this.empty !== undefined ? this.empty({query: this._query.value}) : html`<slot name="empty" data-rozie-params=${(() => { try { return JSON.stringify({query: this._query.value}); } catch { return '{}'; } })()}>No options</slot>`}
-        </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
+        </div>` : nothing}</div>` : nothing}${this.virtual ? html`<div class="rozie-select-list rozie-select-list--virtual" role="listbox" id=${rozieAttr(this.idRoot() + '-list')} aria-label=${rozieAttr(this.ariaLabel)} aria-multiselectable=${this.multiple} style=${rozieStyle((this.popupVisible() ? '' : 'display:none;') + (this.maxHeight ? 'height:' + this.maxHeight + ';max-height:' + this.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + this.maxHeight : 'overflow-y:auto'))} @mousedown=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onListMouseDown($event); }} data-rozie-ref="listEl" data-rozie-s-6e3ebfa6>
         <div class="rozie-select-spacer" aria-hidden="true" style=${rozieStyle('height:' + this.padTop() + 'px')} data-rozie-s-6e3ebfa6></div>
 
         ${repeat<any>(this.windowedRows(), (wr, _idx) => wr.row.id, (wr, _idx) => html`<div class="${Object.entries({ "rozie-select-option": true, 'is-active': this._activeIndex.value === wr.vi.index, 'is-selected': this.isSelected(wr.row._opt), 'is-disabled': this.disabledOf(wr.row._opt) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" id=${rozieAttr(this.optionId(wr.vi.index))} data-index=${rozieAttr(wr.vi.index)} role="option" aria-selected=${!!this.isSelected(wr.row._opt)} aria-disabled=${!!this.disabledOf(wr.row._opt)} @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.select(wr.row._opt); }} @mousemove=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onOptionPointerMove(wr.vi.index); }} data-rozie-s-6e3ebfa6>
@@ -850,42 +850,60 @@ private __rozieFirstUpdateDone = false;
   }
 };
 
-  groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt ? opt.group : null;
+  // An option's group id: its `group` as text (so a numeric id reads the same as the
+  // `groups` entry that lists it), or null when it has none — the Combobox rule.
+  groupOfOption = (opt: any) => opt !== null && typeof opt === 'object' && 'group' in opt && opt.group != null ? String(opt.group) : null;
 
   // Grouping is active only for a non-empty `groups` list, and never while windowing.
   isGrouped = () => !this.virtual && Array.isArray(this.groups) && this.groups.length > 0;
 
-  // Visual order: identity when ungrouped, group-partitioned when grouped. Memoised on
-  // the inputs so repeated calls in one render return the SAME array (stable indices).
-  orderedOptionsCache = {
+  // The option set partitioned ONCE per input change: `ordered` is the visual order
+  // (identity when ungrouped), `blocks` the grouped render's sections. Memoised, so every
+  // call in one render returns the SAME objects — stable indices, stable block identity.
+  // `groups` is part of the key only while grouping is in effect (see groupsKey()).
+  // Each block carries its render key and each item its index in visibleOptions(). The
+  // ungrouped block's key cannot be produced by a group id: named blocks are all `grp-…`.
+  groupsKey = () => this.isGrouped() ? this.groups : null;
+
+  groupingCache = {
   keys: null as any[] | null,
   val: null as any
 };
 
-  orderedOptions = () => {
-  const __rozieMemoKey = [this.options, this.groups, this.virtual];
-  const __rozieMemoPrev = this.orderedOptionsCache.keys;
+  grouping = () => {
+  const __rozieMemoKey = [this.options, this.groupsKey(), this.virtual];
+  const __rozieMemoPrev = this.groupingCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
-    return this.orderedOptionsCache.val;
+    return this.groupingCache.val;
   }
-  const __rozieMemoVal = this.isGrouped() ? groupOptions(this.options, this.groups, this.groupOfOption).ordered : this.options;
-  this.orderedOptionsCache.keys = __rozieMemoKey;
-  this.orderedOptionsCache.val = __rozieMemoVal;
+  const __rozieMemoVal = (() => {
+    if (!this.isGrouped()) return {
+      ordered: this.options,
+      blocks: []
+    };
+    const res = groupOptions(this.options, this.groups, this.groupOfOption);
+    let i = 0;
+    return {
+      ordered: res.ordered,
+      blocks: res.blocks.map((b: any) => ({
+        key: b.group ? 'grp-' + b.group.id : 'ungrouped',
+        group: b.group,
+        items: b.items.map((opt: any) => ({
+          opt,
+          index: i++
+        }))
+      }))
+    };
+  })();
+  this.groupingCache.keys = __rozieMemoKey;
+  this.groupingCache.val = __rozieMemoVal;
   return __rozieMemoVal;
 };
 
-  // Blocks for the grouped render; each item carries its index in visibleOptions().
-  groupBlocks = () => {
-  const res = groupOptions(this.options, this.groups, this.groupOfOption);
-  let i = 0;
-  return res.blocks.map((b: any) => ({
-    group: b.group,
-    items: b.items.map((opt: any) => ({
-      opt,
-      index: i++
-    }))
-  }));
-};
+  orderedOptions = () => this.grouping().ordered;
+
+  // Blocks for the grouped render (empty when ungrouped).
+  groupBlocks = () => this.grouping().blocks;
 
   // ── native mobile picker (`nativePicker`) ──────────────────────────────────
   // Active only for the opt-in prop on a coarse primary pointer, in SINGLE-select, and
@@ -906,7 +924,7 @@ private __rozieFirstUpdateDone = false;
 };
 
   nativeRows = () => {
-  const __rozieMemoKey = [this.options, this.groups, this.virtual];
+  const __rozieMemoKey = [this.options, this.groupsKey(), this.virtual];
   const __rozieMemoPrev = this.nativeRowsCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return this.nativeRowsCache.val;
@@ -981,8 +999,10 @@ private __rozieFirstUpdateDone = false;
   this.queueNativeSync();
 };
 
-  // The watchers' entry point: a Select that is not showing the native picker never
-  // queries the DOM or queues a timer.
+  // The watchers' entry point: while the native picker is not active they do nothing —
+  // no DOM query, no timer. (Not a statement about the whole component: $onMount arms one
+  // sync on its own whenever `nativePicker` is set on a coarse pointer, before
+  // nativeActive() can be read there.)
   scheduleNativeSync = () => {
   if (this.nativeActive()) this.armNativeSync();
 };
@@ -1589,9 +1609,9 @@ private __rozieFirstUpdateDone = false;
   // the same wrapped row the count windows over.
   //
   // $memo, keyed on the TRUE inputs. The key covers everything the map reads:
-  // options ref + groups + virtual (visibleOptions' inputs — with `virtual` on,
-  // grouping is off, so this is source order) and the optionValue resolver
-  // (valueOf in the map body).
+  // options ref + virtual + groups while grouping is in effect (visibleOptions' inputs —
+  // with `virtual` on grouping is off, the order is source order, and a new `groups`
+  // array changes nothing here) and the optionValue resolver (valueOf in the map body).
   // Same reference-stability contract the sibling Combobox's filteredOptions carries —
   // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
   // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
@@ -1601,7 +1621,7 @@ private __rozieFirstUpdateDone = false;
 };
 
   windowSource = () => {
-  const __rozieMemoKey = [this.options, this.groups, this.virtual, this.optionValue];
+  const __rozieMemoKey = [this.options, this.groupsKey(), this.virtual, this.optionValue];
   const __rozieMemoPrev = this.windowSourceCache.keys;
   if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
     return this.windowSourceCache.val;
@@ -2047,6 +2067,16 @@ private __rozieFirstUpdateDone = false;
   $event.preventDefault();
   this.removeChipValue(vals[vals.length - 1]);
   return true;
+};
+
+  // A primary-button press anywhere inside the popup never takes DOM focus: focus stays
+  // on the trigger (the APG select-only model — the popup is driven through
+  // aria-activedescendant), so the keyboard keeps working after a pointer pick in a
+  // multi-select, or after a press on a disabled option, a group heading or the padding.
+  // Without this the press moved focus to <body> and every key went nowhere. Only the
+  // default action of mousedown is cancelled: the click still arrives.
+  onListMouseDown = ($event: any) => {
+  if ($event.button === 0) $event.preventDefault();
 };
 
   // A number-typed helper: a literal `0`/`-1` tabindex trips TS2869 on React

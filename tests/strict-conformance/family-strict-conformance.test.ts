@@ -178,7 +178,13 @@ const FAMILIES: FamilySpec[] = [
         // and the inner `blk.items.map((row) => …)` — have no contextual type (+3).
         // The same Class-6 leaf-body shape as the `orderedOptions` memo above, not a
         // new class; Select.d.ts only gains the `nativePicker?: boolean` prop.
-        TS7006: 7,
+        // 7 → 8 (select cleanup, stable group blocks): `groupBlocks()` now reads the
+        // same `$memo` (`grouping`) as the visual order instead of re-partitioning on
+        // every call, so the grouped branch's outer `groupBlocks().map((blk) => …)`
+        // iterates a `val: any` too (+1; its inner `blk.items.map((row) => …)` was
+        // already counted). Same Class-6 leaf-body shape; Select.d.ts changes are
+        // JSDoc text only.
+        TS7006: 8,
       },
     },
   },
