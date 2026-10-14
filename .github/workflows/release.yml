@@ -80,7 +80,7 @@ name: Release (early subset)
 #     (all six aligned at 0.1.0 — the FIRST all-targets combobox release line). react/solid/
 #     lit/vue carry @rozie/runtime-<fw> and svelte carries @rozie/runtime-svelte (rewritten from
 #     `workspace:` at publish; live on npm); angular carries no @rozie dep (tslib only).
-#     Self-contained — no @rozie-ui workspace dep (vendors the select spine at authoring time).
+#     Self-contained — no @rozie-ui workspace dep (vendors the listbox spine at authoring time).
 #     Hard PREREQUISITE of the command-palette debut below; published first, built first.
 #   - 6 @rozie-ui command-palette leaves: command-palette-{react,vue,solid,lit,svelte,angular}
 #     (all six aligned at 0.1.0 — the DEBUT all-targets command-palette release line). The
@@ -247,7 +247,7 @@ name: Release (early subset)
 #     JSX kept only under the `solid` export condition — the vite-plugin-solid `.mjs` workaround
 #     is no longer needed on any of them).
 #   - 8 @rozie-ui NEW Solid-only leaves DEBUT at a patch (first publish):
-#     dialog-solid, select-solid, maplibre-solid, number-field-solid,
+#     dialog-solid, listbox-solid, maplibre-solid, number-field-solid,
 #     pagination-solid, resizable-solid, slider-solid, switch-solid. Each gets its OWN
 #     "Build debut Solid leaves" / "Publish debut Solid leaves" step pair below (all eight
 #     carry @rozie/runtime-solid as a workspace dep, so they build after the toolchain step;
@@ -285,7 +285,7 @@ name: Release (early subset)
 #     skipped by `pnpm publish` as already-published; no filter-list edit is needed for that case.
 #   - Scope stays exactly the 16 families + 4 toolchain packages already wired above (D3) — the
 #     13 additional unpublished families whose content also moved in this same seam batch
-#     (chartjs, codemirror, dialog, lexical, select, maplibre, number-field, pagination,
+#     (chartjs, codemirror, dialog, lexical, listbox, maplibre, number-field, pagination,
 #     resizable, rete, slider, switch, wavesurfer) are NOT added; their regenerated content ships
 #     whenever they eventually debut.
 #     (SUPERSEDED for rete, 2026-08-04: rete is now release-verified and wired above.
@@ -351,10 +351,27 @@ name: Release (early subset)
 #     release-precheck check (f) — published-tarball drift (RELEASING.md §6 item 11) —
 #     so the class this wave exists to close cannot silently re-accumulate.
 #
+# 2026-10 select family DEBUT (all six targets; replaces `listbox`):
+#   - The `@rozie-ui/listbox` family was renamed to `@rozie-ui/select` and completed. Only
+#     `listbox-solid` ever published (the 2026-09-26 Solid-only debut above); the listbox
+#     workspace packages no longer exist, so `listbox-solid` is dropped from the "debut Solid
+#     leaves" step pair and the advisory precheck, and `listbox-solid` gets `npm deprecate`d
+#     by hand after this wave publishes (RELEASING.md §6 next-wave checklist).
+#   - 6 @rozie-ui select leaves: select-{react,vue,solid,lit,svelte,angular}, debut at a PATCH
+#     via `.changeset/select-debut.md` (0.1.0 -> 0.1.1, the codemirror/chartjs/wavesurfer and
+#     2026-09-26 Solid debut precedent — a new package name has no prior version to break).
+#     None is in `.changeset/config.json`'s `ignore` list. react/solid/lit/vue carry
+#     @rozie/runtime-<fw>, svelte @rozie/runtime-svelte, angular @rozie/runtime-angular.
+#   - Each leaf declares @rozie-ui/popover-<target> as a REQUIRED peer and imports it at
+#     compile (Option-A composition, like data-table), so "Build select leaves" runs AFTER
+#     "Build popover leaves" and "Publish select leaves" runs AFTER "Publish popover leaves".
+#   - The three "dialog, listbox, maplibre, …" lists below and in the debut-Solid step comments
+#     are the historical 2026-09-26 record and keep the name that shipped.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
 # above is not release-verified. As of the 2026-09-26 wave, that includes the 40 remaining
 # targets (React/Vue/Svelte/Lit/Angular) of the 8 families whose SOLID leaf debuted above
-# (dialog, select, maplibre, number-field, pagination, resizable, slider, switch), PLUS all
+# (dialog, listbox, maplibre, number-field, pagination, resizable, slider, switch), PLUS all
 # 6 targets of `lexical` (its Solid leaf does NOT debut this wave — no content read/write API
 # yet, so it is fully held back alongside its siblings) — 46 packages total — held back until
 # they get their own dogfooding pass, exactly like uppy and every other not-yet-verified
@@ -818,15 +835,16 @@ jobs:
       # so this sits AFTER the toolchain build, same rationale as every other non-vue leaf step
       # above. None carries an @rozie-ui workspace peer, so there is NO ordering coupling to any
       # other leaf family — this step can run anywhere after the toolchain build. The OTHER five
-      # targets of these same 8 families (dialog, select, maplibre, number-field,
+      # targets of these same 8 families (dialog, listbox, maplibre, number-field,
       # pagination, resizable, slider, switch) remain out of scope and are NOT built here — see
       # the dated header note above. `lexical` is NOT in this step at all (fully held back, all
-      # six targets — no content read/write API yet).
+      # six targets — no content read/write API yet). `listbox-solid` is no longer in this step:
+      # the family was renamed to `select` (2026-10) and all six select leaves build together in
+      # "Build select leaves" below.
       - name: Build debut Solid leaves
         run: >
           pnpm
           --filter=@rozie-ui/dialog-solid
-          --filter=@rozie-ui/select-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
           --filter=@rozie-ui/pagination-solid
@@ -877,11 +895,29 @@ jobs:
           --filter=@rozie-ui/data-table-angular
           build
 
+      # Build all six select leaves into their compiled dist/ drop-in (2026-10 select debut —
+      # the renamed, completed listbox family). Mixed per-target toolchain (react/solid/lit
+      # tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Sits
+      # AFTER the toolchain build so the local @rozie/runtime-* dist exists for type resolution,
+      # and AFTER "Build popover leaves": the committed leaf src/ IMPORTS
+      # `@rozie-ui/popover-<target>` (a required peer, workspace-linked via auto-install-peers),
+      # so select's declaration emit reads popover's built dist.
+      - name: Build select leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/select-react
+          --filter=@rozie-ui/select-vue
+          --filter=@rozie-ui/select-solid
+          --filter=@rozie-ui/select-lit
+          --filter=@rozie-ui/select-svelte
+          --filter=@rozie-ui/select-angular
+          build
+
       # Build all six combobox leaves into their compiled dist/ drop-in. Mixed per-target
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
       # dist exists for the react/solid/lit/svelte/vue leaf type resolution (angular = tslib
-      # only). Self-contained: no @rozie-ui workspace dep (it vendors the select spine at
+      # only). Self-contained: no @rozie-ui workspace dep (it vendors the listbox spine at
       # authoring time). MUST run BEFORE the command-palette build below — command-palette's
       # composition imports `@rozie-ui/combobox-<target>` (a required peer, workspace-linked via
       # auto-install-peers), so command-palette's declaration emit reads combobox's built dist.
@@ -1067,13 +1103,18 @@ jobs:
           --filter @rozie-ui/wavesurfer-svelte
           --filter @rozie-ui/wavesurfer-angular
           --filter @rozie-ui/dialog-solid
-          --filter @rozie-ui/select-solid
           --filter @rozie-ui/maplibre-solid
           --filter @rozie-ui/number-field-solid
           --filter @rozie-ui/pagination-solid
           --filter @rozie-ui/resizable-solid
           --filter @rozie-ui/slider-solid
           --filter @rozie-ui/switch-solid
+          --filter @rozie-ui/select-react
+          --filter @rozie-ui/select-vue
+          --filter @rozie-ui/select-solid
+          --filter @rozie-ui/select-lit
+          --filter @rozie-ui/select-svelte
+          --filter @rozie-ui/select-angular
 
       # Then the 11 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
@@ -1214,6 +1255,26 @@ jobs:
           --filter=@rozie-ui/data-table-lit
           --filter=@rozie-ui/data-table-svelte
           --filter=@rozie-ui/data-table-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six select leaves (2026-10 DEBUT, first publish — the renamed, completed listbox
+      # family; see the dated header note). pnpm rewrites their `workspace:` deps to the concrete
+      # @rozie/runtime-* versions in the tarball. Each leaf declares @rozie-ui/popover-<target>
+      # as a required peer — published in the "Publish popover leaves" step above, so the peer
+      # resolves for consumers. Inherits dry_run (default TRUE) via steps.flags.outputs.extra
+      # and the skip-if-already-published behavior (no --force).
+      - name: Publish select leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/select-react
+          --filter=@rozie-ui/select-vue
+          --filter=@rozie-ui/select-solid
+          --filter=@rozie-ui/select-lit
+          --filter=@rozie-ui/select-svelte
+          --filter=@rozie-ui/select-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -1558,7 +1619,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # The 8 DEBUT Solid-only leaves (2026-09-26 wave — dialog, select, maplibre,
+      # The 8 DEBUT Solid-only leaves (2026-09-26 wave — dialog, listbox, maplibre,
       # number-field, pagination, resizable, slider, switch; verified 0/8 on npm via a direct
       # registry GET, since `npm view` lags on first-ever names). pnpm rewrites each leaf's
       # `@rozie/runtime-solid` workspace dep to the concrete published version in the tarball —
@@ -1570,13 +1631,14 @@ jobs:
       # `lexical` is NOT in this step at all — fully held back this wave (all six targets,
       # including Solid; no content read/write API yet), still fully in `.changeset/config.json`'s
       # `ignore` list.
+      # `listbox-solid` is no longer in this step: the family was renamed to `select` (2026-10)
+      # and all six select leaves publish in "Publish select leaves" above.
       # Inherits dry_run (default TRUE) via steps.flags.outputs.extra and the
       # skip-if-already-published behavior (no --force).
       - name: Publish debut Solid leaves (@rozie-ui/*)
         run: >
           pnpm
           --filter=@rozie-ui/dialog-solid
-          --filter=@rozie-ui/select-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
           --filter=@rozie-ui/pagination-solid

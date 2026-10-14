@@ -7,7 +7,7 @@
   keep the family's own default width. The two `wrap` ones hold four values in a 190px box, so
   their chips wrap onto more than one row.
 
-  Behavioral-only: no screenshot is taken here.
+  The same page is also captured as the SelectScreenshot / SelectScreenshotOpen pixel cells.
 -->
 <rozie name="SelectScreenshotDemo">
 <components>

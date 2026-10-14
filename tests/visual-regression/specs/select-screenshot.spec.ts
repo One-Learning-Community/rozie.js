@@ -23,7 +23,14 @@ const theme = (family: string, name: string) => readFileSync(resolve(UI, family,
  * colour, and Select's placeholder must be the same colour. The focus state (border, ring) and
  * the horizontal gap between two chips are compared as well.
  *
- * Behavioral-only (no screenshot baseline).
+ * The same demo also carries two PIXEL cells per target (bottom of this file): the page at rest
+ * (`SelectScreenshot.png`: controls, chips, wrapped chips, disabled and empty rows, Select and
+ * Combobox side by side) and with the Select multi popup open (`SelectScreenshotOpen.png`: the
+ * floating list with its group headings). They are captured page-level, like
+ * overlay-screenshot.spec.ts, because the popup is positioned by @rozie-ui/popover outside the
+ * demo's own box. All six targets diff against the same shared PNG. BASELINES ARE
+ * LINUX-DOCKER-GENERATED (tools/ci-repro/vr.sh); a cell fixmes until its PNG exists, and
+ * ROZIE_VR_BOOTSTRAP_BASELINE=<name> ungates it for the one `-u` pass that creates it.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -229,6 +236,56 @@ for (const target of TARGETS) {
       diff('empty state', textColor(EMPTY), selEmpty, await read(cbx('none', '.rozie-combobox-empty'), textColor(EMPTY)));
 
       expect(mismatches).toEqual([]);
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pixel cells (Linux baselines only — see the header).
+// ---------------------------------------------------------------------------------------------
+const BOOTSTRAP_BASELINES = new Set(
+  (process.env.ROZIE_VR_BOOTSTRAP_BASELINE ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+);
+const baselineExists = (name: string) =>
+  BOOTSTRAP_BASELINES.has(name) || existsSync(resolve(__dirname, `../__screenshots__/${name}.png`));
+
+/** Wait for fonts, then for every running animation/transition to finish. */
+async function settlePage(page: Page): Promise<void> {
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => undefined))));
+  await page.waitForTimeout(300);
+}
+
+const SHOTS = ['SelectScreenshot', 'SelectScreenshotOpen'] as const;
+
+for (const shot of SHOTS) {
+  const hasBaseline = baselineExists(shot);
+  for (const target of TARGETS) {
+    const built = existsSync(resolve(__dirname, `../dist/${target}/host/entry.${target}.html`));
+    const runner = !built || !hasBaseline ? test.fixme : test;
+    runner(`${shot} · ${target}`, async ({ page }) => {
+      await page.goto(`/?example=SelectScreenshot&target=${target}`);
+      await expect(page.getByTestId('cb-single').locator('.rozie-combobox-input')).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByTestId('sel-single').locator('.rozie-select-control')).toBeVisible();
+      // the seeded values have rendered: two chips in each multi, four in each wrap
+      await expect(page.getByTestId('sel-multi').locator('.rozie-select-chip')).toHaveCount(2);
+      await expect(page.getByTestId('cb-multi').locator('.rozie-combobox-chip')).toHaveCount(2);
+      await expect(page.getByTestId('sel-wrap').locator('.rozie-select-chip')).toHaveCount(4);
+      await expect(page.getByTestId('cb-wrap').locator('.rozie-combobox-chip')).toHaveCount(4);
+
+      if (shot === 'SelectScreenshotOpen') {
+        const trigger = page.getByTestId('sel-multi').locator('[role="combobox"]').first();
+        await trigger.click();
+        const list = page.getByTestId('sel-multi').locator('.rozie-select-list').first();
+        await expect(list).toBeVisible();
+        await expect(page.getByTestId('sel-multi').locator('.rozie-select-group-heading')).toHaveCount(2);
+        await expect(page.getByTestId('sel-multi').locator('.rozie-select-option')).toHaveCount(4);
+        // park the pointer on the empty page so no option shows a hover state
+        await page.mouse.move(1200, 700);
+      }
+
+      await settlePage(page);
+      await expect(page).toHaveScreenshot(`${shot}.png`, { animations: 'disabled', maxDiffPixels: 2 });
     });
   }
 }
