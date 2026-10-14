@@ -273,4 +273,88 @@ for (const target of TARGETS) {
     await expect(list).toBeVisible();
     await settled(page, log, 'TFT');
   });
+
+  // ── rapid close -> open ───────────────────────────────────────────────────
+  runner(`select-open-state [${target}]: closing and opening again at once leaves the popup open, one open-change per transition`, async ({ page }) => {
+    await page.goto(`/?example=SelectOpenState&target=${target}`);
+    const wrap = page.getByTestId('api-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const log = page.getByTestId('readout-api-log');
+    // Two actions on the trigger in ONE task: no frame, no timer and no framework flush
+    // can run between them. Escape is seen by the trigger's handler AND by the composed
+    // popover at the document, exactly as a real key press is.
+    //
+    // On React the two are separated by one microtask turn, which is what always lies
+    // between two real events: React commits a key's state change in a microtask, so two
+    // dispatches with NOTHING between them hand the second handler the first one's
+    // pre-change state — a situation no user input can produce (the second key then
+    // commits the highlighted option instead of opening). Still no frame, no timer.
+    const burst = (second: 'space' | 'arrow' | 'click') =>
+      trigger.evaluate(async (el, [what, turn]) => {
+        const key = (k: string) => el.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, composed: true }));
+        key('Escape');
+        if (turn) await Promise.resolve();
+        if (what === 'space') key(' ');
+        else if (what === 'arrow') key('ArrowDown');
+        else (el as HTMLElement).click();
+      }, [second, target === 'react'] as const);
+    const open = async (want: string) => {
+      await expect(list).toBeVisible();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      await settled(page, log, want);
+      // Still open after the pause: nothing closed it a moment later.
+      await expect(list).toBeVisible();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    };
+
+    await trigger.click();
+    await open('T');
+    await burst('space');
+    await open('TFT');
+    await burst('arrow');
+    await open('TFTFT');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await burst('click');
+    await open('TFTFTFT');
+    // Real key presses back to back (no assertion in between).
+    await trigger.focus();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press(' ');
+    await open('TFTFTFTFT');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('ArrowDown');
+    await open('TFTFTFTFTFT');
+    // …and the popup that survived is a normal one: Escape closes it once.
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    await settled(page, log, 'TFTFTFTFTFTF');
+  });
+
+  runner(`select-open-state [${target}]: open(), close(), open() through the handle in one tick ends open`, async ({ page }) => {
+    await page.goto(`/?example=SelectOpenState&target=${target}`);
+    const wrap = page.getByTestId('api-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    const log = page.getByTestId('readout-api-log');
+    await expect(trigger).toBeVisible();
+    await page.getByTestId('api-burst').focus();
+    await page.keyboard.press('x');
+    // The final state holds on all six.
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    // EXPECTED FAILURE on React — the event sequence only. The three calls run in one
+    // tick against ONE render's state: the shared close() reads `open` as it was when
+    // the tick began (closed) and does nothing, and the second open() does not see the
+    // first one's write and emits again — 'TT' instead of 'TFT'. Those functions are the
+    // list spine's (and verbatim copies of it), which this branch may not change.
+    test.fail(target === 'react', "three handle calls in one tick read one render's state: open-change is 'TT', not 'TFT'");
+    await settled(page, log, 'TFT');
+    await expect(list).toBeVisible();
+    // From OPEN: open() is a no-op, close() closes, open() opens again.
+    await page.keyboard.press('x');
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await settled(page, log, 'TFTFT');
+  });
 }

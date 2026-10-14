@@ -64,6 +64,13 @@ const onApiOpenChange = (e) => {
 }
 const apiOpen = () => { $refs.apiSelect.open() }
 const apiToggle = () => { $refs.apiSelect.toggle() }
+// Three handle calls in ONE tick, on a key (so no outside click is involved).
+const onBurstKey = (e) => {
+  if (e.key !== 'x') return
+  $refs.apiSelect.open()
+  $refs.apiSelect.close()
+  $refs.apiSelect.open()
+}
 </script>
 <template>
 <div class="select-open-state-demo">
@@ -92,6 +99,7 @@ const apiToggle = () => { $refs.apiSelect.toggle() }
   <div class="row">
     <button type="button" data-testid="api-open" @click="apiOpen()">open()</button>
     <button type="button" data-testid="api-toggle" @click="apiToggle()">toggle()</button>
+    <button type="button" data-testid="api-burst" @keydown="onBurstKey($event)">open() close() open() (press x)</button>
     <span data-testid="readout-api-log">{{ $data.apiLog }}</span>
   </div>
   <div data-testid="api-select">

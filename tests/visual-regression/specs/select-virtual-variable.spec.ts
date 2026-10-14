@@ -71,7 +71,9 @@ for (const target of TARGETS) {
         return null;
       };
       const sc = deep('.rozie-select-list--virtual');
-      if (sc) sc.scrollTop = sc.scrollHeight * 0.4;
+      // Scrolled the way a user does: a wheel event comes with the move (a keyboard
+      // scroll-into-view still settling yields to it).
+      if (sc) { sc.dispatchEvent(new WheelEvent('wheel', { bubbles: true, composed: true })); sc.scrollTop = sc.scrollHeight * 0.4; }
     });
     await page.waitForTimeout(100);
     const early = await topVisibleOption(page);
@@ -118,6 +120,7 @@ for (const target of TARGETS) {
         return null;
       };
       const sc = deep('.rozie-select-list--virtual')!;
+      sc.dispatchEvent(new WheelEvent('wheel', { bubbles: true, composed: true })); // a user's wheel, not a bare script write
       sc.scrollTop = sc.scrollHeight;
     });
     await page.waitForTimeout(800);
@@ -146,6 +149,7 @@ for (const target of TARGETS) {
         return null;
       };
       const sc = deep('.rozie-select-list--virtual')!;
+      sc.dispatchEvent(new WheelEvent('wheel', { bubbles: true, composed: true })); 
       if (how === 'end') sc.scrollTop = sc.scrollHeight;
       if (how === 'up') sc.scrollTop = sc.scrollTop - 300;
       return Math.round(sc.scrollHeight - sc.scrollTop - sc.clientHeight);

@@ -342,6 +342,13 @@ for (const target of TARGETS) {
     await expect(list).toBeVisible();
     await expect.poll(inView('Row 35')).toBe(true);
     expect(await inView('Row 1')()).toBe(false); // the list really is scrolled
+    await page.keyboard.press('Escape');
+    await expect(list).toHaveCount(0);
+    // …and through the handle, called from a timer (outside any user event).
+    await page.getByTestId('open-later').click();
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-34$/);
+    await expect.poll(inView('Row 35')).toBe(true);
   });
 
   runner(`select [${target}]: a text field inside an option takes focus by mouse and can be typed into; a plain option leaves focus on the trigger`, async ({ page }) => {

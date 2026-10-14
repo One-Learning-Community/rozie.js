@@ -10,24 +10,27 @@ import Popover from '@rozie-ui/popover-solid';
 import { groupOptions } from './internal/groupOptions';
 
 // ── VALUE IDENTITY ─────────────────────────────────────────────────────────
-// Which options the model selects is decided in ONE place, src/internal/valueMatch.ts
-// (a pure, unit-tested helper vendored into every leaf — the groupOptions.ts pattern),
+// Whether a model value selects an option is decided by src/internal/valueMatch.ts (a
+// pure, unit-tested helper vendored into every leaf — the groupOptions.ts pattern),
 // IDENTITY FIRST: a model value selects the options whose value is identical to it, and
-// only when no option is identical do objects fall back to equal contents. The fallback
-// is what makes an object value read back through a reactive proxy (Vue's ref /
-// reactive, Svelte's $state) show as selected at all; see that file for the rule and
+// only when no option is identical do plain objects fall back to equal contents. The
+// fallback is what makes an object value read back through a reactive proxy (Vue's ref
+// / reactive, Svelte's $state) show as selected at all; see that file for the rule and
 // its one limit.
+//
+// NOTHING HERE IS CACHED. Every answer is computed from `$props.value` and
+// `$props.options` as they are when asked, so a model or an option list the consumer
+// changed in place is shown as it is now. For primitive values that costs what the
+// spine's code cost (`===` / `includes` per option); the scan over the options
+// (hasIdenticalOption) only runs for a model value and an option value that are
+// different objects with equal contents.
 //
 // The spine's `isSelected`, `selectedLabel` and `select` compare with `===` /
 // `includes`, so Select owns these three (they are not imported; nothing Select still
 // imports from the spine reaches them).
-import { matchValues } from './internal/valueMatch';
+import { identical, selects, selectedIn, toggleIn, distinctValues, uniqueKeys, keyBase } from './internal/valueMatch';
 
-// The match of the current model against the current options, computed once per change
-// of either (never per option): `rows` is one entry per DISTINCT model value —
-// `members` its positions in the model, `at` the indices of the options it selects —
-// and `picked` the set of selected option entries. The model's length is part of the
-// key so an array a consumer grew in place is seen where the framework reports it.
+// Is some option's value identical to this model value?
 
 // virtual-core: the framework-agnostic windowing state machine (the data-table
 // precedent — NO per-framework adapter). The static import is emitted unconditionally
@@ -213,7 +216,7 @@ interface GroupHeadingSlotCtx { group: SelectGroup; }
 
 interface SelectProps extends Omit<import('solid-js').ComponentProps<'div'>, 'options' | 'value' | 'defaultValue' | 'onValueChange' | 'multiple' | 'inline' | 'disabled' | 'placeholder' | 'closeOnSelect' | 'optionLabel' | 'optionValue' | 'optionDisabled' | 'idBase' | 'hideEmpty' | 'selectOnTab' | 'clearable' | 'clearLabel' | 'nativePicker' | 'placement' | 'offset' | 'disableFlip' | 'disableShift' | 'block' | 'groups' | 'ariaLabel' | 'virtual' | 'estimateRowHeight' | 'maxHeight' | 'onOpenChange' | 'onChange' | 'chipSlot' | 'selectedSlot' | 'optionSlot' | 'emptySlot' | 'groupHeadingSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
-   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value; only when no option is identical does an object value match by content (same prototype, equal own properties), which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Known limit: on Vue and Svelte two options whose object values have equal contents cannot be told apart — give them distinct contents, or map them to a primitive with `optionValue`.
+   * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array (equal own properties, compared up to 32 levels deep) — which is how a value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Any other object (a `Date`, a `Map`, a class instance) matches by identity only. Known limit: on Vue and Svelte two options whose plain-object values have equal contents cannot be told apart. Mapping options to a primitive with `optionValue` is the robust choice.
    */
   options?: any[];
   /**
@@ -350,6 +353,9 @@ export default function Select(_props: SelectProps): JSX.Element {
   const [coarse, setCoarse] = createSignal(false);
   const [panelOpen, setPanelOpen] = createSignal(false);
   const [panelEcho, setPanelEcho] = createSignal(false);
+  const [session, setSession] = createSignal(0);
+  const [panelSession, setPanelSession] = createSignal(0);
+  const [resync, setResync] = createSignal(0);
   const [activeIndex, setActiveIndex] = createSignal(-1);
   const [query, setQuery] = createSignal('');
   const [rows, setRows] = createSignal<any[]>([]);
@@ -360,7 +366,10 @@ export default function Select(_props: SelectProps): JSX.Element {
     return optionId(activeIndex());
   });
   onMount(() => {
-    disposed = false; // a remount of the same instance (React StrictMode) starts clean
+    // A remount of the same instance (React StrictMode) starts clean: frames queued by the
+    // first mount were dropped at its unmount, so no re-measure is in flight.
+    disposed = false;
+    remeasurePending = false;
     if (!local.idBase) setAutoId('rozie-select-' + nextAutoId());
     // The coarse-pointer probe must never throw out of $onMount (the windowing setup
     // below runs for every Select), and older engines only have addListener().
@@ -402,6 +411,8 @@ export default function Select(_props: SelectProps): JSX.Element {
     // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
     // this and does nothing.
     disposed = true;
+    remeasurePending = false;
+    if (resyncTimer !== null) clearTimeout(resyncTimer);
     if (typeTimer !== null) clearTimeout(typeTimer);
     if (nativeSyncTimer !== null) clearTimeout(nativeSyncTimer);
     if (coarseQuery && coarseListener) {
@@ -421,7 +432,21 @@ export default function Select(_props: SelectProps): JSX.Element {
   createEffect(on(() => (() => panelOpen())(), (v) => untrack(() => (() => {
     if (panelOpen() === panelEcho()) return;
     setPanelEcho(panelOpen());
-    if (!panelOpen()) close();
+    if (panelOpen()) return;
+    // A dismissal of the popup that is showing goes through close().
+    if (panelSession() === session()) {
+      close();
+      return;
+    }
+    // A leftover from the popup before this one: nothing to close. The panel has to be
+    // shown again for the current session — but NOT in this same flush: the popover holds
+    // `false` because it wrote it, and Angular only pushes a bound value down when it
+    // differs from the one it pushed last (`true`), so `panelOpen` must be seen `false`
+    // by one flush before it goes back to `true`. Hence a task later, through state.
+    queueResync();
+  })()), { defer: true }));
+  createEffect(on(() => (() => resync())(), (v) => untrack(() => (() => {
+    syncPanel();
   })()), { defer: true }));
   createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
     syncRows();
@@ -472,6 +497,8 @@ export default function Select(_props: SelectProps): JSX.Element {
   let coarseQuery: any = null;
   let coarseListener: any = null;
   let nativeSyncTimer: any = null;
+  // The pending panel re-sync (see queueResync()); null per the timer-handle convention.
+  let resyncTimer: any = null;
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, close/clear, and the activeDescendant derivation come from
@@ -578,46 +605,30 @@ export default function Select(_props: SelectProps): JSX.Element {
   function onOptionPointerMove(index: any) {
     if (activeIndex() !== index) setActiveIndex(index);
   }
-  const selectionCache = {
-    keys: null as any[] | null,
-    val: null as any
-  };
-  function selection() {
-    const __rozieMemoKey = [value(), Array.isArray(value()) ? (value() as any).length : -1, local.options, local.multiple, local.optionValue];
-    const __rozieMemoPrev = selectionCache.keys;
-    if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
-      return selectionCache.val;
-    }
-    const __rozieMemoVal = (() => {
-      const opts = Array.isArray(local.options) ? local.options : [];
-      const cur = value();
-      const model = local.multiple ? Array.isArray(cur) ? cur : [] : [cur];
-      const res = matchValues(model, opts.map((o: any) => valueOf(o)));
-      return {
-        opts,
-        model,
-        rows: res.rows,
-        picked: new Set(opts.filter((o: any, i: any) => res.picked[i]))
-      };
-    })();
-    selectionCache.keys = __rozieMemoKey;
-    selectionCache.val = __rozieMemoVal;
-    return __rozieMemoVal;
+  // Is some option's value identical to this model value?
+  function hasIdenticalOption(m: any) {
+    const opts = Array.isArray(local.options) ? local.options : [];
+    return opts.some((o: any) => identical(valueOf(o), m));
   }
-  // Is a given option currently selected?
+
+  // Is a given option currently selected? Compares VALUES, never the option object: an
+  // option handed in from reactive state (a windowed row on Vue or Svelte) is a proxy of
+  // the consumer's object and is identical to nothing.
   function isSelected(opt: any) {
-    return selection().picked.has(opt);
+    const v = valueOf(opt);
+    const cur = value();
+    if (local.multiple) return Array.isArray(cur) && selectedIn(cur, v, hasIdenticalOption);
+    return selects(cur, v, hasIdenticalOption);
   }
 
   // The label shown in the trigger (single-select; a multi-select shows chips instead).
-  // A plain function, called in the template — NOT a `$computed`: on React a `$computed`
-  // is a `useMemo` hoisted above the `$memo` cache it would read here (`selection`), and
-  // evaluating it threw "Cannot access … before initialization" on the first render.
+  // A plain function, called in the template — not a `$computed` (the spine's is one).
   function selectedLabel() {
     if (local.multiple) return '';
-    const sel = selection();
-    const at = sel.rows.length > 0 ? sel.rows[0].at : [];
-    return at.length > 0 ? labelOf(sel.opts[at[0]]) : '';
+    const cur = value();
+    const opts = Array.isArray(local.options) ? local.options : [];
+    const match = opts.find((o: any) => selects(cur, valueOf(o), hasIdenticalOption));
+    return match === undefined ? '' : labelOf(match);
   }
 
   // Commit an option. Single-select replaces the value; multi-select toggles membership —
@@ -627,12 +638,11 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (disabledOf(opt)) return;
     const v = valueOf(opt);
     if (local.multiple) {
-      const sel = selection();
-      const i = sel.opts.indexOf(opt);
-      const drop = sel.rows.filter((r: any) => r.at.includes(i)).flatMap((r: any) => r.members);
+      const cur = value();
+      const arr = Array.isArray(cur) ? cur : [];
       // Fresh array on every commit — in-place mutation is dropped by the
       // React/Solid/Lit/Angular change detectors.
-      const next = drop.length > 0 ? sel.model.filter((x: any, j: any) => !drop.includes(j)) : [...sel.model, v];
+      const next = toggleIn(arr, v, hasIdenticalOption);
       setValue(next);
       _props.onChange?.({
         value: next,
@@ -951,15 +961,16 @@ export default function Select(_props: SelectProps): JSX.Element {
   // It carries the public name because `$expose` binds a verb to the script binding of
   // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
   // It also asks for the highlighted option to be scrolled into view once the list is
-  // there: opening starts the highlight on the SELECTED option, which in a long list
-  // can be far below the fold (the spine's own open() leaves the list at its top).
-  // Not for a windowed list: that one keeps its scroll position across close and open,
-  // and its reveal re-asserts itself for a few frames (settleReveal()), which would
-  // override a scroll made right after opening.
+  // there: opening starts the highlight on the SELECTED option, which in a long list can
+  // be far below the fold, and in a windowed one is not even rendered — the trigger's
+  // `aria-activedescendant` would name an id that does not exist until the first key.
+  // And it counts the open: `$data.session` is what tells a dismissal of THIS popup from
+  // one left over from the popup before it (see syncPanel()).
   function open() {
     if (nativeActive()) return;
+    if (!local.disabled && !open$local()) setSession(session() + 1);
     openCore();
-    if (!local.virtual) scrollActiveIntoView();
+    scrollActiveIntoView();
   }
 
   // ---- shared windowing math (Phase 64 P4: @rozie-ui/headless-core/windowing.rzts) ----
@@ -1398,14 +1409,19 @@ export default function Select(_props: SelectProps): JSX.Element {
   // visual order. CR-02: the shared windowing contract requires each row to carry a STABLE
   // `.id` (windowing.rzts virtualItemKey reads src[i].id, and the windowed template keys on
   // wr.row.id), so each option is wrapped into an id-bearing row: `_opt` the original option
-  // (read via wr.row._opt in the windowed template), `_i` its index. Kept === $data.rows so
+  // (read via rowOption(wr) in the windowed template), `_i` its index. Kept === $data.rows so
   // the math's rowList[vi.index] resolves to the same wrapped row the count windows over.
   //
-  // `id` is a UNIQUE PRIMITIVE, built the way the chip keys are: an object value is keyed
-  // by its position (every object stringifies alike — as a framework key the raw value
-  // gave every row the key "[object Object]", and React rebuilt the rows on each change of
-  // the window), anything else by its type and string form, and options that share a value
-  // are numbered.
+  // `id` is a UNIQUE PRIMITIVE (uniqueKeys in src/internal/valueMatch.ts — no two rows can
+  // share one, whatever the values are): an object value is keyed by its position (every
+  // object stringifies alike — as a framework key the raw value gave every row the key
+  // "[object Object]", and React rebuilt the rows on each change of the window), anything
+  // else by its type and string form.
+  //
+  // The windowed template reads the option through rowOption(), NOT `wr.row._opt`: these
+  // rows are handed to `$data.rows`, which on Vue and Svelte gives them back as reactive
+  // proxies — `_opt` would then be a proxy of the consumer's option, and a commit made
+  // from it would hand the consumer a proxy instead of its own value.
   //
   // $memo, keyed on the TRUE inputs. The key covers everything the map reads:
   // options ref + virtual + groups while grouping is in effect (visibleOptions' inputs —
@@ -1413,6 +1429,7 @@ export default function Select(_props: SelectProps): JSX.Element {
   // array changes nothing here) and the optionValue resolver (valueOf in the map body).
   // virtual-core's getItemKey/getMeasurements walk this O(count) per pass, so an
   // unmemoized per-call re-map made every scroll tick O(N²) in wrapper allocations.
+  // (A memo of row KEYS only: what is selected is never cached — see VALUE IDENTITY.)
   const windowSourceCache = {
     keys: null as any[] | null,
     val: null as any
@@ -1424,23 +1441,25 @@ export default function Select(_props: SelectProps): JSX.Element {
       return windowSourceCache.val;
     }
     const __rozieMemoVal = (() => {
-      const seen = new Map();
-      return visibleOptions().map((o: any, i: any) => {
-        const v = valueOf(o);
-        const base = v !== null && typeof v === 'object' ? '@' + i : typeof v + ':' + String(v);
-        const n = seen.get(base) || 0;
-        seen.set(base, n + 1);
-        return {
-          id: n === 0 ? base : base + '#' + n,
-          _opt: o,
-          _i: i
-        };
-      });
+      const opts = visibleOptions();
+      const keys = uniqueKeys(opts.map((o: any, i: any) => keyBase(valueOf(o), i)));
+      return opts.map((o: any, i: any) => ({
+        id: keys[i],
+        _opt: o,
+        _i: i
+      }));
     })();
     windowSourceCache.keys = __rozieMemoKey;
     windowSourceCache.val = __rozieMemoVal;
     return __rozieMemoVal;
   }
+  // The option a windowed row stands for, read from the option list itself by the row's
+  // index. While the rows lag one step behind a list that just shrank, the row's own copy.
+  function rowOption(wr: any) {
+    const opts = visibleOptions();
+    return wr.vi.index < opts.length ? opts[wr.vi.index] : wr.row._opt;
+  }
+
   // D-05 NO-OP PIN HOOK (defined in THIS host, NOT the shared partial — keeps data-table
   // A==B intact). The shared windowedRows/padTop/padBottom call pinnedEditIndex()/
   // pinnedMeasurement() UNGUARDED by convention; a select has no edit-pinning, so these
@@ -1605,8 +1624,10 @@ export default function Select(_props: SelectProps): JSX.Element {
     triggerElRef?.focus();
   }
 
-  // The user scrolled the list (wheel, touch, a press on the scrollbar): any reveal still
-  // in flight is theirs to override.
+  // The user is scrolling the list: any reveal still in flight is theirs to override.
+  // Called for a wheel, a touch move, and a press of any mouse button inside the list (a
+  // scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
+  // DOM focus stays on the trigger.
   function cancelReveal() {
     revealGen = revealGen + 1;
   }
@@ -1689,8 +1710,19 @@ export default function Select(_props: SelectProps): JSX.Element {
   function scrollActiveIntoView() {
     revealGen = revealGen + 1;
     const gen = revealGen;
-    const run = () => revealIndex(liveActive, gen, 6);
+    const run = () => revealLive(gen, 8);
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else setTimeout(run, 0);
+  }
+  // Reveal the committed highlight. When there is none yet — open() called outside a user
+  // event (a timer, a promise) is committed by React on its own schedule, possibly after
+  // this frame — look again next frame, a bounded number of times, instead of giving up.
+  function revealLive(gen: any, tries: any) {
+    if (disposed || gen !== revealGen) return;
+    if (liveActive < 0) {
+      if (tries > 0 && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => revealLive(gen, tries - 1));
+      return;
+    }
+    revealIndex(liveActive, gen, 6);
   }
 
   // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
@@ -1760,17 +1792,27 @@ export default function Select(_props: SelectProps): JSX.Element {
   // run in one pass and the second one misreads our own write as a dismissal (seen as
   // a popup that stayed shut after Enter-then-ArrowDown).
   // The echo is written FIRST, for targets whose watchers run synchronously on a write.
+  //
+  // WHICH popup the popover closed is state too. `$data.session` counts the opens (the
+  // open() gate) and `$data.panelSession` is the session the panel was last shown for.
+  // A popover write is a dismissal of the current popup only while the two are equal.
+  // They differ when the select was closed AND opened again before the watchers ran:
+  // Escape is handled by the trigger (close()) and, at the document, by the popover
+  // (its own write), and a key or click right after it reopens the select — on Angular,
+  // whose effects run on a later tick, all of that lands in one flush, and taking the
+  // leftover write for a dismissal closed the popup that had just been opened (Space
+  // straight after Escape left the select shut, roughly one run in four).
   function syncPanel() {
     // A write of the popover's that the `panelOpen` watcher below has not taken yet (the
     // pair differs): leave it alone. Writing our own state over it here loses the
     // dismissal — an outside click on a button that also changes `options` runs this
     // function before that watcher on Angular, and the popup stayed "open" with no panel.
-    // The watcher takes it, close() changes $data.open, and that brings this function
-    // back with the pair equal.
+    // The watcher takes it and brings this function back with the pair equal.
     if (panelOpen() !== panelEcho()) return;
     const visible = popupVisible();
     if (visible === panelOpen()) return;
     setPanelEcho(visible);
+    if (visible) setPanelSession(session());
     setPanelOpen(visible);
   }
   // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
@@ -1778,6 +1820,15 @@ export default function Select(_props: SelectProps): JSX.Element {
   // routed through a signal effect on Lit, which a plain property change does not re-run
   // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
 
+  // The later look: nothing is remembered across the wait — the timer only bumps a
+  // counter, and syncPanel() decides from the state as it is then.
+  function queueResync() {
+    if (resyncTimer !== null) clearTimeout(resyncTimer);
+    resyncTimer = setTimeout(() => {
+      resyncTimer = null;
+      if (!disposed) setResync(resync() + 1);
+    }, 0);
+  }
   // Select-local keydown wrapper in front of the key reducer (kept out of listCore so the
   // shared partial and the sibling families' generated output stay untouched).
   //  - hideEmpty: when the popup is hidden because the list is empty ($data.open is still true
@@ -1831,45 +1882,25 @@ export default function Select(_props: SelectProps): JSX.Element {
   // than once shows one chip, at its first position). A value that matches no option
   // keeps a chip labelled by its raw value (and a null option) rather than vanishing.
   // `members` are the value's positions in the model — what removing the chip removes.
-  // `key` is unique per row: an object that matched an option is keyed by that option's
-  // index (every object stringifies alike), anything else by its type and string form,
-  // and rows that still share a key (two objects matching no option) are numbered.
+  // `key` is unique per row by construction (uniqueKeys): an object that matched an
+  // option is keyed by that option's index (every object stringifies alike), anything
+  // else by its type and string form.
   function chipRows() {
-    const sel = selection();
-    // Walk the model itself and keep each value's FIRST position (the row that starts
-    // there): the rows then carry the model array's own element typing into the leaves,
-    // which a walk over the memoised `sel.rows` does not.
-    const firsts = selectedValues().map((v: any, j: any) => ({
-      v,
-      row: sel.rows.find((r: any) => r.members[0] === j)
-    })).filter((x: any) => x.row);
-    const keyed = firsts.map((x: any) => {
-      const at = x.row.at.length > 0 ? Number(x.row.at[0]) : -1;
-      const v = x.v;
-      const members = selectedValues().map((m: any, j: any) => j).filter((j: any) => x.row.members.includes(j));
-      return {
-        v,
-        at,
-        members,
-        base: at !== -1 && v !== null && typeof v === 'object' ? 'chip-@' + at : 'chip-' + typeof v + ':' + String(v)
-      };
-    });
-    return keyed.map((k: any, i: any) => {
-      const earlier = keyed.slice(0, i).filter((e: any) => e.base === k.base).length;
-      const key = earlier === 0 ? k.base : k.base + '#' + earlier;
-      return k.at === -1 ? {
-        key,
-        value: k.v,
-        members: k.members,
-        label: String(k.v),
-        option: null
-      } : {
-        key,
-        value: k.v,
-        members: k.members,
-        label: labelOf(sel.opts[k.at]),
-        option: sel.opts[k.at]
-      };
+    const opts = Array.isArray(local.options) ? local.options : [];
+    const rows = distinctValues(selectedValues(), opts.map((o: any) => valueOf(o)));
+    const keys = uniqueKeys(rows.map((r: any, i: any) => 'chip-' + keyBase(r.value, r.at !== -1 ? r.at : i)));
+    return rows.map((r: any, i: any) => r.at === -1 ? {
+      key: keys[i],
+      value: r.value,
+      members: r.members,
+      label: String(r.value),
+      option: null
+    } : {
+      key: keys[i],
+      value: r.value,
+      members: r.members,
+      label: labelOf(opts[r.at]),
+      option: opts[r.at]
     });
   }
   function chipRemoveLabel(row: any) {
@@ -1914,8 +1945,9 @@ export default function Select(_props: SelectProps): JSX.Element {
   // walked up to the list (the onControlClick() approach) — on Lit a slot fill lives in the
   // light DOM while the list is in the shadow root, and `closest()` does not cross that.
   function onListMouseDown($event: any) {
+    // ANY button: a primary press may start a scrollbar drag, a middle press autoscroll.
+    cancelReveal();
     if ($event.button !== 0) return;
-    cancelReveal(); // a press here may be the start of a scrollbar drag
     const focusable = 'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [tabindex]';
     const path = typeof $event.composedPath === 'function' ? $event.composedPath() : [];
     if (path.length > 0) {
@@ -2026,8 +2058,8 @@ export default function Select(_props: SelectProps): JSX.Element {
             </div></Show>}</div></Show>}{<Show when={local.virtual}><div role="listbox" aria-label={rozieAttr(local.ariaLabel)} aria-multiselectable={local.multiple} ref={(el) => { listElRef = el as HTMLElement; }} class={"rozie-select-list rozie-select-list--virtual"} id={rozieAttr(idRoot() + '-list')} style={parseInlineStyle((popupVisible() ? '' : 'display:none;') + (local.maxHeight ? 'height:' + local.maxHeight + ';max-height:' + local.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + local.maxHeight : 'overflow-y:auto'))} onMouseDown={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onListMouseDown($event); }} onWheel={($event: WheelEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} onTouchMove={($event: TouchEvent & { currentTarget: HTMLDivElement; target: Element }) => { cancelReveal(); }} data-rozie-s-6e3ebfa6="">
             <div class={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padTop() + 'px')} data-rozie-s-6e3ebfa6="" />
 
-            <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <div data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={!!isSelected(wr().row._opt)} aria-disabled={!!disabledOf(wr().row._opt)} id={rozieAttr(optionId(wr().vi.index))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === wr().vi.index, 'is-selected': isSelected(wr().row._opt), 'is-disabled': disabledOf(wr().row._opt) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(wr().row._opt); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(wr().vi.index); }} data-rozie-s-6e3ebfa6="">
-              {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return wr().row._opt; }, get index() { return wr().vi.index; }, get active() { return activeIndex() === wr().vi.index; }, get selected() { return isSelected(wr().row._opt); }, get disabled() { return disabledOf(wr().row._opt); } }) ?? rozieDisplay(labelOf(wr().row._opt))}
+            <Key each={windowedRows() as readonly any[]} by={(wr) => wr.row.id}>{(wr) => <div data-index={rozieAttr(wr().vi.index)} role="option" aria-selected={!!isSelected(rowOption(wr()))} aria-disabled={!!disabledOf(rowOption(wr()))} id={rozieAttr(optionId(wr().vi.index))} class={"rozie-select-option" + " " + rozieClass({ 'is-active': activeIndex() === wr().vi.index, 'is-selected': isSelected(rowOption(wr())), 'is-disabled': disabledOf(rowOption(wr())) })} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { select(rowOption(wr())); }} onMouseMove={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onOptionPointerMove(wr().vi.index); }} data-rozie-s-6e3ebfa6="">
+              {(_props.optionSlot ?? _props.slots?.['option'])?.({ get option() { return rowOption(wr()); }, get index() { return wr().vi.index; }, get active() { return activeIndex() === wr().vi.index; }, get selected() { return isSelected(rowOption(wr())); }, get disabled() { return disabledOf(rowOption(wr())); } }) ?? rozieDisplay(labelOf(rowOption(wr())))}
             </div>}</Key>
 
             <div class={"rozie-select-spacer"} aria-hidden="true" style={parseInlineStyle('height:' + padBottom() + 'px')} data-rozie-s-6e3ebfa6="" />

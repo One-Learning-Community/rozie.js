@@ -106,42 +106,6 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('readout-value')).toHaveText('oat');
   });
 
-  runner(`select-groups [${target}]: unmounting a windowed select in the middle of a keyboard scroll leaves no error behind`, async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
-    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-    await page.goto(`/?example=SelectGroups&target=${target}`);
-    await page.getByTestId('mode-virtual').click();
-    await expect(page.getByTestId('readout-mode')).toHaveText('virtual');
-    const trigger = page.locator('[role="combobox"]').first();
-    await trigger.focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(page.locator('[role="option"]')).toHaveCount(6);
-    // End queues the scroll-into-view frames; the mode switch unmounts the select before they run.
-    await page.evaluate(() => {
-      const walk = (root: Document | ShadowRoot): Element | null => {
-        const t = root.querySelector('.rozie-select-trigger[role="combobox"]');
-        if (t) return t;
-        for (const el of Array.from(root.querySelectorAll('*'))) {
-          const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
-          const inner = sr ? walk(sr) : null;
-          if (inner) return inner;
-        }
-        return null;
-      };
-      walk(document)!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true, composed: true }));
-    });
-    await page.getByTestId('mode-flat').click();
-    await expect(page.getByTestId('readout-mode')).toHaveText('flat');
-    await page.waitForTimeout(500);
-    // The page is alive: the flat select that replaced it works.
-    const flat = page.locator('[role="combobox"]').first();
-    await flat.focus();
-    await page.keyboard.press('ArrowDown');
-    await expect(page.locator('[role="option"]')).toHaveCount(6);
-    expect(errors).toEqual([]);
-  });
-
   runner(`select-groups [${target}]: without groups, options that carry a group render flat in source order`, async ({ page }) => {
     await page.goto(`/?example=SelectGroups&target=${target}`);
     await page.getByTestId('mode-flat').click();

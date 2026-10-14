@@ -330,6 +330,43 @@ for (const target of TARGETS) {
     await expect.poll(async () => options.count(), { timeout: 15_000 }).toBeGreaterThan(0);
   });
 
+  runner(`select-floating [${target}]: a windowed list opened with a selection far down shows it, and aria-activedescendant names a rendered option`, async ({ page }) => {
+    await page.goto(`/?example=SelectFloating&target=${target}`);
+    const wrap = page.getByTestId('virtual-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    await expect(list).toHaveCount(1);
+    await page.getByTestId('pick-far-virtual').click();
+    await expect(trigger).toContainText('Option 400');
+    // How many elements in the trigger's own tree carry the id it names.
+    const named = () => trigger.evaluate((t) => {
+      const id = t.getAttribute('aria-activedescendant');
+      return id ? (t.getRootNode() as Document | ShadowRoot).querySelectorAll(`[id="${id}"]`).length : -1;
+    });
+    const selectedInView = async () => {
+      const l = await list.boundingBox();
+      const row = wrap.locator('[role="option"][data-index="399"]');
+      if ((await row.count()) !== 1) return false;
+      const o = await row.boundingBox();
+      return !!l && !!o && o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+    // Opened by click — no key is pressed afterwards.
+    await trigger.click();
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-399$/);
+    await expect.poll(selectedInView, { timeout: 15_000 }).toBe(true);
+    await expect.poll(named).toBe(1);
+    await expect(wrap.locator('[role="option"][data-index="399"]')).toHaveAttribute('aria-selected', 'true');
+    // Closed and opened by key: the same.
+    await page.keyboard.press('Escape');
+    await expect(list).toBeHidden();
+    await list.evaluate((el) => { el.scrollTop = 0; });
+    await page.keyboard.press('ArrowDown');
+    await expect(list).toBeVisible();
+    await expect.poll(selectedInView, { timeout: 15_000 }).toBe(true);
+    await expect.poll(named).toBe(1);
+  });
+
   runner(`select-floating [${target}]: custom #option content renders inside the floated list and picks`, async ({ page }) => {
     await page.goto(`/?example=SelectFloating&target=${target}`);
     const wrap = page.getByTestId('nested-outer');

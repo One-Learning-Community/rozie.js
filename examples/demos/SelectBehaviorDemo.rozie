@@ -58,6 +58,8 @@ const OPTIONS = [
 // loop runs again on every render of this demo and the list grew by 40 each time).
 const LONG = Array.from({ length: 40 }, (unused, k) => ({ label: k === 29 ? 'Zebra' : 'Row ' + (k + 1), value: 'row-' + (k + 1) }))
 const pickFar = () => { $data.longValue = 'row-35' }
+// The handle's open() called OUTSIDE any user event (a timer).
+const openLater = () => { setTimeout(() => { $refs.longSelect.open() }, 0) }
 // An option that carries a text field (the `option` slot): the field must take focus
 // by mouse and be typed into.
 const SLOTTED = [{ label: 'Plain', value: 'plain' }, { label: 'With note', value: 'note', field: true }, { label: 'Last', value: 'last' }]
@@ -114,7 +116,8 @@ const pickValue = (v) => { $data.value = v }
   </div>
   <div data-testid="long-select">
     <button type="button" data-testid="pick-far" @click="pickFar()">Select Row 35</button>
-    <Select :options="LONG" r-model:value="$data.longValue" aria-label="Long list" />
+    <button type="button" data-testid="open-later" @click="openLater()">open() from a timer</button>
+    <Select ref="longSelect" :options="LONG" r-model:value="$data.longValue" aria-label="Long list" />
   </div>
   <div data-testid="slot-select">
     <span data-testid="readout-note">{{ $data.note }}</span>

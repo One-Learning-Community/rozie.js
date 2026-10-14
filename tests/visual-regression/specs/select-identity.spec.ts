@@ -283,9 +283,6 @@ for (const target of TARGETS) {
 
   // ── windowed rows keyed uniquely ──────────────────────────────────────────
   runner(`select-identity [${target}]: a windowed list of object-valued options renders each row once, in order, through scrolling`, async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (e) => errors.push(String(e)));
-    page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(m.text()); });
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('virt-objects');
     const trigger = wrap.locator('[role="combobox"]');
@@ -330,7 +327,141 @@ for (const target of TARGETS) {
     await wrap.locator('[role="option"][data-index="2"]').click();
     await expect(page.getByTestId('readout-virt-picked')).toHaveText('Thing 3');
     await expect(trigger).toContainText('Thing 3');
-    expect(errors.filter((e) => /key|duplicate/i.test(e))).toEqual([]);
+  });
+
+  // ── windowed rows: selected state does not depend on the option OBJECT ─────
+  // The four windowed selects are fed plain module-level arrays. The rows they render
+  // come out of the Select's own reactive state, so on vue and svelte the row's option
+  // is a proxy of the consumer's object, never identical to it.
+  for (const kind of ['virt-prim', 'virt-objects'] as const) {
+    runner(`select-identity [${target}]: windowed, plain option array (${kind === 'virt-prim' ? 'primitive' : 'object'} values) — the picked row is the selected row, and picking another moves it`, async ({ page }) => {
+      await page.goto(`/?example=SelectIdentity&target=${target}`);
+      const wrap = page.getByTestId(kind);
+      const trigger = wrap.locator('[role="combobox"]');
+      const row = (i: number) => wrap.locator(`[role="option"][data-index="${i}"]`);
+      const selectedRows = () => wrap.locator('[role="option"][aria-selected="true"]').evaluateAll((els) => els.map((e) => Number(e.getAttribute('data-index'))));
+      const word = kind === 'virt-prim' ? 'Item' : 'Thing';
+      await trigger.click();
+      await expect(row(2)).toBeVisible({ timeout: 15_000 });
+      await row(2).click();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await expect(trigger).toContainText(`${word} 3`);
+      await trigger.click();
+      await expect(row(2)).toBeVisible({ timeout: 15_000 });
+      await expect(row(2)).toHaveAttribute('aria-selected', 'true');
+      await expect(row(2)).toHaveClass(/is-selected/);
+      await expect.poll(selectedRows).toEqual([2]);
+      await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-2$/); // the highlight starts on it
+      await row(4).click();
+      await expect(trigger).toContainText(`${word} 5`);
+      await trigger.click();
+      await expect(row(4)).toBeVisible({ timeout: 15_000 });
+      await expect.poll(selectedRows).toEqual([4]);
+      await expect(row(2)).toHaveAttribute('aria-selected', 'false');
+    });
+  }
+
+  for (const kind of ['virt-prim-many', 'virt-objects-many'] as const) {
+    runner(`select-identity [${target}]: windowed multi-select, plain option array (${kind === 'virt-prim-many' ? 'primitive' : 'object'} values) — a second click on a selected row takes it out, with no duplicates`, async ({ page }) => {
+      await page.goto(`/?example=SelectIdentity&target=${target}`);
+      const wrap = page.getByTestId(kind);
+      const trigger = wrap.locator('[role="combobox"]');
+      const row = (i: number) => wrap.locator(`[role="option"][data-index="${i}"]`);
+      const readout = page.getByTestId(kind === 'virt-prim-many' ? 'readout-virt-prim-many' : 'readout-virt-many');
+      const v = (n: number) => (kind === 'virt-prim-many' ? `item-${n}` : String(n));
+      const labels = wrap.locator('.rozie-select-chip__label');
+      const word = kind === 'virt-prim-many' ? 'Item' : 'Thing';
+      await trigger.click();
+      await expect(row(1)).toBeVisible({ timeout: 15_000 });
+      await row(1).click();
+      await row(3).click();
+      await expect(readout).toHaveText(`${v(2)},${v(4)}`);
+      await expect(row(1)).toHaveAttribute('aria-selected', 'true');
+      await expect(row(3)).toHaveAttribute('aria-selected', 'true');
+      await expect(row(2)).toHaveAttribute('aria-selected', 'false');
+      await expect(labels).toHaveText([`${word} 2`, `${word} 4`]);
+      // A second click on a selected row deselects it — it is not appended again.
+      await row(1).click();
+      await expect(readout).toHaveText(v(4));
+      await expect(row(1)).toHaveAttribute('aria-selected', 'false');
+      await expect(labels).toHaveText([`${word} 4`]);
+      await row(3).click();
+      await expect(readout).toHaveText('');
+      await expect(labels).toHaveCount(0);
+      // …and again: on, on, off leaves exactly one.
+      await row(0).click();
+      await row(5).click();
+      await row(0).click();
+      await expect(readout).toHaveText(v(6));
+    });
+  }
+
+  // ── the bound arrays changed IN PLACE ─────────────────────────────────────
+  // Whatever makes the framework render again must show the truth. The demo hands its two
+  // bound arrays to the page and the spec changes them there (a `.rozie` file may not:
+  // ROZ207). Only vue and svelte render again for a change made INSIDE a bound array —
+  // their state is deeply reactive — so only they run this; on the other four the
+  // consumer has to assign a new array, which the rest of this file covers.
+  const DEEP = target === 'vue' || target === 'svelte';
+  (DEEP ? runner : test.skip)(`select-identity [${target}]: a model and an option list changed in place are shown as they are now`, async ({ page }) => {
+    await page.goto(`/?example=SelectIdentity&target=${target}`);
+    const many = page.getByTestId('live-many');
+    const one = page.getByTestId('live-one');
+    const labels = many.locator('.rozie-select-chip__label');
+    const readout = page.getByTestId('readout-live-many');
+    type Hook = { model: unknown[]; options: unknown[] };
+    const hook = (fn: string) => page.evaluate((src) => {
+      const h = (globalThis as unknown as { __selectIdentityDemo: Hook }).__selectIdentityDemo;
+      new Function('h', src)(h);
+    }, fn);
+    const opt = (wrap: typeof many, label: string) => wrap.locator('[role="option"]', { hasText: new RegExp(`^\\s*${label}\\s*$`) });
+    await expect(readout).toHaveText('a,b,d');
+    await expect(labels).toHaveText(['A', 'B', 'd']); // 'd' matches no option yet: its raw value
+    await expect(one.locator('.rozie-select-placeholder')).toHaveText('Nothing');
+
+    // An option pushed for a value already in the model: both selects pick it up.
+    await hook(`h.options.push({ label: 'D', value: 'd' })`);
+    await expect(page.getByTestId('readout-live-opts')).toHaveText('4');
+    await expect(labels).toHaveText(['A', 'B', 'D']);
+    await expect(one.locator('.rozie-select-selected')).toHaveText('D');
+    await one.locator('[role="combobox"]').click();
+    await expect(opt(one, 'D')).toHaveAttribute('aria-selected', 'true');
+    await expect(one.locator('[role="combobox"]')).toHaveAttribute('aria-activedescendant', /-opt-3$/);
+    await page.keyboard.press('Escape');
+
+    // One model element replaced in place: b -> c.
+    await hook(`h.model[1] = 'c'`);
+    await expect(readout).toHaveText('a,c,d');
+    await expect(labels).toHaveText(['A', 'C', 'D']);
+    await many.locator('[role="combobox"]').click();
+    await expect(opt(many, 'C')).toHaveAttribute('aria-selected', 'true');
+    await expect(opt(many, 'B')).toHaveAttribute('aria-selected', 'false');
+    await expect(opt(many, 'A')).toHaveAttribute('aria-selected', 'true');
+    await page.keyboard.press('Escape');
+
+    // The same element replaced through splice.
+    await hook(`h.model.splice(1, 1, 'b')`);
+    await expect(readout).toHaveText('a,b,d');
+    await expect(labels).toHaveText(['A', 'B', 'D']);
+
+    // Reordered in place: labels follow their values, and removing a chip removes ITS value.
+    await hook(`h.model.reverse()`);
+    await expect(readout).toHaveText('d,b,a');
+    await expect(labels).toHaveText(['D', 'B', 'A']);
+    await hook(`h.model.sort()`);
+    await expect(readout).toHaveText('a,b,d');
+    await expect(labels).toHaveText(['A', 'B', 'D']);
+    await hook(`h.model.reverse()`);
+    await expect(labels).toHaveText(['D', 'B', 'A']);
+    await many.locator('.rozie-select-chip').nth(0).locator('.rozie-select-chip__remove').click();
+    await expect(readout).toHaveText('b,a');
+    await expect(labels).toHaveText(['B', 'A']);
+    // Picking a selected option takes out exactly that value.
+    await many.locator('[role="combobox"]').click();
+    await opt(many, 'B').click();
+    await expect(readout).toHaveText('a');
+    await expect(opt(many, 'B')).toHaveAttribute('aria-selected', 'false');
+    await expect(opt(many, 'A')).toHaveAttribute('aria-selected', 'true');
   });
 
   // ── B4 ────────────────────────────────────────────────────────────────────

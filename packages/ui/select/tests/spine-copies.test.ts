@@ -42,19 +42,19 @@ const RENAMED: Partial<Record<(typeof COPIED)[number], string>> = { open: 'openC
  * derived from the spine's text; each differs like this:
  *
  *  - `isSelected(opt)`: the spine compares `valueOf(opt)` with the model (`===`, or
- *    `includes` for an array). Select's is a lookup in `selection()`, the memoised match
- *    of the model against the options made by src/internal/valueMatch.ts — identity
- *    first, equal object contents only when no option is identical.
+ *    `includes` for an array). Select's makes the same two comparisons through
+ *    src/internal/valueMatch.ts (`selects` / `selectedIn`) — identity first, equal
+ *    contents of plain objects only when no option is identical. Nothing is cached.
  *  - `selectedLabel`: the spine's is a `$computed` that finds the option with `=== cur`
  *    and, for `multiple`, joins the labels of every selected option. Select's is a plain
- *    function (a `$computed` cannot read a `$memo` on React) that reads the first option the
- *    single value matched in `selection()`, and returns '' for `multiple`: the multi
- *    branch has no reader here — the only use is the `selected` slot, which the
- *    template renders under `r-if="!$props.multiple"` (a multi-select shows chips).
- *  - `select(opt)`: the single-select branch is the spine's, line for line. The
- *    multi-select branch decides "already selected" and what to remove from
- *    `selection()` (every model position of the value(s) that select this option)
- *    instead of `arr.includes(v)` / `arr.filter((x) => x !== v)`.
+ *    function that finds the option with `selects(cur, …)` and returns '' for
+ *    `multiple`: the multi branch has no reader here — the only use is the `selected`
+ *    slot, which the template renders under `r-if="!$props.multiple"` (a multi-select
+ *    shows chips).
+ *  - `select(opt)`: the single-select branch is the spine's, line for line. In the
+ *    multi-select branch the one line that builds `next`
+ *    (`arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]`) is `toggleIn(arr, v, …)`;
+ *    every other line is the spine's.
  *
  * What ties them to the spine is SPINE_REWRITTEN_FROM below: the spine's text for the
  * three is pinned, so a change there fails this file until it is looked at.
@@ -263,8 +263,16 @@ describe('Select host-local navigation is a verbatim copy of the list spine', ()
 
   it('open is a host gate in front of openCore: inert while the native picker is active', () => {
     const gate = statementText(select, 'open');
-    // …and asks for the highlighted (selected) option to be scrolled into view (non-windowed lists).
-    expect(gate).toBe(['const open = () => {', '  if (nativeActive()) return', '  openCore()', '  if (!$props.virtual) scrollActiveIntoView()', '}'].join('\n'));
+    // …counts the open (the session the panel sync reads) and asks for the highlighted
+    // (selected) option to be scrolled into view.
+    expect(gate).toBe([
+      'const open = () => {',
+      '  if (nativeActive()) return',
+      '  if (!$props.disabled && !$data.open) $data.session = $data.session + 1',
+      '  openCore()',
+      '  scrollActiveIntoView()',
+      '}',
+    ].join('\n'));
     // …and nothing else reaches the spine's body directly.
     expect(select.split('openCore()').length - 1).toBe(1);
   });
@@ -307,10 +315,19 @@ describe("Select's rewritten value-identity functions follow the spine's", () =>
     });
   }
 
-  it("select: the single-select branch is the spine's, line for line", () => {
-    const branch = (text: string) => text.slice(text.indexOf('  } else {'));
-    expect(branch(SPINE_REWRITTEN_FROM.select)).toContain('$model.value = v');
-    expect(branch(statementText(select, 'select'))).toBe(branch(SPINE_REWRITTEN_FROM.select));
+  it("select: the spine's text with ONE line replaced", () => {
+    const spineLine = '    const next = arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]';
+    const hostLine = '    const next = toggleIn(arr, v, hasIdenticalOption)';
+    expect(SPINE_REWRITTEN_FROM.select.split(spineLine).length).toBe(2);
+    expect(statementText(select, 'select')).toBe(SPINE_REWRITTEN_FROM.select.replace(spineLine, hostLine));
+  });
+
+  it("isSelected: the spine's text with its two comparisons replaced", () => {
+    const expected = SPINE_REWRITTEN_FROM.isSelected
+      .replace('Array.isArray(cur) && cur.includes(v)', 'Array.isArray(cur) && selectedIn(cur, v, hasIdenticalOption)')
+      .replace('  return cur === v', '  return selects(cur, v, hasIdenticalOption)');
+    expect(expected).not.toBe(SPINE_REWRITTEN_FROM.isSelected);
+    expect(statementText(select, 'isSelected')).toBe(expected);
   });
 
   it('selectedLabel is only read where a multi-select never renders it', () => {
