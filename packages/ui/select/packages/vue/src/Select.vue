@@ -114,7 +114,7 @@ import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, m
 const props = withDefaults(
   defineProps<{
     /**
-     * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array: equal own properties, compared up to 32 levels deep and 2,000 nested objects, beyond which values count as different. That is how a plain-object value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Every other object matches by identity only — a class instance, a `Map`, a `Set`, and a plain object created in another realm (an iframe). On Vue that means a class-instance or `Map` value held in reactive state never shows as selected. Two options whose plain-object values have equal contents cannot be told apart on Vue and Svelte. Mapping options to a primitive with `optionValue` is the robust choice. The list may grow or shrink in place (`push`, `splice`); to change an option, pass a new array.
+     * The option set. Each entry is either a primitive (`string`/`number`) or an object; objects resolve their label, value, and disabled state via the `option*` resolver props, falling back to `.label` / `.value` / `.disabled`. An option is selected when its value is identical to the model value. Only when no option is identical does a value match by content, and only a plain object or an array: equal own properties, compared up to 32 levels deep and at most 2,000 object-pair comparisons per value pair, beyond which the two values count as different. That is how a plain-object value read back through reactive state (Vue `ref` / `reactive`, Svelte `$state`) still shows as selected. Every other object matches by identity only — a class instance, a `Map`, a `Set`, and a plain object created in another realm (an iframe). On Vue that means a class-instance or `Map` value held in reactive state never shows as selected. Two options whose plain-object values have equal contents cannot be told apart on Vue and Svelte. Mapping options to a primitive with `optionValue` is the robust choice. The list may grow or shrink in place (`push`, `splice`); to change an option, pass a new array.
      */
     options?: any[];
     /**
@@ -761,8 +761,13 @@ const onControlKeyDown = ($event: any) => {
 // `aria-activedescendant` would name an id that does not exist until the first key.
 // And it counts the open: `$data.session` is what tells a dismissal of THIS popup from
 // one left over from the popup before it (see syncPanel()).
+// And a windowed list is re-fed here when its row count is not the option count: the
+// rows are only read while the popup is open, and every open passes through this gate,
+// so an `options` array grown or shrunk in place is caught on every target — including
+// those where no watcher and no post-render hook sees such a change (Angular, Solid).
 const open = () => {
   if (nativeActive()) return;
+  if (props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
   if (!props.disabled && !open$local.value) session.value = session.value + 1;
   const cur = value.value;
   if (props.multiple && Array.isArray(cur)) scopedSelection = {
@@ -1183,6 +1188,12 @@ let scrollEndPinnedTop = -1;
 // a watcher so a callback queued from an older render still reads the current index.
 let revealGen = 0;
 let liveActive = -1;
+// How long one reveal may keep looking for its outcome (the highlighted option rendered
+// and in view). Not a schedule: a reveal ends on that outcome, or when it is superseded
+// or cancelled, normally within a few frames. This only stops a reveal whose outcome can
+// never come (say, a popup that is never shown) from looking forever. The same bound
+// virtual-core gives its own scroll reconciliation.
+const REVEAL_PATIENCE_MS = 5000;
 // Set in $onUnmount: every deferred callback (the reveal, its settle, the re-measure
 // passes, the first-paint kick) checks it and does nothing on an unmounted select.
 let disposed = false;
@@ -1396,13 +1407,13 @@ const focusControl = () => {
 const cancelReveal = () => {
   revealGen = revealGen + 1;
 };
-// Scroll option `index` into view inside the scrolling listbox, for reveal `gen`. When
-// windowing, route through the virtualizer (scrollToIndex) so an option OUTSIDE the
-// rendered window is scrolled into view (the windowed-arrow-nav seam); else the native
-// scrollIntoView. Reads nothing reactive but the id base: it runs from a deferred
-// callback (below).
-const revealIndex = (index: any, gen: any, tries: any) => {
-  if (disposed || gen !== revealGen || index < 0 || !__rozieRootRef.value || !__rozieRootRef.value!.isConnected) return;
+// Scroll option `index` into view inside the scrolling listbox, for reveal `gen`, giving
+// up at time `until` (see REVEAL_PATIENCE_MS). When windowing, route through the
+// virtualizer (scrollToIndex) so an option OUTSIDE the rendered window is scrolled into
+// view (the windowed-arrow-nav seam); else the native scrollIntoView. Reads nothing
+// reactive but the id base: it runs from a deferred callback (below).
+const revealIndex = (index: any, gen: any, until: any) => {
+  if (disposed || gen !== revealGen || index < 0 || liveActive !== index || !__rozieRootRef.value || !__rozieRootRef.value!.isConnected) return;
   if (virtualizer) {
     // An explicit move decides the scroll-end pin (see recordScrollEnd()): going to the
     // LAST option holds the end, so virtual-core's later compensation for options that
@@ -1420,43 +1431,58 @@ const revealIndex = (index: any, gen: any, tries: any) => {
       align: 'center'
     });
     scheduleRemeasure();
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => settleReveal(index, gen, 12));
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => settleReveal(index, gen, until));
     return;
   }
   const el = __rozieRootRef.value!.querySelector('#' + CSS.escape(optionId(index)));
-  if (el) {
+  if (el && el.getClientRects().length > 0) {
     el.scrollIntoView({
       block: 'nearest'
     });
     return;
   }
-  // The list is not in the DOM yet (the popup is opening in this same turn): look again
-  // next frame, a bounded number of times.
-  if (tries > 0 && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => revealIndex(index, gen, tries - 1));
+  // The option is not in the DOM yet, or not laid out (the popup is still opening — on
+  // some targets that is a few commits after the key or click that opened it): look
+  // again next frame.
+  if (Date.now() < until && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => revealIndex(index, gen, until));
 };
 // The windowed reveal is done when the option IS in view, not when scrollToIndex ran:
-// checked on the DOM, one frame at a time, for a bounded number of frames. A scroll can
-// be undone after the fact — virtual-core's size compensation for options measured in
-// the previous window writes an ABSOLUTE scrollTop from the offset it last saw, and
-// when that lands after our scroll it puts the list back where it was (measured on
-// Angular: Home pressed right after End left the list at the end, and virtual-core does
-// not re-issue a scroll whose target did not change). Asking again is idempotent once
-// the list is where it should be. Stops as soon as the highlight moves elsewhere, a
-// newer reveal starts, the user scrolls (cancelReveal()), or the select unmounts.
-const settleReveal = (index: any, gen: any, tries: any) => {
+// checked on the DOM, one frame at a time, until it is. A scroll can be lost or undone:
+//  - the popup may not be laid out yet. A windowed list stays mounted while closed, inside
+//    a `display: none` panel, and the panel is shown a few commits after the key or click
+//    that opened it — a scroll written before that is dropped, and the row's box reads
+//    0 × 0 (which must not count as "in view"). This used to be a count of 12 frames
+//    (about 100 ms in headless Chromium), and a popup that took longer than that to
+//    appear left the list at its top with the selection out of view for good. Frames in
+//    which the list has no box are now simply waited out.
+//  - virtual-core's size compensation for options measured in the previous window writes
+//    an ABSOLUTE scrollTop from the offset it last saw, and when that lands after our
+//    scroll it puts the list back where it was (measured on Angular: Home pressed right
+//    after End left the list at the end, and virtual-core does not re-issue a scroll whose
+//    target did not change).
+// Asking again is idempotent once the list is where it should be. Stops when the option
+// is in view, the highlight moves elsewhere (a close clears it), a newer reveal starts,
+// the user scrolls (cancelReveal()), the select unmounts — or, as a safety valve only,
+// at `until`.
+const settleReveal = (index: any, gen: any, until: any) => {
   if (disposed || gen !== revealGen || !virtualizer || !gridScrollEl || !gridScrollEl.isConnected || liveActive !== index) return;
-  const el = gridScrollEl.querySelector('.rozie-select-option[data-index="' + index + '"]');
-  if (el) {
-    const box = gridScrollEl.getBoundingClientRect();
-    const row = el.getBoundingClientRect();
-    if (row.top >= box.top - 1 && row.bottom <= box.bottom + 1) return;
+  const box = gridScrollEl.getBoundingClientRect();
+  if (box.height > 0) {
+    const el = gridScrollEl.querySelector('.rozie-select-option[data-index="' + index + '"]');
+    if (el) {
+      const row = el.getBoundingClientRect();
+      // In view: inside the list's box — or, for an option taller than the list, covering it.
+      const inside = row.top >= box.top - 1 && row.bottom <= box.bottom + 1;
+      const covering = row.height > box.height && row.top <= box.top + 1 && row.bottom >= box.bottom - 1;
+      if (row.height > 0 && (inside || covering)) return;
+    }
+    virtualizer.scrollToIndex(index, {
+      align: 'center'
+    });
+    scheduleRemeasure();
   }
-  if (tries <= 0) return;
-  virtualizer.scrollToIndex(index, {
-    align: 'center'
-  });
-  scheduleRemeasure();
-  requestAnimationFrame(() => settleReveal(index, gen, tries - 1));
+  if (Date.now() >= until || typeof requestAnimationFrame !== 'function') return;
+  requestAnimationFrame(() => settleReveal(index, gen, until));
 };
 // Keep the active option visible — called by the keyboard and type-ahead paths right
 // after they write `$data.activeIndex`, and by open() (never by pointer hover, which
@@ -1472,19 +1498,20 @@ const settleReveal = (index: any, gen: any, tries: any) => {
 const scrollActiveIntoView = () => {
   revealGen = revealGen + 1;
   const gen = revealGen;
-  const run = () => revealLive(gen, 8);
+  const until = Date.now() + REVEAL_PATIENCE_MS;
+  const run = () => revealLive(gen, until);
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(run);else setTimeout(run, 0);
 };
 // Reveal the committed highlight. When there is none yet — open() called outside a user
 // event (a timer, a promise) is committed by React on its own schedule, possibly after
-// this frame — look again next frame, a bounded number of times, instead of giving up.
-const revealLive = (gen: any, tries: any) => {
+// this frame — look again next frame instead of giving up.
+const revealLive = (gen: any, until: any) => {
   if (disposed || gen !== revealGen) return;
   if (liveActive < 0) {
-    if (tries > 0 && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => revealLive(gen, tries - 1));
+    if (Date.now() < until && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => revealLive(gen, until));
     return;
   }
-  revealIndex(liveActive, gen, 6);
+  revealIndex(liveActive, gen, until);
 };
 // ---- windowing lifecycle (post-mount; ONLY when virtual) ----------------
 // kickWindow: the cross-target first-paint settle. Re-captures the LIVE scroll element,

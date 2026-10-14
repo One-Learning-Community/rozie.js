@@ -407,16 +407,18 @@ for (const target of TARGETS) {
   //  - angular: after `live-tick` the template is checked again, so what the template
   //    computes is current; but no watcher and no post-render hook runs (an in-place
   //    change is not an input change, and the compiled `$onUpdate` never runs its body
-  //    on Angular — see the report), so the windowed rows and the native element's
-  //    checked option, which are kept by those, stay as they were.
+  //    on Angular — see the report), so the native element's checked option, which is
+  //    kept by those, stays as it was.
   //  - lit: the select is not rendered again by its parent (same property values); it is
   //    by anything of its own — opening its popup refreshes it (refresh() below).
   //  - solid: nothing renders again; only a list mounted AFTER the change (the popup, on
   //    open) reads the arrays anew.
+  // The windowed rows are seen on all six: they are only read while the popup is open,
+  // and opening goes through Select's open(), which re-feeds them when the option count
+  // has moved away from the virtualizer's.
   // Assertions are skipped exactly where a target cannot see the change.
   const ON_SCREEN = target !== 'solid'; // the label, the chips
   const DEMO_RENDERS = target !== 'solid'; // the demo's own readouts
-  const WINDOWED = target === 'vue' || target === 'svelte' || target === 'react' || target === 'lit';
   const NATIVE = target === 'vue' || target === 'svelte' || target === 'react';
   const refresh = async (wrap: Locator) => {
     if (target !== 'lit') return;
@@ -572,9 +574,9 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('live-one').locator('.rozie-select-selected')).toHaveText('B');
   });
 
-  (WINDOWED ? runner : test.skip)(`select-identity [${target}]: windowed list — an option pushed or removed in place shows as a row, selected and navigable`, async ({ page }) => {
-    // Not on angular, solid: the rows are re-fed by a watcher or the post-render hook,
-    // neither of which runs there for an in-place change (see the list above).
+  runner(`select-identity [${target}]: windowed list — an option pushed or removed in place shows as a row, selected and navigable`, async ({ page }) => {
+    // All six: on angular and solid no watcher and no post-render hook sees the change,
+    // so this is open()'s re-feed (see the list above).
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('live-virtual');
     const trigger = wrap.locator('[role="combobox"]');

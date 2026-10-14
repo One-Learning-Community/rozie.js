@@ -239,48 +239,6 @@ export function selectionTest(model: readonly unknown[], valuesOf: () => readonl
   };
 }
 
-/**
- * Holds ONE `MatchIndex` for the length of a synchronous burst of questions (the rows
- * of one render), so the burst costs O(options + model) in total.
- *
- * It is not a cache of what is selected across time. The index is thrown away:
- *
- *   - by a microtask queued when it is built — it never reaches a later task, where
- *     the consumer may have changed the model or the options in place;
- *   - whenever it is asked about another model array or option array, or one whose
- *     length changed (every write Select makes to the model is a fresh array);
- *   - by `drop()`, which Select calls around each of its own writes and emits.
- *
- * `valuesOf()` is only called when an index has to be built.
- */
-export interface MatchCache {
-  index(model: readonly unknown[], options: readonly unknown[], valuesOf: () => readonly unknown[]): MatchIndex;
-  drop(): void;
-}
-
-export function createMatchCache(): MatchCache {
-  let held: { model: readonly unknown[]; modelLength: number; options: readonly unknown[]; optionsLength: number; index: MatchIndex } | null = null;
-  const drop = () => {
-    held = null;
-  };
-  return {
-    index(model, options, valuesOf) {
-      if (held !== null && held.model === model && held.modelLength === model.length && held.options === options && held.optionsLength === options.length) {
-        return held.index;
-      }
-      const index = buildMatchIndex(model, valuesOf());
-      // Without a microtask queue nothing can be held safely: build every time.
-      if (typeof queueMicrotask !== 'function') return index;
-      held = { model, modelLength: model.length, options, optionsLength: options.length, index };
-      queueMicrotask(() => {
-        if (held !== null && held.index === index) held = null;
-      });
-      return index;
-    },
-    drop,
-  };
-}
-
 export interface ValueRow {
   /** The model value (its first occurrence). */
   value: unknown;

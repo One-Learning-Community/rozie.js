@@ -265,11 +265,13 @@ describe('Select host-local navigation is a verbatim copy of the list spine', ()
 
   it('open is a host gate in front of openCore: inert while the native picker is active', () => {
     const gate = statementText(select, 'open');
-    // …counts the open (the session the panel sync reads) and asks for the highlighted
-    // (selected) option to be scrolled into view.
+    // …re-feeds a windowed list whose row count no longer matches the options (an
+    // in-place change no watcher saw), counts the open (the session the panel sync reads)
+    // and asks for the highlighted (selected) option to be scrolled into view.
     expect(gate).toBe([
       'const open = () => {',
       '  if (nativeActive()) return',
+      '  if ($props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow()',
       '  if (!$props.disabled && !$data.open) $data.session = $data.session + 1',
       '  const cur = $props.value',
       '  if ($props.multiple && Array.isArray(cur)) scopedSelection = { model: cur, length: cur.length, test: selectionFor() }',

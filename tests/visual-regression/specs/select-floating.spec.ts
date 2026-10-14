@@ -367,6 +367,46 @@ for (const target of TARGETS) {
     await expect.poll(named).toBe(1);
   });
 
+  runner(`select-floating [${target}]: a windowed list whose popup is shown late still ends with the selection in view`, async ({ page }) => {
+    // The popup of a windowed select is a mounted-but-`display: none` panel, shown a few
+    // commits after the key that opens it. Here that takes 300 ms (the page hides the
+    // panel for that long after the key), as on a slow or cold page. The reveal must end
+    // on the selected row being in view, not on a number of frames — the previous
+    // 12-frame budget gave up before the panel appeared, on all six.
+    await page.goto(`/?example=SelectFloating&target=${target}`);
+    const wrap = page.getByTestId('virtual-select');
+    const trigger = wrap.locator('[role="combobox"]');
+    const list = wrap.locator('[role="listbox"]');
+    await expect(list).toHaveCount(1);
+    await page.getByTestId('pick-far-virtual').click();
+    await expect(trigger).toContainText('Option 400');
+    const selectedInView = async () => {
+      const l = await list.boundingBox();
+      const row = wrap.locator('[role="option"][data-index="399"]');
+      if ((await row.count()) !== 1) return false;
+      const o = await row.boundingBox();
+      return !!l && !!o && o.y >= l.y - 1 && o.y + o.height <= l.y + l.height + 1;
+    };
+    // Once normally (so the rows near the selection have been rendered), then closed.
+    await trigger.click();
+    await expect.poll(selectedInView, { timeout: 15_000 }).toBe(true);
+    await page.keyboard.press('Escape');
+    await expect(list).toBeHidden();
+    const panel = wrap.locator('.rozie-popover-floating');
+    await expect(panel).toHaveCount(1);
+    await panel.evaluate((el: HTMLElement) => {
+      document.addEventListener('keydown', () => {
+        el.style.setProperty('display', 'none', 'important');
+        setTimeout(() => el.style.removeProperty('display'), 300);
+      }, { once: true, capture: true });
+    });
+    await page.keyboard.press('ArrowDown');
+    await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-399$/);
+    await expect(list).toBeVisible();
+    await expect.poll(selectedInView, { timeout: 15_000 }).toBe(true);
+    await expect(wrap.locator('[role="option"][data-index="399"]')).toHaveAttribute('aria-selected', 'true');
+  });
+
   runner(`select-floating [${target}]: custom #option content renders inside the floated list and picks`, async ({ page }) => {
     await page.goto(`/?example=SelectFloating&target=${target}`);
     const wrap = page.getByTestId('nested-outer');
