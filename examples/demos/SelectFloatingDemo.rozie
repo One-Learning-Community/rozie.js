@@ -10,8 +10,12 @@
     - block-select: a `block` select — the control and popup fill the container.
     - virtual-select: a windowed (`virtual`) select that floats — the popover keeps
       its panel mounted while closed so the virtualizer keeps its scroll element.
+    - placed-select: `placement="top-start"` and `:offset="24"` with room on both
+      sides — the popup opens ABOVE the control, 24px away (the defaults are below, 4px).
     - bottom-select: pinned to the bottom of a 580px-tall box, so in a 600px-tall
       viewport there is no room below it and the popup flips above the control.
+    - noflip-select: next to bottom-select, same position, with `disable-flip` — the
+      popup stays below the control although there is no room for it.
 
   top-select also reports every `open-change` it emits (`readout-log`, one letter
   per event: T = open, F = closed) and can be driven through its handle: the
@@ -36,6 +40,8 @@
   nested: null,
   block: null,
   bottom: null,
+  noflip: null,
+  placed: null,
   big: null,
   many: [],
   log: '',
@@ -101,8 +107,17 @@ const onToggleKey = (e) => {
     <Select :options="$data.many" r-model:value="$data.big" :virtual="true" maxHeight="200px" aria-label="Virtual" />
   </div>
 
-  <div data-testid="bottom-select" class="bottom">
-    <Select :options="OPTIONS" r-model:value="$data.bottom" aria-label="Bottom" />
+  <div data-testid="placed-select">
+    <Select :options="OPTIONS" r-model:value="$data.placed" placement="top-start" :offset="24" aria-label="Placed" />
+  </div>
+
+  <div class="row bottom">
+    <div data-testid="bottom-select">
+      <Select :options="OPTIONS" r-model:value="$data.bottom" aria-label="Bottom" />
+    </div>
+    <div data-testid="noflip-select">
+      <Select :options="OPTIONS" r-model:value="$data.noflip" disable-flip aria-label="No flip" />
+    </div>
   </div>
 </div>
 </template>

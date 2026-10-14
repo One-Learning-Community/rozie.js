@@ -121,15 +121,34 @@ for (const target of TARGETS) {
       const cbPh = await cbx('plain', '.rozie-combobox-input').first().evaluate((el) => getComputedStyle(el, '::placeholder').color);
       if (selPh !== cbPh) mismatches.push(`placeholder.color: select=${selPh} combobox=${cbPh}`);
 
-      // chip spacing: the horizontal distance between two adjacent chips
-      const chipGap = async (chips: Locator) => {
+      // chip spacing: the horizontal distance between two adjacent chips ON ONE ROW
+      const chipGap = async (label: string, chips: Locator) => {
         const a = await chips.nth(0).boundingBox();
         const b = await chips.nth(1).boundingBox();
-        return a && b ? Math.round((b.x - (a.x + a.width)) * 100) / 100 : NaN;
+        expect(a && b, `${label}: two chips to measure`).toBeTruthy();
+        expect(Math.abs(a!.y - b!.y), `${label}: the two measured chips share a row`).toBeLessThanOrEqual(1);
+        const gap = Math.round((b!.x - (a!.x + a!.width)) * 100) / 100;
+        expect(gap, `${label}: the chips are apart`).toBeGreaterThan(0);
+        return gap;
       };
-      const selChipGap = await chipGap(sel('multi', '.rozie-select-chip'));
-      const cbChipGap = await chipGap(cbx('multi', '.rozie-combobox-chip'));
+      const selChipGap = await chipGap('select', sel('multi', '.rozie-select-chip'));
+      const cbChipGap = await chipGap('combobox', cbx('multi', '.rozie-combobox-chip'));
       if (selChipGap !== cbChipGap) mismatches.push(`chip spacing: select=${selChipGap} combobox=${cbChipGap}`);
+
+      // wrapped chips: the vertical distance between two ROWS of chips (the narrow pair)
+      const rowGap = async (label: string, chips: Locator) => {
+        const boxes = await chips.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; }));
+        expect(boxes.length, `${label}: four chips`).toBe(4);
+        const first = boxes[0]!;
+        const next = boxes.find((b) => b.top >= first.bottom);
+        expect(next, `${label}: the chips wrap onto a second row`).toBeTruthy();
+        const gap = Math.round((next!.top - first.bottom) * 100) / 100;
+        expect(gap, `${label}: the rows are apart`).toBeGreaterThan(0);
+        return gap;
+      };
+      const selRowGap = await rowGap('select', sel('wrap', '.rozie-select-chip'));
+      const cbRowGap = await rowGap('combobox', cbx('wrap', '.rozie-combobox-chip'));
+      if (selRowGap !== cbRowGap) mismatches.push(`chip row spacing: select=${selRowGap} combobox=${cbRowGap}`);
 
       // focus state: ring and border (the Combobox draws them on the focused input, Select on :focus-within)
       const FOCUS = ['box-shadow', 'border-top-color', 'outline-style', 'outline-width'];
@@ -138,9 +157,11 @@ for (const target of TARGETS) {
         await page.waitForTimeout(300);
       };
       await sel('plain', '[role="combobox"]').first().focus();
+      await expect(sel('plain', '[role="combobox"]').first()).toBeFocused();
       await settle();
       const selFocus = await read(sel('plain', '.rozie-select-control'), FOCUS);
       await cbx('plain', '.rozie-combobox-input').first().focus();
+      await expect(cbx('plain', '.rozie-combobox-input').first()).toBeFocused();
       await settle();
       const cbFocus = await read(cbx('plain', '.rozie-combobox-input'), FOCUS);
       FOCUS.forEach((p, i) => { if (selFocus[i] !== cbFocus[i]) mismatches.push(`focus.${p}: select=${selFocus[i]} combobox=${cbFocus[i]}`); });

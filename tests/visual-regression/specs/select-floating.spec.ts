@@ -40,6 +40,8 @@ for (const target of TARGETS) {
     const l = await list.boundingBox();
     expect(l!.y).toBeGreaterThanOrEqual(c!.y + c!.height);          // below
     expect(Math.abs(l!.width - c!.width)).toBeLessThanOrEqual(1);   // width-matched
+    expect(Math.abs(l!.x - c!.x)).toBeLessThanOrEqual(1);           // bottom-START: left edges meet
+    expect(Math.abs(l!.y - (c!.y + c!.height) - 4)).toBeLessThanOrEqual(1); // the default 4px offset
     await page.keyboard.press('Escape');
 
     const bottom = page.getByTestId('bottom-select');
@@ -48,27 +50,106 @@ for (const target of TARGETS) {
     await expect(bl).toBeVisible();
     const bc = await bottom.locator('.rozie-select-control').boundingBox();
     await expect.poll(async () => { const b = await bl.boundingBox(); return b!.y + b!.height <= bc!.y + 1; }).toBe(true); // flipped above
+    await page.keyboard.press('Escape');
+    await expect(bl).toHaveCount(0);
+
+    // disable-flip, at the SAME height as the select that just flipped: the popup stays
+    // below its control although it does not fit there.
+    const noflip = page.getByTestId('noflip-select');
+    const nc = await noflip.locator('.rozie-select-control').boundingBox();
+    expect(Math.abs(nc!.y - bc!.y)).toBeLessThanOrEqual(1);          // same row as bottom-select
+    await noflip.locator('[role="combobox"]').click();
+    const nl = noflip.locator('[role="listbox"]');
+    await expect(nl).toBeVisible();
+    const below = async () => { const b = await nl.boundingBox(); return !!b && b.y >= nc!.y + nc!.height - 1; };
+    await expect.poll(below).toBe(true);
+    const nb = await nl.boundingBox();
+    expect(nb!.y + nb!.height).toBeGreaterThan(600);                 // it really does not fit in the viewport
+    await page.waitForTimeout(300);                                   // …and it does not flip a moment later
+    expect(await below()).toBe(true);
+  });
+
+  runner(`select-floating [${target}]: a non-default placement and offset take effect`, async ({ page }) => {
+    await page.goto(`/?example=SelectFloating&target=${target}`);
+    const wrap = page.getByTestId('placed-select');
+    await wrap.locator('[role="combobox"]').click();
+    const list = wrap.locator('[role="listbox"]');
+    await expect(list).toBeVisible();
+    const c = await wrap.locator('.rozie-select-control').boundingBox();
+    // There is room below as well (so "above" is the placement prop, not a flip).
+    const vh = page.viewportSize()!.height;
+    // placement="top-start": above the control; offset=24: exactly that far from it.
+    await expect.poll(async () => { const l = await list.boundingBox(); return !!l && Math.abs(c!.y - (l.y + l.height) - 24) <= 1; }).toBe(true);
+    const l = await list.boundingBox();
+    expect(vh - (c!.y + c!.height)).toBeGreaterThan(l!.height + 24);
+    expect(l!.y).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(l!.x - c!.x)).toBeLessThanOrEqual(1);
+    expect(Math.abs(l!.width - c!.width)).toBeLessThanOrEqual(1);
   });
 
   runner(`select-floating [${target}]: outside click closes only the clicked-away select; ids stay unique`, async ({ page }) => {
     await page.goto(`/?example=SelectFloating&target=${target}`);
     const a = page.getByTestId('top-select').locator('[role="combobox"]');
     const b = page.getByTestId('second-select').locator('[role="combobox"]');
+    // Every id on the page that a select or its composed popover generated (walking open
+    // shadow roots), and — per select trigger — how many elements in the trigger's own
+    // tree its `aria-controls` names.
+    const audit = () =>
+      page.evaluate(() => {
+        const ids: string[] = [];
+        const triggers: { label: string | null; expanded: string | null; controls: string | null; hits: number }[] = [];
+        const walk = (root: Document | ShadowRoot) => {
+          // Generated ids (by prefix) and every id inside a select, whatever its base.
+          root.querySelectorAll('[id]').forEach((e) => {
+            if (e.id.startsWith('rozie-select') || e.id.startsWith('rozie-popover') || e.closest('.rozie-select')) ids.push(e.id);
+          });
+          root.querySelectorAll('.rozie-select-trigger[role="combobox"]').forEach((t) => {
+            const controls = t.getAttribute('aria-controls');
+            const scope = t.getRootNode() as Document | ShadowRoot;
+            triggers.push({
+              label: t.getAttribute('aria-label'),
+              expanded: t.getAttribute('aria-expanded'),
+              controls,
+              hits: controls ? scope.querySelectorAll(`[id="${controls}"]`).length : -1,
+            });
+          });
+          root.querySelectorAll('*').forEach((e) => { if ((e as HTMLElement).shadowRoot) walk((e as HTMLElement).shadowRoot!); });
+        };
+        walk(document);
+        return { ids, triggers };
+      });
+    const check = async (open: string) => {
+      const { ids, triggers } = await audit();
+      // The scan sees the selects and at least the open list and its options.
+      expect(triggers.length).toBe(8);
+      expect(ids.length).toBeGreaterThan(5);
+      expect(ids.filter((id, i) => ids.indexOf(id) !== i), 'duplicated ids').toEqual([]);
+      // Every trigger names its own popup, and no two triggers name the same one.
+      const controls = triggers.map((t) => t.controls);
+      expect(controls.every((c) => !!c && c.endsWith('-list'))).toBe(true);
+      expect(new Set(controls).size).toBe(controls.length);
+      for (const t of triggers) {
+        if (t.label === open) {
+          expect(t.expanded).toBe('true');
+          expect(t.hits, `aria-controls of the open select "${t.label}"`).toBe(1);
+        } else if (t.label === 'Virtual') {
+          expect(t.hits, 'the windowed list stays mounted while closed').toBe(1);
+        } else {
+          expect(t.expanded).toBe('false');
+          expect(t.hits, `aria-controls of the closed select "${t.label}"`).toBe(0); // its list is not rendered
+        }
+      }
+    };
     await a.click();
     await expect(a).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('top-select').locator('[role="option"]')).toHaveCount(5);
+    await check('Top');
     await b.click();
     await expect(a).toHaveAttribute('aria-expanded', 'false');
     await expect(b).toHaveAttribute('aria-expanded', 'true');
-    const ids = await page.evaluate(() => {
-      const out: string[] = [];
-      const walk = (root: Document | ShadowRoot) => {
-        root.querySelectorAll('[id]').forEach((e) => out.push(e.id));
-        root.querySelectorAll('*').forEach((e) => { if ((e as HTMLElement).shadowRoot) walk((e as HTMLElement).shadowRoot!); });
-      };
-      walk(document);
-      return out.filter((i) => i.startsWith('rozie-select'));
-    });
-    expect(new Set(ids).size).toBe(ids.length);
+    await expect(page.getByTestId('second-select').locator('[role="option"]')).toHaveCount(5);
+    await expect(page.getByTestId('top-select').locator('[role="listbox"]')).toHaveCount(0);
+    await check('Second');
     await page.mouse.click(5, 5);
     await expect(b).toHaveAttribute('aria-expanded', 'false');
   });
@@ -205,7 +286,10 @@ for (const target of TARGETS) {
     const w = await wrap.boundingBox();
     const c = await wrap.locator('.rozie-select-control').boundingBox();
     expect(Math.abs(c!.width - w!.width)).toBeLessThanOrEqual(1);
+    expect(w!.width).toBeGreaterThan(400); // wider than the default 16rem control: `block` did something
     await expect.poll(async () => { const l = await list.boundingBox(); return Math.abs(l!.width - c!.width) <= 1; }).toBe(true);
+    // …and it sits directly below the control, left edges aligned.
+    await expect.poll(async () => { const l = await list.boundingBox(); return !!l && Math.abs(l.y - (c!.y + c!.height) - 4) <= 1 && Math.abs(l.x - c!.x) <= 1; }).toBe(true);
   });
 
   runner(`select-floating [${target}]: a windowed (virtual) list floats, stays mounted while closed, and navigates`, async ({ page }) => {

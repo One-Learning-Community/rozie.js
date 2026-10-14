@@ -4,7 +4,8 @@
   rendered by both families, stacked in a 320px column, so the spec can compare their computed
   styles element by element: control, chips, option rows, popup surface, group headings,
   disabled state and the empty state. `block` instances fill the column; the two `plain` ones
-  keep the family's own default width.
+  keep the family's own default width. The two `wrap` ones hold four values in a 190px box, so
+  their chips wrap onto more than one row.
 
   Behavioral-only: no screenshot is taken here.
 -->
@@ -15,7 +16,7 @@
   Combobox: '../../packages/ui/combobox/src/Combobox.rozie',
 }
 </components>
-<data>{ single: 'banana', multi: ['apple', 'banana'], plain: null, plainC: null, off: 'banana', offC: 'banana', none: null, noneC: null }</data>
+<data>{ single: 'banana', multi: ['apple', 'banana'], plain: null, plainC: null, off: 'banana', offC: 'banana', none: null, noneC: null, wrap: ['apple', 'banana', 'carrot', 'water'], wrapC: ['apple', 'banana', 'carrot', 'water'] }</data>
 <script>
 const OPTIONS = [
   { label: 'Apple', value: 'apple', group: 'fruit' },
@@ -36,6 +37,8 @@ const NONE = []
   <div data-testid="cb-plain"><Combobox :options="OPTIONS" r-model:value="$data.plainC" placeholder="Pick one" ariaLabel="Combobox plain" idBase="shot-cb-plain" /></div>
   <div data-testid="sel-off"><Select :options="OPTIONS" r-model:value="$data.off" block disabled aria-label="Select disabled" /></div>
   <div data-testid="cb-off"><Combobox :options="OPTIONS" r-model:value="$data.offC" block disabled ariaLabel="Combobox disabled" idBase="shot-cb-off" /></div>
+  <div data-testid="sel-wrap" class="narrow"><Select :options="OPTIONS" r-model:value="$data.wrap" multiple block :close-on-select="false" aria-label="Select wrap" /></div>
+  <div data-testid="cb-wrap" class="narrow"><Combobox :options="OPTIONS" r-model:value="$data.wrapC" multiple block ariaLabel="Combobox wrap" idBase="shot-cb-wrap" /></div>
   <div data-testid="sel-none"><Select :options="NONE" r-model:value="$data.none" block placeholder="Nothing" aria-label="Select empty" /></div>
   <div data-testid="cb-none"><Combobox :options="NONE" r-model:value="$data.noneC" block placeholder="Nothing" ariaLabel="Combobox empty" idBase="shot-cb-none" /></div>
 </div>
@@ -50,6 +53,9 @@ const NONE = []
   gap: 0.75rem;
   font-family: system-ui, -apple-system, sans-serif;
   color: #1a1a1a;
+}
+.narrow {
+  width: 190px;
 }
 </style>
 </rozie>

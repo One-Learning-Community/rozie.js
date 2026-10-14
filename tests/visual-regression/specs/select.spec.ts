@@ -172,6 +172,24 @@ for (const target of TARGETS) {
     await page.keyboard.press('ArrowDown'); // Banana
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('readout-tab')).toHaveText('banana');
+    // Tab still does its own job: the popup is closed and focus has moved on, to the
+    // next control in the page (the trigger of the select below).
+    await expect(tab).toHaveAttribute('aria-expanded', 'false');
+    await expect(tab).not.toBeFocused();
+    const tabNone = page.getByTestId('tab-none-select').locator('[role="combobox"]');
+    await expect(tabNone).toBeFocused();
+    // --- selectOnTab with NO option highlighted (every option disabled): Tab commits
+    // nothing, closes the popup, and focus moves on ---
+    await page.keyboard.press('ArrowDown');
+    await expect(tabNone).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('tab-none-select').locator('[role="option"]')).toHaveCount(2);
+    await expect(tabNone).not.toHaveAttribute('aria-activedescendant', /.+/); // nothing is highlighted
+    await page.keyboard.press('Tab');
+    await expect(tabNone).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByTestId('tab-none-select').locator('[role="listbox"]')).toHaveCount(0);
+    await expect(page.getByTestId('readout-tab-none')).toHaveText('');
+    await expect(tabNone).not.toBeFocused();
+    await expect(page.getByTestId('long-select').locator('[role="combobox"]')).toBeFocused();
     // --- without selectOnTab, Tab only closes: no commit ---
     const plain = page.getByTestId('main-select').locator('[role="combobox"]');
     const before = (await page.getByTestId('readout-value').textContent())?.trim() ?? '';
@@ -180,6 +198,8 @@ for (const target of TARGETS) {
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Tab');
     await expect(page.getByTestId('readout-value')).toHaveText(before);
+    await expect(plain).toHaveAttribute('aria-expanded', 'false');
+    await expect(plain).not.toBeFocused();
   });
 
   runner(`select [${target}]: div trigger keeps button semantics (click, Space, Enter, disabled)`, async ({ page }) => {

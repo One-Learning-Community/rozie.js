@@ -49,8 +49,17 @@ for (const target of TARGETS) {
     // (index 2) and fifth in visual order (index 4).
     await page.keyboard.type('b');           await expect.poll(activeText).toBe('Banana');
     await expect(trigger).toHaveAttribute('aria-activedescendant', /-opt-4$/);
-    await page.waitForTimeout(700); // let the 600ms type-ahead buffer reset
-    await page.keyboard.type('o');           await expect.poll(activeText).toBe('Oat');
+    // Inside the buffer window a second letter EXTENDS the buffer: "b" + "o" matches
+    // nothing, so the highlight stays on Banana ("o" alone would be Oat).
+    await page.keyboard.type('o');
+    await page.waitForTimeout(100);
+    expect(await activeText()).toBe('Banana');
+    // Once the buffer has reset, the same letter starts a fresh one and jumps to Oat.
+    // No fixed sleep: retype it until it lands (every key press restarts the buffer's
+    // 600ms timer, so the retries are spaced wider than that).
+    await expect
+      .poll(async () => { await page.keyboard.type('o'); await page.waitForTimeout(50); return activeText(); }, { intervals: [700], timeout: 15_000 })
+      .toBe('Oat');
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('readout-value')).toHaveText('oat');
   });

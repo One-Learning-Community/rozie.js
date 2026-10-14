@@ -413,5 +413,14 @@ for (const target of TARGETS) {
     await expect(control).toHaveAttribute('aria-activedescendant', new RegExp(`-opt-${edge}$`));
     await page.waitForTimeout(300);
     expect(await scrollTopOf(page)).toBe(before);
+
+    // Home from a list that has SETTLED at its end (not pressed in the same breath as
+    // End, as above): the list goes to the top and stays there.
+    await page.keyboard.press('Home');
+    await expect(control).toHaveAttribute('aria-activedescendant', /-opt-0$/);
+    await expect.poll(inView(0), { timeout: 15_000 }).toBe(true);
+    await page.waitForTimeout(500);
+    expect(await scrollTopOf(page)).toBe(0);
+    expect(await inView(0)()).toBe(true);
   });
 }
