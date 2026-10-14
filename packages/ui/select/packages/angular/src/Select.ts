@@ -305,6 +305,8 @@ interface GroupHeadingCtx {
       color: var(--rozie-select-chip-remove-color, var(--rsl-chip-remove-color, currentColor));
     }
     .rozie-select-trigger { flex: 1 1 auto; min-width: 0; min-height: 1.5em; outline: none; background: none; border: 0; padding: 0; text-align: start; }
+    .rozie-select-control:has(.rozie-select-chip) { justify-content: flex-start; }
+    .rozie-select-control:has(.rozie-select-chip) .rozie-select-trigger { flex-basis: 3rem; }
     .rozie-select-disabled .rozie-select-control { cursor: default; background: var(--rozie-select-disabled-bg, var(--rsl-disabled-bg, rgba(0, 0, 0, 0.04))); }
     .rozie-select-disabled { opacity: var(--rozie-select-disabled-opacity, var(--rsl-disabled-opacity, 0.55)); pointer-events: none; }
     .rozie-select-placeholder { color: var(--rozie-select-placeholder, var(--rsl-placeholder, #757575)); }

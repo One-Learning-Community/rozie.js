@@ -61,7 +61,13 @@ for (const target of TARGETS) {
     await noflip.locator('[role="combobox"]').click();
     const nl = noflip.locator('[role="listbox"]');
     await expect(nl).toBeVisible();
-    const below = async () => { const b = await nl.boundingBox(); return !!b && b.y >= nc!.y + nc!.height - 1; };
+    // Re-measure the control each time: showing the active option may scroll the page a few
+    // pixels (the list overflows the viewport), which moves the control and the list together.
+    const below = async () => {
+      const b = await nl.boundingBox();
+      const cc = await noflip.locator('.rozie-select-control').boundingBox();
+      return !!b && !!cc && b.y >= cc.y + cc.height - 1;
+    };
     await expect.poll(below).toBe(true);
     const nb = await nl.boundingBox();
     expect(nb!.y + nb!.height).toBeGreaterThan(600);                 // it really does not fit in the viewport
