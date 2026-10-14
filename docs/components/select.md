@@ -4,11 +4,11 @@
 
 There is no vanilla-JS dependency: selection state, keyboard navigation, type-ahead, and focus management are implemented directly against the platform. Every visual value is a CSS custom property, so the select re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
-<PublishedTargetsNotice family="select" :published="['solid']" />
+<PublishedTargetsNotice family="select" :published="[]" />
 
 ## The `@rozie-ui/select` packages
 
-`Select` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/select-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
+`Select` is designed to ship as six pre-compiled, per-framework packages, but none of them is published to npm yet — all six are still in dogfooding. (The earlier `@rozie-ui/listbox-solid` package is superseded by this family.) The rows below link to each workspace README for review:
 
 | Package | Install | README |
 | --- | --- | --- |
@@ -16,7 +16,7 @@ There is no vanilla-JS dependency: selection state, keyboard navigation, type-ah
 | `@rozie-ui/select-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/vue/README.md) |
 | `@rozie-ui/select-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/svelte/README.md) |
 | `@rozie-ui/select-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/angular/README.md) |
-| `@rozie-ui/select-solid` | `npm i @rozie-ui/select-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/solid/README.md) |
+| `@rozie-ui/select-solid` | *not yet published (dogfooding)* | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/solid/README.md) |
 | `@rozie-ui/select-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/lit/README.md) |
 
 Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` — composed internally for the floating popup — which in turn requires `@floating-ui/dom`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
@@ -26,6 +26,8 @@ In practice, install the target's `Select` package together with its `@rozie-ui/
 ```bash
 npm i @rozie-ui/select-<target> @rozie-ui/popover-<target>
 ```
+
+If you use `virtual` (long lists), also install the optional peer `@tanstack/virtual-core` (`^3`); nothing else needs it.
 
 ## Quick start
 
@@ -80,7 +82,7 @@ Give each option an optional `group` id and pass `groups` — an ordered `[{ id,
 </template>
 ```
 
-Options without a `group` come first with no heading, then the listed groups in `groups` order, then any group that appears on an option but is not listed (headed by its id). Options keep their source order inside a group. Each section is a `role="group"` element named by its label, and the arrow keys, Home/End and type-ahead walk the options in the order they are shown. Grouping applies only while `groups` is non-empty, and is not applied while `virtual` is on.
+A listed group with no matching options renders no heading. Options without a `group` come first with no heading, then the listed groups in `groups` order, then any group that appears on an option but is not listed (headed by its id). Options keep their source order inside a group. Each section is a `role="group"` element named by its label, and the arrow keys, Home/End and type-ahead walk the options in the order they are shown. Grouping applies only while `groups` is non-empty, and is not applied while `virtual` is on.
 
 ## Multiple selection with chips
 
@@ -119,7 +121,7 @@ The popup floats through the composed `@rozie-ui/popover` leaf (Floating UI). It
 
 The floating popup's gap is the `offset` prop. The `--rozie-select-list-gap` token only affects `inline`, where the list is in normal flow. With `inline` set, `placement`, `offset`, `disableFlip` and `disableShift` are ignored.
 
-The control has a fixed default width (`16rem`, the `--rozie-select-width` token, the same rule as Combobox). A root sized with CSS does not stretch its control; set `block` to make the root `display: block; width: 100%` so the control and the width-matched popup fill the container.
+The control has a fixed default width (`16rem`, the `--rozie-select-width` token, the same rule as Combobox). A root sized with CSS does not stretch its control; set `block` (or `inline`, which also makes the root block-level at 100% width so the control stretches) to make the root `display: block; width: 100%` so the control and the width-matched popup fill the container.
 
 Select sets `--rozie-popover-z` on its root from the `--rozie-select-z` token (default `1000`), so override `--rozie-select-z` to raise or lower the popup's stacking, not the popover token.
 
@@ -152,7 +154,7 @@ It also stays off with a mouse or trackpad, whatever the props.
 
 ## Long lists
 
-Set `virtual` to window a long option list: only the visible slice renders inside a bounded scrolling list, with spacers keeping the total scroll height. Bound the list with `maxHeight` (for example `'320px'`) and, if your rows are not about 36px tall, seed `estimateRowHeight`. Windowing works in the floating popup and with `inline` alike. Groups are ignored while `virtual` is on: the options render flat, in source order.
+Set `virtual` to window a long option list. It needs the optional peer `@tanstack/virtual-core` (`^3`) installed in your project: only the visible slice renders inside a bounded scrolling list, with spacers keeping the total scroll height. Bound the list with `maxHeight` (for example `'320px'`) and, if your rows are not about 36px tall, seed `estimateRowHeight`. Windowing works in the floating popup and with `inline` alike. Groups are ignored while `virtual` is on: the options render flat, in source order.
 
 ```rozie
 <template>
@@ -217,7 +219,7 @@ How a value is matched to an option decides which options show as selected.
 | Event | Description |
 | --- | --- |
 | `open-change` | Fired whenever the popup opens or closes. Payload `{ open: boolean }`. |
-| `change` | Fired after the selection changes. Payload `{ value, option }` — `value` is the new selected value (an array in multi-select), `option` is the toggled option (`null` when cleared). |
+| `change` | Fired after the selection changes. Payload `{ value, option }` — `value` is the new selected value (an array in multi-select), `option` is the toggled option (`null` when cleared or when a chip is removed). |
 
 ### Imperative handle
 
@@ -237,7 +239,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | --- | --- | --- |
 | `selected` | `selected, value` | Custom rendering of the trigger's chosen-value display. Single-select only: with `multiple` the selected values render as chips (see `chip`). |
 | `option` | `option, index, active, selected, disabled` | Custom per-option rendering (the main scoped slot). |
-| `empty` | `query` | Shown when the (filtered) option list is empty. |
+| `empty` | `query` | Shown when there are no options. `query` is always an empty string (Select has no filter). |
 | `chip` | `option, remove, index` | Custom rendering of one multi-select chip, inside the `.rozie-select-chip` wrapper (`option` is `null` for a value missing from `options`; `remove()` removes that value and refocuses the control). Defaults to a label plus a remove button. |
 | `groupHeading` | `group` | Custom rendering of a group's heading (`group` is the `{ id, label }` entry). Defaults to the group's label. |
 
@@ -266,9 +268,9 @@ It follows the [ARIA APG "Select-Only Combobox" pattern](https://www.w3.org/WAI/
 | `Home` / `End` | Jump to the first / last enabled option. |
 | `Enter` | Commit the active option. |
 | `Escape` | Close the popup and return focus to the control. |
-| `Space` | (Select-only) toggle the popup / commit the active option. |
+| `Space` | Toggle the popup / commit the active option. |
 | `Tab` | Close the popup and move on. With `selectOnTab`, first picks the highlighted option. |
-| _printable_ | (Select-only) type-ahead — jump to the first option whose label starts with the typed buffer. |
+| _printable_ | Type-ahead — jump to the first option whose label starts with the typed buffer. |
 
 ## Accessibility
 

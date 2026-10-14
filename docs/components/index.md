@@ -67,7 +67,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 
 | Family | Wraps | Showcase |
 | --- | --- | --- |
-| **Select** | *(no engine)* headless WAI-ARIA select / combobox | [/components/select](/components/select) |
+| **Select** | *(no engine)* headless WAI-ARIA select | [/components/select](/components/select) |
 | **Slider** | *(no engine)* headless accessible slider / range | [/components/slider](/components/slider) |
 | **Otp** | *(no engine)* headless accessible one-time-code / PIN input | [/components/otp](/components/otp) |
 | **Combobox** | *(no engine)* headless WAI-ARIA combobox / autocomplete | [/components/combobox](/components/combobox) |
