@@ -305,16 +305,10 @@ private __rozieFirstUpdateDone = false;
     // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
     // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
     // only $refs-safe site). Stays null otherwise (zero overhead).
-    // Build the thumbnail strip's own Embla instance when enabled. $refs.thumbsViewportEl
-    // exists exactly when the `thumbnails` r-if has rendered (read here in $onMount, the
-    // only $refs-safe site). Stays null otherwise (zero overhead).
     if (this.thumbnails && this._refThumbsViewportEl) {
       this.emblaThumbs = EmblaCarousel(this._refThumbsViewportEl, this.thumbsOptionsFromProps());
     }
 
-    // engine → consumer: on every snap change write the two-way model AND fire the
-    // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
-    // refreshes the built-in dots/arrows + thumb sync.
     // engine → consumer: on every snap change write the two-way model AND fire the
     // distinctly-named `select` emit (model `selectedIndex` ≠ emit `select`). syncNav
     // refreshes the built-in dots/arrows + thumb sync.
@@ -352,22 +346,10 @@ private __rozieFirstUpdateDone = false;
     // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
     // its own. Re-measure once after the first layout flush via reInit (its `reInit`
     // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
-    // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
-    // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured
-    // at init is stale — and a slide-size change (vs a viewport resize or slide
-    // add/remove) fires neither `resize` nor `reInit`, so Embla never re-measures on
-    // its own. Re-measure once after the first layout flush via reInit (its `reInit`
-    // handler resyncs the dot count); `resize` keeps the viewport-resize case covered.
     this.embla.on('resize', () => this.syncNav());
 
     // seed the nav state immediately (covers the already-laid-out case)…
-    // seed the nav state immediately (covers the already-laid-out case)…
     this.syncNav();
-    // …then re-measure after layout fully settles (a consumer's slide CSS / a root
-    // width via attribute fallthrough can land a couple of frames after $onMount;
-    // Embla caches slide sizes at init and a slide-size change alone fires no
-    // re-measure). Two rAFs out, then a macrotask, each reInit → its handler resyncs
-    // the dot count. Idempotent: a reInit on already-correct sizes is a no-op diff.
     // …then re-measure after layout fully settles (a consumer's slide CSS / a root
     // width via attribute fallthrough can land a couple of frames after $onMount;
     // Embla caches slide sizes at init and a slide-size change alone fires no

@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 interface HeaderCtx {
   $implicit: { close: any };
@@ -91,7 +91,9 @@ interface FooterCtx {
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Modal {
-  open = model<boolean>(false);
+  readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+  openChange = output<boolean>();
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
   closeOnEscape = input<boolean>(true);
   closeOnBackdrop = input<boolean>(true);
   lockBodyScroll = input<boolean>(true);

@@ -1523,5 +1523,22 @@ export function emitAttributes(attrs: AttributeBinding[], ctx: EmitAttrCtx): Emi
     out.push(pendingPostSpreadStyle);
   }
 
+  // A native `<select>`'s `value` can only select an option it already holds,
+  // and Solid sets it when the value changes, not when the options do: options
+  // that arrive after the value left another option selected. The binding goes
+  // through `rozieSelectValue` (in the element's ref), which re-applies it on
+  // both.
+  if (ctx.tagName === 'select') {
+    const vi = out.findIndex((a) => a.startsWith('value={') && a.endsWith('}'));
+    if (vi !== -1) {
+      const expr = out[vi]!.slice('value={'.length, -1);
+      out.splice(vi, 1);
+      ctx.collectors.runtime.add('rozieSelectValue');
+      const call = `rozieSelectValue(el as HTMLSelectElement, () => (${expr}));`;
+      const ri = out.findIndex((a) => a.startsWith('ref={(el) => { '));
+      if (ri !== -1) out[ri] = out[ri]!.replace('ref={(el) => { ', `ref={(el) => { ${call} `);
+      else out.push(`ref={(el) => { ${call} }}`);
+    }
+  }
   return { jsx: out.join(' '), diagnostics };
 }

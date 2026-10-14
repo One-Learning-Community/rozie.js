@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
-import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { Combobox } from '@rozie-ui/combobox-angular';
 
@@ -627,11 +627,15 @@ export class CommandPalette {
    * @example
    * <rozie-command-palette [(open)]="paletteOpen" [items]="commands" />
    */
-  open = model<boolean>(false);
+  readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+  openChange = output<boolean>();
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
   /**
    * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
-  query = model<string>('');
+  readonly __rozieModelIn_query = input<string | undefined>(undefined, { alias: 'query' });
+  queryChange = output<string>();
+  query = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_query, this.queryChange, '');
   /**
    * Custom ranking/exclusion hook: `(item, query, defaultScore) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). The third argument is that built-in scorer, `(item, query) => number | null`, so a hook can adjust the default ranking instead of replacing it: a recency/frecency boost is `const base = defaultScore(item, query); return base === null ? null : base + recencyBonus(item.id)`, and a row pinned last (e.g. a synthetic "Create '…'" row) is `item.id === 'create' ? -Infinity : defaultScore(item, query)`. The `query` passed in is trimmed.
    * @example
@@ -727,6 +731,7 @@ export class CommandPalette {
   back = output<void>();
   select = output<CommandPaletteSelectPayload>();
   actionSelect = output<CommandPaletteActionSelectPayload>({ alias: 'action-select' });
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['select'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('breadcrumb', { read: TemplateRef }) breadcrumbTpl?: TemplateRef<BreadcrumbCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
   @ContentChild('groupHeading', { read: TemplateRef }) groupHeadingTpl?: TemplateRef<GroupHeadingCtx>;

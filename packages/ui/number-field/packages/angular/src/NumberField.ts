@@ -1,7 +1,7 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-number-field',
@@ -89,7 +89,9 @@ export class NumberField {
    * @example
    * <rozie-number-field [(modelValue)]="qty" [min]="0" [max]="10" />
    */
-  modelValue = model<(number) | null>(null);
+  readonly __rozieModelIn_modelValue = input<(number) | null | undefined>(undefined, { alias: 'modelValue' });
+  modelValueChange = output<(number) | null>();
+  modelValue = rozieModel<(number) | null, import('@angular/core').ModelSignal<(number) | null>>(this.__rozieModelIn_modelValue, this.modelValueChange, null);
   /**
    * Inclusive lower bound. Every commit clamps the value to `>= min`, and the **Home** key jumps to `min`. `null` (the default) means no lower bound. Also emitted as `aria-valuemin`.
    */
@@ -132,6 +134,7 @@ export class NumberField {
   focused = signal(false);
   input = viewChild<ElementRef<HTMLInputElement>>('input');
   change = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   private __rozieDestroyRef = inject(DestroyRef);
 
   ngAfterViewInit() {

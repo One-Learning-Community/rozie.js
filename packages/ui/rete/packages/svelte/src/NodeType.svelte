@@ -210,6 +210,11 @@ setContext('rete:nodeType', {
   }
 });
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  if (cv) cv.registerType(type, buildSpec());
+})(); }); });
+
 onMount(() => {
   // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
   // renderNode resolves typeReg[node.type].bodyRenderer for every graph node of this
@@ -244,11 +249,6 @@ $effect(() => (() => {
   registered = true;
   cv.registerType(type, buildSpec());
 })());
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
-  if (cv) cv.registerType(type, buildSpec());
-})(); }); });
 </script>
 
 <div class="rozie-node-type-children" style="display:none" data-rozie-s-372f9492>{@render children?.()}</div>

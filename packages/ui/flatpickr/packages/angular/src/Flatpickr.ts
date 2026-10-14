@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 import flatpickr from 'flatpickr';
 
@@ -42,7 +42,9 @@ export class Flatpickr {
    * @example
    * <rozie-flatpickr [(date)]="picked" (change)="onChange" />
    */
-  date = model<string>('');
+  readonly __rozieModelIn_date = input<string | undefined>(undefined, { alias: 'date' });
+  dateChange = output<string>();
+  date = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_date, this.dateChange, '');
   /**
    * Selection mode: `'single'`, `'multiple'`, `'range'`, or `'time'`. In `'range'` mode the two-way `date` commits per `commitOn`. Runtime-updatable via flatpickr's `set()`.
    */
@@ -180,6 +182,7 @@ export class Flatpickr {
   yearChange = output<void>();
   valueUpdate = output<unknown>();
   dayCreate = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   private __rozieDestroyRef = inject(DestroyRef);
   private __rozieWatchInitial_0 = true;
   private __rozieWatchInitial_1 = true;

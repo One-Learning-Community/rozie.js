@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -31,12 +31,24 @@ const props = withDefaults(
   { disabled: false, readonly: false, ariaLabel: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The on/off state of the switch (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a switch **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). `true` is the checked/on state; reflected as `aria-checked`.
  * @example
  * <Switch v-model:modelValue="on" ariaLabel="Wi-Fi" />
  */
-const modelValue = defineModel<boolean>('modelValue', { default: false });
+const __rozieModel_modelValue = defineModel<boolean>('modelValue', { default: false });
+const modelValue = computed<boolean>({
+  get: () => __rozieModel_modelValue.value,
+  set: (v) => { if (__rozieBound('modelValue')) __rozieVm.emit('update:modelValue', v); else __rozieModel_modelValue.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

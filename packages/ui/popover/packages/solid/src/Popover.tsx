@@ -187,36 +187,6 @@ export default function Popover(_props: PopoverProps): JSX.Element {
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
   const [autoId, setAutoId] = createSignal('');
-  onMount(() => {
-    const _cleanup = (() => {
-    if (!local.idBase) setAutoId('rozie-popover-' + nextAutoId());
-    // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open (or keepMounted); startTracking re-reads via the
-    // watch path.
-    anchorNode = anchorElRef;
-    liveReference = local.reference;
-    if (open() && !local.disabled) {
-      // floatingNode is populated by its r-if having rendered; read it lazily inside
-      // the watch/handlers too. Position on next tick when it exists.
-      floatingNode = floatingElRef;
-      arrowNode = arrowElRef;
-      startTracking();
-    } else if (local.keepMounted && !local.disabled) {
-      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
-      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
-      // strictly open-gated (D-11) — so the hidden panel already carries real
-      // coordinates before the first open instead of painting at 0,0. position()
-      // itself no-ops when disablePositioning is set.
-      floatingNode = floatingElRef;
-      arrowNode = arrowElRef;
-      position();
-    }
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => {
-    stopTracking();
-  });
-  });
   createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
     if (isOpen && !local.disabled) {
       // A controlled `open` write (or the handle) never ran requestOpen's capture.
@@ -264,6 +234,36 @@ export default function Popover(_props: PopoverProps): JSX.Element {
       position();
     }
   })()), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    if (!local.idBase) setAutoId('rozie-popover-' + nextAutoId());
+    // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
+    // and may be null until open (or keepMounted); startTracking re-reads via the
+    // watch path.
+    anchorNode = anchorElRef;
+    liveReference = local.reference;
+    if (open() && !local.disabled) {
+      // floatingNode is populated by its r-if having rendered; read it lazily inside
+      // the watch/handlers too. Position on next tick when it exists.
+      floatingNode = floatingElRef;
+      arrowNode = arrowElRef;
+      startTracking();
+    } else if (local.keepMounted && !local.disabled) {
+      // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+      // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+      // strictly open-gated (D-11) — so the hidden panel already carries real
+      // coordinates before the first open instead of painting at 0,0. position()
+      // itself no-ops when disablePositioning is set.
+      floatingNode = floatingElRef;
+      arrowNode = arrowElRef;
+      position();
+    }
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    stopTracking();
+  });
+  });
   let anchorElRef: HTMLElement | null = null;
   let floatingElRef: HTMLElement | null = null;
   let arrowElRef: HTMLElement | null = null;

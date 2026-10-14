@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -61,10 +61,22 @@ const props = withDefaults(
   { totalPages: null, total: null, pageSize: null, siblingCount: 1, boundaryCount: 1, disabled: false, ariaLabel: 'Pagination' }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.
  */
-const modelValue = defineModel<number>('modelValue', { default: 1 });
+const __rozieModel_modelValue = defineModel<number>('modelValue', { default: 1 });
+const modelValue = computed<number>({
+  get: () => __rozieModel_modelValue.value,
+  set: (v) => { if (__rozieBound('modelValue')) __rozieVm.emit('update:modelValue', v); else __rozieModel_modelValue.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

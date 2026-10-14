@@ -136,7 +136,7 @@ export interface CommandPaletteActionSelectPayload {
 <script setup lang="ts">
 import Combobox from '@rozie-ui/combobox-vue';
 
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { scoreCommands, itemHighlight } from './internal/scoreCommands';
 import { isNavigating, pushFrame, popFrame, currentFrame, settleFrame, failFrame, breadcrumb, depth as levelDepth, levelDefaultItems, levelVirtual, levelVirtualMaxHeight, levelVirtualEstimateRowHeight } from './internal/levelStack';
@@ -145,7 +145,7 @@ import { canOpenActions, actionsOf, firstEnabledActionIndex, rovingActionIndex, 
 import { hasArgs, argsOf, initArgValues, firstUnfilledRequiredIndex, canSubmitArgs, buildArgsPayload, isFirstFieldEmpty } from './internal/argsSurface';
 import { deriveCommandGroups } from './internal/commandGroups';
 import { formatKeyToken } from './internal/formatKeyToken';
-import { computed } from 'vue';
+
 
 const props = withDefaults(
   defineProps<{
@@ -233,16 +233,32 @@ const props = withDefaults(
   { score: null, items: () => [], defaultItems: () => [], placeholder: 'Type a command…', emptyText: 'No results.', closeOnSelect: true, ariaLabel: 'Command palette', idBase: '', searchDebounce: 150, actionKey: '$mod+k', closeOnAction: true, groupCap: 0, appendTo: false, virtual: false, virtualMaxHeight: null, virtualEstimateRowHeight: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * Whether the palette overlay is shown (two-way `r-model`). Two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`); every close path (backdrop click, Escape, selecting an item when `closeOnSelect`, the imperative `close()`) writes `open = false`. As one of two `model: true` props the component does not generate an Angular `ControlValueAccessor`.
  * @example
  * <CommandPalette v-model:open="paletteOpen" :items="commands" />
  */
-const open = defineModel<boolean>('open', { default: false });
+const __rozieModel_open = defineModel<boolean>('open', { default: false });
+const open = computed<boolean>({
+  get: () => __rozieModel_open.value,
+  set: (v) => { if (__rozieBound('open')) __rozieVm.emit('update:open', v); else __rozieModel_open.value = v; },
+});
 /**
  * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
  */
-const query = defineModel<string>('query', { default: '' });
+const __rozieModel_query = defineModel<string>('query', { default: '' });
+const query = computed<string>({
+  get: () => __rozieModel_query.value,
+  set: (v) => { if (__rozieBound('query')) __rozieVm.emit('update:query', v); else __rozieModel_query.value = v; },
+});
 
 const emit = defineEmits<{
   navigate: [payload: CommandPaletteNavigatePayload];

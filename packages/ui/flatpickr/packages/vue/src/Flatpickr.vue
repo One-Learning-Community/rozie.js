@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -141,12 +141,24 @@ const props = withDefaults(
   { mode: 'single', dateFormat: 'Y-m-d', altInput: false, altFormat: 'F j, Y', enableTime: false, enableSeconds: false, time24hr: false, noCalendar: false, minDate: null, maxDate: null, placeholder: 'Select a date…', disabled: false, commitOn: 'complete', options: () => ({}), name: '', inline: false, staticPosition: false, position: 'auto', appendTo: null, showMonths: 1, weekNumbers: false, monthSelectorType: 'dropdown', prevArrow: null, nextArrow: null, allowInput: false, disable: () => [], enable: () => [], locale: null, firstDayOfWeek: 0, parseDate: null, formatDate: null, plugins: () => [] }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The two-way value (`r-model:date`) — the **formatted string** flatpickr produces, not a `Date`. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Consumers that need the parsed `Date[]` read them off the `change` event payload instead.
  * @example
  * <Flatpickr v-model:date="picked" @change="onChange" />
  */
-const date = defineModel<string>('date', { default: '' });
+const __rozieModel_date = defineModel<string>('date', { default: '' });
+const date = computed<string>({
+  get: () => __rozieModel_date.value,
+  set: (v) => { if (__rozieBound('date')) __rozieVm.emit('update:date', v); else __rozieModel_date.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

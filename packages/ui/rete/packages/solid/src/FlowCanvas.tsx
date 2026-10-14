@@ -595,6 +595,57 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
+  createEffect(on(() => (() => graph())(), (v) => untrack(() => (() => {
+    // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
+    // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
+    // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
+    // this only refreshes it for a genuine outside edit).
+    if (selfWriteInFlight) {
+      // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
+      selfWriteInFlight = false;
+    } else if (!programmatic) {
+      const c = structuredClone(currentGraph());
+      if (c != null) lastWrittenGraph = c;
+    }
+    if (reconcileNodes) {
+      Promise.resolve(reconcileNodes()).then(() => {
+        if (reconcileConnections) reconcileConnections();
+      });
+    }
+    // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
+    if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+    // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
+    // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
+    // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
+    // corner handles stay stuck at their pre-change screen position (only re-tracking on the
+    // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
+    // the minimap rects above already do.
+    if (scheduleResizerTrack) scheduleResizerTrack();
+  })()), { defer: true }));
+  createEffect(on(() => (() => portReg())(), (v) => untrack(() => (() => {
+    if (reconcileNodes) {
+      Promise.resolve(reconcileNodes()).then(() => {
+        if (reconcileConnections) reconcileConnections();
+      });
+    }
+  })()), { defer: true }));
+  createEffect(on(() => (() => typeReg())(), (v) => untrack(() => (() => {
+    if (reconcileNodes) reconcileNodes();
+  })()), { defer: true }));
+  createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
+    if (!area || typeof v !== 'number') return;
+    if (v === area.area.transform.k) return;
+    programmatic++;
+    Promise.resolve(area.area.zoom(v)).finally(() => {
+      programmatic--;
+    });
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.selectable)(), (v) => untrack(() => ((v: any) => {
+    if (v === false) clearSelection();
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.readonly)(), (v) => untrack(() => ((v: any) => {
+    if (v === true) clearSelection();
+  })(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     const container = canvasElRef;
@@ -3300,57 +3351,6 @@ export default function FlowCanvas(_props: FlowCanvasProps): JSX.Element {
     area = null;
   });
   });
-  createEffect(on(() => (() => graph())(), (v) => untrack(() => (() => {
-    // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
-    // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
-    // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
-    // this only refreshes it for a genuine outside edit).
-    if (selfWriteInFlight) {
-      // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
-      selfWriteInFlight = false;
-    } else if (!programmatic) {
-      const c = structuredClone(currentGraph());
-      if (c != null) lastWrittenGraph = c;
-    }
-    if (reconcileNodes) {
-      Promise.resolve(reconcileNodes()).then(() => {
-        if (reconcileConnections) reconcileConnections();
-      });
-    }
-    // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
-    if (scheduleMinimapRedraw) scheduleMinimapRedraw();
-    // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
-    // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
-    // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
-    // corner handles stay stuck at their pre-change screen position (only re-tracking on the
-    // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
-    // the minimap rects above already do.
-    if (scheduleResizerTrack) scheduleResizerTrack();
-  })()), { defer: true }));
-  createEffect(on(() => (() => portReg())(), (v) => untrack(() => (() => {
-    if (reconcileNodes) {
-      Promise.resolve(reconcileNodes()).then(() => {
-        if (reconcileConnections) reconcileConnections();
-      });
-    }
-  })()), { defer: true }));
-  createEffect(on(() => (() => typeReg())(), (v) => untrack(() => (() => {
-    if (reconcileNodes) reconcileNodes();
-  })()), { defer: true }));
-  createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
-    if (!area || typeof v !== 'number') return;
-    if (v === area.area.transform.k) return;
-    programmatic++;
-    Promise.resolve(area.area.zoom(v)).finally(() => {
-      programmatic--;
-    });
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.selectable)(), (v) => untrack(() => ((v: any) => {
-    if (v === false) clearSelection();
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.readonly)(), (v) => untrack(() => ((v: any) => {
-    if (v === true) clearSelection();
-  })(v)), { defer: true }));
   let canvasElRef: HTMLElement | null = null;
   let minimapElRef: HTMLElement | null = null;
   let marqueeElRef: HTMLElement | null = null;

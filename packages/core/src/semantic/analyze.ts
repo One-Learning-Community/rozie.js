@@ -33,6 +33,7 @@ import { runUnknownRefValidator } from './validators/unknownRefValidator.js';
 import { runPropWriteValidator } from './validators/propWriteValidator.js';
 import { runUpdateExpressionValidator } from './validators/updateExpressionValidator.js';
 import { runRForKeyValidator } from './validators/rForKeyValidator.js';
+import { runRForAliasShadowValidator } from './validators/rForAliasShadowValidator.js';
 import { runReservedIdentifierValidator } from './validators/reservedIdentifierValidator.js';
 import { runListenerElementValidator } from './validators/listenerElementValidator.js';
 import { runExposeValidator } from './validators/exposeValidator.js';
@@ -74,6 +75,7 @@ export function analyzeAST(ast: RozieAST): AnalyzeResult {
   runPropWriteValidator(ast, bindings, diagnostics);
   runUpdateExpressionValidator(ast, bindings, diagnostics);
   runRForKeyValidator(ast, diagnostics);
+  runRForAliasShadowValidator(ast, bindings, diagnostics);
   runReservedIdentifierValidator(ast, bindings, diagnostics);
   // Phase 21 — $expose methods-only validation (ROZ115–ROZ120). Reads
   // bindings.exposeCalls; emits at most one diagnostic per offending site.

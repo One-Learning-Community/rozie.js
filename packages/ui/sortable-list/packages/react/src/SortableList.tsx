@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './SortableList.css';
 import { useSortableJS } from './internal/useSortableJS';
@@ -492,7 +493,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
 
   const _rozieExposeRef = useRef({ getInstance, toArray, sort, option });
   _rozieExposeRef.current = { getInstance, toArray, sort, option };
-  useImperativeHandle(ref, () => ({ getInstance: (...args: Parameters<typeof getInstance>): ReturnType<typeof getInstance> => _rozieExposeRef.current.getInstance(...args), toArray: (...args: Parameters<typeof toArray>): ReturnType<typeof toArray> => _rozieExposeRef.current.toArray(...args), sort: (...args: Parameters<typeof sort>): ReturnType<typeof sort> => _rozieExposeRef.current.sort(...args), option: (...args: Parameters<typeof option>): ReturnType<typeof option> => _rozieExposeRef.current.option(...args) }), []);
+  useImperativeHandle(ref, () => ({ getInstance: (...args: Parameters<typeof getInstance>): ReturnType<typeof getInstance> => flushSync(() => _rozieExposeRef.current.getInstance(...args)), toArray: (...args: Parameters<typeof toArray>): ReturnType<typeof toArray> => flushSync(() => _rozieExposeRef.current.toArray(...args)), sort: (...args: Parameters<typeof sort>): ReturnType<typeof sort> => flushSync(() => _rozieExposeRef.current.sort(...args)), option: (...args: Parameters<typeof option>): ReturnType<typeof option> => flushSync(() => _rozieExposeRef.current.option(...args)) }), []);
 
   return (
     <>

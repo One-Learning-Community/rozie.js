@@ -58,6 +58,11 @@ const reposition = () => {
 // element is r-if-gated, so $refs.panelEl is undefined at mount time — $watch
 // is the primitive that re-runs the effect after panel mount.
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  if (open) reposition();
+})(); }); });
+
 onMount(() => {
   // Initial reposition only if the panel is open at mount time.
   if (open) reposition();
@@ -66,11 +71,6 @@ onMount(() => {
   // Example of integrating a vanilla JS library — $refs gives direct DOM access.
   // new Popper($refs.triggerEl, $refs.panelEl, { placement: 'bottom-start' })
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
-  if (open) reposition();
-})(); }); });
 
 $effect(() => {
   if (!(open && closeOnOutsideClick)) return;

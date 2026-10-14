@@ -603,12 +603,9 @@ const nativeEl = () => {
   return null
 }
 // Write the model into the native element. Imperative on purpose: a <select>'s
-// selection is DOM state, and the declarative shape — `:value` on the <select> plus
-// `:selected` on each <option> — did not behave the same on six targets when it was
-// tried (and `selected` on an <option> is a dev-mode console error on React). It is
-// also the only way to put the element back when a choice is not accepted (the
-// placeholder entry, or a consumer that keeps the old value), where nothing reactive
-// changes.
+// selection is DOM state, and a choice that is not accepted (the placeholder entry, or
+// a consumer that keeps the old value) changes nothing reactive — a declarative `:value`
+// would not be re-applied, and the element would keep showing the refused option.
 const syncNative = () => {
   const el = nativeEl()
   if (!el) return
@@ -768,8 +765,8 @@ const onControlKeyDown = ($event) => {
 // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
 // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
 // through it, so the custom popup can never open while the native picker is active.
-// It carries the public name because `$expose` binds a verb to the script binding of
-// that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+// It carries the public name because the spine copies above call `open()`, and those
+// calls must reach the gate too.
 // It also asks for the highlighted option to be scrolled into view once the list is
 // there: opening starts the highlight on the SELECTED option, which in a long list can
 // be far below the fold, and in a windowed one is not even rendered — the trigger's
@@ -779,7 +776,7 @@ const onControlKeyDown = ($event) => {
 // And a windowed list is re-fed here when its row count is not the option count: the
 // rows are only read while the popup is open, and every open passes through this gate,
 // so an `options` array grown or shrunk in place is caught on every target — including
-// those where no watcher and no post-render hook sees such a change (Angular, Solid).
+// Solid, where no watcher and no post-render hook sees such a change.
 const open = () => {
   if (nativeActive()) return
   if ($props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow()
@@ -1241,11 +1238,8 @@ const syncPanel = () => {
     $data.panelOpen = false
   }
 }
-// select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
-// reads only $data, one whose getter reads only props. A getter that mixes the two is
-// routed through a signal effect on Lit, which a plain property change does not re-run
-// (measured: with `hideEmpty`, options arriving while open never showed the popup there).
-$watch(() => $data.open, () => {
+// select -> popover: everything popupVisible() reads.
+$watch(() => ($data.open ? 'o' : '-') + ($props.hideEmpty ? 'h' : 's') + ($props.options ? $props.options.length : 0), () => {
   syncPanel()
 })
 // …and the open COUNT: a close and an open in one flush leave `$data.open` where it
@@ -1253,12 +1247,8 @@ $watch(() => $data.open, () => {
 $watch(() => $data.session, () => {
   syncPanel()
 })
-$watch(() => (($props.hideEmpty ? 'h' : 's') + ($props.options ? $props.options.length : 0)), () => {
-  syncPanel()
-})
 // `disabled` turned on while the popup is open: close it (one `open-change`). The
 // pointer-events cut and the trigger's key gate would otherwise leave it stranded.
-// Props-only getter, for the Lit reason above.
 $watch(() => !!$props.disabled, () => {
   if ($props.disabled) close()
 })
@@ -1484,17 +1474,11 @@ $onMount(() => {
       coarseQuery = window.matchMedia('(pointer: coarse)')
       $data.coarse = !!coarseQuery.matches
       // Only records the new state: this closure is the mount-time one, so the reaction
-      // (closing the custom popup) lives in the `$data.coarse` watcher below.
+      // (closing the custom popup, the first paint of the native element) lives in the
+      // `$data.coarse` watcher below.
       coarseListener = (e) => { $data.coarse = !!e.matches }
       if (typeof coarseQuery.addEventListener === 'function') coarseQuery.addEventListener('change', coarseListener)
       else if (typeof coarseQuery.addListener === 'function') coarseQuery.addListener(coarseListener)
-      // The first paint of the native element. Not left to the `$data.coarse` watcher:
-      // on Svelte and Solid a write made here in $onMount lands before that watcher's
-      // (skipped) first run, so it never fires — a select mounted with a value showed
-      // the placeholder on those two. Not gated on nativeActive() either: on React the
-      // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
-      // no native element was rendered.
-      if ($props.nativePicker && coarseQuery.matches) armNativeSync()
     }
   } catch (err) {
     coarseQuery = null
@@ -1517,15 +1501,11 @@ $onMount(() => {
 // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
 // options into the virtualizer and re-pull the window (the data-table
 // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
-// nothing else:
-//  - the reference, not its length: an array replaced by another of the SAME length is a
-//    new option set too (a length-keyed getter kept the old rows on Vue);
-//  - props only: mixed with a $data read, the getter is routed through a signal effect on
-//    Lit, which a plain property change does not re-run (the windowed list kept the old
-//    rows there until something else re-rendered it).
+// nothing else — the reference, not its length: an array replaced by another of the SAME
+// length is a new option set too (a length-keyed getter kept the old rows on Vue).
 // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
 //
-// A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+// A second watcher follows the LENGTH: a list grown or shrunk in
 // place keeps its reference. And because a watcher only hears what the framework
 // reports — an in-place change is reported on Vue and Svelte, not on the other four —
 // the post-render hook below re-feeds too, whenever the virtualizer's count is not the
@@ -1543,12 +1523,8 @@ const refeedWindow = () => {
 }
 $watch(() => $props.options, () => { refeedWindow() })
 $watch(() => ($props.options ? $props.options.length : 0), () => { refeedWindow() })
-// (`optionCount()`, not `windowSource().length`: with `virtual` on there is no grouping,
-// so they are the same number — and on React a function named here becomes a
-// `useCallback`, which `windowSource` must not: `virtualizerOptions` above lists it as a
-// dependency, and a `useCallback` declared below that line is read before it exists.)
 $onUpdate(() => {
-  if ($props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow()
+  if ($props.virtual && virtualizer && virtualizer.options.count !== windowSource().length) refeedWindow()
   // The native element's selection is DOM state: after any render that may have added
   // or removed <option>s, write the model into it again (a no-op when it already shows it).
   if (nativeActive()) syncNative()
@@ -1558,21 +1534,15 @@ $onUpdate(() => {
 $watch(() => $data.activeIndex, () => { liveActive = $data.activeIndex })
 
 // The list shrank under the highlight: move it to the first enabled option.
-// A watcher of its own whose getter reads ONLY props: on Lit a getter that mixes
-// props with $data is routed through a signal effect, which a plain property change
-// never re-runs; a props-only getter is routed through updated(changedProperties) and
-// does re-run.
 $watch(() => ($props.options ? $props.options.length : 0), () => {
   if ($data.activeIndex >= visibleOptions().length) $data.activeIndex = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1
 })
 
-// The native picker may have taken over: the pointer turned coarse, or a prop that
-// nativeActive() / the native element's mode reads changed. Two watchers, one data-only
-// and one props-only getter: a getter mixing both is not re-run by a prop change on Lit.
-$watch(() => $data.coarse, () => { yieldToNative() })
-$watch(() => (($props.nativePicker ? 'n' : '-') + ($props.virtual ? 'v' : '-') + ($props.inline ? 'i' : '-') + ($props.multiple ? 'm' : '-')), () => { yieldToNative() })
+// The native picker may have taken over: the pointer turned coarse (including at mount),
+// or a prop that nativeActive() / the native element's mode reads changed.
+$watch(() => ($data.coarse ? 'c' : '-') + ($props.nativePicker ? 'n' : '-') + ($props.virtual ? 'v' : '-') + ($props.inline ? 'i' : '-') + ($props.multiple ? 'm' : '-'), () => { yieldToNative() })
 // The model or the option set changed: write the selection into the native element
-// again (props-only getters).
+// again.
 $watch(() => $props.value, () => { scheduleNativeSync() })
 $watch(() => $props.options, () => { scheduleNativeSync() })
 $watch(() => ($props.options ? $props.options.length : 0), () => { scheduleNativeSync() })
@@ -1596,9 +1566,7 @@ $onUnmount(() => {
   virtualizer = null
 })
 
-// Imperative handle. Shorthand keys only: a verb is bound to the script binding of its
-// name on every target, so an aliased `{ open: fn }` key compiles but is ignored —
-// every function is named exactly as its verb (`open` is the gated host function).
+// Imperative handle (`open` is the gated host function).
 $expose({ open, close, toggle, clear, focusControl })
 </script>
 
@@ -1681,7 +1649,7 @@ $expose({ open, close, toggle, clear, focusControl })
           role="combobox"
           aria-haspopup="listbox"
           :tabindex="triggerTabindex()"
-          :aria-hidden="nativeActive() ? 'true' : null"
+          :aria-hidden="nativeActive() ? true : null"
           :aria-expanded="!!popupVisible()"
           :aria-controls="idRoot() + '-list'"
           :aria-activedescendant="popupVisible() && $data.activeIndex < visibleOptions().length ? activeDescendant : null"
@@ -1708,16 +1676,13 @@ $expose({ open, close, toggle, clear, focusControl })
         <!-- Native mobile picker (`nativePicker` on a coarse pointer, single-select): an
              invisible native <select> over the whole control, so a tap opens the OS picker. Its selection is
              written by syncNative() in the script; each <option> value is the option's index
-             in visibleOptions(). No `name`: it does not take part in form submission.
-             `.stop` on change: the component emits its own `change`, and on Angular (no
-             shadow boundary) a consumer's `(change)` binding would also receive the native
-             event bubbling out of the host — measured as two calls per commit. -->
+             in visibleOptions(). No `name`: it does not take part in form submission. -->
         <select
           r-if="nativeActive()"
           class="rozie-select-native"
           :disabled="!!$props.disabled"
           :aria-label="$props.ariaLabel ? $props.ariaLabel : null"
-          @change.stop="onNativeChange($event)"
+          @change="onNativeChange($event)"
         >
           <option value="" :disabled="!!nativePlaceholderDisabled()">{{ $props.placeholder }}</option>
           <option

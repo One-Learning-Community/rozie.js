@@ -24,8 +24,8 @@ const solve = (token$local: any) => {
 };
 // setStatus(status): param == the $data key. `$data.status = status` lowers on
 // Vue to `status.value = status` (param shadows the state ref) pre-fix.
-const setStatus = (status: any) => {
-  status = status;
+const setStatus = (status$local: any) => {
+  status = status$local;
 };
 // logLabel(label): param == the $computed name. The bare `label` read lowers on
 // Vue to `label.value` (reads the computed ref, not the param) pre-fix.

@@ -252,16 +252,6 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
-  onMount(() => {
-    const _cleanup = (() => {
-    view = new EditorView({
-      state: buildState(value()),
-      parent: hostElRef
-    });
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => view?.destroy());
-  });
   createEffect(on(() => (() => value())(), (v) => untrack(() => ((v: any) => writeDoc(v))(v)), { defer: true }));
   createEffect(on(() => (() => local.language)(), (v) => untrack(() => (() => {
     scheduleReconfigure(langCompartment, langExt);
@@ -287,6 +277,16 @@ export default function CodeMirror(_props: CodeMirrorProps): JSX.Element {
   createEffect(on(() => (() => local.decorations)(), (v) => untrack(() => (() => {
     scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt());
   })()), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    view = new EditorView({
+      state: buildState(value()),
+      parent: hostElRef
+    });
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => view?.destroy());
+  });
   let hostElRef: HTMLElement | null = null;
 
   let view: any = null;

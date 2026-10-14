@@ -16,10 +16,10 @@ export default function InlineEquivHostF(_props: InlineEquivHostFProps): JSX.Ele
     void base;
     return rest;
   })();
-  const usedFirstF = useMemo(() => clamp(tickF + props.base), [clamp, props.base, tickF]);
-  const usedSecondF = useMemo(() => clamp(usedFirstF + 1), [clamp, usedFirstF]);
 
   const tickF = props.base * 2;
+  const usedFirstF = useMemo(() => clamp(tickF + props.base), [clamp, props.base, tickF]);
+  const usedSecondF = useMemo(() => clamp(usedFirstF + 1), [clamp, usedFirstF]);
 
   return (
     <>

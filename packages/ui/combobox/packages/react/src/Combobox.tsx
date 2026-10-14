@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Combobox.css';
 import Popover from '@rozie-ui/popover-react';
@@ -380,8 +381,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     if (opt !== null && typeof opt === 'object' && 'disabled' in opt) return !!opt.disabled;
     return false;
   }
-  // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
-  // per-instance id) so the option ids follow the host's auto-id fallback.
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -468,12 +467,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     return src && src[i] ? src[i].id : undefined;
   }
 
-  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
-
   // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
   // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
   // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -539,11 +532,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     // (virtualization.rzts) for environments where queueMicrotask is unavailable.
     if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
   }
-
-  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -554,9 +542,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     if (measuredRowCount.current === 0) return props.estimateRowHeight;
     return Math.round(measuredRowTotal.current / measuredRowCount.current);
   }
-
-  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -767,14 +752,6 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
-
-  // ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-  // rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-  // a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-  // returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-  // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-
-  // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
 
   // Windowing instance state (reassigned module-`let`s → React hoists to useRef; do NOT
   // const). NULL until $onMount, ONLY constructed when $props.virtual. gridScrollEl is the
@@ -2102,7 +2079,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
 
   const _rozieExposeRef = useRef({ focus, clear, seedQuery, pinOpen, activeOption, query });
   _rozieExposeRef.current = { focus, clear, seedQuery, pinOpen, activeOption, query };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), seedQuery: (...args: Parameters<typeof seedQuery>): ReturnType<typeof seedQuery> => _rozieExposeRef.current.seedQuery(...args), pinOpen: (...args: Parameters<typeof pinOpen>): ReturnType<typeof pinOpen> => _rozieExposeRef.current.pinOpen(...args), activeOption: (...args: Parameters<typeof activeOption>): ReturnType<typeof activeOption> => _rozieExposeRef.current.activeOption(...args), query: (...args: Parameters<typeof query>): ReturnType<typeof query> => _rozieExposeRef.current.query(...args) }), []);
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)), seedQuery: (...args: Parameters<typeof seedQuery>): ReturnType<typeof seedQuery> => flushSync(() => _rozieExposeRef.current.seedQuery(...args)), pinOpen: (...args: Parameters<typeof pinOpen>): ReturnType<typeof pinOpen> => flushSync(() => _rozieExposeRef.current.pinOpen(...args)), activeOption: (...args: Parameters<typeof activeOption>): ReturnType<typeof activeOption> => flushSync(() => _rozieExposeRef.current.activeOption(...args)), query: (...args: Parameters<typeof query>): ReturnType<typeof query> => flushSync(() => _rozieExposeRef.current.query(...args)) }), []);
 
   return (
     <>

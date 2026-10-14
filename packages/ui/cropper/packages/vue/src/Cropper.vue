@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -97,10 +97,22 @@ const props = withDefaults(
   { src: '', aspectRatio: NaN, viewMode: 0, dragMode: 'crop', disabled: false, guides: true, center: true, background: true, movable: true, rotatable: true, scalable: true, zoomable: true, zoomOnWheel: true, cropBoxMovable: true, cropBoxResizable: true, autoCrop: true, autoCropArea: 0.8, responsive: true, preview: undefined, options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The crop box — `{ x, y, width, height, rotate, scaleX, scaleY }`. The lone two-way `model: true` prop: dragging or resizing the crop box writes the new box back (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write `setData`s the live cropper.
  */
-const data = defineModel<unknown>('data', { default: undefined });
+const __rozieModel_data = defineModel<unknown>('data', { default: undefined });
+const data = computed<unknown>({
+  get: () => __rozieModel_data.value,
+  set: (v) => { if (__rozieBound('data')) __rozieVm.emit('update:data', v); else __rozieModel_data.value = v; },
+});
 
 const emit = defineEmits<{
   ready: [...args: any[]];

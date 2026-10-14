@@ -13,7 +13,7 @@
 </template>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
+import { Fragment, computed, getCurrentInstance, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -105,24 +105,48 @@ const props = withDefaults(
   { mapStyle: undefined, minZoom: 0, maxZoom: 22, maxBounds: undefined, bounds: undefined, fitBoundsOptions: () => ({}), dragPan: true, dragRotate: true, scrollZoom: true, doubleClickZoom: true, boxZoom: true, keyboard: true, touchZoomRotate: true, touchPitch: true, markers: () => [], popups: () => [], sources: () => [], layers: () => [], interactiveLayerIds: () => [], controls: () => [], options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The map center as `[lng, lat]` — **longitude first** (MapLibre's convention, not Leaflet's `[lat, lng]`). Two-way: panning the map writes the new center back through the model path (echo-guarded), and a consumer write `easeTo`s the live map. The `moveend` echo reads `getCenter()` as `[lng, lat]`.
  * @example
  * <MapLibre v-model:center="center" v-model:zoom="zoom" />
  */
-const center = defineModel<any[]>('center', { default: () => [0, 0] });
+const __rozieModel_center = defineModel<any[]>('center', { default: () => [0, 0] });
+const center = computed<any[]>({
+  get: () => __rozieModel_center.value,
+  set: (v) => { if (__rozieBound('center')) __rozieVm.emit('update:center', v); else __rozieModel_center.value = v; },
+});
 /**
  * The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.
  */
-const zoom = defineModel<number>('zoom', { default: 1 });
+const __rozieModel_zoom = defineModel<number>('zoom', { default: 1 });
+const zoom = computed<number>({
+  get: () => __rozieModel_zoom.value,
+  set: (v) => { if (__rozieBound('zoom')) __rozieVm.emit('update:zoom', v); else __rozieModel_zoom.value = v; },
+});
 /**
  * The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.
  */
-const bearing = defineModel<number>('bearing', { default: 0 });
+const __rozieModel_bearing = defineModel<number>('bearing', { default: 0 });
+const bearing = computed<number>({
+  get: () => __rozieModel_bearing.value,
+  set: (v) => { if (__rozieBound('bearing')) __rozieVm.emit('update:bearing', v); else __rozieModel_bearing.value = v; },
+});
 /**
  * The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.
  */
-const pitch = defineModel<number>('pitch', { default: 0 });
+const __rozieModel_pitch = defineModel<number>('pitch', { default: 0 });
+const pitch = computed<number>({
+  get: () => __rozieModel_pitch.value,
+  set: (v) => { if (__rozieBound('pitch')) __rozieVm.emit('update:pitch', v); else __rozieModel_pitch.value = v; },
+});
 
 const emit = defineEmits<{
   mouseenter: [...args: any[]];

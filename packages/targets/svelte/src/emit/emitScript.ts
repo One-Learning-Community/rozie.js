@@ -1685,7 +1685,11 @@ function isExposedTopLevelDecl(stmt: t.Statement, exposeNames: Set<string>): boo
     if (
       t.isIdentifier(d.id) &&
       d.init &&
-      (t.isArrowFunctionExpression(d.init) || t.isFunctionExpression(d.init))
+      (t.isArrowFunctionExpression(d.init) ||
+        t.isFunctionExpression(d.init) ||
+        // `const open = openGated` — core's expandExposeAliases writes this for
+        // an aliased verb `{ open: openGated }`.
+        t.isIdentifier(d.init))
     ) {
       return exposeNames.has(d.id.name);
     }
@@ -1884,9 +1888,12 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     sections.push(contextEmit.provideLines.join('\n'));
   }
   if (derivedLines.length > 0) sections.push(derivedLines.join('\n'));
-  if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
-  // Quick plan 260515-u2b — watcher $effect blocks after lifecycle.
+  // Watcher $effect blocks BEFORE the lifecycle hooks: `onMount` is an effect
+  // too, and effects first run in creation order. A watcher created after it
+  // took its first (skipped) run after the mount body had already written the
+  // watched `$data`, so that write never fired the watcher.
   if (watcherLines.length > 0) sections.push(watcherLines.join('\n'));
+  if (lifecycleLines.length > 0) sections.push(lifecycleLines.join('\n'));
 
   const scriptBlock = sections.join('\n\n');
 

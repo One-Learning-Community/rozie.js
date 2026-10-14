@@ -64,12 +64,12 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
 
   const [draft, setDraft] = createSignal('');
   const [touched, setTouched] = createSignal(false);
-  onMount(() => {
-    if (local.autofocus) inputElRef?.focus();
-  });
   createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
     if (v) inputElRef?.focus();
   })(v)), { defer: true }));
+  onMount(() => {
+    if (local.autofocus) inputElRef?.focus();
+  });
   let inputElRef: HTMLElement | null = null;
 
   // ── N-04: the draft is DERIVED, not seeded setup-once ───────────────────────────────────

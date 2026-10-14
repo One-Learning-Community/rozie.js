@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, mergeListeners, pickListeners, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Dialog.css';
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
@@ -235,7 +236,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
 
   const _rozieExposeRef = useRef({ show, hide });
   _rozieExposeRef.current = { show, hide };
-  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), hide: (...args: Parameters<typeof hide>): ReturnType<typeof hide> => _rozieExposeRef.current.hide(...args) }), []);
+  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => flushSync(() => _rozieExposeRef.current.show(...args)), hide: (...args: Parameters<typeof hide>): ReturnType<typeof hide> => flushSync(() => _rozieExposeRef.current.hide(...args)) }), []);
 
   return (
     <>

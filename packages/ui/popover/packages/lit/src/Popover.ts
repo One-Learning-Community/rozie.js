@@ -267,9 +267,6 @@ private __rozieFirstUpdateDone = false;
     // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
     // and may be null until open (or keepMounted); startTracking re-reads via the
     // watch path.
-    // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-    // and may be null until open (or keepMounted); startTracking re-reads via the
-    // watch path.
     this.anchorNode = this._refAnchorEl;
     this.liveReference = this.reference;
     if (this.open && !this.disabled) {

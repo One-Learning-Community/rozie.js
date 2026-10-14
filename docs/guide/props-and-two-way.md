@@ -122,12 +122,18 @@ One flag in `<props>`. Six different two-way-binding expansions, each one the ta
 
 | Target | Expansion |
 | --- | --- |
-| Vue | `const value = defineModel<number>('value', { default: 0 })` |
+| Vue | `defineModel<number>('value', { default: 0 })`, read and written through a writable `computed` (see below) |
 | React | `useControllableState({ value, defaultValue, onValueChange })` from `@rozie/runtime-react` |
 | Svelte 5 | `let { value = $bindable(0) }: Props = $props()` |
-| Angular | `value = model<number>(0)` |
+| Angular | an aliased `input()` + `valueChange = output()`, read and written through `rozieModel` from `@rozie/runtime-angular` |
 | Solid | `createControllableSignal(_props, 'value', 0)` from `@rozie/runtime-solid` |
 | Lit | `createLitControllableProperty({ host, eventName: 'value-change', defaultValue: 0 })` from `@rozie/runtime-lit` — a `value` property/attribute pair plus a `value-change` CustomEvent |
+
+### Controlled while the consumer binds a value
+
+On every target a `model: true` prop is **controlled** while the consumer binds a value to it (anything but `undefined`) and **uncontrolled** otherwise — React's rule, now compiled the same way everywhere. Controlled, a `$model.x` write only notifies the consumer; what the component shows stays the consumer's value until the consumer sends a new one. So a consumer that refuses a change — a one-way binding, or a two-way binding whose handler puts the old value back — keeps the control on its value. Uncontrolled, the write updates the component's own state.
+
+One exception, a Svelte one-way binding (`value={x}` without `bind:`): Svelte gives the component no way to tell it from `bind:value`, and takes the component's write as a local override until `x` changes. To refuse changes on Svelte, bind with a setter: `bind:value={() => x, (v) => { /* keep or change x */ }}`.
 
 ### Reading vs. writing a model prop: `$props.x` and `$model.x`
 

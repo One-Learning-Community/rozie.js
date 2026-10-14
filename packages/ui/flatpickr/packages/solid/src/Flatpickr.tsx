@@ -182,6 +182,31 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
   onMount(() => { local.ref?.({ clear, openPicker, closePicker, selectDate, jumpToDate, getSelectedDates, togglePicker, changeMonth, changeYear }); });
 
   const [date, setDate] = createControllableSignal<string>(_props as unknown as Record<string, unknown>, 'date', '');
+  createEffect(on(() => (() => date())(), (v) => untrack(() => ((v: any) => {
+    if (!instance) return;
+    if (v !== instance.input.value) instance.setDate(v, false);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.mode)(), (v) => untrack(() => ((v: any) => instance?.set('mode', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.minDate)(), (v) => untrack(() => ((v: any) => instance?.set('minDate', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.maxDate)(), (v) => untrack(() => ((v: any) => instance?.set('maxDate', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.dateFormat)(), (v) => untrack(() => ((v: any) => instance?.set('dateFormat', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => {
+    if (instance) instance.input.disabled = v;
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.disable)(), (v) => untrack(() => ((v: any) => instance?.set('disable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.enable)(), (v) => untrack(() => ((v: any) => instance?.set('enable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
+    ...(v ?? {}),
+    ...(local.firstDayOfWeek !== 0 ? {
+      firstDayOfWeek: local.firstDayOfWeek
+    } : {})
+  }))(v)), { defer: true }));
+  createEffect(on(() => (() => local.firstDayOfWeek)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
+    ...(local.locale ?? {}),
+    ...(v !== 0 ? {
+      firstDayOfWeek: v
+    } : {})
+  }))(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     instance = flatpickr(inputElRef!, {
@@ -287,31 +312,6 @@ export default function Flatpickr(_props: FlatpickrProps): JSX.Element {
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => instance?.destroy());
   });
-  createEffect(on(() => (() => date())(), (v) => untrack(() => ((v: any) => {
-    if (!instance) return;
-    if (v !== instance.input.value) instance.setDate(v, false);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.mode)(), (v) => untrack(() => ((v: any) => instance?.set('mode', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.minDate)(), (v) => untrack(() => ((v: any) => instance?.set('minDate', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.maxDate)(), (v) => untrack(() => ((v: any) => instance?.set('maxDate', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.dateFormat)(), (v) => untrack(() => ((v: any) => instance?.set('dateFormat', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => {
-    if (instance) instance.input.disabled = v;
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.disable)(), (v) => untrack(() => ((v: any) => instance?.set('disable', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.enable)(), (v) => untrack(() => ((v: any) => instance?.set('enable', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
-    ...(v ?? {}),
-    ...(local.firstDayOfWeek !== 0 ? {
-      firstDayOfWeek: local.firstDayOfWeek
-    } : {})
-  }))(v)), { defer: true }));
-  createEffect(on(() => (() => local.firstDayOfWeek)(), (v) => untrack(() => ((v: any) => instance?.set('locale', {
-    ...(local.locale ?? {}),
-    ...(v !== 0 ? {
-      firstDayOfWeek: v
-    } : {})
-  }))(v)), { defer: true }));
   let inputElRef: HTMLElement | null = null;
 
   let instance: any = null;

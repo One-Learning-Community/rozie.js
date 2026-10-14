@@ -1,4 +1,5 @@
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx } from '@rozie/runtime-react';
 import './ExposeProbe.css';
 
@@ -23,7 +24,7 @@ const ExposeProbe = forwardRef<ExposeProbeHandle, ExposeProbeProps>(function Exp
 
   const _rozieExposeRef = useRef({ reset, focus });
   _rozieExposeRef.current = { reset, focus };
-  useImperativeHandle(ref, () => ({ reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args) }), []);
+  useImperativeHandle(ref, () => ({ reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args)), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)) }), []);
 
   return (
     <>

@@ -2,7 +2,7 @@
 //
 // Each example .rozie compiles to a {name}.ts.snap fixture; per-example
 // substring invariants follow:
-//   - Counter — model<number>(0) + console.log("hello from rozie") (DX-03)
+//   - Counter — rozieModel value + console.log("hello from rozie") (DX-03)
 //   - SearchInput — debounce class-body field initializer + FormsModule
 //   - Dropdown — three effect((onCleanup) =>) blocks (outside-click + escape +
 //                throttle resize) + ::ng-deep :root for CSS-variable escape hatch
@@ -86,10 +86,10 @@ describe('emitAngular — Plan 05-04a smoke tests (TypeScript parses emitted out
 });
 
 describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance criteria)', () => {
-  it('Counter.ts.snap contains literal `value = model<number>(0)` AND `console.log("hello from rozie")` (DX-03)', () => {
+  it('Counter.ts.snap contains the `value` rozieModel AND `console.log("hello from rozie")` (DX-03)', () => {
     const { ir, src, filename } = loadExample('Counter');
     const { code } = emitAngular(ir, { filename, source: src });
-    expect(code).toContain('value = model<number>(0)');
+    expect(code).toContain("value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0)");
     expect(code).toContain('console.log("hello from rozie")');
     expect(code).toContain('signal(false)');
     expect(code).toContain('computed(() =>');

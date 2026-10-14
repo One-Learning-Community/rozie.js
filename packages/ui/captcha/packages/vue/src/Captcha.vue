@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -37,12 +37,24 @@ const props = withDefaults(
   { provider: 'recaptcha', theme: 'light', size: 'normal', tabindex: null, options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The verified response token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written by the widget on success and cleared on expire/reset, so reading it gives you the live response to send to your server for form submission.
  * @example
  * <Captcha v-model:token="token" provider="recaptcha" sitekey="…" />
  */
-const token = defineModel<string>('token', { default: '' });
+const __rozieModel_token = defineModel<string>('token', { default: '' });
+const token = computed<string>({
+  get: () => __rozieModel_token.value,
+  set: (v) => { if (__rozieBound('token')) __rozieVm.emit('update:token', v); else __rozieModel_token.value = v; },
+});
 
 const emit = defineEmits<{
   verify: [...args: any[]];

@@ -714,6 +714,10 @@ export const EXAMPLES = [
   // options replaced under a windowed list, `hideEmpty` options going empty <-> non-empty, and the
   // handle's open() / toggle() called from an outside click. Behavioral-only (select-open-state.spec.ts).
   'SelectOpenState',
+  // A declarative native `<select :value>` (loader → examples/demos/NativeSelectValueDemo.rozie):
+  // the bound value selects its option at mount, on change, and as options change.
+  // Behavioral-only (native-select-value.spec.ts).
+  'NativeSelectValue',
   // @rozie-ui/select value identity (loader → examples/demos/SelectIdentityDemo.rozie): object option
   // values read back through reactive state, a consumer that keeps the old value, and a multi-select
   // model holding a value twice. Behavioral-only (select-identity.spec.ts).
@@ -1735,6 +1739,8 @@ export const LIT_TAGS: Record<Example, string> = {
   SelectNative: 'rozie-select-native',
   // 'rozie-select-open-state-demo' = kebab of SelectOpenStateDemo.
   SelectOpenState: 'rozie-select-open-state',
+  // 'rozie-native-select-value-demo' = kebab of NativeSelectValueDemo.
+  NativeSelectValue: 'rozie-native-select-value',
   // 'rozie-select-identity-demo' = kebab of SelectIdentityDemo.
   SelectIdentity: 'rozie-select-identity',
   // 'rozie-select-screenshot-demo' = kebab of SelectScreenshotDemo.
@@ -2315,6 +2321,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   SelectNative: {},
   // SelectOpenStateDemo is self-contained (own options + internal r-models). No parent props.
   SelectOpenState: {},
+  // NativeSelectValueDemo is self-contained. No parent props.
+  NativeSelectValue: {},
   // SelectIdentityDemo is self-contained (own options + internal models). No parent props.
   SelectIdentity: {},
   // SelectScreenshotDemo is self-contained (own options + internal r-models). No parent props.

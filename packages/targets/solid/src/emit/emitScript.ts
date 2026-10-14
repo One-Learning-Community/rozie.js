@@ -815,6 +815,9 @@ export function emitScript(
     hookLines.push(portalsEmit.setupLines);
   }
 
+  // Where the lifecycle hooks start: the $watch effects (4c) are spliced in here.
+  const lifecycleStart = hookLines.length;
+
   // 4. onMount/onCleanup for each LifecycleHook.
   //
   // Rule 1 fix: when lh.setup is a BlockStatement, genCode() produces `{ ... }`
@@ -950,6 +953,11 @@ export function emitScript(
   // recreating the Chart.js instance) on every data tick. `untrack` confines
   // the watcher's dependency set to the getter's reads only — matching Vue's
   // `watch(getter, cb)` and Svelte's untrack-wrapped $watch callback.
+  // The watcher effects go BEFORE the lifecycle hooks: `onMount` is an effect
+  // too, and effects first run in creation order. A watcher created after it
+  // took its first (deferred) run after the mount body had already written the
+  // watched signal, so that write never fired the watcher.
+  const watcherLines: string[] = [];
   for (const wh of ir.watchers) {
     collectors.solidImports.add('createEffect');
     collectors.solidImports.add('untrack');
@@ -976,17 +984,18 @@ export function emitScript(
     // only bind the value into the call when the callback declares a param.
     if (wh.immediate) {
       const callArg = wh.callbackParams.length > 0 ? '__watchVal' : '';
-      hookLines.push(
+      watcherLines.push(
         `createEffect(() => { const __watchVal = (${getterCode})(); untrack(() => (${cbCode})(${callArg})); });`,
       );
     } else {
       collectors.solidImports.add('on');
       const callArg = wh.callbackParams.length > 0 ? 'v' : '';
-      hookLines.push(
+      watcherLines.push(
         `createEffect(on(() => (${getterCode})(), (v) => untrack(() => (${cbCode})(${callArg})), { defer: true }));`,
       );
     }
   }
+  hookLines.splice(lifecycleStart, 0, ...watcherLines);
 
   // 4b. Ref variable declarations: `let fooRef: HTMLElement | null = null;`
   // Solid uses plain let variables (not useRef objects) for DOM refs.

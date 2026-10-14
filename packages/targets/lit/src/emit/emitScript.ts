@@ -33,6 +33,7 @@ import {
   exposedVerbSurface,
 } from '@rozie/core';
 import { computeTsCastWrapText, unwrapTsCast } from '../../../../core/src/ast/unwrapTsCast.js';
+import { blockHasOwnReturn } from '../../../../core/src/codegen/blockHasOwnReturn.js';
 import { resolveComponentRefs } from '../../../../core/src/codegen/resolveComponentRefs.js';
 import { collectFillerTypeImports } from '../../../../core/src/codegen/collectFillerTypeImports.js';
 import {
@@ -807,6 +808,46 @@ function isLifecycleCall(stmt: t.Statement): {
  * as a string. If it's an identifier, return `<name>();`. Cleanup return-values
  * are stripped and pushed to _disconnectCleanups.
  */
+/**
+ * Render a lifecycle hook's body for splicing into `firstUpdated()` /
+ * `updated()`, which several hooks share.
+ *
+ *  - Comments print once. A comment between two statements is attached to
+ *    both (the first one's trailing, the second one's leading), and the rewrite
+ *    pass clones each statement, so the two copies are distinct objects that
+ *    Babel's own once-per-comment check does not catch: printed statement by
+ *    statement, the comment came out twice. The copies are dropped by position
+ *    (every statement here comes from one function body, hence one file) and
+ *    the body is printed in one generate() call.
+ *  - A body that `return`s early is called as an arrow instead of spliced: the
+ *    `return` would skip every hook after it.
+ */
+function renderSplicedBody(stmts: t.Statement[]): string {
+  if (stmts.length === 0) return '';
+  dedupeNeighbourComments(stmts);
+  const block = t.blockStatement(stmts);
+  if (blockHasOwnReturn(block)) {
+    return `(${generate(t.arrowFunctionExpression([], block), GEN_OPTS).code})();`;
+  }
+  return generate(t.program(stmts), GEN_OPTS).code;
+}
+
+/**
+ * Drop a comment from a statement's `leadingComments` when the statement
+ * before it already carries the same comment (same position and text) as a
+ * trailing comment. Mutates the statements' comment arrays.
+ */
+function dedupeNeighbourComments(stmts: t.Statement[]): void {
+  const key = (c: t.Comment): string => `${c.start}:${c.end}:${c.value}`;
+  for (let i = 1; i < stmts.length; i++) {
+    const before = stmts[i - 1]!.trailingComments;
+    const lead = stmts[i]!.leadingComments;
+    if (!before || !lead) continue;
+    const seen = new Set(before.map(key));
+    stmts[i]!.leadingComments = lead.filter((c) => !seen.has(key(c)));
+  }
+}
+
 function inlineHookBody(arg: t.Expression): { body: string; cleanup: string } {
   if (t.isIdentifier(arg)) {
     return { body: `${arg.name}();`, cleanup: '' };
@@ -837,8 +878,7 @@ function inlineHookBody(arg: t.Expression): { body: string; cleanup: string } {
           }
         }
       }
-      const rendered = stmts.map((s) => generate(s, GEN_OPTS).code).join('\n');
-      return { body: rendered, cleanup };
+      return { body: renderSplicedBody(stmts), cleanup };
     }
     // Concise arrow: () => expr — the expression IS the return value.
     // Treat it as a cleanup/unsubscribe callback rather than a side-effect body.
@@ -1079,7 +1119,10 @@ function classifyWatcherRoute(
   // 'props' route with no prop names so the watcher body never re-runs after
   // mount via either route. The initial firing semantic is preserved either
   // way; constant getters don't observe any change.
-  if (nonPropsSeen) return { route: 'effect', propNames: [] };
+  // A mixed getter (signals AND plain `@property` reads) takes the effect route
+  // and keeps its prop names: the effect does not see a plain property change,
+  // so the emitter adds an `updated()` branch for those (see the effect route).
+  if (nonPropsSeen) return { route: 'effect', propNames: [...propNames] };
   return { route: 'props', propNames: [...propNames] };
 }
 
@@ -1469,7 +1512,7 @@ function lifecycleHookBody(
   if (t.isBlockStatement(hook.setup)) {
     const wrapper = t.file(t.program([...hook.setup.body]));
     const rewritten = rewriteScript(wrapper, ir, { methodNamesOverride: methodNames, runtime });
-    body = rewritten.file.program.body.map((s) => generate(s, GEN_OPTS).code).join('\n');
+    body = renderSplicedBody(rewritten.file.program.body);
   } else if (t.isExpression(hook.setup)) {
     // A bare callable reference (`$onMount(reset)` → Identifier;
     // `$onMount(obj.handler)` → MemberExpression) needs to be INVOKED, so wrap
@@ -1972,15 +2015,35 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
         // not join the effect's dependency set; the callback is skipped on the
         // first run. `{ immediate: true }` keeps today's eager shape.
         needsEffectImport = true;
+        // A mixed getter also reads plain `@property` values, which the effect
+        // does not track: a change to one of those alone never re-ran it. The
+        // effect records the value it last saw, and an `updated()` branch for
+        // those props re-reads the getter and fires when the value differs —
+        // so a cycle where a signal already fired for the same value fires once.
+        const mixed = classification.propNames.length > 0;
+        const prevField = `__rozieWatchPrev_${i}`;
+        const record = mixed ? `this.${prevField} = __watchVal; ` : '';
+        if (mixed) {
+          fieldLines.push(`private ${prevField}: unknown;`);
+          needsFirstUpdateDoneFlag = true;
+          const propChecks = classification.propNames
+            .map((n) => `changedProperties.has('${n}')`)
+            .join(' || ');
+          watcherUpdatedBranches.push(
+            `if (this.__rozieFirstUpdateDone && (${propChecks})) { const __watchVal = untracked(${getterCode}); if (!Object.is(__watchVal, this.${prevField})) { this.${prevField} = __watchVal; untracked(() => (${cbCode})(${callArg})); } }`,
+          );
+        }
         if (irWatcher.immediate) {
           watcherCleanupPushes.push(
-            `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); }));`,
+            mixed
+              ? `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => { ${record}(${cbCode})(${callArg}); }); }));`
+              : `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => (${cbCode})(${callArg})); }));`,
           );
         } else {
           const flag = `__rozieWatchInitial_${i}`;
           fieldLines.push(`private ${flag} = true;`);
           watcherCleanupPushes.push(
-            `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => { if (this.${flag}) { this.${flag} = false; return; } (${cbCode})(${callArg}); }); }));`,
+            `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => { ${record}if (this.${flag}) { this.${flag} = false; return; } (${cbCode})(${callArg}); }); }));`,
           );
         }
       }

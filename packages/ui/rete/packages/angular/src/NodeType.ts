@@ -131,14 +131,6 @@ export class NodeType {
   constructor() {
     this.cv = this.canvas;
     this.bodyHandles = new Set();
-    effect(() => () => {
-      if (this.registered) return;
-      const live = this.canvas;
-      if (live == null) return;
-      this.cv = live;
-      this.registered = true;
-      this.cv.registerType(this.type(), this.buildSpec());
-    });
     effect(() => { const __watchVal = (() => this.type())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.cv) this.cv.registerType(this.type(), this.buildSpec());
     })(); }); });
@@ -173,6 +165,17 @@ export class NodeType {
       for (const view of this._portalViews) view.destroy();
       this._portalViews.clear();
     });
+  }
+
+  ngAfterViewChecked() {
+    (() => {
+      if (this.registered) return;
+      const live = this.canvas;
+      if (live == null) return;
+      this.cv = live;
+      this.registered = true;
+      this.cv.registerType(this.type(), this.buildSpec());
+    })();
   }
 
   // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the

@@ -18,14 +18,26 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 
 const props = withDefaults(
   defineProps<{ closeOnEscape?: boolean; closeOnBackdrop?: boolean; lockBodyScroll?: boolean; title?: string }>(),
   { closeOnEscape: true, closeOnBackdrop: true, lockBodyScroll: true, title: '' }
 );
 
-const open = defineModel<boolean>('open', { default: false });
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
+const __rozieModel_open = defineModel<boolean>('open', { default: false });
+const open = computed<boolean>({
+  get: () => __rozieModel_open.value,
+  set: (v) => { if (__rozieBound('open')) __rozieVm.emit('update:open', v); else __rozieModel_open.value = v; },
+});
 
 const emit = defineEmits<{
   close: [...args: any[]];

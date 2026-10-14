@@ -59,12 +59,14 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    if (this.added) return;
-    const live = this.injectedType;
-    if (live == null) return;
-    this.nt = live;
-    this.added = true;
-    this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple, this.position);
+    (() => {
+      if (this.added) return;
+      const live = this.injectedType;
+      if (live == null) return;
+      this.nt = live;
+      this.added = true;
+      this.nt.addPort(this.portSide(), this.portKey(), this.type, this.label, this.multiple, this.position);
+    })();
   }
 
   disconnectedCallback(): void {

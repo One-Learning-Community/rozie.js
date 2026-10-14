@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { Popover } from '@rozie-ui/popover-angular';
 
@@ -114,7 +114,7 @@ interface GroupHeadingCtx {
     }
             </span>
     }
-    }<div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-hidden]="rozieAttr(nativeActive() ? 'true' : null)" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
+    }<div #triggerEl class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" [attr.tabindex]="rozieAttr(triggerTabindex())" [attr.aria-hidden]="rozieAttr(nativeActive() ? true : null)" [attr.aria-expanded]="!!popupVisible()" [attr.aria-controls]="rozieAttr(idRoot() + '-list')" [attr.aria-activedescendant]="rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-disabled]="!!(disabled() || this.__rozieCvaDisabled())" (keydown)="onTriggerKeyDown($event)">
               @if (!multiple()) {
     @if ((selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected'])) {
     <ng-container *ngTemplateOutlet="(selectedTpl ?? __rozieFillMap()['selected'] ?? templates()?.['selected']); context: { $implicit: { selected: selectedLabel(), value: value() }, selected: selectedLabel(), value: value() }" />
@@ -134,7 +134,7 @@ interface GroupHeadingCtx {
     }<span class="rozie-select-arrow" aria-hidden="true">▾</span>
             
             @if (nativeActive()) {
-    <select class="rozie-select-native" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(__attr_aria_label)" (change)="$event.stopPropagation(); onNativeChange($event)">
+    <select class="rozie-select-native" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [attr.aria-label]="rozieAttr(__attr_aria_label)" (change)="onNativeChange($event)">
               <option value="" [disabled]="!!nativePlaceholderDisabled()">{{ placeholder() }}</option>
               @for (row of nativeRows().loose; track 'n-' + row.index) {
     <option [attr.value]="rozieAttr(row.index)" [disabled]="!!disabledOf(row.opt)">{{ rozieDisplay(labelOf(row.opt)) }}</option>
@@ -415,7 +415,9 @@ export class Select {
    * @example
    * <rozie-select [(value)]="fruit" [options]="fruits" />
    */
-  value = model<(unknown) | null>(null);
+  readonly __rozieModelIn_value = input<(unknown) | null | undefined>(undefined, { alias: 'value' });
+  valueChange = output<(unknown) | null>();
+  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null);
   /**
    * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence. Backspace removes the last chip shown.
    */
@@ -531,6 +533,7 @@ export class Select {
   __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   openChange = output<unknown>({ alias: 'open-change' });
   change = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('chip', { read: TemplateRef }) chipTpl?: TemplateRef<ChipCtx>;
   @ContentChild('selected', { read: TemplateRef }) selectedTpl?: TemplateRef<SelectedCtx>;
   @ContentChild('option', { read: TemplateRef }) optionTpl?: TemplateRef<OptionCtx>;
@@ -563,8 +566,6 @@ export class Select {
   private __rozieWatchInitial_12 = true;
   private __rozieWatchInitial_13 = true;
   private __rozieWatchInitial_14 = true;
-  private __rozieWatchInitial_15 = true;
-  private __rozieWatchInitial_16 = true;
 
   constructor() {
       const renderer = inject(Renderer2);
@@ -582,12 +583,6 @@ export class Select {
         onCleanup(() => listenTarget.removeEventListener('click', handler as EventListener, true));
       });
 
-    effect(() => () => {
-      if (this.virtual() && this.virtualizer && this.virtualizer.options.count !== this.optionCount()) this.refeedWindow();
-      // The native element's selection is DOM state: after any render that may have added
-      // or removed <option>s, write the model into it again (a no-op when it already shows it).
-      if (this.nativeActive()) this.syncNative();
-    });
     inject(DestroyRef).onDestroy(() => {
       // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
       // this and does nothing.
@@ -604,55 +599,49 @@ export class Select {
       this.virtualizerCleanup = null;
       this.virtualizer = null;
     });
-    effect(() => { const __watchVal = (() => this.open$local())(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.open$local() ? 'o' : '-') + (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0))(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
     effect(() => { const __watchVal = (() => this.session())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
-    effect(() => { const __watchVal = (() => (this.hideEmpty() ? 'h' : 's') + (this.options() ? this.options().length : 0))(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
-      this.syncPanel();
-    })(); }); });
-    effect(() => { const __watchVal = (() => !!(this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => !!(this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       if ((this.disabled() || this.__rozieCvaDisabled())) this.close();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.panelOpen())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       this.takePanelWrite();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.panelEcho())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.panelEcho())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => {
       if (!this.panelOpen() && this.panelEcho()) this.takePanelWrite();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.resync())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.resync())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => {
       this.syncPanel();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => {
       this.refeedWindow();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } (() => {
       this.refeedWindow();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.activeIndex())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.activeIndex())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => {
       this.liveActive = this.activeIndex();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } (() => {
       if (this.activeIndex() >= this.visibleOptions().length) this.activeIndex.set(this.visibleOptions().length > 0 ? this.nextEnabled(-1, 1) : -1);
     })(); }); });
-    effect(() => { const __watchVal = (() => this.coarse())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => (this.coarse() ? 'c' : '-') + (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } (() => {
       this.yieldToNative();
     })(); }); });
-    effect(() => { const __watchVal = (() => (this.nativePicker() ? 'n' : '-') + (this.virtual() ? 'v' : '-') + (this.inline() ? 'i' : '-') + (this.multiple() ? 'm' : '-'))(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
-      this.yieldToNative();
-    })(); }); });
-    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.value())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_15) { this.__rozieWatchInitial_15 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.options() ? this.options().length : 0)(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_16) { this.__rozieWatchInitial_16 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.groups())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => {
       this.scheduleNativeSync();
     })(); }); });
   }
@@ -677,18 +666,12 @@ export class Select {
         this.coarseQuery = window.matchMedia('(pointer: coarse)');
         this.coarse.set(!!this.coarseQuery.matches);
         // Only records the new state: this closure is the mount-time one, so the reaction
-        // (closing the custom popup) lives in the `$data.coarse` watcher below.
+        // (closing the custom popup, the first paint of the native element) lives in the
+        // `$data.coarse` watcher below.
         this.coarseListener = (e: any) => {
           this.coarse.set(!!e.matches);
         };
         if (typeof this.coarseQuery.addEventListener === 'function') this.coarseQuery.addEventListener('change', this.coarseListener);else if (typeof this.coarseQuery.addListener === 'function') this.coarseQuery.addListener(this.coarseListener);
-        // The first paint of the native element. Not left to the `$data.coarse` watcher:
-        // on Svelte and Solid a write made here in $onMount lands before that watcher's
-        // (skipped) first run, so it never fires — a select mounted with a value showed
-        // the placeholder on those two. Not gated on nativeActive() either: on React the
-        // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
-        // no native element was rendered.
-        if (this.nativePicker() && this.coarseQuery.matches) this.armNativeSync();
       }
     } catch (err: any) {
       this.coarseQuery = null;
@@ -705,6 +688,15 @@ export class Select {
       this.windowVer.set(this.windowVer() + 1);
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => this.kickWindow(8));else setTimeout(() => this.kickWindow(8), 0);
     }
+  }
+
+  ngAfterViewChecked() {
+    if (this.virtual() && this.virtualizer && this.virtualizer.options.count !== this.windowSource().length) this.refeedWindow();
+    // The native element's selection is DOM state: after any render that may have added
+    // or removed <option>s, write the model into it again (a no-op when it already shows it).
+    // The native element's selection is DOM state: after any render that may have added
+    // or removed <option>s, write the model into it again (a no-op when it already shows it).
+    if (this.nativeActive()) this.syncNative();
   }
 
   activeDescendant = computed(() => {
@@ -800,7 +792,6 @@ export class Select {
   // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
   // per-instance id) so the option ids follow the host's auto-id fallback.
   optionId = (index: any) => this.idRoot() + '-opt-' + index;
-  // Is a given option currently selected? Multi compares array membership.
   close = () => {
     if (!this.open$local()) return;
     this.open$local.set(false);
@@ -818,7 +809,6 @@ export class Select {
       option: null
     });
   };
-  // ---- keyboard navigation over the VISIBLE list -------------------------
   // Pointer hover sets the virtual highlight (matches native <select> feel).
   onOptionPointerMove = (index: any) => {
     if (this.activeIndex() !== index) this.activeIndex.set(index);
@@ -1029,12 +1019,9 @@ export class Select {
     return null;
   };
   // Write the model into the native element. Imperative on purpose: a <select>'s
-  // selection is DOM state, and the declarative shape — `:value` on the <select> plus
-  // `:selected` on each <option> — did not behave the same on six targets when it was
-  // tried (and `selected` on an <option> is a dev-mode console error on React). It is
-  // also the only way to put the element back when a choice is not accepted (the
-  // placeholder entry, or a consumer that keeps the old value), where nothing reactive
-  // changes.
+  // selection is DOM state, and a choice that is not accepted (the placeholder entry, or
+  // a consumer that keeps the old value) changes nothing reactive — a declarative `:value`
+  // would not be re-applied, and the element would keep showing the refused option.
   syncNative = () => {
     const el = this.nativeEl();
     if (!el) return;
@@ -1205,8 +1192,8 @@ export class Select {
   // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
   // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
   // through it, so the custom popup can never open while the native picker is active.
-  // It carries the public name because `$expose` binds a verb to the script binding of
-  // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  // It carries the public name because the spine copies above call `open()`, and those
+  // calls must reach the gate too.
   // It also asks for the highlighted option to be scrolled into view once the list is
   // there: opening starts the highlight on the SELECTED option, which in a long list can
   // be far below the fold, and in a windowed one is not even rendered — the trigger's
@@ -1216,7 +1203,7 @@ export class Select {
   // And a windowed list is re-fed here when its row count is not the option count: the
   // rows are only read while the popup is open, and every open passes through this gate,
   // so an `options` array grown or shrunk in place is caught on every target — including
-  // those where no watcher and no post-render hook sees such a change (Angular, Solid).
+  // Solid, where no watcher and no post-render hook sees such a change.
   open = () => {
     if (this.nativeActive()) return;
     if (this.virtual() && this.virtualizer && this.virtualizer.options.count !== this.optionCount()) this.refeedWindow();
@@ -1328,11 +1315,6 @@ export class Select {
     const src = this.windowSource();
     return src && src[i] ? src[i].id : undefined;
   };
-  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
   // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
   // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
   // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -1400,10 +1382,6 @@ export class Select {
     // (virtualization.rzts) for environments where queueMicrotask is unavailable.
     if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
   };
-  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -1415,8 +1393,6 @@ export class Select {
     if (this.measuredRowCount === 0) return __estimateRowHeight;
     return Math.round(this.measuredRowTotal / this.measuredRowCount);
   };
-  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -1621,12 +1597,6 @@ export class Select {
     for (const it of items as any) if (it.index === r) return false;
     return true;
   };
-  // ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-  // rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-  // a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-  // returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-  // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-  // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
   virtualizer: any = null;
   virtualizerCleanup: any = null;
   gridScrollEl: any = null;
@@ -2065,10 +2035,7 @@ export class Select {
       this.panelOpen.set(false);
     }
   };
-  // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
-  // reads only $data, one whose getter reads only props. A getter that mixes the two is
-  // routed through a signal effect on Lit, which a plain property change does not re-run
-  // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
+  // select -> popover: everything popupVisible() reads.
   // popover -> select: the popover's own write.
   takePanelWrite = () => {
     const __panelOpen = this.panelOpen();
@@ -2273,15 +2240,11 @@ export class Select {
   // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
   // options into the virtualizer and re-pull the window (the data-table
   // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
-  // nothing else:
-  //  - the reference, not its length: an array replaced by another of the SAME length is a
-  //    new option set too (a length-keyed getter kept the old rows on Vue);
-  //  - props only: mixed with a $data read, the getter is routed through a signal effect on
-  //    Lit, which a plain property change does not re-run (the windowed list kept the old
-  //    rows there until something else re-rendered it).
+  // nothing else — the reference, not its length: an array replaced by another of the SAME
+  // length is a new option set too (a length-keyed getter kept the old rows on Vue).
   // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
   //
-  // A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+  // A second watcher follows the LENGTH: a list grown or shrunk in
   // place keeps its reference. And because a watcher only hears what the framework
   // reports — an in-place change is reported on Vue and Svelte, not on the other four —
   // the post-render hook below re-feeds too, whenever the virtualizer's count is not the

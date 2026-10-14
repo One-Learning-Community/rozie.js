@@ -45,7 +45,7 @@ export interface TipTapErrorPayload {
 </script>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+import { Fragment, computed, getCurrentInstance, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
 import { Editor, Extension, Node } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -136,12 +136,24 @@ const props = withDefaults(
   { editable: true, placeholder: '', autofocus: false, editorClass: '', ariaLabel: 'Rich text editor', editorProps: () => ({}), extensions: () => [], starterKit: () => ({}), nodeSpecs: () => [], uploadImage: null, maxLength: null, enforceMaxLength: false, bubbleMenuShouldShow: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The editor's document content as an HTML string — the sole `model: true` prop (two-way `r-model`). Typing writes the new HTML back through the model path (TipTap's `onUpdate`); a consumer write reflects into the live document, echo-guarded so a programmatic set does not reset the selection or re-emit `update`.
  * @example
  * <TipTap v-model:html="content" placeholder="Start writing…" />
  */
-const html = defineModel<string>('html', { default: '<p>Start writing…</p>' });
+const __rozieModel_html = defineModel<string>('html', { default: '<p>Start writing…</p>' });
+const html = computed<string>({
+  get: () => __rozieModel_html.value,
+  set: (v) => { if (__rozieBound('html')) __rozieVm.emit('update:html', v); else __rozieModel_html.value = v; },
+});
 
 const emit = defineEmits<{
   update: [payload: string];

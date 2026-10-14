@@ -328,18 +328,6 @@ export function setDragMode(mode: any) {
   if (instance) instance.setDragMode(mode);
 }
 
-onMount(() => {
-  // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
-  // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
-  // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
-  // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
-  imgEl = imageEl;
-  buildCropper(null);
-  return () => {
-    if (instance) instance.destroy();
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => src)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
   if (instance && typeof v === 'string' && v) instance.replace(v);
@@ -363,6 +351,18 @@ $effect(() => { const __watchVal = (() => data)(); untrack(() => { if (__rozieWa
   if (sameData(v, instance.getData())) return;
   instance.setData($state.snapshot(v));
 })(__watchVal); }); });
+
+onMount(() => {
+  // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+  // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+  // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+  // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+  imgEl = imageEl;
+  buildCropper(null);
+  return () => {
+    if (instance) instance.destroy();
+  };
+});
 </script>
 
 <div {...__rozieAttrs} class={["rozie-cropper", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-cddf3b42><img class="rozie-cropper-img" bind:this={imageEl} src={src} alt="" data-rozie-s-cddf3b42 /></div>

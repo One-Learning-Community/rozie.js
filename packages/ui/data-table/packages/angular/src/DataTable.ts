@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
-import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';
+import { RozieSlot, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel, rozieToken } from '@rozie/runtime-angular';
 
 import { Popover } from '@rozie-ui/popover-angular';
 
@@ -1200,7 +1200,9 @@ export class DataTable {
    * @example
    * <rozie-data-table [(data)]="rows" [columns]="cols" />
    */
-  data = model.required<any[]>();
+  readonly __rozieModelIn_data = input.required<any[]>({ alias: 'data' });
+  dataChange = output<any[]>();
+  data = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_data, this.dataChange, undefined as unknown as any[]);
   /**
    * Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `'left'` or `'right'` is applied once as the table's initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial two-way `columnPinning` model value or an interactive pin) owns the slice and this declaration is ignored.
    */
@@ -1212,19 +1214,27 @@ export class DataTable {
   /**
    * `SortingState` — `[{ id, desc }]`. Uncontrolled fallback when unbound. Two-way: writes funnel a fresh value through the `sort-change` event regardless of binding.
    */
-  sorting = model<any[]>((() => [])());
+  readonly __rozieModelIn_sorting = input<any[] | undefined>(undefined, { alias: 'sorting' });
+  sortingChange = output<any[]>();
+  sorting = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_sorting, this.sortingChange, (() => [])());
   /**
    * The global search string — narrows all columns. Feeds `getFilteredRowModel()`. Surfaces through `filter-change`. Two-way: fires `filter-change` regardless of binding.
    */
-  globalFilter = model<string>('');
+  readonly __rozieModelIn_globalFilter = input<string | undefined>(undefined, { alias: 'globalFilter' });
+  globalFilterChange = output<string>();
+  globalFilter = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_globalFilter, this.globalFilterChange, '');
   /**
    * `ColumnFiltersState` — `[{ id, value }]` per-column narrowing (gated by each column's `filterable`). Two-way: whole-array replace on write, fires `filter-change`.
    */
-  columnFilters = model<any[]>((() => [])());
+  readonly __rozieModelIn_columnFilters = input<any[] | undefined>(undefined, { alias: 'columnFilters' });
+  columnFiltersChange = output<any[]>();
+  columnFilters = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnFilters, this.columnFiltersChange, (() => [])());
   /**
    * `{ pageIndex, pageSize }`. Defaults to `{ pageIndex: 0, pageSize: 10 }`; feeds the prev/next + page-size chrome (and `getPaginationRowModel()`). Two-way: funnels a fresh object through `page-change`.
    */
-  pagination = model<Record<string, any>>((() => ({
+  readonly __rozieModelIn_pagination = input<Record<string, any> | undefined>(undefined, { alias: 'pagination' });
+  paginationChange = output<Record<string, any>>();
+  pagination = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_pagination, this.paginationChange, (() => ({
     pageIndex: 0,
     pageSize: 10
   }))());
@@ -1247,7 +1257,9 @@ export class DataTable {
   /**
    * `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback (`$data.expandedDefault`) when unbound — the default is `null` so the uncontrolled fallback AND the grouping auto-expand default are reachable (a non-null default would short-circuit them). When grouping is active and `expanded` is untouched, group subtrees auto-expand.
    */
-  expanded = model<(Record<string, any> | boolean) | null>(null);
+  readonly __rozieModelIn_expanded = input<(Record<string, any> | boolean) | null | undefined>(undefined, { alias: 'expanded' });
+  expandedChange = output<(Record<string, any> | boolean) | null>();
+  expanded = rozieModel<(Record<string, any> | boolean) | null, import('@angular/core').ModelSignal<(Record<string, any> | boolean) | null>>(this.__rozieModelIn_expanded, this.expandedChange, null);
   /**
    * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
    */
@@ -1263,27 +1275,39 @@ export class DataTable {
   /**
    * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding the two-way `grouping` model (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
    */
-  grouping = model<(any[]) | null>(null);
+  readonly __rozieModelIn_grouping = input<(any[]) | null | undefined>(undefined, { alias: 'grouping' });
+  groupingChange = output<(any[]) | null>();
+  grouping = rozieModel<(any[]) | null, import('@angular/core').ModelSignal<(any[]) | null>>(this.__rozieModelIn_grouping, this.groupingChange, null);
   /**
    * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
    */
-  rowSelection = model<Record<string, any>>((() => ({}))());
+  readonly __rozieModelIn_rowSelection = input<Record<string, any> | undefined>(undefined, { alias: 'rowSelection' });
+  rowSelectionChange = output<Record<string, any>>();
+  rowSelection = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_rowSelection, this.rowSelectionChange, (() => ({}))());
   /**
    * `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through `visibility-change`.
    */
-  columnVisibility = model<Record<string, any>>((() => ({}))());
+  readonly __rozieModelIn_columnVisibility = input<Record<string, any> | undefined>(undefined, { alias: 'columnVisibility' });
+  columnVisibilityChange = output<Record<string, any>>();
+  columnVisibility = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnVisibility, this.columnVisibilityChange, (() => ({}))());
   /**
    * `ColumnSizingState` — `{ [colId]: number }`. Driven live by the pointer-drag resize handle (`columnResizeMode: 'onChange'`). Two-way: fires `resize-change`.
    */
-  columnSizing = model<Record<string, any>>((() => ({}))());
+  readonly __rozieModelIn_columnSizing = input<Record<string, any> | undefined>(undefined, { alias: 'columnSizing' });
+  columnSizingChange = output<Record<string, any>>();
+  columnSizing = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnSizing, this.columnSizingChange, (() => ({}))());
   /**
    * `ColumnOrderState` — `string[]`. A fresh order array on reorder (never an in-place splice). Two-way: fires `reorder-change`.
    */
-  columnOrder = model<any[]>((() => [])());
+  readonly __rozieModelIn_columnOrder = input<any[] | undefined>(undefined, { alias: 'columnOrder' });
+  columnOrderChange = output<any[]>();
+  columnOrder = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnOrder, this.columnOrderChange, (() => [])());
   /**
    * `ColumnPinningState` — `{ left: string[], right: string[] }`. Pinned columns get `position: sticky` + computed offsets. Defaults to `{ left: [], right: [] }`. Two-way: fires `pin-change`.
    */
-  columnPinning = model<Record<string, any>>((() => ({
+  readonly __rozieModelIn_columnPinning = input<Record<string, any> | undefined>(undefined, { alias: 'columnPinning' });
+  columnPinningChange = output<Record<string, any>>();
+  columnPinning = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnPinning, this.columnPinningChange, (() => ({
     left: [],
     right: []
   }))());
@@ -1442,30 +1466,6 @@ export class DataTable {
       this.teardownFillDrag();
       // §6 (260709-3qt): remove any live drag-select document listeners on a mid-drag unmount.
       this.teardownRangeDrag();
-    });
-    effect(() => () => {
-      this.maybeClearHistoryOnExternalSwap();
-      // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
-      // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
-      // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
-      // the window where it was emits nothing.
-      this.emitVisibleRangeIfChanged();
-      // A-02: the post-render hook is the one place that observes EVERY column-width change on all
-      // six targets — an interactive resize writes `columnSizing` through table-core under
-      // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
-      // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
-      // signature, so a tick that changed no width costs one loop over the leaf columns.
-      this.remeasureColumnSizes();
-      if (!this.table) return;
-      // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
-      // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
-      // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
-      // identical length) still re-feeds.
-      const d = this.currentData() || [];
-      if (d === this.lastData && d.length === this.lastDataLen) return;
-      this.lastData = d;
-      this.lastDataLen = d.length;
-      this.reFeed();
     });
     effect(() => {
       if (!(globalThis as { ngDevMode?: unknown }).ngDevMode || this.__rozieSlotWarned) return;
@@ -1931,6 +1931,33 @@ export class DataTable {
     this.announceState.sorting = this.effectiveSorting();
     this.announceState.columnFilters = this.effectiveColumnFilters();
     this.announceState.globalFilter = this.effectiveGlobalFilter();
+  }
+
+  ngAfterViewChecked() {
+    (() => {
+      this.maybeClearHistoryOnExternalSwap();
+      // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+      // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+      // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+      // the window where it was emits nothing.
+      this.emitVisibleRangeIfChanged();
+      // A-02: the post-render hook is the one place that observes EVERY column-width change on all
+      // six targets — an interactive resize writes `columnSizing` through table-core under
+      // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
+      // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
+      // signature, so a tick that changed no width costs one loop over the leaf columns.
+      this.remeasureColumnSizes();
+      if (!this.table) return;
+      // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+      // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
+      // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+      // identical length) still re-feeds.
+      const d = this.currentData() || [];
+      if (d === this.lastData && d.length === this.lastDataLen) return;
+      this.lastData = d;
+      this.lastDataLen = d.length;
+      this.reFeed();
+    })();
   }
 
   table: any = null;
@@ -5003,9 +5030,6 @@ export class DataTable {
   };
   // page-relative active row → absolute (display-order) index.
   toAbsRow = (localRow: any) => localRow + this.pageRowOffset();
-  // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
-  // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
-  // directly (already absolute). Reactive via rowIndexOf's tick().
   // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
   // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
   // non-virtual paginated body $data.rows is only the page slice, so read the live model.

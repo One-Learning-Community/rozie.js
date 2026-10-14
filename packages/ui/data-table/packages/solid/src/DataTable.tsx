@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { Show, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
-import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieContext, rozieDisplay } from '@rozie/runtime-solid';
+import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieContext, rozieDisplay, rozieSelectValue } from '@rozie/runtime-solid';
 import Popover from '@rozie-ui/popover-solid';
 import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
@@ -827,6 +827,36 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   const [pasteAnnounce, setPasteAnnounce] = createSignal('');
   const [rangeAnnounce, setRangeAnnounce] = createSignal('');
   const [liveAnnounce, setLiveAnnounce] = createSignal('');
+  createEffect(on(() => (() => windowVer())(), (v) => untrack(() => (() => emitVisibleRangeIfChanged())()), { defer: true }));
+  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(),
+  // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+  // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+  // Next button availability track the new total.
+  local.rowCount, local.pageCount, rowSelection(), expanded(), local.expandable, grouping(), local.groupable, columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+  // even when the fresh array is the SAME length (a single-cell edit replaces one row
+  // object → new array ref, identical length → the .length key alone would miss it). The
+  // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+  // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+  data(), dataDefault(),
+  // Column CONFIG prop (the `:columns` array form) — the sibling column source to
+  // $data.colReg (the `<Column>` children). Watch it so a runtime `:columns` swap re-feeds:
+  // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
+  // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
+  // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
+  local.columns, colReg()])(), (v) => untrack(() => (() => {
+    // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
+    // table-core receives on this same tick (rather than landing a frame late and re-ordering
+    // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
+    // seedColumnPinning() in stateAssembly.rzts. This is the `<Column>`-children entry point:
+    // those register during mount, so the $onMount call below can find zero columns.
+    seedColumnPinning();
+    reFeed();
+    maybeClearHistoryOnExternalSwap();
+  })()), { defer: true }));
+  createEffect(on(() => (() => [sorting(), columnFilters(), globalFilter(), sortingDefault(), columnFiltersDefault(), globalFilterDefault()])(), (v) => untrack(() => (() => {
+    const msg = buildSortFilterAnnounce();
+    if (msg) setLiveAnnounce(msg);
+  })()), { defer: true }));
   onMount(() => {
     // Seed the uncontrolled `data` fallback (Phase 51 req-4) from the initial prop so an
     // edit committed BEFORE the consumer ever pushes new rows (or when the consumer passes
@@ -1222,36 +1252,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     lastDataLen = d.length;
     reFeed();
   });
-  createEffect(on(() => (() => windowVer())(), (v) => untrack(() => (() => emitVisibleRangeIfChanged())()), { defer: true }));
-  createEffect(on(() => (() => [sorting(), globalFilter(), columnFilters(), pagination(),
-  // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
-  // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
-  // Next button availability track the new total.
-  local.rowCount, local.pageCount, rowSelection(), expanded(), local.expandable, grouping(), local.groupable, columnVisibility(), columnSizing(), columnOrder(), columnPinning(), local.selectionMode, (data() || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
-  // even when the fresh array is the SAME length (a single-cell edit replaces one row
-  // object → new array ref, identical length → the .length key alone would miss it). The
-  // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
-  // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
-  data(), dataDefault(),
-  // Column CONFIG prop (the `:columns` array form) — the sibling column source to
-  // $data.colReg (the `<Column>` children). Watch it so a runtime `:columns` swap re-feeds:
-  // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
-  // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
-  // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
-  local.columns, colReg()])(), (v) => untrack(() => (() => {
-    // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
-    // table-core receives on this same tick (rather than landing a frame late and re-ordering
-    // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
-    // seedColumnPinning() in stateAssembly.rzts. This is the `<Column>`-children entry point:
-    // those register during mount, so the $onMount call below can find zero columns.
-    seedColumnPinning();
-    reFeed();
-    maybeClearHistoryOnExternalSwap();
-  })()), { defer: true }));
-  createEffect(on(() => (() => [sorting(), columnFilters(), globalFilter(), sortingDefault(), columnFiltersDefault(), globalFilterDefault()])(), (v) => untrack(() => (() => {
-    const msg = buildSortFilterAnnounce();
-    if (msg) setLiveAnnounce(msg);
-  })()), { defer: true }));
   let __rozieRootRef: HTMLElement | null = null;
 
   // table-core instance — top-level `let` referenced from hooks → React hoists to
@@ -4518,9 +4518,6 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   function toAbsRow(localRow: any) {
     return localRow + pageRowOffset();
   }
-  // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
-  // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
-  // directly (already absolute). Reactive via rowIndexOf's tick().
 
   // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
   // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
@@ -8813,7 +8810,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
                 {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
-              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (editorValueFor(cell().column.id))); }} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
               </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(row())} aria-label={rozieAttr(rowIsExpanded(row()) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(row(), $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(row()) ? '▾' : '▸')}</button>
@@ -8890,7 +8887,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
                 {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
-              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
+              </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (editorValueFor(cell().column.id))); }} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
               </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               <button type="button" data-expander="" aria-expanded={!!rowIsExpanded(wr().row)} aria-label={rozieAttr(rowIsExpanded(wr().row) ? 'Collapse group' : 'Expand group')} class={"rdt-expander rdt-group-toggle"} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onToggleExpand(wr().row, $event); }} data-rozie-s-d5dcab4c="">{rozieDisplay(rowIsExpanded(wr().row) ? '▾' : '▸')}</button>
@@ -8927,7 +8924,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
         {rozieDisplay('Page ' + (pageIndex() + 1) + ' of ' + displayPageCount())}
       </span>
       <button type="button" class={"rdt-page-btn rdt-page-next"} disabled={!canNextPage()} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onNextPage(); }} data-rozie-s-d5dcab4c="">Next</button>
-      <select aria-label="Rows per page" class={"rdt-page-size"} value={pageSize()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c="">
+      <select aria-label="Rows per page" class={"rdt-page-size"} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (pageSize())); }} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onPageSizeChange($event); }} data-rozie-s-d5dcab4c="">
         <option value={10} data-rozie-s-d5dcab4c="">10</option>
         <option value={25} data-rozie-s-d5dcab4c="">25</option>
         <option value={50} data-rozie-s-d5dcab4c="">50</option>

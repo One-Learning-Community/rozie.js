@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 interface MarkCtx {
   $implicit: { value: any; label: any; position: any };
@@ -254,7 +254,9 @@ export class Slider {
    * @example
    * <rozie-slider [(value)]="volume" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" />
    */
-  value = model<(unknown) | null>(null);
+  readonly __rozieModelIn_value = input<(unknown) | null | undefined>(undefined, { alias: 'value' });
+  valueChange = output<(unknown) | null>();
+  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null);
   /**
    * Switch to dual-thumb range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping native inputs. The exact analog of listbox's `multiple` (scalar↔array). A bare attribute (`<Slider range>`) coerces to `true`.
    */
@@ -301,6 +303,7 @@ export class Slider {
   showValue = input<boolean>(false);
   inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
   change = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('mark', { read: TemplateRef }) markTpl?: TemplateRef<MarkCtx>;
   @ContentChild('bubble', { read: TemplateRef }) bubbleTpl?: TemplateRef<BubbleCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);

@@ -607,6 +607,8 @@ function tryWrapEscapingConstUseMemo(
   if (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init)) return null;
   const constName = decl.id.name;
   if (!escapingHelperNames.has(constName)) return null;
+  // A primitive literal is the same value on every render: a plain const.
+  if (isPrimitiveLiteral(init)) return null;
 
   collectors.react.add('useMemo');
 
@@ -628,6 +630,24 @@ function tryWrapEscapingConstUseMemo(
   // (`takeUnprintedComments`), which prints every comment exactly once in
   // source order regardless of which wrap claims either side.
   return `const ${constName} = useMemo(${arrowBody(init)}, ${depsLiteral});`;
+}
+
+/** `5`, `'x'`, `true`, `null`, `-1`, a template literal without expressions. */
+function isPrimitiveLiteral(node: t.Expression): boolean {
+  if (
+    t.isStringLiteral(node) ||
+    t.isNumericLiteral(node) ||
+    t.isBooleanLiteral(node) ||
+    t.isNullLiteral(node) ||
+    t.isBigIntLiteral(node)
+  ) {
+    return true;
+  }
+  if (t.isTemplateLiteral(node)) return node.expressions.length === 0;
+  if (t.isUnaryExpression(node) && (node.operator === '-' || node.operator === '+')) {
+    return t.isNumericLiteral(node.argument);
+  }
+  return false;
 }
 
 /**

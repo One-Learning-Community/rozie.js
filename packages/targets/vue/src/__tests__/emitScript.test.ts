@@ -76,11 +76,11 @@ describe('emitScript — behavior', () => {
     expect(script).toContain('onBeforeUnmount(unlockScroll);');
   });
 
-  it("Test 7: Counter import line is `import { computed, ref } from 'vue';` (sorted)", () => {
+  it("Test 7: Counter import line is `import { computed, getCurrentInstance, ref } from 'vue';` (sorted)", () => {
     const { script } = emitScript(lowerExample('Counter'));
     // First non-empty line should be the import.
     const firstLine = script.split('\n').find((l) => l.trim().length > 0);
-    expect(firstLine).toBe("import { computed, ref } from 'vue';");
+    expect(firstLine).toBe("import { computed, getCurrentInstance, ref } from 'vue';");
   });
 
   it('Test 8: defineEmits emitted only when ir.emits non-empty (Counter has no emits)', () => {

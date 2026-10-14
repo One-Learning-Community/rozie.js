@@ -210,6 +210,50 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
   const [selected, setSelected] = createSignal(0);
   const [canPrev, setCanPrev] = createSignal(false);
   const [canNext, setCanNext] = createSignal(false);
+  createEffect(on(() => (() => selectedIndex())(), (v) => untrack(() => ((i: any) => {
+    if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => [local.loop, local.align, local.axis, local.slidesToScroll, local.dragFree, local.draggable, local.containScroll, local.skipSnaps, local.duration, local.direction].join('|'))(), (v) => untrack(() => (() => embla?.reInit(reinitOptions()))()), { defer: true }));
+  createEffect(on(() => (() => `${local.autoplay}|${local.autoplayDelay}`)(), (v) => untrack(() => (() => embla?.reInit(reinitOptions(), emblaPluginsFromProps()))()), { defer: true }));
+  createEffect(on(() => (() => local.slides.length)(), (v) => untrack(() => (() => {
+    embla?.reInit(reinitOptions());
+    emblaThumbs?.reInit(thumbsOptionsFromProps());
+    syncNav();
+  })()), { defer: true }));
+  createEffect(on(() => (() => [].length)(), (v) => untrack(() => (() => {
+    embla?.reInit(reinitOptions());
+    syncNav();
+  })()), { defer: true }));
+  createEffect(on(() => (() => local.thumbnails)(), (v) => untrack(() => ((on: any) => {
+    if (!on) {
+      if (emblaThumbs) {
+        emblaThumbs.destroy();
+        emblaThumbs = null;
+      }
+      return;
+    }
+    if (emblaThumbs) return;
+    // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+    // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+    // ViewportEl is still null when the callback runs, so a synchronous build
+    // silently no-ops and a runtime thumbnails toggle never gets an engine.
+    // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+    // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+    // lands first after the flush wins; targets that already flushed
+    // synchronously take the immediate fast path in `build()` below and never
+    // wait on the deferred passes.
+    const build = () => {
+      if (!embla) return; // unmounted — the $onMount cleanup nulled it
+      if (!local.thumbnails) return; // toggled back off before this pass ran
+      if (emblaThumbs) return; // idempotent across the double-schedule
+      if (!thumbsViewportElRef) return;
+      emblaThumbs = EmblaCarousel(thumbsViewportElRef, thumbsOptionsFromProps());
+      syncNav();
+    };
+    build();
+    if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
+  })(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     embla = EmblaCarousel(viewportElRef!, initialOptions(), emblaPluginsFromProps());
@@ -286,50 +330,6 @@ export default function Carousel(_props: CarouselProps): JSX.Element {
     }
   });
   });
-  createEffect(on(() => (() => selectedIndex())(), (v) => untrack(() => ((i: any) => {
-    if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => [local.loop, local.align, local.axis, local.slidesToScroll, local.dragFree, local.draggable, local.containScroll, local.skipSnaps, local.duration, local.direction].join('|'))(), (v) => untrack(() => (() => embla?.reInit(reinitOptions()))()), { defer: true }));
-  createEffect(on(() => (() => `${local.autoplay}|${local.autoplayDelay}`)(), (v) => untrack(() => (() => embla?.reInit(reinitOptions(), emblaPluginsFromProps()))()), { defer: true }));
-  createEffect(on(() => (() => local.slides.length)(), (v) => untrack(() => (() => {
-    embla?.reInit(reinitOptions());
-    emblaThumbs?.reInit(thumbsOptionsFromProps());
-    syncNav();
-  })()), { defer: true }));
-  createEffect(on(() => (() => [].length)(), (v) => untrack(() => (() => {
-    embla?.reInit(reinitOptions());
-    syncNav();
-  })()), { defer: true }));
-  createEffect(on(() => (() => local.thumbnails)(), (v) => untrack(() => ((on: any) => {
-    if (!on) {
-      if (emblaThumbs) {
-        emblaThumbs.destroy();
-        emblaThumbs = null;
-      }
-      return;
-    }
-    if (emblaThumbs) return;
-    // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
-    // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
-    // ViewportEl is still null when the callback runs, so a synchronous build
-    // silently no-ops and a runtime thumbnails toggle never gets an engine.
-    // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
-    // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
-    // lands first after the flush wins; targets that already flushed
-    // synchronously take the immediate fast path in `build()` below and never
-    // wait on the deferred passes.
-    const build = () => {
-      if (!embla) return; // unmounted — the $onMount cleanup nulled it
-      if (!local.thumbnails) return; // toggled back off before this pass ran
-      if (emblaThumbs) return; // idempotent across the double-schedule
-      if (!thumbsViewportElRef) return;
-      emblaThumbs = EmblaCarousel(thumbsViewportElRef, thumbsOptionsFromProps());
-      syncNav();
-    };
-    build();
-    if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
-  })(v)), { defer: true }));
   let viewportElRef: HTMLElement | null = null;
   let thumbsViewportElRef: HTMLElement | null = null;
 

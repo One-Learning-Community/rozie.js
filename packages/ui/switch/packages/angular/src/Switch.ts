@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 interface DefaultCtx {
   $implicit: { checked: any; toggle: any };
@@ -94,7 +94,9 @@ export class Switch {
    * @example
    * <rozie-switch [(modelValue)]="on" ariaLabel="Wi-Fi" />
    */
-  modelValue = model<boolean>(false);
+  readonly __rozieModelIn_modelValue = input<boolean | undefined>(undefined, { alias: 'modelValue' });
+  modelValueChange = output<boolean>();
+  modelValue = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_modelValue, this.modelValueChange, false);
   /**
    * Disable the control entirely — it becomes non-focusable (`tabindex` is dropped), non-toggleable (click and keyboard are ignored), and `aria-disabled` is set. Also sets the Angular `ControlValueAccessor` disabled state.
    */
@@ -109,6 +111,7 @@ export class Switch {
   ariaLabel = input<(string) | null>(null);
   control = viewChild<ElementRef<HTMLButtonElement>>('control');
   change = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

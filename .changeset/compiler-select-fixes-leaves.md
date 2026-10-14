@@ -1,0 +1,113 @@
+---
+"@rozie-ui/captcha-angular": patch
+"@rozie-ui/captcha-lit": patch
+"@rozie-ui/captcha-react": patch
+"@rozie-ui/captcha-vue": patch
+"@rozie-ui/chartjs-react": patch
+"@rozie-ui/chartjs-solid": patch
+"@rozie-ui/chartjs-svelte": patch
+"@rozie-ui/codemirror-angular": patch
+"@rozie-ui/codemirror-react": patch
+"@rozie-ui/codemirror-solid": patch
+"@rozie-ui/codemirror-svelte": patch
+"@rozie-ui/codemirror-vue": patch
+"@rozie-ui/combobox-angular": patch
+"@rozie-ui/combobox-lit": patch
+"@rozie-ui/combobox-react": patch
+"@rozie-ui/combobox-solid": patch
+"@rozie-ui/combobox-svelte": patch
+"@rozie-ui/combobox-vue": patch
+"@rozie-ui/command-palette-angular": patch
+"@rozie-ui/command-palette-react": patch
+"@rozie-ui/command-palette-solid": patch
+"@rozie-ui/command-palette-svelte": patch
+"@rozie-ui/command-palette-vue": patch
+"@rozie-ui/cropper-angular": patch
+"@rozie-ui/cropper-react": patch
+"@rozie-ui/cropper-solid": patch
+"@rozie-ui/cropper-svelte": patch
+"@rozie-ui/cropper-vue": patch
+"@rozie-ui/data-table-angular": patch
+"@rozie-ui/data-table-lit": patch
+"@rozie-ui/data-table-react": patch
+"@rozie-ui/data-table-solid": patch
+"@rozie-ui/data-table-svelte": patch
+"@rozie-ui/data-table-vue": patch
+"@rozie-ui/date-picker-angular": patch
+"@rozie-ui/date-picker-react": patch
+"@rozie-ui/date-picker-vue": patch
+"@rozie-ui/dialog-solid": patch
+"@rozie-ui/embla-angular": patch
+"@rozie-ui/embla-lit": patch
+"@rozie-ui/embla-react": patch
+"@rozie-ui/embla-solid": patch
+"@rozie-ui/embla-svelte": patch
+"@rozie-ui/embla-vue": patch
+"@rozie-ui/flatpickr-angular": patch
+"@rozie-ui/flatpickr-react": patch
+"@rozie-ui/flatpickr-solid": patch
+"@rozie-ui/flatpickr-svelte": patch
+"@rozie-ui/flatpickr-vue": patch
+"@rozie-ui/fullcalendar-angular": patch
+"@rozie-ui/fullcalendar-lit": patch
+"@rozie-ui/fullcalendar-react": patch
+"@rozie-ui/fullcalendar-solid": patch
+"@rozie-ui/fullcalendar-svelte": patch
+"@rozie-ui/fullcalendar-vue": patch
+"@rozie-ui/maplibre-solid": patch
+"@rozie-ui/otp-angular": patch
+"@rozie-ui/otp-react": patch
+"@rozie-ui/otp-vue": patch
+"@rozie-ui/pdf-angular": patch
+"@rozie-ui/pdf-lit": patch
+"@rozie-ui/pdf-react": patch
+"@rozie-ui/pdf-solid": patch
+"@rozie-ui/pdf-svelte": patch
+"@rozie-ui/pdf-vue": patch
+"@rozie-ui/popover-angular": patch
+"@rozie-ui/popover-lit": patch
+"@rozie-ui/popover-react": patch
+"@rozie-ui/popover-solid": patch
+"@rozie-ui/popover-svelte": patch
+"@rozie-ui/popover-vue": patch
+"@rozie-ui/rete-angular": patch
+"@rozie-ui/rete-lit": patch
+"@rozie-ui/rete-react": patch
+"@rozie-ui/rete-solid": patch
+"@rozie-ui/rete-svelte": patch
+"@rozie-ui/rete-vue": patch
+"@rozie-ui/select-angular": patch
+"@rozie-ui/select-lit": patch
+"@rozie-ui/select-react": patch
+"@rozie-ui/select-solid": patch
+"@rozie-ui/select-svelte": patch
+"@rozie-ui/select-vue": patch
+"@rozie-ui/sortable-list-angular": patch
+"@rozie-ui/sortable-list-react": patch
+"@rozie-ui/sortable-list-solid": patch
+"@rozie-ui/sortable-list-svelte": patch
+"@rozie-ui/sortable-list-vue": patch
+"@rozie-ui/tags-angular": patch
+"@rozie-ui/tags-react": patch
+"@rozie-ui/tags-vue": patch
+"@rozie-ui/tiptap-angular": patch
+"@rozie-ui/tiptap-lit": patch
+"@rozie-ui/tiptap-react": patch
+"@rozie-ui/tiptap-solid": patch
+"@rozie-ui/tiptap-svelte": patch
+"@rozie-ui/tiptap-vue": patch
+"@rozie-ui/toast-react": patch
+"@rozie-ui/wavesurfer-angular": patch
+"@rozie-ui/wavesurfer-react": patch
+"@rozie-ui/wavesurfer-solid": patch
+"@rozie-ui/wavesurfer-svelte": patch
+"@rozie-ui/wavesurfer-vue": patch
+---
+
+Regenerated with the compiler fixes found while building `@rozie-ui/select`. Depending on the target and the component:
+
+- Angular: a two-way (`model: true`) prop is now controlled while the consumer binds a value — a write by the component only emits `<name>Change`, so a consumer that refuses the change keeps the control on its value. The prop keeps its `ModelSignal` type. `$onUpdate` hooks now run (after every render); they never ran before. An output named like a native bubbling event (`change`, `submit`, `reset`, `select`) no longer also delivers the native event to a consumer's binding.
+- Vue: a two-way prop bound one-way (`:value` without `v-model`) is now controlled too: the component's write emits `update:value` and the control keeps the consumer's value.
+- React: an `$expose` verb now runs in `flushSync`, so calls made in one tick each see what the call before left; primitive script constants are plain `const`s; a body statement no longer reads a binding declared after it on the first render.
+- Svelte, Solid: a `$watch` now sees a `$data` write made in `$onMount`.
+- Lit: a `$watch` whose getter reads both props and `$data` re-runs when only the prop changes; duplicated comments in lifecycle bodies are gone.

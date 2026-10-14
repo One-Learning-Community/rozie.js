@@ -27,7 +27,7 @@ export interface PopoverHandle {
 </script>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
 import { useOutsideClick } from '@rozie/runtime-vue';
 
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
@@ -115,10 +115,22 @@ const props = withDefaults(
   { placement: 'bottom', trigger: 'click', offset: 8, disableFlip: false, disableShift: false, arrow: false, disabled: false, modal: false, strategy: 'absolute', bare: false, disablePositioning: false, keepMounted: false, matchWidth: false, disableDismiss: false, popupRole: 'dialog', idBase: '', reference: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * Whether the floating content is open. The sole `model: true` prop, and its change event is the only change signal Popover fires. Bind it two-way — Vue `v-model:open`, React/Solid `open` + `onOpenChange`, Svelte `bind:open`, Angular `[(open)]`, Lit the `open` property + the `open-change` event — and Popover writes the new state back whenever the trigger, a dismissal or the handle toggles it. Left unbound it falls back to an uncontrolled default.
  */
-const open = defineModel<boolean>('open', { default: false });
+const __rozieModel_open = defineModel<boolean>('open', { default: false });
+const open = computed<boolean>({
+  get: () => __rozieModel_open.value,
+  set: (v) => { if (__rozieBound('open')) __rozieVm.emit('update:open', v); else __rozieModel_open.value = v; },
+});
 
 defineSlots<{
   anchor(props: { open: boolean; toggle: () => void; show: () => void; hide: () => void; panelId: string; popupRole: PopoverPopupRole | null }): any;

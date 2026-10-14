@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState, useOutsideClick } from '@rozie/runtime-react';
 import './Select.css';
 import Popover from '@rozie-ui/popover-react';
@@ -236,16 +237,16 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const gridScrollEl = useRef<any>(null);
   const virtualizer = useRef<any>(null);
   const virtualizerCleanup = useRef<any>(null);
-  const scopedSelection = useRef<any>(null);
-  const nativeSyncTimer = useRef<any>(null);
   const measuredRowCount = useRef(0);
   const measuredRowTotal = useRef(0);
   const windowVerBumpPending = useRef(false);
   const scrollEndPinnedTop = useRef(-1);
   const scrollEndPinned = useRef(false);
   const scrollEndPinnedCount = useRef(-1);
+  const scopedSelection = useRef<any>(null);
   const resyncTimer = useRef<any>(null);
   const typeTimer = useRef<any>(null);
+  const nativeSyncTimer = useRef<any>(null);
   const liveActive = useRef(-1);
   const revealGen = useRef(0);
   const typeBuffer = useRef('');
@@ -256,8 +257,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   });
   const _idBaseRef = useRef(props.idBase);
   _idBaseRef.current = props.idBase;
-  const _nativePickerRef = useRef(props.nativePicker);
-  _nativePickerRef.current = props.nativePicker;
   const _virtualRef = useRef(props.virtual);
   _virtualRef.current = props.virtual;
   const [autoId, setAutoId] = useState('');
@@ -296,8 +295,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   const _watch12First = useRef(true);
   const _watch13First = useRef(true);
   const _watch14First = useRef(true);
-  const _watch15First = useRef(true);
-  const _watch16First = useRef(true);
 
   // ---- shared list spine (P2: @rozie-ui/headless-core/listCore.rzts) ------
   // The option resolvers, close/clear, and the activeDescendant derivation come from
@@ -381,14 +378,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   function optionId(index: any) {
     return idRoot() + '-opt-' + index;
   }
-
-  // ---- derived state -----------------------------------------------------
-  // The visible option list: identity in select-only / non-filtering mode,
-  // a case-insensitive substring filter when a combobox query is present.
-  // A plain function (not `$computed`) so it reads uniformly across all six
-  // targets — a `$computed` is a value on React but an accessor on Solid, so
-  // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
-  // plain function is identical everywhere.
   const { onOpenChange: _rozieProp_onOpenChange } = props;
     const close = useCallback(() => {
     if (!open$local) return;
@@ -407,8 +396,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       option: null
     });
   }
-
-  // ---- keyboard navigation over the VISIBLE list -------------------------
   // Pointer hover sets the virtual highlight (matches native <select> feel).
   const onOptionPointerMove = useCallback((index: any) => {
     if (activeIndex !== index) setActiveIndex(index);
@@ -535,7 +522,9 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // set although the reference is the same. An option REPLACED in place at the same
   // length is not seen by these memos — to change an option, pass a new array (stated in
   // the `options` prop description).
-  const optionCount = useCallback(() => Array.isArray(props.options) ? props.options.length : 0, [props.options]);
+  function optionCount() {
+    return Array.isArray(props.options) ? props.options.length : 0;
+  }
   const groupingCache = useMemo(() => ({
     keys: null as any[] | null,
     val: null as any
@@ -637,12 +626,9 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     return null;
   }
   // Write the model into the native element. Imperative on purpose: a <select>'s
-  // selection is DOM state, and the declarative shape — `:value` on the <select> plus
-  // `:selected` on each <option> — did not behave the same on six targets when it was
-  // tried (and `selected` on an <option> is a dev-mode console error on React). It is
-  // also the only way to put the element back when a choice is not accepted (the
-  // placeholder entry, or a consumer that keeps the old value), where nothing reactive
-  // changes.
+  // selection is DOM state, and a choice that is not accepted (the placeholder entry, or
+  // a consumer that keeps the old value) changes nothing reactive — a declarative `:value`
+  // would not be re-applied, and the element would keep showing the refused option.
   const syncNative = useCallback(() => {
     const el = nativeEl();
     if (!el) return;
@@ -661,10 +647,10 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   }
   // Now, and once more after the framework has rendered: on some targets the watchers
   // below run before the <select> / <option> elements are committed.
-  const armNativeSync = useCallback(() => {
+  function armNativeSync() {
     syncNative();
     queueNativeSync();
-  }, [queueNativeSync, syncNative]);
+  }
   // The watchers' entry point: while the native picker is not active they do nothing —
   // no DOM query, no timer. (Not a statement about the whole component: $onMount arms one
   // sync on its own whenever `nativePicker` is set on a coarse pointer, before
@@ -816,8 +802,8 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
   // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
   // through it, so the custom popup can never open while the native picker is active.
-  // It carries the public name because `$expose` binds a verb to the script binding of
-  // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  // It carries the public name because the spine copies above call `open()`, and those
+  // calls must reach the gate too.
   // It also asks for the highlighted option to be scrolled into view once the list is
   // there: opening starts the highlight on the SELECTED option, which in a long list can
   // be far below the fold, and in a windowed one is not even rendered — the trigger's
@@ -827,7 +813,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // And a windowed list is re-fed here when its row count is not the option count: the
   // rows are only read while the popup is open, and every open passes through this gate,
   // so an `options` array grown or shrunk in place is caught on every target — including
-  // those where no watcher and no post-render hook sees such a change (Angular, Solid).
+  // Solid, where no watcher and no post-render hook sees such a change.
   function open() {
     if (nativeActive()) return;
     if (props.virtual && virtualizer.current && virtualizer.current.options.count !== optionCount()) refeedWindow();
@@ -942,12 +928,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     return src && src[i] ? src[i].id : undefined;
   }
 
-  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
-
   // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
   // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
   // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -1013,11 +993,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     // (virtualization.rzts) for environments where queueMicrotask is unavailable.
     if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
   }
-
-  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -1028,48 +1003,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     if (measuredRowCount.current === 0) return props.estimateRowHeight;
     return Math.round(measuredRowTotal.current / measuredRowCount.current);
   }
-
-  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
-  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
-  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
-  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
-  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
-  // on virtual-core's generic option inference. onChange's windowVer write is routed through
-  // bumpWindowVer() (87-10) rather than a raw `$data.x = $data.x + 1` — resizeItem() can call
-  // this onChange MANY times in a single synchronous sweep (once per row whose real measured
-  // size differs from its cache, e.g. every never-before-measured row in the FIRST window),
-  // and coalescing those into one microtask-deferred write is what keeps every target's render
-  // landing strictly AFTER the whole sweep (see bumpWindowVer()'s own comment for the confirmed
-  // Solid-specific rendering gap this closes). The React emitter still lowers the underlying
-  // `$data.windowVer = $data.windowVer + 1` to functional setState — correct even deferred to a
-  // microtask, exactly as it was correct from a mount closure before.
-  const virtualizerOptions = useCallback((): any => ({
-    count: windowSource().length,
-    getScrollElement: () => gridScrollEl.current,
-    estimateSize: (i: any) => estimateRowSize(i),
-    observeElementRect,
-    observeElementOffset,
-    scrollToFn: elementScroll,
-    measureElement,
-    overscan: 8,
-    getItemKey: virtualItemKey,
-    onChange: () => {
-      bumpWindowVer();
-      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
-      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
-      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
-      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
-      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
-      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
-      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
-      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
-      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
-      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
-      // re-measure is a no-op.
-      scheduleRemeasure();
-    }
-  }), [bumpWindowVer, estimateRowSize, scheduleRemeasure, virtualItemKey, windowSource]);
   // pinMeasurement(pin): the D-05 pin-hook read, RE-TYPED at the windowing layer so the
   // shared math is strict-clean across every host. The host-provided pinnedMeasurement() has
   // two shapes: the DataTable host returns a real virtual-core measurement; the listbox/combobox
@@ -1239,13 +1172,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     return true;
   }
 
-  // ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-  // rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-  // a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-  // returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-  // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-
-  // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
   // Windowing instance state (the `let table` precedent — React hoists reassigned
   // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
   // when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
@@ -1263,7 +1189,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // or cancelled, normally within a few frames. This only stops a reveal whose outcome can
   // never come (say, a popup that is never shown) from looking forever. The same bound
   // virtual-core gives its own scroll reconciliation.
-  const REVEAL_PATIENCE_MS = useMemo(() => 5000, []);
+  const REVEAL_PATIENCE_MS = 5000;
   // Set in $onUnmount: every deferred callback (the reveal, its settle, the re-measure
   // passes, the first-paint kick) checks it and does nothing on an unmounted select.
   // windowSource(): the windowing.rzts host-contract row source — the option set in
@@ -1295,7 +1221,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     keys: null as any[] | null,
     val: null as any
   }), []);
-  function windowSource() {
+  const windowSource = useCallback(() => {
     const __rozieMemoKey = [props.options, optionCount(), groupsKey(), props.virtual, props.optionValue];
     const __rozieMemoPrev = windowSourceCache.keys;
     if (__rozieMemoPrev !== null && __rozieMemoPrev.length === __rozieMemoKey.length && __rozieMemoKey.every((v: any, i: any) => v === __rozieMemoPrev[i])) {
@@ -1313,7 +1239,46 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     windowSourceCache.keys = __rozieMemoKey;
     windowSourceCache.val = __rozieMemoVal;
     return __rozieMemoVal;
-  }
+  }, [groupsKey, optionCount, props.optionValue, props.options, props.virtual, valueOf, visibleOptions]);
+  // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
+  // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
+  // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
+  // Returned `any` (the currentState() precedent) so the strict bundled-leaf tsc does not choke
+  // on virtual-core's generic option inference. onChange's windowVer write is routed through
+  // bumpWindowVer() (87-10) rather than a raw `$data.x = $data.x + 1` — resizeItem() can call
+  // this onChange MANY times in a single synchronous sweep (once per row whose real measured
+  // size differs from its cache, e.g. every never-before-measured row in the FIRST window),
+  // and coalescing those into one microtask-deferred write is what keeps every target's render
+  // landing strictly AFTER the whole sweep (see bumpWindowVer()'s own comment for the confirmed
+  // Solid-specific rendering gap this closes). The React emitter still lowers the underlying
+  // `$data.windowVer = $data.windowVer + 1` to functional setState — correct even deferred to a
+  // microtask, exactly as it was correct from a mount closure before.
+  const virtualizerOptions = useCallback((): any => ({
+    count: windowSource().length,
+    getScrollElement: () => gridScrollEl.current,
+    estimateSize: (i: any) => estimateRowSize(i),
+    observeElementRect,
+    observeElementOffset,
+    scrollToFn: elementScroll,
+    measureElement,
+    overscan: 8,
+    getItemKey: virtualItemKey,
+    onChange: () => {
+      bumpWindowVer();
+      // CR-01: re-observe the freshly-committed window so RECYCLED rows get measured.
+      // virtual-core only observe()s a node you explicitly hand to measureElement (it does
+      // NOT auto-discover rendered rows — measureElement is the SOLE caller of
+      // observer.observe, virtual-core@3.17.1 dist/esm/index.js:794-817). Rows that recycle
+      // into view on scroll are brand-new DOM nodes; without re-sweeping they keep the
+      // estimateRowHeight seed forever and the spacer math drifts (req-2). Deferred one frame
+      // so the new <tr> set is in the DOM before we measure. Safe from an infinite
+      // measure→onChange→measure loop: measureElement is idempotent on an already-observed
+      // node (the `prevNode !== node` guard), and resizeItem only re-fires onChange when the
+      // measured height actually DIFFERS from the cached one (delta !== 0) — an unchanged
+      // re-measure is a no-op.
+      scheduleRemeasure();
+    }
+  }), [bumpWindowVer, estimateRowSize, scheduleRemeasure, virtualItemKey, windowSource]);
   // The option a windowed row stands for, read from the option list itself by the row's
   // index. While the rows lag one step behind a list that just shrank, the row's own copy.
   const rowOption = useCallback((wr: any) => {
@@ -1699,10 +1664,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
       setPanelOpen(false);
     }
   }
-  // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
-  // reads only $data, one whose getter reads only props. A getter that mixes the two is
-  // routed through a signal effect on Lit, which a plain property change does not re-run
-  // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
+  // select -> popover: everything popupVisible() reads.
   // popover -> select: the popover's own write.
   function takePanelWrite() {
     if (panelOpen === panelEcho) return;
@@ -1910,15 +1872,11 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
   // options into the virtualizer and re-pull the window (the data-table
   // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
-  // nothing else:
-  //  - the reference, not its length: an array replaced by another of the SAME length is a
-  //    new option set too (a length-keyed getter kept the old rows on Vue);
-  //  - props only: mixed with a $data read, the getter is routed through a signal effect on
-  //    Lit, which a plain property change does not re-run (the windowed list kept the old
-  //    rows there until something else re-rendered it).
+  // nothing else — the reference, not its length: an array replaced by another of the SAME
+  // length is a new option set too (a length-keyed getter kept the old rows on Vue).
   // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
   //
-  // A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+  // A second watcher follows the LENGTH: a list grown or shrunk in
   // place keeps its reference. And because a watcher only hears what the framework
   // reports — an in-place change is reported on Vue and Svelte, not on the other four —
   // the post-render hook below re-feeds too, whenever the virtualizer's count is not the
@@ -1935,8 +1893,6 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     }
   }, [props.virtual, scheduleRemeasure, syncRows, virtualizerOptions]);
 
-  const _armNativeSyncRef = useRef(armNativeSync);
-  _armNativeSyncRef.current = armNativeSync;
   const _kickWindowRef = useRef(kickWindow);
   _kickWindowRef.current = kickWindow;
   const _syncRowsRef = useRef(syncRows);
@@ -1961,18 +1917,12 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
         coarseQuery.current = window.matchMedia('(pointer: coarse)');
         setCoarse(!!coarseQuery.current.matches);
         // Only records the new state: this closure is the mount-time one, so the reaction
-        // (closing the custom popup) lives in the `$data.coarse` watcher below.
+        // (closing the custom popup, the first paint of the native element) lives in the
+        // `$data.coarse` watcher below.
         coarseListener.current = (e: any) => {
           setCoarse(!!e.matches);
         };
         if (typeof coarseQuery.current.addEventListener === 'function') coarseQuery.current.addEventListener('change', coarseListener.current);else if (typeof coarseQuery.current.addListener === 'function') coarseQuery.current.addListener(coarseListener.current);
-        // The first paint of the native element. Not left to the `$data.coarse` watcher:
-        // on Svelte and Solid a write made here in $onMount lands before that watcher's
-        // (skipped) first run, so it never fires — a select mounted with a value showed
-        // the placeholder on those two. Not gated on nativeActive() either: on React the
-        // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
-        // no native element was rendered.
-        if (_nativePickerRef.current && coarseQuery.current.matches) _armNativeSyncRef.current();
       }
     } catch (err: any) {
       coarseQuery.current = null;
@@ -1991,11 +1941,11 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_virtualRef.current && virtualizer.current && virtualizer.current.options.count !== optionCount()) refeedWindow();
+    if (_virtualRef.current && virtualizer.current && virtualizer.current.options.count !== windowSource().length) refeedWindow();
     // The native element's selection is DOM state: after any render that may have added
     // or removed <option>s, write the model into it again (a no-op when it already shows it).
     if (nativeActive()) syncNative();
-  }, [nativeActive, optionCount, refeedWindow, syncNative, virtualizer]);
+  }, [nativeActive, refeedWindow, syncNative, virtualizer, windowSource]);
   useEffect(() => {
     return () => {
       // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
@@ -2017,69 +1967,61 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
   useEffect(() => {
     if (_watch0First.current) { _watch0First.current = false; return; }
     syncPanel();
-  }, [open$local]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open$local, props.hideEmpty, props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
     syncPanel();
   }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
-    syncPanel();
-  }, [props.hideEmpty, props.options]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
     if (props.disabled) close();
   }, [props.disabled]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch3First.current) { _watch3First.current = false; return; }
     takePanelWrite();
   }, [panelOpen]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch4First.current) { _watch4First.current = false; return; }
     if (!panelOpen && panelEcho) takePanelWrite();
   }, [panelEcho]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch5First.current) { _watch5First.current = false; return; }
     syncPanel();
   }, [resync]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch6First.current) { _watch6First.current = false; return; }
+    refeedWindow();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch7First.current) { _watch7First.current = false; return; }
     refeedWindow();
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch8First.current) { _watch8First.current = false; return; }
-    refeedWindow();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch9First.current) { _watch9First.current = false; return; }
     liveActive.current = activeIndex;
   }, [activeIndex]);
   useEffect(() => {
-    if (_watch10First.current) { _watch10First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     if (activeIndex >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (_watch10First.current) { _watch10First.current = false; return; }
+    yieldToNative();
+  }, [coarse, props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (_watch11First.current) { _watch11First.current = false; return; }
-    yieldToNative();
-  }, [coarse]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch12First.current) { _watch12First.current = false; return; }
-    yieldToNative();
-  }, [props.inline, props.multiple, props.nativePicker, props.virtual]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch13First.current) { _watch13First.current = false; return; }
     scheduleNativeSync();
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    if (_watch12First.current) { _watch12First.current = false; return; }
+    scheduleNativeSync();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch13First.current) { _watch13First.current = false; return; }
+    scheduleNativeSync();
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (_watch14First.current) { _watch14First.current = false; return; }
-    scheduleNativeSync();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch15First.current) { _watch15First.current = false; return; }
-    scheduleNativeSync();
-  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (_watch16First.current) { _watch16First.current = false; return; }
     scheduleNativeSync();
   }, [props.groups]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -2091,7 +2033,7 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
 
   const _rozieExposeRef = useRef({ open, close, toggle, clear, focusControl });
   _rozieExposeRef.current = { open, close, toggle, clear, focusControl };
-  useImperativeHandle(ref, () => ({ open: (...args: Parameters<typeof open>): ReturnType<typeof open> => _rozieExposeRef.current.open(...args), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => _rozieExposeRef.current.close(...args), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), focusControl: (...args: Parameters<typeof focusControl>): ReturnType<typeof focusControl> => _rozieExposeRef.current.focusControl(...args) }), []);
+  useImperativeHandle(ref, () => ({ open: (...args: Parameters<typeof open>): ReturnType<typeof open> => flushSync(() => _rozieExposeRef.current.open(...args)), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => flushSync(() => _rozieExposeRef.current.close(...args)), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => flushSync(() => _rozieExposeRef.current.toggle(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)), focusControl: (...args: Parameters<typeof focusControl>): ReturnType<typeof focusControl> => flushSync(() => _rozieExposeRef.current.focusControl(...args)) }), []);
 
   return (
     <>
@@ -2102,11 +2044,11 @@ const Select = forwardRef<SelectHandle, SelectProps>(function Select(_props: Sel
           <div className={"rozie-select-control"} ref={controlEl} onClick={($event) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
             {!!(props.multiple) && (chipRows().map((row, idx) => <span key={row.key} className={"rozie-select-chip"} data-rozie-s-6e3ebfa6="">
               {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => onChipRemove(row), index: idx }) : <><span className={"rozie-select-chip__label"} data-rozie-s-6e3ebfa6="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-select-chip__remove"} tabIndex={-1} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onChipRemove(row); }} data-rozie-s-6e3ebfa6="">×</button></>}
-            </span>))}<div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-hidden={(nativeActive() ? 'true' : undefined) ?? undefined} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+            </span>))}<div ref={triggerEl} className={"rozie-select-trigger"} role="combobox" aria-haspopup="listbox" tabIndex={triggerTabindex()} aria-hidden={(nativeActive() ? true : undefined) ?? undefined} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined)} aria-label={rozieAttr(props.ariaLabel)} aria-disabled={!!props.disabled} onKeyDown={($event) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
               {!!(!props.multiple) && ((props.renderSelected ?? props.slots?.['selected']) ? ((props.renderSelected ?? props.slots?.['selected']) as Function)({ selected: selectedLabel(), value }) : ((selectedLabel()) ? <span className={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel())}</span> : <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>))}{!!(props.multiple && selectedValues().length === 0) && <span className={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{props.placeholder}</span>}</div>
             {!!(props.clearable && hasValue() && !props.disabled) && <button type="button" className={"rozie-select-clear"} tabIndex={-1} aria-label={props.clearLabel} onMouseDown={($event) => { $event.preventDefault(); noop(); }} onClick={($event) => { onClearClick(); }} data-rozie-s-6e3ebfa6="">×</button>}<span className={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
             
-            {!!(nativeActive()) && <select className={"rozie-select-native"} disabled={!!props.disabled} aria-label={rozieAttr(props.ariaLabel ? props.ariaLabel : undefined)} onChange={($event) => { $event.stopPropagation(); onNativeChange($event); }} data-rozie-s-6e3ebfa6="">
+            {!!(nativeActive()) && <select className={"rozie-select-native"} disabled={!!props.disabled} aria-label={rozieAttr(props.ariaLabel ? props.ariaLabel : undefined)} onChange={($event) => { onNativeChange($event); }} data-rozie-s-6e3ebfa6="">
               <option value="" disabled={!!nativePlaceholderDisabled()} data-rozie-s-6e3ebfa6="">{props.placeholder}</option>
               {nativeRows().loose.map((row) => <option key={'n-' + row.index} value={rozieAttr(row.index)} disabled={!!disabledOf(row.opt)} data-rozie-s-6e3ebfa6="">{rozieDisplay(labelOf(row.opt))}</option>)}
               {nativeRows().grouped.map((blk) => <optgroup key={'ng-' + blk.group.id} label={rozieAttr(blk.group.label)} data-rozie-s-6e3ebfa6="">

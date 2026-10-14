@@ -37,19 +37,6 @@ export default function Layer(_props: LayerProps): JSX.Element {
 
   const srcCtx = useContext(rozieContext("maplibre:source")) ?? null;
   const layers = useContext(rozieContext("maplibre:layers"));
-  onMount(() => {
-    const _cleanup = (() => {
-    if (reg) {
-      didRegister = true;
-      appliedSource = resolveSource();
-      reg.register(local.id, buildSpec());
-    }
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => {
-    if (reg) reg.unregister(local.id);
-  });
-  });
   createEffect(on(() => (() => resolveSource())(), (v) => untrack(() => ((src: any) => {
     if (!reg || src == null || src === appliedSource) return;
     appliedSource = src;
@@ -85,6 +72,19 @@ export default function Layer(_props: LayerProps): JSX.Element {
       beforeId: local.beforeId
     });
   })()), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    if (reg) {
+      didRegister = true;
+      appliedSource = resolveSource();
+      reg.register(local.id, buildSpec());
+    }
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    if (reg) reg.unregister(local.id);
+  });
+  });
 
   // $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc
   // rejects on `.register(...)` / `srcCtx.id` (TS2339). The .rozie-native fix is the

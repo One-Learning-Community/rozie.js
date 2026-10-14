@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
+import { Fragment, computed, getCurrentInstance, h, onBeforeUnmount, onMounted, provide, ref, render, useSlots, watch } from 'vue';
 import { rozieDeepClone } from '@rozie/runtime-vue';
 
 const props = withDefaults(
@@ -106,23 +106,43 @@ const props = withDefaults(
   { validateTypes: true, pannable: true, zoomable: true, selectable: true, readonly: false, minZoom: 0.1, maxZoom: 4, snapGrid: 0, accumulateOnCtrl: true, curvature: 0.3, fitOnMount: true, controls: true, minimap: false, background: 'dots', canConnect: null, history: true, marquee: false, nodeToolbar: false }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The single source of truth (two-way `r-model`) — `{ nodes: [{ id, type, x, y, data?, width?, height? }], connections: [{ id?, source, sourceOutput?, target, targetInput?, type?, label?, stroke?, dashed?, waypoints? }] }`. A node's `type` selects its `<NodeType>` template (render-by-type + port schema); `data` is the opaque payload handed to that type's `#body` scope; `width`/`height` are the explicit fixed box a `<NodeType resizable>` corner-drag persists (absent = auto-sized, and double-clicking a resize handle clears them back to auto). A connection's `type` is its path shape — `bezier` (default), `step`, `smoothstep`, or `straight`. A connection's optional `waypoints` (`{x,y}[]`) is the route the `autoArrange()` verb writes for an edge it routed around an intermediate node (see Auto-layout) — additive and optional; an edge without one renders exactly as before. The canvas writes back a FRESH top-level object on every drag (x/y) and connect/disconnect (connections) — immutable applyNodeChanges style. `sourceOutput`/`targetInput` default to `out`/`in`; a missing connection `id` is derived from the endpoints.
  * @example
  * <FlowCanvas v-model:graph="graph" :validate-types="true" />
  */
-const graph = defineModel<Record<string, any>>('graph', { default: () => ({
+const __rozieModel_graph = defineModel<Record<string, any>>('graph', { default: () => ({
   nodes: [],
   connections: []
 }) });
+const graph = computed<Record<string, any>>({
+  get: () => __rozieModel_graph.value,
+  set: (v) => { if (__rozieBound('graph')) __rozieVm.emit('update:graph', v); else __rozieModel_graph.value = v; },
+});
 /**
  * The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.
  */
-const zoom = defineModel<number>('zoom', { default: 1 });
+const __rozieModel_zoom = defineModel<number>('zoom', { default: 1 });
+const zoom = computed<number>({
+  get: () => __rozieModel_zoom.value,
+  set: (v) => { if (__rozieBound('zoom')) __rozieVm.emit('update:zoom', v); else __rozieModel_zoom.value = v; },
+});
 /**
  * Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).
  */
-const mode = defineModel<string>('mode', { default: 'pan' });
+const __rozieModel_mode = defineModel<string>('mode', { default: 'pan' });
+const mode = computed<string>({
+  get: () => __rozieModel_mode.value,
+  set: (v) => { if (__rozieBound('mode')) __rozieVm.emit('update:mode', v); else __rozieModel_mode.value = v; },
+});
 
 const emit = defineEmits<{
   'edge-click': [...args: any[]];

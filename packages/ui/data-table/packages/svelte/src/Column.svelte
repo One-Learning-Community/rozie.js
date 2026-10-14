@@ -122,6 +122,11 @@ const buildSpec = () => ({
   validate: validate
 });
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, groupable, aggregationFn, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  if (reg) reg.registerColumn(colId(), buildSpec());
+})(); }); });
+
 onMount(() => {
   // register this column's spec. On Lit the injected registry may still be undefined
   // here (REQ-30 async context); the $onUpdate below performs the registration once
@@ -142,11 +147,6 @@ $effect(() => (() => {
   registered = true;
   reg.registerColumn(colId(), buildSpec());
 })());
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, groupable, aggregationFn, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
-  if (reg) reg.registerColumn(colId(), buildSpec());
-})(); }); });
 </script>
 
 <div class="rozie-data-table-column" style="display:none" data-rozie-s-289f2d72></div>

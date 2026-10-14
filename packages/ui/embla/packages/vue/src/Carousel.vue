@@ -31,7 +31,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -117,12 +117,24 @@ const props = withDefaults(
   { slides: () => [], loop: false, align: 'center', axis: 'x', slidesToScroll: 1, dragFree: false, draggable: true, containScroll: 'trimSnaps', startIndex: 0, skipSnaps: false, duration: 25, direction: 'ltr', autoplay: false, autoplayDelay: 4000, dots: false, arrows: false, thumbnails: false, plugins: () => [], options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The current scroll-snap index (two-way `r-model`). Dragging or scrolling writes the new index back (echo-guarded so a programmatic `scrollTo` does not ping-pong); a consumer write scrolls the carousel. Distinct from the `select` emit — a model prop must not share a name with an emit.
  * @example
  * <Carousel :slides="items" v-model:selectedIndex="idx" />
  */
-const selectedIndex = defineModel<number>('selectedIndex', { default: 0 });
+const __rozieModel_selectedIndex = defineModel<number>('selectedIndex', { default: 0 });
+const selectedIndex = computed<number>({
+  get: () => __rozieModel_selectedIndex.value,
+  set: (v) => { if (__rozieBound('selectedIndex')) __rozieVm.emit('update:selectedIndex', v); else __rozieModel_selectedIndex.value = v; },
+});
 
 const emit = defineEmits<{
   select: [...args: any[]];

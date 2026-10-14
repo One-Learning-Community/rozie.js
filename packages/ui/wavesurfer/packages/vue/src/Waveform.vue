@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -115,14 +115,30 @@ const props = withDefaults(
   { src: null, peaks: undefined, duration: null, height: 128, waveColor: '#8a2be2', progressColor: '#5a189a', cursorColor: '#333333', cursorWidth: 1, barWidth: null, barGap: null, barRadius: null, minPxPerSec: 1, volume: 1, playbackRate: 1, autoplay: false, normalizeAmplitude: false, hideScrollbar: false, disableInteraction: false, disableDragToSeek: false, timeline: false, hover: false, hoverColor: null, dragToCreateRegions: false, regionColor: null, options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
  */
-const regions = defineModel<unknown>('regions', { default: undefined });
+const __rozieModel_regions = defineModel<unknown>('regions', { default: undefined });
+const regions = computed<unknown>({
+  get: () => __rozieModel_regions.value,
+  set: (v) => { if (__rozieBound('regions')) __rozieVm.emit('update:regions', v); else __rozieModel_regions.value = v; },
+});
 /**
  * The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.
  */
-const currentTime = defineModel<unknown>('currentTime', { default: undefined });
+const __rozieModel_currentTime = defineModel<unknown>('currentTime', { default: undefined });
+const currentTime = computed<unknown>({
+  get: () => __rozieModel_currentTime.value,
+  set: (v) => { if (__rozieBound('currentTime')) __rozieVm.emit('update:currentTime', v); else __rozieModel_currentTime.value = v; },
+});
 
 const emit = defineEmits<{
   regionCreated: [...args: any[]];

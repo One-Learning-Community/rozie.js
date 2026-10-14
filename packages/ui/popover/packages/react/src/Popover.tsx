@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, rozieAttr, useControllableState, useOutsideClick } from '@rozie/runtime-react';
 import './Popover.css';
 // The `offset` AND `arrow` middleware factories are ALIASED on import: both are
@@ -750,7 +751,7 @@ const Popover = forwardRef<PopoverHandle, PopoverProps>(function Popover(_props:
 
   const _rozieExposeRef = useRef({ show, hide, toggle, reposition });
   _rozieExposeRef.current = { show, hide, toggle, reposition };
-  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), hide: (...args: Parameters<typeof hide>): ReturnType<typeof hide> => _rozieExposeRef.current.hide(...args), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), reposition: (...args: Parameters<typeof reposition>): ReturnType<typeof reposition> => _rozieExposeRef.current.reposition(...args) }), []);
+  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => flushSync(() => _rozieExposeRef.current.show(...args)), hide: (...args: Parameters<typeof hide>): ReturnType<typeof hide> => flushSync(() => _rozieExposeRef.current.hide(...args)), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => flushSync(() => _rozieExposeRef.current.toggle(...args)), reposition: (...args: Parameters<typeof reposition>): ReturnType<typeof reposition> => flushSync(() => _rozieExposeRef.current.reposition(...args)) }), []);
 
   return (
     <>

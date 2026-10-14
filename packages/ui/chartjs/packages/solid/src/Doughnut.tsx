@@ -124,26 +124,6 @@ export default function Doughnut(_props: DoughnutProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
-  onMount(() => {
-    const _cleanup = (() => {
-    canvasEl = canvasElRef;
-    instance = new ChartJS(canvasEl, buildConfig());
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => {
-    tooltipDispose?.();
-    tooltipEl?.remove();
-    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
-    // can finish. The captured `dying` instance is destroyed after the grace;
-    // 0 (default) destroys synchronously.
-    const dying = instance;
-    if (local.destroyDelay > 0) {
-      setTimeout(() => dying?.destroy(), local.destroyDelay);
-    } else {
-      dying?.destroy();
-    }
-  });
-  });
   createEffect(() => { const __watchVal = (() => local.data)(); untrack(() => ((v: any) => {
     if (!instance) return;
     if (local.redraw) {
@@ -207,6 +187,26 @@ export default function Doughnut(_props: DoughnutProps): JSX.Element {
     instance.update('none');
   })()), { defer: true }));
   createEffect(on(() => (() => local.plugins)(), (v) => untrack(() => (() => recreate())()), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    canvasEl = canvasElRef;
+    instance = new ChartJS(canvasEl, buildConfig());
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    tooltipDispose?.();
+    tooltipEl?.remove();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (local.destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), local.destroyDelay);
+    } else {
+      dying?.destroy();
+    }
+  });
+  });
   let canvasElRef: HTMLElement | null = null;
 
   // Doughnut registers only its own Chart.js controller/element/scale set

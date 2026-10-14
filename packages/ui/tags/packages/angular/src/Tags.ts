@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 interface TagCtx {
   $implicit: { tag: any; index: any; remove: any };
@@ -160,7 +160,9 @@ export class Tags {
    * @example
    * <rozie-tags [(modelValue)]="skills" placeholder="Add a skill…" />
    */
-  modelValue = model<any[]>((() => [])());
+  readonly __rozieModelIn_modelValue = input<any[] | undefined>(undefined, { alias: 'modelValue' });
+  modelValueChange = output<any[]>();
+  modelValue = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_modelValue, this.modelValueChange, (() => [])());
   /**
    * The keys that commit the current draft as a token (matched against the key event's `key`). Default `[',', 'Enter']`. Non-`'Enter'` entries also act as the split characters when pasting bulk text: a paste containing one is split and every part is added, and the parts that are rejected (by `validate` or `max`) are inserted at the caret, so the typed draft is kept. A paste with no split character is ordinary text. Use e.g. `[' ', 'Enter']` for a space-delimited input.
    */
@@ -200,6 +202,7 @@ export class Tags {
   change = output<unknown>();
   add = output<unknown>();
   remove = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('tag', { read: TemplateRef }) tagTpl?: TemplateRef<TagCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

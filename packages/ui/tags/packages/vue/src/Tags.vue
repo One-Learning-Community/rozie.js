@@ -15,7 +15,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -57,12 +57,24 @@ const props = withDefaults(
   { delimiters: () => [',', 'Enter'], allowDuplicates: false, max: null, disabled: false, readonly: false, validate: null, placeholder: '', ariaLabel: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The committed tokens — `model: true`, so a commit/remove/paste writes a **fresh** array back through `r-model:modelValue` (uncontrolled fallback `[]`). Because it is the sole model prop, the Angular output is a `ControlValueAccessor` (`[formControl]` / `[(ngModel)]` bind directly).
  * @example
  * <Tags v-model:modelValue="skills" placeholder="Add a skill…" />
  */
-const modelValue = defineModel<any[]>('modelValue', { default: () => [] });
+const __rozieModel_modelValue = defineModel<any[]>('modelValue', { default: () => [] });
+const modelValue = computed<any[]>({
+  get: () => __rozieModel_modelValue.value,
+  set: (v) => { if (__rozieBound('modelValue')) __rozieVm.emit('update:modelValue', v); else __rozieModel_modelValue.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

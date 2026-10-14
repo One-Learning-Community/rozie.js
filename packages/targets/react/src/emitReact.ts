@@ -52,6 +52,7 @@ import { emitPropsInterface } from './emit/emitPropsInterface.js';
 import { emitScript } from './emit/emitScript.js';
 import { emitStyle } from './emit/emitStyle.js';
 import { emitTemplate } from './emit/emitTemplate.js';
+import { orderByEagerDeps } from './emit/orderByEagerDeps.js';
 import { computeScopeHash, scopeAttrName } from './emit/scopeHash.js';
 import { buildShell } from './emit/shell.js';
 import {
@@ -60,7 +61,7 @@ import {
 } from './rewrite/collectReactImports.js';
 import { composeSourceMap } from './sourcemap/compose.js';
 import { handleInterfaceName } from '../../../core/src/codegen/generatedTypeNames.js';
-import { REACT_ELEMENT_PORTAL_IMPORT, REACT_NODE_TYPE_IMPORT, REACT_PORTAL_ROOT_IMPORTS } from '../../../core/src/codegen/targetModuleImports.js';
+import { REACT_ELEMENT_PORTAL_IMPORT, REACT_FLUSH_SYNC_IMPORT, REACT_NODE_TYPE_IMPORT, REACT_PORTAL_ROOT_IMPORTS } from '../../../core/src/codegen/targetModuleImports.js';
 
 export interface EmitReactOptions {
   filename?: string;
@@ -159,10 +160,15 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
   // add `import { createPortal } from 'react-dom';`. This is the NATIVE
   // element-subtree teleport construct — orthogonal to (and may coexist
   // with) the P33 createRoot-into-container slot machinery above.
+  // An `$expose` handle runs each verb in `flushSync` (see the handle below);
+  // the portal-root imports already bring `flushSync`.
+  const needsFlushSyncImport = (ir.expose ?? []).length > 0 && !hasPortals;
   const portalImport =
     (hasPortals
       ? `${REACT_PORTAL_ROOT_IMPORTS}\n`
-      : '') + (tmpl.hasElementPortal ? `${REACT_ELEMENT_PORTAL_IMPORT}\n` : '');
+      : '') +
+    (tmpl.hasElementPortal ? `${REACT_ELEMENT_PORTAL_IMPORT}\n` : '') +
+    (needsFlushSyncImport ? `${REACT_FLUSH_SYNC_IMPORT}\n` : '');
 
   // Plan 04-04: emit <listeners>-block entries (4-class A/B/C/D classifier).
   const listeners = emitListeners(ir, { react: reactImports, runtime: runtimeImports }, registry);
@@ -208,9 +214,14 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
   //     → wrapper consts (`scriptInjections`, template + listener)
   //     → listener useEffect blocks (`listenerEffects`)
   //     → return JSX
-  const script = [hookSection, userArrowsSection, lifecycleEffectsSection]
-    .filter((s) => s.length > 0)
-    .join('\n\n');
+  // Sections keep their order, statements inside keep theirs, except where a
+  // statement reads a binding declared below it while rendering (a TDZ throw
+  // on the first render) — see orderByEagerDeps.
+  const script = orderByEagerDeps(
+    [hookSection, userArrowsSection, lifecycleEffectsSection]
+      .filter((s) => s.length > 0)
+      .join('\n\n'),
+  );
 
   const allScriptInjections = [...tmpl.scriptInjections, ...listeners.scriptInjections];
 
@@ -307,10 +318,19 @@ export function emitReact(ir: IRComponent, opts: EmitReactOptions = {}): EmitRea
     // `export interface <Name>Handle`.
     const refInit = `const _rozieExposeRef = useRef({ ${exposeNames.join(', ')} });`;
     const refSync = `_rozieExposeRef.current = { ${exposeNames.join(', ')} };`;
+    // Each verb runs inside `flushSync`, so React commits what it changed —
+    // and this component re-renders, re-syncing `_rozieExposeRef` — before the
+    // caller's next statement. A verb reads its render's state: without the
+    // flush, `close(); open()` in one tick ran `open()` against the state from
+    // before `close()` (it saw "open" and did nothing), and two `close()` calls
+    // both saw "open" and both emitted. The other five targets read live state,
+    // so each call acts on what the call before it left. (Called during a
+    // render or from inside a React effect, `flushSync` cannot flush: React
+    // warns in development and the verb behaves as it did without it.)
     const dispatchers = exposeNames
       .map(
         (n) =>
-          `${n}: (...args: Parameters<typeof ${n}>): ReturnType<typeof ${n}> => _rozieExposeRef.current.${n}(...args)`,
+          `${n}: (...args: Parameters<typeof ${n}>): ReturnType<typeof ${n}> => flushSync(() => _rozieExposeRef.current.${n}(...args))`,
       )
       .join(', ');
     const handleLine = `useImperativeHandle(ref, () => ({ ${dispatchers} }), []);`;

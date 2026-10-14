@@ -1,5 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, output, untracked, viewChild } from '@angular/core';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 // Default import is `WaveSurfer` (≠ the component name `Waveform`, so no import⇄
 // component collision — Cropper had to alias; we don't). Plugin factories are
@@ -124,7 +124,9 @@ export class Waveform {
   /**
    * The interactive regions as an array of `{ id?, start, end?, content?, color?, drag?, resize? }`. Providing an array (even empty) registers the Regions plugin — at construction if it's already an array, or lazily the first time `regions` transitions from `null`/`undefined` to an array. Two-way (`model: true`): user create / drag / resize / remove writes the updated array back (round-trip-guarded); a consumer write reconciles the live regions (add / update / remove by `id`).
    */
-  regions = model<unknown>(undefined);
+  readonly __rozieModelIn_regions = input<unknown | undefined>(undefined, { alias: 'regions' });
+  regionsChange = output<unknown>();
+  regions = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_regions, this.regionsChange, undefined);
   /**
    * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
@@ -140,7 +142,9 @@ export class Waveform {
   /**
    * The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.
    */
-  currentTime = model<unknown>(undefined);
+  readonly __rozieModelIn_currentTime = input<unknown | undefined>(undefined, { alias: 'currentTime' });
+  currentTimeChange = output<unknown>();
+  currentTime = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_currentTime, this.currentTimeChange, undefined);
   container = viewChild<ElementRef<HTMLDivElement>>('container');
   regionCreated = output<unknown>();
   regionUpdated = output<unknown>();

@@ -19,7 +19,7 @@ export interface DialogClosePayload {
 </script>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 import { applyScrollLock as applySharedScrollLock } from './internal/scrollLock';
 
@@ -55,12 +55,24 @@ const props = withDefaults(
   { disableBackdropClose: false, disableEscapeClose: false, disableScrollLock: false, initialFocus: null, ariaLabel: null, ariaLabelledby: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.
  * @example
  * <Dialog v-model:open="confirmOpen" ariaLabelledby="confirm-title" />
  */
-const open = defineModel<boolean>('open', { default: false });
+const __rozieModel_open = defineModel<boolean>('open', { default: false });
+const open = computed<boolean>({
+  get: () => __rozieModel_open.value,
+  set: (v) => { if (__rozieBound('open')) __rozieVm.emit('update:open', v); else __rozieModel_open.value = v; },
+});
 
 const emit = defineEmits<{
   close: [payload: DialogClosePayload];

@@ -1,7 +1,7 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-counter',
@@ -34,7 +34,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Counter {
-  value = model<number>(0);
+  readonly __rozieModelIn_value = input<number | undefined>(undefined, { alias: 'value' });
+  valueChange = output<number>();
+  value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0);
   step = input<number>(1);
   min = input<number>(-Infinity);
   max = input<number>(Infinity);

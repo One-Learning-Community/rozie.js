@@ -10,12 +10,12 @@
             <span class="rozie-select-chip__label">{{ row.label }}</span>
             <button type="button" class="rozie-select-chip__remove" tabindex="-1" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="noop()" @click="onChipRemove(row)">×</button>
           </slot>
-        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-hidden="(nativeActive() ? 'true' : undefined) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-hidden="(nativeActive() ? true : undefined) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
           <template v-if="!props.multiple"><slot name="selected" :selected="selectedLabel()" :value="value">
             <span v-if="selectedLabel()" class="rozie-select-selected">{{ selectedLabel() }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot></template><span v-if="props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ props.placeholder }}</span></div>
         <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
         
-        <select v-if="nativeActive()" class="rozie-select-native" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change.stop="onNativeChange($event)">
+        <select v-if="nativeActive()" class="rozie-select-native" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change="onNativeChange($event)">
           <option value="" :disabled="!!nativePlaceholderDisabled()">{{ props.placeholder }}</option>
           <option v-for="row in nativeRows().loose" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
           <optgroup v-for="blk in nativeRows().grouped" :key="'ng-' + blk.group.id" :label="blk.group.label">
@@ -74,7 +74,7 @@ export interface SelectGroup {
 <script setup lang="ts">
 import Popover from '@rozie-ui/popover-vue';
 
-import { computed, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
 import { useOutsideClick } from '@rozie/runtime-vue';
 
 // ---- option grouping (src/internal/groupOptions.ts) ---------------------
@@ -217,12 +217,24 @@ const props = withDefaults(
   { options: () => [], multiple: false, inline: false, disabled: false, placeholder: '', closeOnSelect: true, optionLabel: null, optionValue: null, optionDisabled: null, idBase: '', hideEmpty: false, selectOnTab: false, clearable: false, clearLabel: 'Clear', nativePicker: false, placement: 'bottom-start', offset: 4, disableFlip: false, disableShift: false, block: false, groups: () => [], ariaLabel: null, virtual: false, estimateRowHeight: 36, maxHeight: '' }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The selected value (two-way `r-model`) — a scalar in single-select, an array of values in multi-select. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Select **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). How a value is matched to an option is described under `options`.
  * @example
  * <Select v-model:value="fruit" :options="fruits" />
  */
-const value = defineModel<unknown | null>('value', { default: null });
+const __rozieModel_value = defineModel<unknown | null>('value', { default: null });
+const value = computed<unknown | null>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 const emit = defineEmits<{
   'open-change': [...args: any[]];
@@ -339,14 +351,6 @@ const disabledOf = (opt: any) => {
 // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
 // per-instance id) so the option ids follow the host's auto-id fallback.
 const optionId = (index: any) => idRoot() + '-opt-' + index;
-
-// ---- derived state -----------------------------------------------------
-// The visible option list: identity in select-only / non-filtering mode,
-// a case-insensitive substring filter when a combobox query is present.
-// A plain function (not `$computed`) so it reads uniformly across all six
-// targets — a `$computed` is a value on React but an accessor on Solid, so
-// aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
-// plain function is identical everywhere.
 const close = () => {
   if (!open$local.value) return;
   open$local.value = false;
@@ -364,8 +368,6 @@ const clear = () => {
     option: null
   });
 };
-
-// ---- keyboard navigation over the VISIBLE list -------------------------
 // Pointer hover sets the virtual highlight (matches native <select> feel).
 const onOptionPointerMove = (index: any) => {
   if (activeIndex.value !== index) activeIndex.value = index;
@@ -577,12 +579,9 @@ const nativeEl = () => {
   return null;
 };
 // Write the model into the native element. Imperative on purpose: a <select>'s
-// selection is DOM state, and the declarative shape — `:value` on the <select> plus
-// `:selected` on each <option> — did not behave the same on six targets when it was
-// tried (and `selected` on an <option> is a dev-mode console error on React). It is
-// also the only way to put the element back when a choice is not accepted (the
-// placeholder entry, or a consumer that keeps the old value), where nothing reactive
-// changes.
+// selection is DOM state, and a choice that is not accepted (the placeholder entry, or
+// a consumer that keeps the old value) changes nothing reactive — a declarative `:value`
+// would not be re-applied, and the element would keep showing the refused option.
 const syncNative = () => {
   const el = nativeEl();
   if (!el) return;
@@ -753,8 +752,8 @@ const onControlKeyDown = ($event: any) => {
 // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
 // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
 // through it, so the custom popup can never open while the native picker is active.
-// It carries the public name because `$expose` binds a verb to the script binding of
-// that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+// It carries the public name because the spine copies above call `open()`, and those
+// calls must reach the gate too.
 // It also asks for the highlighted option to be scrolled into view once the list is
 // there: opening starts the highlight on the SELECTED option, which in a long list can
 // be far below the fold, and in a windowed one is not even rendered — the trigger's
@@ -764,7 +763,7 @@ const onControlKeyDown = ($event: any) => {
 // And a windowed list is re-fed here when its row count is not the option count: the
 // rows are only read while the popup is open, and every open passes through this gate,
 // so an `options` array grown or shrunk in place is caught on every target — including
-// those where no watcher and no post-render hook sees such a change (Angular, Solid).
+// Solid, where no watcher and no post-render hook sees such a change.
 const open = () => {
   if (nativeActive()) return;
   if (props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
@@ -867,12 +866,6 @@ const virtualItemKey = (i: any) => {
   const src = windowSource();
   return src && src[i] ? src[i].id : undefined;
 };
-
-// COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-// row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-// cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-// overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-// horizontal Virtualizer instance (see the AXIS MECHANISM note above).
 // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
 // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
 // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -940,11 +933,6 @@ const bumpWindowVer = (): void => {
   // (virtualization.rzts) for environments where queueMicrotask is unavailable.
   if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
 };
-
-// ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-// virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-// re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-// own measureElement/resizeItem idempotence (see refineRowEstimate() below).
 // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
 // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
 // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -955,9 +943,6 @@ const estimateRowSize = (i: number): number => {
   if (measuredRowCount === 0) return props.estimateRowHeight;
   return Math.round(measuredRowTotal / measuredRowCount);
 };
-
-// foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-// accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
 // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
 // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
 // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -1161,14 +1146,6 @@ const rowIsOutsideWindow = (r: any) => {
   for (const it of items as any) if (it.index === r) return false;
   return true;
 };
-
-// ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-// rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-// a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-// returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-// cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-
-// windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
 // Windowing instance state (the `let table` precedent — React hoists reassigned
 // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
 // when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
@@ -1611,10 +1588,7 @@ const syncPanel = () => {
     panelOpen.value = false;
   }
 };
-// select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
-// reads only $data, one whose getter reads only props. A getter that mixes the two is
-// routed through a signal effect on Lit, which a plain property change does not re-run
-// (measured: with `hideEmpty`, options arriving while open never showed the popup there).
+// select -> popover: everything popupVisible() reads.
 // popover -> select: the popover's own write.
 const takePanelWrite = () => {
   if (panelOpen.value === panelEcho.value) return;
@@ -1816,15 +1790,11 @@ const onControlClick = ($event: any) => {
 // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
 // options into the virtualizer and re-pull the window (the data-table
 // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
-// nothing else:
-//  - the reference, not its length: an array replaced by another of the SAME length is a
-//    new option set too (a length-keyed getter kept the old rows on Vue);
-//  - props only: mixed with a $data read, the getter is routed through a signal effect on
-//    Lit, which a plain property change does not re-run (the windowed list kept the old
-//    rows there until something else re-rendered it).
+// nothing else — the reference, not its length: an array replaced by another of the SAME
+// length is a new option set too (a length-keyed getter kept the old rows on Vue).
 // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
 //
-// A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+// A second watcher follows the LENGTH: a list grown or shrunk in
 // place keeps its reference. And because a watcher only hears what the framework
 // reports — an in-place change is reported on Vue and Svelte, not on the other four —
 // the post-render hook below re-feeds too, whenever the virtualizer's count is not the
@@ -1859,18 +1829,12 @@ onMounted(() => {
       coarseQuery = window.matchMedia('(pointer: coarse)');
       coarse.value = !!coarseQuery.matches;
       // Only records the new state: this closure is the mount-time one, so the reaction
-      // (closing the custom popup) lives in the `$data.coarse` watcher below.
+      // (closing the custom popup, the first paint of the native element) lives in the
+      // `$data.coarse` watcher below.
       coarseListener = (e: any) => {
         coarse.value = !!e.matches;
       };
       if (typeof coarseQuery.addEventListener === 'function') coarseQuery.addEventListener('change', coarseListener);else if (typeof coarseQuery.addListener === 'function') coarseQuery.addListener(coarseListener);
-      // The first paint of the native element. Not left to the `$data.coarse` watcher:
-      // on Svelte and Solid a write made here in $onMount lands before that watcher's
-      // (skipped) first run, so it never fires — a select mounted with a value showed
-      // the placeholder on those two. Not gated on nativeActive() either: on React the
-      // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
-      // no native element was rendered.
-      if (props.nativePicker && coarseQuery.matches) armNativeSync();
     }
   } catch (err: any) {
     coarseQuery = null;
@@ -1889,7 +1853,7 @@ onMounted(() => {
   }
 });
 onUpdated(() => {
-  if (props.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
+  if (props.virtual && virtualizer && virtualizer.options.count !== windowSource().length) refeedWindow();
   // The native element's selection is DOM state: after any render that may have added
   // or removed <option>s, write the model into it again (a no-op when it already shows it).
   if (nativeActive()) syncNative();
@@ -1911,13 +1875,10 @@ onBeforeUnmount(() => {
   virtualizer = null;
 });
 
-watch(() => open$local.value, () => {
+watch(() => (open$local.value ? 'o' : '-') + (props.hideEmpty ? 'h' : 's') + (props.options ? props.options.length : 0), () => {
   syncPanel();
 }, { flush: 'post' });
 watch(() => session.value, () => {
-  syncPanel();
-}, { flush: 'post' });
-watch(() => (props.hideEmpty ? 'h' : 's') + (props.options ? props.options.length : 0), () => {
   syncPanel();
 }, { flush: 'post' });
 watch(() => !!props.disabled, () => {
@@ -1944,10 +1905,7 @@ watch(() => activeIndex.value, () => {
 watch(() => props.options ? props.options.length : 0, () => {
   if (activeIndex.value >= visibleOptions().length) activeIndex.value = visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1;
 }, { flush: 'post' });
-watch(() => coarse.value, () => {
-  yieldToNative();
-}, { flush: 'post' });
-watch(() => (props.nativePicker ? 'n' : '-') + (props.virtual ? 'v' : '-') + (props.inline ? 'i' : '-') + (props.multiple ? 'm' : '-'), () => {
+watch(() => (coarse.value ? 'c' : '-') + (props.nativePicker ? 'n' : '-') + (props.virtual ? 'v' : '-') + (props.inline ? 'i' : '-') + (props.multiple ? 'm' : '-'), () => {
   yieldToNative();
 }, { flush: 'post' });
 watch(() => value.value, () => {

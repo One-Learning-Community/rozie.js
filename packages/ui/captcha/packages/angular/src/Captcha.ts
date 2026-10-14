@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 // The provider api.js loader (inject-once singleton + poll/timeout/error) lives
 // in a vendored internal module so its branchy logic is unit-tested independent
@@ -46,7 +46,9 @@ export class Captcha {
    * @example
    * <rozie-captcha [(token)]="token" provider="recaptcha" sitekey="…" />
    */
-  token = model<string>('');
+  readonly __rozieModelIn_token = input<string | undefined>(undefined, { alias: 'token' });
+  tokenChange = output<string>();
+  token = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_token, this.tokenChange, '');
   /**
    * Widget color theme: `light` or `dark` (all three core providers), or `auto` (Turnstile only). Construction-time — re-key the component to change it live.
    */

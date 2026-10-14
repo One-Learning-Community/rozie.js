@@ -108,14 +108,14 @@ const a11yLabel = () => {
   return columnId;
 };
 
-onMount(() => {
-  if (autofocus) inputEl?.focus();
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => autofocus)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
   if (v) inputEl?.focus();
 })(__watchVal); }); });
+
+onMount(() => {
+  if (autofocus) inputEl?.focus();
+});
 </script>
 
 <input bind:this={inputEl} class="rdt-cell-editor" type="text" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} oninput={($event) => { onInput($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-0d17f43a />

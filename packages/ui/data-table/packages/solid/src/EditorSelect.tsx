@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 import { createEffect, createSignal, mergeProps, on, onMount, splitProps, untrack } from 'solid-js';
 import { Key } from '@solid-primitives/keyed';
-import { rozieAttr, rozieDisplay } from '@rozie/runtime-solid';
+import { rozieAttr, rozieDisplay, rozieSelectValue } from '@rozie/runtime-solid';
 
 interface EditorSelectProps {
   /**
@@ -48,12 +48,12 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   const [draft, setDraft] = createSignal('');
   const [touched, setTouched] = createSignal(false);
-  onMount(() => {
-    if (local.autofocus) selectElRef?.focus();
-  });
   createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
     if (v) selectElRef?.focus();
   })(v)), { defer: true }));
+  onMount(() => {
+    if (local.autofocus) selectElRef?.focus();
+  });
   let selectElRef: HTMLElement | null = null;
 
   // Seed the draft once from the incoming value (setup-once). Normalize null/undefined
@@ -116,7 +116,7 @@ export default function EditorSelect(_props: EditorSelectProps): JSX.Element {
 
   return (
     <>
-    <select data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { selectElRef = el as HTMLElement; }} class={"rdt-cell-editor"} value={draftValue()} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
+    <select data-editing-cell="" aria-label={rozieAttr(a11yLabel())} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (draftValue())); selectElRef = el as HTMLElement; }} class={"rdt-cell-editor"} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onKeydown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onBlur(); }} data-rozie-s-117f1a16="">
       <Key each={local.options as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-117f1a16="">{rozieDisplay(opt().label)}</option>}</Key>
     </select>
     </>

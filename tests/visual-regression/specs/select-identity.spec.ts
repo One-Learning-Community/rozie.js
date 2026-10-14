@@ -118,16 +118,16 @@ for (const target of TARGETS) {
   });
 
   // ── B3 ────────────────────────────────────────────────────────────────────
-  // KNOWN GAP, pinned exactly (no blanket expected-failure): on the targets named in
-  // each test the control keeps the value the component wrote itself. The compiled Select
-  // holds `value` in the framework's own two-way primitive there (Vue `defineModel`,
-  // Svelte `$bindable`, Angular `model()`), which has no "controlled" mode to fall back
-  // to; React, Solid and Lit go through Rozie's controllable-state helpers. Nothing in
-  // Select.rozie can tell the two apart (its only handle is `$model.value`), so closing
-  // the gap needs the emitters — and when they close it, the pinned branch fails.
+  // While the consumer binds a value, the control shows the consumer's value: a write by
+  // the Select only notifies it (the controlled rule, compiled into every target).
+  // KNOWN GAP, pinned exactly: Svelte with a ONE-WAY binding. A `$bindable` prop the
+  // parent does not bind takes the child's write as a local override until the parent's
+  // value changes, and Svelte gives the component no way to tell a one-way binding from
+  // `bind:` — so there the control keeps the value it wrote. (`bind:value` with a
+  // setter that refuses — Svelte's own controlled form — works, see the next test.)
   runner(`select-identity [${target}]: a one-way binding whose consumer keeps the old value — the control shows the consumer's value`, async ({ page }) => {
     // The parent binds one-way and never sends a different value.
-    const KEEPS_OWN_WRITE = target === 'vue' || target === 'svelte' || target === 'angular';
+    const KEEPS_OWN_WRITE = target === 'svelte';
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('refuse');
     const trigger = wrap.locator('[role="combobox"]');
@@ -156,11 +156,10 @@ for (const target of TARGETS) {
   });
 
   runner(`select-identity [${target}]: a two-way binding whose consumer writes the old value back in its change handler — the control shows the consumer's value`, async ({ page }) => {
-    // Angular only: the parent's value goes apple -> banana -> apple inside ONE handler;
-    // at the next change detection the binding holds the value it last pushed down
-    // ('apple'), so the input is not written again and the Select's `model()` stays on
-    // 'banana'. (Consumer-side remedy: write the old value back a task later.)
-    const KEEPS_OWN_WRITE = target === 'angular';
+    // The parent's value goes apple -> banana -> apple inside ONE handler. (On Angular the
+    // binding is not pushed down again — it still holds 'apple' — and the Select shows it
+    // because its write only emitted.)
+    const KEEPS_OWN_WRITE = false;
     await page.goto(`/?example=SelectIdentity&target=${target}`);
     const wrap = page.getByTestId('bounce');
     const trigger = wrap.locator('[role="combobox"]');

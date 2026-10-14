@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-spike012-r5-c3',
@@ -26,7 +26,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Spike012R5C3 {
-  value = model<string>('');
+  readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string>();
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
   n = signal(0);
   q = signal('');
 

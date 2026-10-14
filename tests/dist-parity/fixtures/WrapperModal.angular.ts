@@ -1,7 +1,7 @@
-import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, contentChildren, forwardRef, input, model, signal } from '@angular/core';
+import { Component, ContentChild, TemplateRef, ViewEncapsulation, computed, contentChildren, forwardRef, input, output, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieModel } from '@rozie/runtime-angular';
 
 import { Modal } from './Modal';
 
@@ -44,7 +44,9 @@ interface ActionsCtx {}
 })
 export class WrapperModal {
   title = input<string>('Wrapped');
-  open = model<boolean>(false);
+  readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+  openChange = output<boolean>();
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
   @ContentChild('brand', { read: TemplateRef }) brandTpl?: TemplateRef<BrandCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('actions', { read: TemplateRef }) actionsTpl?: TemplateRef<ActionsCtx>;

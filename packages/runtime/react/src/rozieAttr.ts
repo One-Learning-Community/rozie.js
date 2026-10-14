@@ -36,10 +36,19 @@
  */
 import { rozieDisplay } from './rozieDisplay.js';
 
-export function rozieAttr<T>(
-  v: T,
-): (T extends string ? T : T extends null | undefined ? never : string) | undefined {
-  return (v == null ? undefined : rozieDisplay(v)) as
-    | (T extends string ? T : T extends null | undefined ? never : string)
-    | undefined;
+export function rozieAttr<T>(v: T): RozieAttrValue<T> | undefined {
+  return (v == null ? undefined : rozieDisplay(v)) as RozieAttrValue<T> | undefined;
 }
+
+/**
+ * The wrapped type of one member of `T`. A boolean stringifies to `'true'` /
+ * `'false'`, and is typed so: React types aria attributes as `Booleanish`
+ * (`boolean | 'true' | 'false'`), which a widened `string` does not fit (TS2322).
+ */
+export type RozieAttrValue<T> = T extends string
+  ? T
+  : T extends boolean
+    ? `${T}`
+    : T extends null | undefined
+      ? never
+      : string;

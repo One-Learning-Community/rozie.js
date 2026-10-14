@@ -705,17 +705,8 @@ private portals = {
     };
     // Unset (null) keeps the locale's own first day. Never pass the key empty:
     // FullCalendar's Number refiner would turn `undefined` into NaN.
-    // Unset (null) keeps the locale's own first day. Never pass the key empty:
-    // FullCalendar's Number refiner would turn `undefined` into NaN.
     if (typeof this.firstDay === 'number') curated.firstDay = this.firstDay;
 
-    // Portal-slot primitive (Spike 003) — when a consumer supplies an `event`
-    // slot, route every cell render through it. The portal helper mounts the
-    // consumer's framework-native fragment (React JSX, Vue VNodes, Svelte
-    // Snippet, etc.) into a DOM container that FullCalendar owns; the dispose
-    // handle is returned to FullCalendar so it cleans up the mounted tree when
-    // the cell is removed. Consumers that don't fill the slot get FullCalendar's
-    // default rendering (title text) — guarded by `$slots.event`.
     // Portal-slot primitive (Spike 003) — when a consumer supplies an `event`
     // slot, route every cell render through it. The portal helper mounts the
     // consumer's framework-native fragment (React JSX, Vue VNodes, Svelte
@@ -735,19 +726,6 @@ private portals = {
         };
       };
     }
-    // The 9 remaining *Content portal-slots — wired identically to `event`, one
-    // per FullCalendar per-cell content hook. Each guarded by its own slot so
-    // unfilled slots keep FullCalendar's default rendering (or an
-    // `options.*Content` passthrough). (10 portal-slots total counting `event`
-    // above; allDayContent + slotLaneContent are the two timeGrid axis/lane
-    // hooks, and noEventsContent is the list-view "no events" hook — inert
-    // unless the consumer engages @fullcalendar/list via :options.plugins.)
-    //
-    // NOTE the `nowIndicatorContent` slot is named for its FullCalendar engine
-    // hook (`nowIndicatorContent`) so it does NOT clash with the boolean
-    // `nowIndicator` PROP — a slot name that equals a declared prop name is now a
-    // hard compile error (ROZ127 SLOT_PROP_NAME_COLLISION), because Svelte 5
-    // unifies snippets and props into one `$props` namespace.
     // The 9 remaining *Content portal-slots — wired identically to `event`, one
     // per FullCalendar per-cell content hook. Each guarded by its own slot so
     // unfilled slots keep FullCalendar's default rendering (or an
@@ -863,12 +841,6 @@ private portals = {
     // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
     // the bundled-only plugin set there is no list view, so this hook never fires
     // — by design, documented, zero bundle cost.
-    // noEventsContent — the list-view "no events to display" hook. Pre-declared
-    // and wired like the other 9 *Content slots, but INERT unless the consumer
-    // (a) engages @fullcalendar/list via the now-merged :options.plugins AND
-    // (b) shows a list view (listWeek/listDay/listMonth) with ZERO events. With
-    // the bundled-only plugin set there is no list view, so this hook never fires
-    // — by design, documented, zero bundle cost.
     if (this.noEventsContent !== undefined) {
       curated.noEventsContent = (arg: any) => {
         const node = document.createElement('div');
@@ -882,8 +854,6 @@ private portals = {
       };
     }
 
-    // `events` is curated too: the prop owns its own event source (below), so an
-    // `options.events` is ignored, exactly as before.
     // `events` is curated too: the prop owns its own event source (below), so an
     // `options.events` is ignored, exactly as before.
     this.curatedKeys = new Set([...Object.keys(curated), 'events']);

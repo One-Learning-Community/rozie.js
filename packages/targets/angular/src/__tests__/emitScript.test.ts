@@ -35,10 +35,10 @@ function loadIR(name: string): IRComponent {
 }
 
 describe('emitScript — Counter signal mapping', () => {
-  it('Counter $props with model:true emits model<number>(0)', () => {
+  it('Counter $props with model:true emits a rozieModel over an aliased input', () => {
     const ir = loadIR('Counter');
     const { classBody } = emitScript(ir);
-    expect(classBody).toContain('value = model<number>(0)');
+    expect(classBody).toContain("value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0)");
   });
 
   it('Counter $data emits hovering = signal(false)', () => {

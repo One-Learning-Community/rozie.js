@@ -1,0 +1,32 @@
+<!--
+  NativeSelectValueDemo.rozie — BEHAVIORAL consumer for a declarative
+  `<select :value="…">` (native-select-value.spec.ts). The bound value must select its
+  <option> on the first render, when the value changes, when the options are replaced
+  by an equal set, and when the options arrive after the value.
+
+  This is a BEHAVIORAL cell — no screenshot stabilization here.
+-->
+<rozie name="NativeSelectValueDemo">
+<data>{ pick: 'b', opts: ['a', 'b', 'c'], late: [], latePick: 'c' }</data>
+<script>
+const setPick = (v) => { $data.pick = v }
+const replaceOpts = () => { $data.opts = ['a', 'b', 'c'] }
+const fillLate = () => { $data.late = ['a', 'b', 'c'] }
+const onChange = ($event) => { $data.pick = $event.target.value }
+</script>
+<template>
+<div class="nsv">
+  <select data-testid="sel" :value="$data.pick" @change="onChange($event)">
+    <option r-for="o in $data.opts" :key="o" :value="o">{{ o }}</option>
+  </select>
+  <select data-testid="late" :value="$data.latePick">
+    <option r-for="o in $data.late" :key="o" :value="o">{{ o }}</option>
+  </select>
+  <span data-testid="readout">{{ $data.pick }}</span>
+  <button data-testid="pick-c" @click="setPick('c')">c</button>
+  <button data-testid="pick-a" @click="setPick('a')">a</button>
+  <button data-testid="replace" @click="replaceOpts()">replace</button>
+  <button data-testid="fill" @click="fillLate()">fill</button>
+</div>
+</template>
+</rozie>

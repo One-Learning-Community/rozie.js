@@ -364,12 +364,9 @@ for (const target of TARGETS) {
   });
 
   // ── the handle, several calls in one tick ─────────────────────────────────
-  // On five targets every call acts on the state the call before it left. On React the
-  // exposed verbs are closures over ONE render's state, so calls made in the same tick
-  // all see the state the tick began with. That is how the compiler emits every exposed
-  // verb of every component (see the report: "Compiler behaviours observed"); it is not
-  // worked around in Select. The React branches below pin EXACTLY what React does today,
-  // so a compiler fix shows up as a failure here, and nothing else on React is skipped.
+  // Every call acts on the state the call before it left, on all six targets. (On React
+  // a verb reads its render's state; the compiled handle runs each verb in `flushSync`,
+  // so the next call sees the re-render.)
   runner(`select-open-state [${target}]: open(), close(), open() through the handle in one tick`, async ({ page }) => {
     await page.goto(`/?example=SelectOpenState&target=${target}`);
     const wrap = page.getByTestId('api-select');
@@ -383,28 +380,15 @@ for (const target of TARGETS) {
     await page.keyboard.press('x');
     await expect(list).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-    if (target === 'react') {
-      // close() saw "closed" and did nothing; the second open() did not see the first.
-      await settled(page, log, 'TT');
-    } else {
-      await settled(page, log, 'TFT');
-    }
+    await settled(page, log, 'TFT');
     await expect(list).toBeVisible();
 
     // From OPEN: open() is a no-op, close() closes, open() opens again.
     await page.keyboard.press('x');
-    if (target === 'react') {
-      // Both open() calls saw "open" and did nothing; only close() acted: it ends CLOSED.
-      await expect(list).toHaveCount(0);
-      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-      await settled(page, log, 'TTF');
-      await expect(list).toHaveCount(0);
-    } else {
-      await expect(list).toBeVisible();
-      await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-      await settled(page, log, 'TFTFT');
-      await expect(list).toBeVisible();
-    }
+    await expect(list).toBeVisible();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await settled(page, log, 'TFTFT');
+    await expect(list).toBeVisible();
   });
 
   // ── a dismissal after a same-tick close + open ────────────────────────────
@@ -421,14 +405,6 @@ for (const target of TARGETS) {
 
       await page.getByTestId('api-burst').focus();
       await page.keyboard.press('y'); // close(); open() — on a key, so no outside click is involved
-      if (target === 'react') {
-        // React (see the note above the handle test): open() saw the tick's starting state,
-        // "open", and did nothing — the select is simply closed, once.
-        await expect(list).toHaveCount(0);
-        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-        await settled(page, log, 'TF');
-        return;
-      }
       await expect(list).toBeVisible();
       await expect(trigger).toHaveAttribute('aria-expanded', 'true');
       await settled(page, log, 'TFT');
@@ -499,8 +475,7 @@ for (const target of TARGETS) {
       await page.getByTestId(button).click();
       await expect(list).toHaveCount(0);
       await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-      // React, at once: open() saw "open" and did nothing, so there is one close only.
-      await settled(page, log, target === 'react' && button === 'api-reopen' ? 'TF' : 'TFTF');
+      await settled(page, log, 'TFTF');
       await expect(list).toHaveCount(0);
       await expect(trigger).toHaveAttribute('aria-expanded', 'false');
       // Not stuck: it opens again.

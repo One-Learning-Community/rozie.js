@@ -96,6 +96,7 @@ describe('Bug 2 — Angular kebab-case output() field emit', () => {
     const code = compile('Modal');
     // `close` is a valid identifier — must stay byte-identical: no alias arg.
     expect(code).toMatch(/\bclose = output<void>\(\);/);
-    expect(code).not.toContain('alias:');
+    // (The two-way `open` prop's aliased INPUT carries an alias; no output does.)
+    expect(code).not.toMatch(/output<[^>]*>\(\{ alias:/);
   });
 });

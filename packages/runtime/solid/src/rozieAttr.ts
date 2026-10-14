@@ -22,7 +22,8 @@
  * widened to `string`. Solid's JSX narrows aria/enumerated attributes to literal
  * unions; widening to `string` here would make a provably-valid value
  * unassignable (TS2322). Non-string inputs (numbers/booleans/objects) are
- * stringified at runtime, so their wrapped type is `string`.
+ * stringified at runtime, so their wrapped type is `string` — except a boolean,
+ * which is `'true' | 'false'` (see `RozieAttrValue`).
  *
  * A NULLISH member of a MIXED union (e.g. `'tooltip' | 'dialog' | undefined` from
  * a role helper whose neutral case omits the attribute) maps to `never`, NOT
@@ -35,10 +36,19 @@
  */
 import { rozieDisplay } from './rozieDisplay.js';
 
-export function rozieAttr<T>(
-  v: T,
-): (T extends string ? T : T extends null | undefined ? never : string) | undefined {
-  return (v == null ? undefined : rozieDisplay(v)) as
-    | (T extends string ? T : T extends null | undefined ? never : string)
-    | undefined;
+export function rozieAttr<T>(v: T): RozieAttrValue<T> | undefined {
+  return (v == null ? undefined : rozieDisplay(v)) as RozieAttrValue<T> | undefined;
 }
+
+/**
+ * The wrapped type of one member of `T`. A boolean stringifies to `'true'` /
+ * `'false'`, and is typed so: Solid types aria attributes as
+ * `boolean | 'false' | 'true'`, which a widened `string` does not fit (TS2322).
+ */
+export type RozieAttrValue<T> = T extends string
+  ? T
+  : T extends boolean
+    ? `${T}`
+    : T extends null | undefined
+      ? never
+      : string;

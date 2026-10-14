@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 // The v3 api.js loader (inject-once-per-sitekey singleton + ready-gate + token
 // execute) lives in a vendored internal module so its branchy logic is
@@ -50,7 +50,9 @@ export class RecaptchaV3 {
    * @example
    * <rozie-recaptcha-v3 [(token)]="token" sitekey="…" action="signup" />
    */
-  token = model<string>('');
+  readonly __rozieModelIn_token = input<string | undefined>(undefined, { alias: 'token' });
+  tokenChange = output<string>();
+  token = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_token, this.tokenChange, '');
   /**
    * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
    */

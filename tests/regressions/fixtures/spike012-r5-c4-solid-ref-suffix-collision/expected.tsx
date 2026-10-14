@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { clsx } from '@rozie/runtime-react';
 
 interface RefSuffixCollisionProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
@@ -8,7 +8,7 @@ export default function RefSuffixCollision(props: RefSuffixCollisionProps): JSX.
   const [n, setN] = useState(0);
   const box = useRef<HTMLDivElement | null>(null);
 
-  const boxRef = useMemo(() => 7, []);
+  const boxRef = 7;
 
   useEffect(() => {
     setN((box.current as HTMLElement).childElementCount + boxRef);

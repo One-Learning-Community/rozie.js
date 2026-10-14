@@ -491,14 +491,6 @@ export function getRegions() {
   return regionsPlugin ? regionsPlugin.getRegions() : [];
 }
 
-onMount(() => {
-  // $refs read ONLY here (ROZ123). The container is the engine's attach target.
-  buildWaveSurfer();
-  return () => {
-    if (ws) ws.destroy();
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => src)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
   if (ws && typeof v === 'string' && v) ws.load(v);
@@ -617,6 +609,14 @@ $effect(() => { const __watchVal = (() => regions)(); untrack(() => { if (__rozi
   if (!regionsReady) return;
   reconcileRegions($state.snapshot(list));
 })(__watchVal); }); });
+
+onMount(() => {
+  // $refs read ONLY here (ROZ123). The container is the engine's attach target.
+  buildWaveSurfer();
+  return () => {
+    if (ws) ws.destroy();
+  };
+});
 </script>
 
 <div bind:this={container} {...__rozieAttrs} class={["rozie-waveform", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0b6fbb3a></div>

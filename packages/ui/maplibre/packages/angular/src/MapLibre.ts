@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, afterRenderEffect, computed, contentChild, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, afterRenderEffect, computed, contentChild, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieToken } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieModel, rozieToken } from '@rozie/runtime-angular';
 
 import maplibregl from 'maplibre-gl';
 
@@ -121,19 +121,27 @@ export class MapLibre {
    * @example
    * <rozie-map-libre [(center)]="center" [(zoom)]="zoom" />
    */
-  center = model<any[]>((() => [0, 0])());
+  readonly __rozieModelIn_center = input<any[] | undefined>(undefined, { alias: 'center' });
+  centerChange = output<any[]>();
+  center = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_center, this.centerChange, (() => [0, 0])());
   /**
    * The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.
    */
-  zoom = model<number>(1);
+  readonly __rozieModelIn_zoom = input<number | undefined>(undefined, { alias: 'zoom' });
+  zoomChange = output<number>();
+  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1);
   /**
    * The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.
    */
-  bearing = model<number>(0);
+  readonly __rozieModelIn_bearing = input<number | undefined>(undefined, { alias: 'bearing' });
+  bearingChange = output<number>();
+  bearing = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_bearing, this.bearingChange, 0);
   /**
    * The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.
    */
-  pitch = model<number>(0);
+  readonly __rozieModelIn_pitch = input<number | undefined>(undefined, { alias: 'pitch' });
+  pitchChange = output<number>();
+  pitch = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_pitch, this.pitchChange, 0);
   /**
    * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
    */

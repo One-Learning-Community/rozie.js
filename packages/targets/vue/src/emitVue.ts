@@ -237,7 +237,12 @@ function mergeVueImportsAndListeners(
   // duplicate import lines that emitScript or babel/generator may produce),
   // merges the names, emits a single canonical line, and removes the originals.
   let merged = script;
-  if (extraVueNames.length > 0) {
+  // Also when the script already holds two `'vue'` import lines: a template
+  // script injection (a hoisted `computed`) renders its own line, which
+  // redeclares a name the script's import line already has (a two-way prop
+  // brings `computed` there too).
+  const vueImportLineCount = merged.split('\n').filter((l) => /^import \{[^}]*\} from ['"]vue['"];/.test(l.trim())).length;
+  if (extraVueNames.length > 0 || vueImportLineCount > 1) {
     const lines = merged.split('\n');
     const collectedNames = new Set<string>(extraVueNames);
     const vueImportIndices: number[] = [];
@@ -247,7 +252,7 @@ function mergeVueImportsAndListeners(
       // Match both single-line `import { ... } from 'vue';` and
       // multi-line forms that start with `import {` and end with `} from 'vue';`
       // on the same line (most common case from @babel/generator).
-      if (/from ['"]vue['"]/.test(trimmed)) {
+      if (/from ['"]vue['"]/.test(trimmed) && !trimmed.startsWith('import type ')) {
         vueImportIndices.push(i);
         // Extract names: grab everything between `{` and `}` on this line.
         const match = trimmed.match(/\{([^}]+)\}/);

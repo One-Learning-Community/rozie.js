@@ -114,14 +114,14 @@ const a11yLabel = () => {
 // ref on Lit/Solid) covers a REACTIVE refocus while already mounted, e.g. a row-mode
 // validation failure flipping autofocus back onto this already-open drop-in.
 
-onMount(() => {
-  if (autofocus) selectEl?.focus();
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => autofocus)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
   if (v) selectEl?.focus();
 })(__watchVal); }); });
+
+onMount(() => {
+  if (autofocus) selectEl?.focus();
+});
 </script>
 
 <select bind:this={selectEl} class="rdt-cell-editor" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={rozieAttr(draftValue())} onchange={($event) => { onChange($event); }} onkeydown={($event) => { onKeydown($event); }} onblur={($event) => { onBlur(); }} data-rozie-s-117f1a16>{#each options as opt (opt.value)}<option value={rozieAttr(opt.value)} data-rozie-s-117f1a16>{rozieDisplay(opt.label)}</option>{/each}</select>

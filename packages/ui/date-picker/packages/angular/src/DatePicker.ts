@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 import { createKeynavStateMachine, type KeynavStateMachine, focusIsWithinScope } from '@rozie/runtime-keynav-core';
 
 import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, rangeSpansDisabled, resolveLabel, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
@@ -468,7 +468,9 @@ export class DatePicker {
    * @example
    * <rozie-date-picker [(value)]="date" [min]="'2026-01-01'" (change)="onPick" />
    */
-  value = model<string | Record<string, any>>('');
+  readonly __rozieModelIn_value = input<string | Record<string, any> | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string | Record<string, any>>();
+  value = rozieModel<string | Record<string, any>, import('@angular/core').ModelSignal<string | Record<string, any>>>(this.__rozieModelIn_value, this.valueChange, '');
   /**
    * Selection mode: `'single'` (the default — `value` is one ISO `YYYY-MM-DD` string, fully backward-compatible) or `'range'` (`value` becomes a `{ start, end }` object selected with two clicks plus a live hover preview, direction-agnostic). In `range` mode a completed selection additionally emits `rangeComplete`.
    */
@@ -537,6 +539,7 @@ export class DatePicker {
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   change = output<unknown>();
   rangeComplete = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
   @ContentChild('presets', { read: TemplateRef }) presetsTpl?: TemplateRef<PresetsCtx>;

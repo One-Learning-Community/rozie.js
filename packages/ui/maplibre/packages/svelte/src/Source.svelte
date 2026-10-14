@@ -52,24 +52,6 @@ setContext('maplibre:source', {
   }
 });
 
-onMount(() => {
-  // register this source's spec into the parent registry; the parent's
-  // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
-  // On Lit the injected sources registry may still be undefined here (async
-  // context, REQ-30) — the $onUpdate below registers once it resolves.
-  if (reg && !didRegister) {
-    didRegister = true;
-    reg.register(id, {
-      id: id,
-      spec: spec
-    });
-  }
-  // unregister on unmount so the parent reaps this source (its layers first).
-  return () => {
-    if (reg) reg.unregister(id);
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => sources)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((live: any) => {
   if (didRegister || live == null) return;
@@ -87,6 +69,24 @@ $effect(() => { const __watchVal = (() => spec)(); untrack(() => { if (__rozieWa
     spec: v
   });
 })(__watchVal); }); });
+
+onMount(() => {
+  // register this source's spec into the parent registry; the parent's
+  // applyLayers() reconcile (style-load gated) picks it up via its registry watch.
+  // On Lit the injected sources registry may still be undefined here (async
+  // context, REQ-30) — the $onUpdate below registers once it resolves.
+  if (reg && !didRegister) {
+    didRegister = true;
+    reg.register(id, {
+      id: id,
+      spec: spec
+    });
+  }
+  // unregister on unmount so the parent reaps this source (its layers first).
+  return () => {
+    if (reg) reg.unregister(id);
+  };
+});
 </script>
 
 {@render children?.()}

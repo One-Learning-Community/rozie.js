@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -25,12 +25,24 @@ const props = withDefaults(
   { action: 'submit', executeOnMount: false }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The latest verification token (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`. Written on each successful `execute()` — read it to attach the fresh token to your request.
  * @example
  * <RecaptchaV3 v-model:token="token" sitekey="…" action="signup" />
  */
-const token = defineModel<string>('token', { default: '' });
+const __rozieModel_token = defineModel<string>('token', { default: '' });
+const token = computed<string>({
+  get: () => __rozieModel_token.value,
+  set: (v) => { if (__rozieBound('token')) __rozieVm.emit('update:token', v); else __rozieModel_token.value = v; },
+});
 
 const emit = defineEmits<{
   error: [...args: any[]];

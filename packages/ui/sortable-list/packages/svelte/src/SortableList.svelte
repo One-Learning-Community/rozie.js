@@ -330,6 +330,27 @@ export function option(name: any, value: any) {
   return value;
 }
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => disabled)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => instance?.option('disabled', v))(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { (() => group)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => instance?.option('group', resolveGroup()))(); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { (() => cloneable)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => instance?.option('group', resolveGroup()))(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => swapThreshold)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.option('swapThreshold', v))(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => handle)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.option('handle', v))(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => ghostClass)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.option('ghostClass', v))(__watchVal); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => chosenClass)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.option('chosenClass', v))(__watchVal); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => dragClass)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('dragClass', v))(__watchVal); }); });
+let __rozieWatchInitial_8 = true;
+$effect(() => { const __watchVal = (() => filter)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => instance?.option('filter', v))(__watchVal); }); });
+let __rozieWatchInitial_9 = true;
+$effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
+
 onMount(() => {
   // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
   // when the options object below references it.
@@ -385,27 +406,6 @@ onMount(() => {
   // works on every target.
   return () => instance?.destroy();
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => disabled)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => instance?.option('disabled', v))(__watchVal); }); });
-let __rozieWatchInitial_1 = true;
-$effect(() => { (() => group)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => instance?.option('group', resolveGroup()))(); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { (() => cloneable)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => instance?.option('group', resolveGroup()))(); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => swapThreshold)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.option('swapThreshold', v))(__watchVal); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { const __watchVal = (() => handle)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.option('handle', v))(__watchVal); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => ghostClass)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.option('ghostClass', v))(__watchVal); }); });
-let __rozieWatchInitial_6 = true;
-$effect(() => { const __watchVal = (() => chosenClass)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.option('chosenClass', v))(__watchVal); }); });
-let __rozieWatchInitial_7 = true;
-$effect(() => { const __watchVal = (() => dragClass)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => instance?.option('dragClass', v))(__watchVal); }); });
-let __rozieWatchInitial_8 = true;
-$effect(() => { const __watchVal = (() => filter)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => instance?.option('filter', v))(__watchVal); }); });
-let __rozieWatchInitial_9 = true;
-$effect(() => { const __watchVal = (() => easing)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.option('easing', v))(__watchVal); }); });
 </script>
 
 <div bind:this={__rozieRoot} {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex === index }])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex={rozieAttr(keyboardEnabled() ? 0 : null)} onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div></div>

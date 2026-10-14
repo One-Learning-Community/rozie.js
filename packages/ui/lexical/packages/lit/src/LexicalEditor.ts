@@ -151,7 +151,6 @@ private __rozieCtxProvider_rozie_lexical_editor = new ContextProvider(this, { co
     });
 
     // Bind the editor to the authored contenteditable host.
-    // Bind the editor to the authored contenteditable host.
     this.editor.setRootElement(this._refRootEl);
 
     // Register the RichText baseline AND wire the per-target @mention decorator bridge
@@ -159,15 +158,8 @@ private __rozieCtxProvider_rozie_lexical_editor = new ContextProvider(this, { co
     // mergeRegister so the decorator listener tears down with everything else. Plugin
     // components (wave 2) add History/List/Link BEHAVIOR against the same $injected
     // editor. mountDecorators runs AFTER setRootElement so getElementByKey resolves.
-    // Register the RichText baseline AND wire the per-target @mention decorator bridge
-    // (D-06): mountDecorators returns an unregister fn, folded into the same
-    // mergeRegister so the decorator listener tears down with everything else. Plugin
-    // components (wave 2) add History/List/Link BEHAVIOR against the same $injected
-    // editor. mountDecorators runs AFTER setRootElement so getElementByKey resolves.
     const cleanup = mergeRegister(registerRichText(this.editor), mountDecorators(this.editor));
 
-    // Seed an empty paragraph so the caret has a block to land in when the document
-    // is empty (the spike 015 seed pattern, in the `lexical.$…` namespace form).
     // Seed an empty paragraph so the caret has a block to land in when the document
     // is empty (the spike 015 seed pattern, in the `lexical.$…` namespace form).
     this.editor.update(() => {

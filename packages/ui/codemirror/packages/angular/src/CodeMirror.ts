@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieModel } from '@rozie/runtime-angular';
 
 import { EditorState, Compartment, EditorSelection, StateField, RangeSet } from '@codemirror/state';
 // `gutter` is imported under an alias: the `gutter` SLOT (G5 wave 2) lowers into
@@ -152,7 +152,9 @@ export class CodeMirror {
    * @example
    * <rozie-code-mirror [(value)]="source" language="javascript" theme="dark" />
    */
-  value = model<string>('');
+  readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string>();
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
   /**
    * Convenience language. `javascript` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount.
    */

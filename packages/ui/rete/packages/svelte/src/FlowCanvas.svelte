@@ -1896,6 +1896,64 @@ setContext('rete:canvas', {
   }
 });
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { (() => graph)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
+  // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
+  // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
+  // this only refreshes it for a genuine outside edit).
+  if (selfWriteInFlight) {
+    // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
+    selfWriteInFlight = false;
+  } else if (!programmatic) {
+    const c = $state.snapshot(currentGraph());
+    if (c != null) lastWrittenGraph = c;
+  }
+  if (reconcileNodes) {
+    Promise.resolve(reconcileNodes()).then(() => {
+      if (reconcileConnections) reconcileConnections();
+    });
+  }
+  // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
+  if (scheduleMinimapRedraw) scheduleMinimapRedraw();
+  // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
+  // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
+  // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
+  // corner handles stay stuck at their pre-change screen position (only re-tracking on the
+  // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
+  // the minimap rects above already do.
+  if (scheduleResizerTrack) scheduleResizerTrack();
+})(); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { (() => portReg)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
+  if (reconcileNodes) {
+    Promise.resolve(reconcileNodes()).then(() => {
+      if (reconcileConnections) reconcileConnections();
+    });
+  }
+})(); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { (() => typeReg)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
+  if (reconcileNodes) reconcileNodes();
+})(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
+  if (!area || typeof v !== 'number') return;
+  if (v === area.area.transform.k) return;
+  programmatic++;
+  Promise.resolve(area.area.zoom(v)).finally(() => {
+    programmatic--;
+  });
+})(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => selectable)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
+  if (v === false) clearSelection();
+})(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
+  if (v === true) clearSelection();
+})(__watchVal); }); });
+
 onMount(() => {
   const container = canvasEl;
 
@@ -4598,64 +4656,6 @@ onMount(() => {
     area = null;
   };
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { (() => graph)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
-  // T1.3 — keep the canvas's own last-written graph in sync with an EXTERNAL (non-
-  // programmatic) consumer change, so undo/redo's "current" state tracks reality (our own
-  // write-backs / restores set lastWrittenGraph synchronously under the programmatic guard;
-  // this only refreshes it for a genuine outside edit).
-  if (selfWriteInFlight) {
-    // our own commitGraph write echoing back — lastWrittenGraph is already authoritative.
-    selfWriteInFlight = false;
-  } else if (!programmatic) {
-    const c = $state.snapshot(currentGraph());
-    if (c != null) lastWrittenGraph = c;
-  }
-  if (reconcileNodes) {
-    Promise.resolve(reconcileNodes()).then(() => {
-      if (reconcileConnections) reconcileConnections();
-    });
-  }
-  // graph changed (nodes added/removed/moved) → refresh the minimap node rects.
-  if (scheduleMinimapRedraw) scheduleMinimapRedraw();
-  // Phase 74-04 fix: a graph change can resize the tracked node's box WITHOUT going
-  // through rete's own translate/zoom pipe — the resize write-back (flushResizeWriteBack),
-  // an undo/redo restore, and an external consumer edit all land here. Without this, the 4
-  // corner handles stay stuck at their pre-change screen position (only re-tracking on the
-  // NEXT unrelated node-move/pan/zoom/selection-change) instead of following the box like
-  // the minimap rects above already do.
-  if (scheduleResizerTrack) scheduleResizerTrack();
-})(); }); });
-let __rozieWatchInitial_1 = true;
-$effect(() => { (() => portReg)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => {
-  if (reconcileNodes) {
-    Promise.resolve(reconcileNodes()).then(() => {
-      if (reconcileConnections) reconcileConnections();
-    });
-  }
-})(); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { (() => typeReg)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => {
-  if (reconcileNodes) reconcileNodes();
-})(); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
-  if (!area || typeof v !== 'number') return;
-  if (v === area.area.transform.k) return;
-  programmatic++;
-  Promise.resolve(area.area.zoom(v)).finally(() => {
-    programmatic--;
-  });
-})(__watchVal); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { const __watchVal = (() => selectable)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
-  if (v === false) clearSelection();
-})(__watchVal); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => readonly)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
-  if (v === true) clearSelection();
-})(__watchVal); }); });
 </script>
 
 <div bind:this={canvasEl} tabindex="0" {...__rozieAttrs} class={["rozie-flow-canvas", { 'rozie-flow-canvas--lines': background === 'lines', 'rozie-flow-canvas--cross': background === 'cross', 'rozie-flow-canvas--none': background === 'none' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-cd396d6a>{#if controls}<div class="rozie-flow-controls" data-rozie-s-cd396d6a><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-in" aria-label="Zoom in" onclick={controlZoomIn} data-rozie-s-cd396d6a>+</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-zoom-out" aria-label="Zoom out" onclick={controlZoomOut} data-rozie-s-cd396d6a>&#8722;</button><button type="button" class="rozie-flow-controls__btn" data-testid="flow-fit" aria-label="Fit view" onclick={controlFit} data-rozie-s-cd396d6a>&#9744;</button>{#if marquee}<button type="button" class={["rozie-flow-controls__btn", { 'is-active': mode === 'select' }]} data-testid="flow-mode" aria-label={rozieAttr(mode === 'select' ? 'Select mode (click to pan)' : 'Pan mode (click to select)')} onclick={toggleMode} data-rozie-s-cd396d6a>{rozieDisplay(mode === 'select' ? '▢' : '✥')}</button>{/if}</div>{/if}{#if minimap}<div class="rozie-flow-minimap" bind:this={minimapEl} data-testid="flow-minimap" data-rozie-s-cd396d6a></div>{/if}<div class="rozie-flow-marquee" bind:this={marqueeEl} data-testid="flow-marquee" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--nw" bind:this={resizeHandleNwEl} data-testid="flow-resize-handle-nw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--ne" bind:this={resizeHandleNeEl} data-testid="flow-resize-handle-ne" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--sw" bind:this={resizeHandleSwEl} data-testid="flow-resize-handle-sw" data-rozie-s-cd396d6a></div><div class="rozie-flow-resize-handle rozie-flow-resize-handle--se" bind:this={resizeHandleSeEl} data-testid="flow-resize-handle-se" data-rozie-s-cd396d6a></div>{#if nodeToolbar}<div class="rozie-flow-toolbar" bind:this={toolbarEl} data-testid="flow-toolbar" data-rozie-s-cd396d6a></div>{/if}</div>{@render children?.()}

@@ -101,12 +101,14 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
     })(); }
     this.__rozieFirstUpdateDone = true;
 
-    if (this.registered) return;
-    const live = this.registry;
-    if (live == null) return;
-    this.reg = live;
-    this.registered = true;
-    this.reg.registerColumn(this.colId(), this.buildSpec());
+    (() => {
+      if (this.registered) return;
+      const live = this.registry;
+      if (live == null) return;
+      this.reg = live;
+      this.registered = true;
+      this.reg.registerColumn(this.colId(), this.buildSpec());
+    })();
   }
 
   disconnectedCallback(): void {

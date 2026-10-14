@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 interface ItemCtx {
   $implicit: { item: any; remaining: any };
@@ -45,7 +45,9 @@ interface ItemCtx {
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class ScopedSlotContext {
-  items = model<any[]>((() => [])());
+  readonly __rozieModelIn_items = input<any[] | undefined>(undefined, { alias: 'items' });
+  itemsChange = output<any[]>();
+  items = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_items, this.itemsChange, (() => [])());
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

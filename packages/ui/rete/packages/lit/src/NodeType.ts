@@ -187,12 +187,14 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
     })(); }
     this.__rozieFirstUpdateDone = true;
 
-    if (this.registered) return;
-    const live = this.canvas;
-    if (live == null) return;
-    this.cv = live;
-    this.registered = true;
-    this.cv.registerType(this.type, this.buildSpec());
+    (() => {
+      if (this.registered) return;
+      const live = this.canvas;
+      if (live == null) return;
+      this.cv = live;
+      this.registered = true;
+      this.cv.registerType(this.type, this.buildSpec());
+    })();
   }
 
   disconnectedCallback(): void {

@@ -41,12 +41,12 @@ export default function EditorCheckbox(_props: EditorCheckboxProps): JSX.Element
   const _merged = mergeProps({ columnId: '', column: null, row: null, value: null, commit: null, cancel: null, autofocus: false, columnLabel: '' }, _props);
   const [local, attrs] = splitProps(_merged, ['columnId', 'column', 'row', 'value', 'commit', 'cancel', 'autofocus', 'columnLabel']);
 
-  onMount(() => {
-    if (local.autofocus) inputElRef?.focus();
-  });
   createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
     if (v) inputElRef?.focus();
   })(v)), { defer: true }));
+  onMount(() => {
+    if (local.autofocus) inputElRef?.focus();
+  });
   let inputElRef: HTMLElement | null = null;
 
   // Immediate-commit-on-change: read .checked the global-filter way, coerce to a

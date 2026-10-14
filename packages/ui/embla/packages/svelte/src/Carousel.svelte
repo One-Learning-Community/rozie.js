@@ -351,6 +351,57 @@ export function getInstance() {
   return embla;
 }
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => selectedIndex)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((i: any) => {
+  if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
+})(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { (() => [loop, align, axis, slidesToScroll, dragFree, draggable, containScroll, skipSnaps, duration, direction].join('|'))(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => embla?.reInit(reinitOptions()))(); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { (() => `${autoplay}|${autoplayDelay}`)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => embla?.reInit(reinitOptions(), emblaPluginsFromProps()))(); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { (() => slides.length)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
+  embla?.reInit(reinitOptions());
+  emblaThumbs?.reInit(thumbsOptionsFromProps());
+  syncNav();
+})(); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { (() => [].length)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
+  embla?.reInit(reinitOptions());
+  syncNav();
+})(); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => thumbnails)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((on: any) => {
+  if (!on) {
+    if (emblaThumbs) {
+      emblaThumbs.destroy();
+      emblaThumbs = null;
+    }
+    return;
+  }
+  if (emblaThumbs) return;
+  // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
+  // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
+  // ViewportEl is still null when the callback runs, so a synchronous build
+  // silently no-ops and a runtime thumbnails toggle never gets an engine.
+  // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
+  // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
+  // lands first after the flush wins; targets that already flushed
+  // synchronously take the immediate fast path in `build()` below and never
+  // wait on the deferred passes.
+  const build = () => {
+    if (!embla) return; // unmounted — the $onMount cleanup nulled it
+    if (!thumbnails) return; // toggled back off before this pass ran
+    if (emblaThumbs) return; // idempotent across the double-schedule
+    if (!thumbsViewportEl) return;
+    emblaThumbs = EmblaCarousel(thumbsViewportEl!, thumbsOptionsFromProps());
+    syncNav();
+  };
+  build();
+  if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
+})(__watchVal); }); });
+
 onMount(() => {
   embla = EmblaCarousel(viewportEl!, initialOptions(), emblaPluginsFromProps());
 
@@ -424,57 +475,6 @@ onMount(() => {
     }
   };
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => selectedIndex)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((i: any) => {
-  if (embla && typeof i === 'number' && i !== embla.selectedScrollSnap()) embla.scrollTo(i);
-})(__watchVal); }); });
-let __rozieWatchInitial_1 = true;
-$effect(() => { (() => [loop, align, axis, slidesToScroll, dragFree, draggable, containScroll, skipSnaps, duration, direction].join('|'))(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } (() => embla?.reInit(reinitOptions()))(); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { (() => `${autoplay}|${autoplayDelay}`)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => embla?.reInit(reinitOptions(), emblaPluginsFromProps()))(); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { (() => slides.length)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } (() => {
-  embla?.reInit(reinitOptions());
-  emblaThumbs?.reInit(thumbsOptionsFromProps());
-  syncNav();
-})(); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { (() => [].length)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } (() => {
-  embla?.reInit(reinitOptions());
-  syncNav();
-})(); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => thumbnails)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((on: any) => {
-  if (!on) {
-    if (emblaThumbs) {
-      emblaThumbs.destroy();
-      emblaThumbs = null;
-    }
-    return;
-  }
-  if (emblaThumbs) return;
-  // The r-if'd thumbs viewport mounts in the SAME tick this watch fires, and a
-  // pre-flush watcher (Vue's default) runs BEFORE that render — $refs.thumbs-
-  // ViewportEl is still null when the callback runs, so a synchronous build
-  // silently no-ops and a runtime thumbnails toggle never gets an engine.
-  // Double-schedule an idempotent pass through queueMicrotask AND rAF (the
-  // DatePicker scheduleFocus idiom, DatePicker.rozie:656-673) so whichever
-  // lands first after the flush wins; targets that already flushed
-  // synchronously take the immediate fast path in `build()` below and never
-  // wait on the deferred passes.
-  const build = () => {
-    if (!embla) return; // unmounted — the $onMount cleanup nulled it
-    if (!thumbnails) return; // toggled back off before this pass ran
-    if (emblaThumbs) return; // idempotent across the double-schedule
-    if (!thumbsViewportEl) return;
-    emblaThumbs = EmblaCarousel(thumbsViewportEl!, thumbsOptionsFromProps());
-    syncNav();
-  };
-  build();
-  if (typeof queueMicrotask !== 'undefined') queueMicrotask(build);
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(build);
-})(__watchVal); }); });
 </script>
 
 <div {...__rozieAttrs} class={["rozie-embla", { 'rozie-embla--vertical': axis === 'y' }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-4143c216><div class="rozie-embla__stage" data-rozie-s-4143c216>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--prev" disabled={!canPrev} aria-label="Previous slide" onclick={($event) => { scrollPrev(); }} data-rozie-s-4143c216>‹</button>{/if}<div class="rozie-embla__viewport" bind:this={viewportEl} data-rozie-s-4143c216><div class="rozie-embla__container" data-rozie-s-4143c216>{#each slides as slide, i (keyFor(slide, i))}<div class="rozie-embla__slide" data-rozie-s-4143c216>{#if slide$$slot}{@render slide$$slot({ slide, index: i })}{:else}{rozieDisplay(slide)}{/if}</div>{/each}{@render children?.()}</div></div>{#if arrows}<button type="button" class="rozie-embla__arrow rozie-embla__arrow--next" disabled={!canNext} aria-label="Next slide" onclick={($event) => { scrollNext(); }} data-rozie-s-4143c216>›</button>{/if}</div>{#if dots}<div class="rozie-embla__dots" data-rozie-s-4143c216>{#each snaps as di (di)}<button type="button" class={["rozie-embla__dot", { 'is-selected': di === selected }]} aria-label={rozieAttr('Go to slide ' + (di + 1))} onclick={($event) => { scrollToIndex(di); }} data-rozie-s-4143c216></button>{/each}</div>{/if}{#if thumbnails}<div class="rozie-embla__thumbs" data-rozie-s-4143c216><div class="rozie-embla__thumbs-viewport" bind:this={thumbsViewportEl} data-rozie-s-4143c216><div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>{#each slides as item, i (keyFor(item, i))}<div class={["rozie-embla__thumb", { 'is-selected': i === selected }]} onclick={($event) => { selectThumb(i); }} data-rozie-s-4143c216>{#if thumb}{@render thumb({ slide: item, index: i })}{:else}{rozieDisplay(item)}{/if}</div>{/each}</div></div></div>{/if}</div>

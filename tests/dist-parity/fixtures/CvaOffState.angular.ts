@@ -1,5 +1,5 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, model, viewChild } from '@angular/core';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, output, viewChild } from '@angular/core';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-cva-off-state',
@@ -20,7 +20,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   `],
 })
 export class CvaOffState {
-  value = model<string>('');
+  readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string>();
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
 
   // Producer-side write to the `value` model prop: writing `$model.value`
   // lowers to each target's two-way emit (Vue `emit('update:value', …)`,

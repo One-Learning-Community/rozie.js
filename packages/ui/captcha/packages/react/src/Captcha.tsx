@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 // The provider api.js loader (inject-once singleton + poll/timeout/error) lives
 // in a vendored internal module so its branchy logic is unit-tested independent
@@ -167,7 +168,7 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(function Captcha(_props:
 
   const _rozieExposeRef = useRef({ reset, execute, getResponse });
   _rozieExposeRef.current = { reset, execute, getResponse };
-  useImperativeHandle(ref, () => ({ reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args), execute: (...args: Parameters<typeof execute>): ReturnType<typeof execute> => _rozieExposeRef.current.execute(...args), getResponse: (...args: Parameters<typeof getResponse>): ReturnType<typeof getResponse> => _rozieExposeRef.current.getResponse(...args) }), []);
+  useImperativeHandle(ref, () => ({ reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args)), execute: (...args: Parameters<typeof execute>): ReturnType<typeof execute> => flushSync(() => _rozieExposeRef.current.execute(...args)), getResponse: (...args: Parameters<typeof getResponse>): ReturnType<typeof getResponse> => flushSync(() => _rozieExposeRef.current.getResponse(...args)) }), []);
 
   return (
     <>

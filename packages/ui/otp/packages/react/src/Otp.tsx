@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Otp.css';
 import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
@@ -260,7 +261,7 @@ const Otp = forwardRef<OtpHandle, OtpProps>(function Otp(_props: OtpProps, ref):
 
   const _rozieExposeRef = useRef({ focus, clear });
   _rozieExposeRef.current = { focus, clear };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args) }), []);
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)) }), []);
 
   return (
     <>

@@ -179,16 +179,6 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
 
   const [regions, setRegions] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'regions', undefined);
   const [currentTime, setCurrentTime] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'currentTime', undefined);
-  onMount(() => {
-    const _cleanup = (() => {
-    // $refs read ONLY here (ROZ123). The container is the engine's attach target.
-    buildWaveSurfer();
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => {
-    if (ws) ws.destroy();
-  });
-  });
   createEffect(on(() => (() => local.src)(), (v) => untrack(() => ((v: any) => {
     if (ws && typeof v === 'string' && v) ws.load(v);
   })(v)), { defer: true }));
@@ -290,6 +280,16 @@ export default function Waveform(_props: WaveformProps): JSX.Element {
     if (!regionsReady) return;
     reconcileRegions(list);
   })(v)), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    // $refs read ONLY here (ROZ123). The container is the engine's attach target.
+    buildWaveSurfer();
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    if (ws) ws.destroy();
+  });
+  });
   let containerRef: HTMLElement | null = null;
 
   // null-let so the bundled-leaf typeNeutralize pass annotates it `any`: the engine's

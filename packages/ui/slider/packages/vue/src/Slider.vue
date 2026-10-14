@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -88,12 +88,24 @@ const props = withDefaults(
   { range: false, min: 0, max: 100, step: 1, orientation: 'horizontal', disabled: false, marks: () => [], ariaLabel: null, pageStep: null, formatValue: null, showValue: false }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The current value (two-way `r-model`). A scalar number in single mode; a sorted `[lo, hi]` array in `range` mode, with each thumb neighbour-clamped so the pair stays sorted on every commit. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a Slider **is** a form control (`[(ngModel)]` / `[formControl]` bind directly).
  * @example
  * <Slider v-model:value="volume" :min="0" :max="100" :step="1" ariaLabel="Volume" />
  */
-const value = defineModel<unknown | null>('value', { default: null });
+const __rozieModel_value = defineModel<unknown | null>('value', { default: null });
+const value = computed<unknown | null>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

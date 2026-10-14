@@ -349,6 +349,39 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
+  createEffect(on(() => (() => local.events)(), (v) => untrack(() => ((v: any) => {
+    if (!instance) return;
+    eventsSource?.remove();
+    eventsSource = instance.addEventSource((v ?? []).map(normalizeEvent));
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => view())(), (v) => untrack(() => ((v: any) => {
+    if (!instance || !v) return;
+    if (v === instance.view.type) return;
+    suppressViewSync = true;
+    instance.changeView(v);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.weekends)(), (v) => untrack(() => ((v: any) => instance?.setOption('weekends', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => instance?.setOption('editable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.selectable)(), (v) => untrack(() => ((v: any) => instance?.setOption('selectable', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.height)(), (v) => untrack(() => ((v: any) => instance?.setOption('height', normalizeHeight(v)))(v)), { defer: true }));
+  createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.setOption('locale', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.firstDay)(), (v) => untrack(() => ((v: any) => {
+    if (!instance || typeof v !== 'number') return;
+    curatedKeys.add('firstDay');
+    instance.setOption('firstDay', v);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.slotDuration)(), (v) => untrack(() => ((v: any) => instance?.setOption('slotDuration', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.nowIndicator)(), (v) => untrack(() => ((v: any) => instance?.setOption('nowIndicator', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.headerToolbar)(), (v) => untrack(() => ((v: any) => instance?.setOption('headerToolbar', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.options)(), (v) => untrack(() => ((v: any) => {
+    if (!instance || !v) return;
+    for (const k in v) {
+      if (curatedKeys.has(k)) continue;
+      if (sameOptionValue(appliedOptions.get(k), v[k])) continue;
+      appliedOptions.set(k, v[k]);
+      instance.setOption(k, v[k]);
+    }
+  })(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     // The curated config — every key the wrapper owns. The `:options`
@@ -651,39 +684,6 @@ export default function FullCalendar(_props: FullCalendarProps): JSX.Element {
     eventsSource = null;
   });
   });
-  createEffect(on(() => (() => local.events)(), (v) => untrack(() => ((v: any) => {
-    if (!instance) return;
-    eventsSource?.remove();
-    eventsSource = instance.addEventSource((v ?? []).map(normalizeEvent));
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => view())(), (v) => untrack(() => ((v: any) => {
-    if (!instance || !v) return;
-    if (v === instance.view.type) return;
-    suppressViewSync = true;
-    instance.changeView(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.weekends)(), (v) => untrack(() => ((v: any) => instance?.setOption('weekends', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => instance?.setOption('editable', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.selectable)(), (v) => untrack(() => ((v: any) => instance?.setOption('selectable', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.height)(), (v) => untrack(() => ((v: any) => instance?.setOption('height', normalizeHeight(v)))(v)), { defer: true }));
-  createEffect(on(() => (() => local.locale)(), (v) => untrack(() => ((v: any) => instance?.setOption('locale', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.firstDay)(), (v) => untrack(() => ((v: any) => {
-    if (!instance || typeof v !== 'number') return;
-    curatedKeys.add('firstDay');
-    instance.setOption('firstDay', v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.slotDuration)(), (v) => untrack(() => ((v: any) => instance?.setOption('slotDuration', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.nowIndicator)(), (v) => untrack(() => ((v: any) => instance?.setOption('nowIndicator', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.headerToolbar)(), (v) => untrack(() => ((v: any) => instance?.setOption('headerToolbar', v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.options)(), (v) => untrack(() => ((v: any) => {
-    if (!instance || !v) return;
-    for (const k in v) {
-      if (curatedKeys.has(k)) continue;
-      if (sameOptionValue(appliedOptions.get(k), v[k])) continue;
-      appliedOptions.set(k, v[k]);
-      instance.setOption(k, v[k]);
-    }
-  })(v)), { defer: true }));
   let __rozieRootRef: HTMLElement | null = null;
 
   let instance: any = null;

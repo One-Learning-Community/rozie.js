@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, inject, input, output, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { RozieSlot, rozieModel } from '@rozie/runtime-angular';
 
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -174,7 +174,9 @@ export class FullCalendar {
    * @example
    * <rozie-full-calendar [(view)]="view" [events]="events" />
    */
-  view = model<string>('dayGridMonth');
+  readonly __rozieModelIn_view = input<string | undefined>(undefined, { alias: 'view' });
+  viewChange = output<string>();
+  view = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_view, this.viewChange, 'dayGridMonth');
   /**
    * Show the Saturday/Sunday columns. Runtime-updatable via `setOption`.
    */
@@ -235,6 +237,7 @@ export class FullCalendar {
   unselect = output<FullCalendarUnselect>();
   loading = output<FullCalendarLoading>();
   eventsSet = output<FullCalendarEventsSet>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['select'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('event', { read: TemplateRef }) eventTpl?: TemplateRef<EventCtx>;
   @ContentChild('dayCell', { read: TemplateRef }) dayCellTpl?: TemplateRef<DayCellCtx>;
   @ContentChild('dayHeader', { read: TemplateRef }) dayHeaderTpl?: TemplateRef<DayHeaderCtx>;

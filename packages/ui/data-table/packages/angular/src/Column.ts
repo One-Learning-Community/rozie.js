@@ -79,14 +79,6 @@ export class Column {
 
   constructor() {
     this.reg = this.registry;
-    effect(() => () => {
-      if (this.registered) return;
-      const live = this.registry;
-      if (live == null) return;
-      this.reg = live;
-      this.registered = true;
-      this.reg.registerColumn(this.colId(), this.buildSpec());
-    });
     effect(() => { const __watchVal = (() => [this.id(), this.field(), this.header(), this.sortable(), this.filterable(), this.pinned(), this.width(), this.expandable(), this.groupable(), this.aggregationFn(), this.editable(), this.editor(), this.editorOptions(), this.validate()])(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       if (this.reg) this.reg.registerColumn(this.colId(), this.buildSpec());
     })(); }); });
@@ -103,6 +95,17 @@ export class Column {
     this.__rozieDestroyRef.onDestroy(() => {
       if (this.reg) this.reg.unregisterColumn(this.colId());
     });
+  }
+
+  ngAfterViewChecked() {
+    (() => {
+      if (this.registered) return;
+      const live = this.registry;
+      if (live == null) return;
+      this.reg = live;
+      this.registered = true;
+      this.reg.registerColumn(this.colId(), this.buildSpec());
+    })();
   }
 
   // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the

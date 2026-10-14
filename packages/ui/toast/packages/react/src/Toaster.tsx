@@ -1,5 +1,6 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, mergeListeners, parseInlineStyle, pickListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-react';
 import './Toaster.css';
 
@@ -324,7 +325,8 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
   // Deliberately exceeds the 200ms default --rozie-toast-exit-duration token
   // comfortably; a consumer overriding the exit duration beyond ~350ms gets cut
   // short by this failsafe (documented in docs/components/toast.md).
-  const EXIT_FAILSAFE_MS = useMemo(() => 350, []);
+  const EXIT_FAILSAFE_MS = 350;
+
   // Idempotent removal: filters the entry out of $data.toasts. Safe to call
   // twice (from the inline @animationend binding AND the failsafe) — the
   // second call is a harmless no-op filter over an already-absent id.
@@ -710,7 +712,7 @@ const Toaster = forwardRef<ToasterHandle, ToasterProps>(function Toaster(_props:
 
   const _rozieExposeRef = useRef({ show, dismiss, clear, patch, promise });
   _rozieExposeRef.current = { show, dismiss, clear, patch, promise };
-  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), dismiss: (...args: Parameters<typeof dismiss>): ReturnType<typeof dismiss> => _rozieExposeRef.current.dismiss(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), patch: (...args: Parameters<typeof patch>): ReturnType<typeof patch> => _rozieExposeRef.current.patch(...args), promise: (...args: Parameters<typeof promise>): ReturnType<typeof promise> => _rozieExposeRef.current.promise(...args) }), []);
+  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => flushSync(() => _rozieExposeRef.current.show(...args)), dismiss: (...args: Parameters<typeof dismiss>): ReturnType<typeof dismiss> => flushSync(() => _rozieExposeRef.current.dismiss(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)), patch: (...args: Parameters<typeof patch>): ReturnType<typeof patch> => flushSync(() => _rozieExposeRef.current.patch(...args)), promise: (...args: Parameters<typeof promise>): ReturnType<typeof promise> => flushSync(() => _rozieExposeRef.current.promise(...args)) }), []);
 
   return (
     <>

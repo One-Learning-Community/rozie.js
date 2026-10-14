@@ -1,5 +1,6 @@
 import { Fragment, forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, mergeListeners, pickListeners, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Pagination.css';
 import { paginationItems } from './internal/paginationItems';
@@ -241,7 +242,7 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
 
   const _rozieExposeRef = useRef({ goto, next, prev, first, last });
   _rozieExposeRef.current = { goto, next, prev, first, last };
-  useImperativeHandle(ref, () => ({ goto: (...args: Parameters<typeof goto>): ReturnType<typeof goto> => _rozieExposeRef.current.goto(...args), next: (...args: Parameters<typeof next>): ReturnType<typeof next> => _rozieExposeRef.current.next(...args), prev: (...args: Parameters<typeof prev>): ReturnType<typeof prev> => _rozieExposeRef.current.prev(...args), first: (...args: Parameters<typeof first>): ReturnType<typeof first> => _rozieExposeRef.current.first(...args), last: (...args: Parameters<typeof last>): ReturnType<typeof last> => _rozieExposeRef.current.last(...args) }), []);
+  useImperativeHandle(ref, () => ({ goto: (...args: Parameters<typeof goto>): ReturnType<typeof goto> => flushSync(() => _rozieExposeRef.current.goto(...args)), next: (...args: Parameters<typeof next>): ReturnType<typeof next> => flushSync(() => _rozieExposeRef.current.next(...args)), prev: (...args: Parameters<typeof prev>): ReturnType<typeof prev> => flushSync(() => _rozieExposeRef.current.prev(...args)), first: (...args: Parameters<typeof first>): ReturnType<typeof first> => flushSync(() => _rozieExposeRef.current.first(...args)), last: (...args: Parameters<typeof last>): ReturnType<typeof last> => flushSync(() => _rozieExposeRef.current.last(...args)) }), []);
 
   return (
     <>

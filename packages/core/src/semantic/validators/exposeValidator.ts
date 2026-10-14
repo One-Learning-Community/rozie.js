@@ -75,12 +75,55 @@ function collectInScopeFunctionNames(ast: RozieAST): Set<string> {
         if (t.isArrowFunctionExpression(init) || t.isFunctionExpression(init)) {
           names.add(decl.id.name);
         }
+        // `const open = openGated` — an alias of a function is a function
+        // (expandExposeAliases writes this shape for `{ open: openGated }`).
+        if (t.isIdentifier(init) && names.has(init.name)) {
+          names.add(decl.id.name);
+        }
         // NOTE: a $computed(...) const binds a reactive VALUE, not a function —
         // intentionally NOT added (exposing it is ROZ118).
       }
     }
   }
   return names;
+}
+
+/** Every name bound at the top level of the `<script>`. */
+function collectTopLevelNames(ast: RozieAST): Set<string> {
+  const names = new Set<string>();
+  if (!ast.script) return names;
+  for (const stmt of ast.script.program.program.body) {
+    if ((t.isFunctionDeclaration(stmt) || t.isClassDeclaration(stmt)) && stmt.id) {
+      names.add(stmt.id.name);
+    } else if (t.isVariableDeclaration(stmt)) {
+      for (const d of stmt.declarations) {
+        for (const n of Object.keys(t.getBindingIdentifiers(d.id))) names.add(n);
+      }
+    } else if (t.isImportDeclaration(stmt)) {
+      for (const sp of stmt.specifiers) names.add(sp.local.name);
+    }
+  }
+  return names;
+}
+
+function exposedKeyName(key: t.Node): string | null {
+  if (t.isIdentifier(key)) return key.name;
+  if (t.isStringLiteral(key)) return key.value;
+  return null;
+}
+
+/**
+ * A verb written as `{ name: value }` or `{ name() {} }` (not `{ name }` /
+ * `{ name: name }`) whose name is a top-level binding already.
+ */
+function exposeAliasNameTaken(
+  prop: t.ObjectMethod | t.ObjectProperty,
+  topLevelNames: ReadonlySet<string>,
+): boolean {
+  const name = exposedKeyName(prop.key);
+  if (name === null || !topLevelNames.has(name)) return false;
+  if (t.isObjectMethod(prop)) return true;
+  return !(t.isIdentifier(prop.value) && prop.value.name === name);
 }
 
 /**
@@ -96,6 +139,7 @@ export function runExposeValidator(
   if (calls.length === 0) return; // No $expose — nothing to validate.
 
   const inScopeFns = collectInScopeFunctionNames(ast);
+  const topLevelNames = collectTopLevelNames(ast);
 
   // ROZ120 — every non-top-level call is a nested-scope error.
   for (const site of calls) {
@@ -159,6 +203,21 @@ export function runExposeValidator(
       continue;
     }
 
+    // ROZ160 — a verb that is not shorthand needs a script binding of its own
+    // name (expandExposeAliases adds one); when that name is already taken by
+    // another binding, the verb cannot be bound without redeclaring it.
+    if (!prop.computed && exposeAliasNameTaken(prop, topLevelNames)) {
+      const name = exposedKeyName(prop.key)!;
+      diagnostics.push({
+        code: RozieErrorCode.EXPOSE_ALIAS_NAME_TAKEN,
+        severity: 'error',
+        message: `$expose verb '${name}' is bound to another value, but '${name}' is already a top-level <script> binding.`,
+        loc: locFromNode(prop),
+        hint: `Expose the existing '${name}' binding with the shorthand { ${name} }, or rename one of the two.`,
+      });
+      continue;
+    }
+
     // ObjectMethod (`{ clear() {} }`) is a valid function value.
     if (t.isObjectMethod(prop)) {
       if (prop.computed) {
@@ -169,6 +228,16 @@ export function runExposeValidator(
             '$expose({ ... }) does not support computed keys — use a static method name.',
           loc: locFromNode(prop),
           hint: 'Use a plain identifier key, e.g. { clear } or { clear: clear }.',
+        });
+      } else if (prop.kind !== 'method' || prop.generator) {
+        // A getter / setter / generator is not a callable verb.
+        diagnostics.push({
+          code: RozieErrorCode.EXPOSE_VALUE_NOT_FUNCTION,
+          severity: 'error',
+          message:
+            '$expose({ ... }) values must reference an in-scope <script> function (or be an inline arrow). Getters, setters and generators are not exposed.',
+          loc: locFromNode(prop),
+          hint: 'Expose a plain method or arrow, e.g. { getValue: () => $data.x }.',
         });
       }
       continue; // a method definition IS a function value — valid.

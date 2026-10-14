@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -98,12 +98,24 @@ const props = withDefaults(
   { itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, options: () => ({}), labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', itemStyle: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
  * @example
  * <SortableList v-model:items="todos" itemKey="id" />
  */
-const items = defineModel<any[]>('items', { default: () => [] });
+const __rozieModel_items = defineModel<any[]>('items', { default: () => [] });
+const items = computed<any[]>({
+  get: () => __rozieModel_items.value,
+  set: (v) => { if (__rozieBound('items')) __rozieVm.emit('update:items', v); else __rozieModel_items.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

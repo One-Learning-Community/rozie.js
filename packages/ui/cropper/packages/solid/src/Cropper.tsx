@@ -157,20 +157,6 @@ export default function Cropper(_props: CropperProps): JSX.Element {
   onMount(() => { local.ref?.({ getCropper, getData, getCanvasData, getCropBoxData, getImageData, getContainerData, getCroppedCanvas, getCroppedDataURL, reset, clear, showCropBox, replace, rotateTo, rotateBy, zoomTo, zoomBy, scaleX, scaleY, scale, setCanvasData, setCropBoxData, moveTo, move, enable, disable, setAspectRatio, setDragMode }); });
 
   const [data, setData] = createControllableSignal<unknown>(_props as unknown as Record<string, unknown>, 'data', undefined);
-  onMount(() => {
-    const _cleanup = (() => {
-    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
-    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
-    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
-    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
-    imgEl = imageElRef;
-    buildCropper(null);
-  })() as unknown;
-    if (_cleanup) onCleanup(_cleanup as () => void);
-    onCleanup(() => {
-    if (instance) instance.destroy();
-  });
-  });
   createEffect(on(() => (() => local.src)(), (v) => untrack(() => ((v: any) => {
     if (instance && typeof v === 'string' && v) instance.replace(v);
   })(v)), { defer: true }));
@@ -189,6 +175,20 @@ export default function Cropper(_props: CropperProps): JSX.Element {
     if (sameData(v, instance.getData())) return;
     instance.setData(v);
   })(v)), { defer: true }));
+  onMount(() => {
+    const _cleanup = (() => {
+    // Ref the <img> directly — the engine's attach target (the flatpickr/codemirror
+    // pattern). $refs is read ONLY here (ROZ123). The React emitter types an `img`
+    // ref as HTMLElement (not HTMLImageElement) — a strict-tsc mismatch fixed by a
+    // codegen type-aid (scripts/codegen.mjs), NOT an emitter edit (scope fence).
+    imgEl = imageElRef;
+    buildCropper(null);
+  })() as unknown;
+    if (_cleanup) onCleanup(_cleanup as () => void);
+    onCleanup(() => {
+    if (instance) instance.destroy();
+  });
+  });
   let imageElRef: HTMLImageElement | null = null;
 
   // null-lets so the bundled-leaf typeNeutralize pass annotates them `any`:

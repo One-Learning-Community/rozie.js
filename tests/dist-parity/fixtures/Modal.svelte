@@ -61,6 +61,11 @@ const unlockScroll = () => {
 // unmount-time restore; $onMount runs exactly once on every target (a
 // guarded no-op here) and must not be relied on to re-fire.
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+  if (isOpen) lockScroll();else unlockScroll();
+})(__watchVal); }); });
+
 onMount(() => {
   lockScroll();
   return () => unlockScroll();
@@ -68,11 +73,6 @@ onMount(() => {
 onMount(() => {
   dialogEl?.focus();
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
-  if (isOpen) lockScroll();else unlockScroll();
-})(__watchVal); }); });
 
 $effect(() => {
   if (!(open && closeOnEscape)) return;

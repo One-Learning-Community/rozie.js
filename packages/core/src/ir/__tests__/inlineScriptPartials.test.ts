@@ -103,6 +103,37 @@ describe('inlineScriptPartials', () => {
     }
   });
 
+  // A comment between a spliced declaration and a tree-shaken one belongs to the
+  // tree-shaken one: it must not stay on the spliced one's trailing comments,
+  // where it printed above the next host statement.
+  it('R2b: a tree-shaken declaration takes its leading comments with it', async () => {
+    const { inlineScriptPartials } = await import('../inlineScriptPartials.js');
+    const partial = stagePartial(
+      'logic.rzts',
+      [
+        `const kept = () => 1`,
+        `// ---- section of the dropped helper ----`,
+        `// What dropped does.`,
+        `const dropped = () => 2`,
+        `// What alsoKept does.`,
+        `const alsoKept = () => 3`,
+        `export { kept, dropped, alsoKept }`,
+      ].join('\n'),
+    );
+    try {
+      const host = moduleFile(`import { kept, alsoKept } from '${partial.path.replace(/\\/g, '\\\\')}';`);
+      const result = inlineScriptPartials(host, { hostFilename: 'Host.rozie' });
+      const body = bodyOf(result.ast ?? host);
+      const comments = body.flatMap((s) => [...(s.leadingComments ?? []), ...(s.trailingComments ?? [])]);
+      const texts = comments.map((c) => c.value.trim());
+      expect(texts).not.toContain('What dropped does.');
+      expect(texts).not.toContain('---- section of the dropped helper ----');
+      expect(texts).toContain('What alsoKept does.');
+    } finally {
+      partial.dispose();
+    }
+  });
+
   // R3 — pre-lowering placement. A $computed/$onMount moved into a partial
   // lands in `ast.script.program.body` BEFORE `analyzeAST` runs, so the inlined
   // reactive reads are analyzed identically to host-authored reads (shared

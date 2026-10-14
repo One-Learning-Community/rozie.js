@@ -1,6 +1,6 @@
 /**
  * ANGULAR-POPOVER-TYPED-SURFACE — typed public surface phase 1 (Task 17).
- * tsc-checks compile(Popover.rozie): the `open` model is `ModelSignal<boolean>`
+ * tsc-checks compile(Popover.rozie): the `open` model is typed `ModelSignal<boolean>`
  * (its `openChange` is the only change signal — the separate `change` output was
  * removed, release-0.8.0 audit B6),
  * the `anchor` template ctx is typed, handle verbs are typed. Negatives are
@@ -88,13 +88,15 @@ function tsc(files: Record<string, string>): { threw: boolean; output: string } 
   }
 }
 
-describe('ANGULAR-POPOVER-TYPED-SURFACE — open: model<boolean>, typed anchor ctx, typed handle', () => {
+describe('ANGULAR-POPOVER-TYPED-SURFACE — open: ModelSignal<boolean>, typed anchor ctx, typed handle', () => {
   const r0 = compile(SRC, { target: 'angular', filename: 'Popover.rozie', sourceMap: false });
   const ng = stubInternals(r0.code);
 
   it('compiles without errors; open is model<boolean> and there is no change output', () => {
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
-    expect(ng).toMatch(/open = model<boolean>\(false\);/);
+    // `open` keeps the ModelSignal surface (pinned by the consumer below); it is built by
+    // `rozieModel` so a consumer that refuses a change keeps the control on its value.
+    expect(ng).toMatch(/open = rozieModel<boolean, import\('@angular\/core'\)\.ModelSignal<boolean>>\(this\.__rozieModelIn_open, this\.openChange, false\);/);
     expect(ng).not.toMatch(/\bchange = output/);
   });
 

@@ -26,5 +26,6 @@
     "strictTemplates": false,
     "enableI18nLegacyMessageIdFormat": false
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/__tests__/**"]
 }

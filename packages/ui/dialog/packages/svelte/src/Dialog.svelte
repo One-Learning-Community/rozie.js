@@ -185,6 +185,11 @@ export const hide = () => {
   closeWith('programmatic');
 };
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
+  sync(isOpen);
+})(__watchVal); }); });
+
 onMount(() => {
   sync(open);
 });
@@ -206,11 +211,6 @@ onDestroy(() => (() => {
     if (back.isConnected && lost) back.focus();
   }, 0);
 })());
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
-  sync(isOpen);
-})(__watchVal); }); });
 </script>
 
 <dialog aria-label={ariaLabel} aria-labelledby={ariaLabelledby} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>

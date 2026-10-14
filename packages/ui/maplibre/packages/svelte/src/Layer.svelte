@@ -79,17 +79,6 @@ const buildSpec = () => ({
   beforeId: beforeId
 });
 
-onMount(() => {
-  if (reg) {
-    didRegister = true;
-    appliedSource = resolveSource();
-    reg.register(id, buildSpec());
-  }
-  return () => {
-    if (reg) reg.unregister(id);
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => resolveSource())(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((src: any) => {
   if (!reg || src == null || src === appliedSource) return;
@@ -129,6 +118,17 @@ $effect(() => { (() => type)(); untrack(() => { if (__rozieWatchInitial_3) { __r
     beforeId: beforeId
   });
 })(); }); });
+
+onMount(() => {
+  if (reg) {
+    didRegister = true;
+    appliedSource = resolveSource();
+    reg.register(id, buildSpec());
+  }
+  return () => {
+    if (reg) reg.unregister(id);
+  };
+});
 </script>
 
 <!-- empty template -->

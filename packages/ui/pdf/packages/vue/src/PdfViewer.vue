@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -59,10 +59,22 @@ const props = withDefaults(
   { src: undefined, scale: 1, rotation: 0, workerSrc: undefined, standardFontDataUrl: undefined, renderAllPages: false, textLayer: true, password: undefined, query: undefined, autoFit: undefined, options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The 1-based current page. The sole `model: true` prop — **two-way** (`r-model:page` / `v-model:page` / `bind:page` / `[(page)]`), so `page` also drives the Angular `ControlValueAccessor`. In single-page mode it drives which page renders; in `render-all-pages` mode it reflects the scrolled-to page (and scrolls the container when the consumer writes it). Clamped to `[1, pageCount]`.
  */
-const page = defineModel<number>('page', { default: 1 });
+const __rozieModel_page = defineModel<number>('page', { default: 1 });
+const page = computed<number>({
+  get: () => __rozieModel_page.value,
+  set: (v) => { if (__rozieBound('page')) __rozieVm.emit('update:page', v); else __rozieModel_page.value = v; },
+});
 
 const emit = defineEmits<{
   pagerendered: [...args: any[]];

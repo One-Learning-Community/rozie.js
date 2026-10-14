@@ -60,6 +60,7 @@ import { validateAttrFallthrough } from './validateAttrFallthrough.js';
 import { validateListenerFallthrough } from './validateListenerFallthrough.js';
 import { deconflictStateExposeCollision } from '../rewrite/deconflict.js';
 import { inlineScriptPartials } from './inlineScriptPartials.js';
+import { expandExposeAliases } from './lowerers/expandExposeAliases.js';
 import { expandMemo } from './lowerers/expandMemo.js';
 import type { ProducerResolver } from '../resolver/index.js';
 import * as t from '@babel/types';
@@ -183,6 +184,9 @@ export function lowerToIR(ast: RozieAST, opts: LowerOptions): LowerResult {
   // analyzeAST below) to flag as ROZ146.
   if (ast.script) {
     expandMemo(ast.script.program);
+    // An aliased / inline `$expose` verb gets a script binding of its own name
+    // (the emitters bind a verb to the binding it names) — see expandExposeAliases.
+    expandExposeAliases(ast.script.program);
   }
 
   // Run semantic analysis (collectors + 3 validators) after the splice so the

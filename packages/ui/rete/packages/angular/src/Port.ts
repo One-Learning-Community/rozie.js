@@ -42,14 +42,6 @@ export class Port {
 
   constructor() {
     this.nt = this.injectedType;
-    effect(() => () => {
-      if (this.added) return;
-      const live = this.injectedType;
-      if (live == null) return;
-      this.nt = live;
-      this.added = true;
-      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple(), this.position());
-    });
   }
 
   ngAfterViewInit() {
@@ -61,6 +53,17 @@ export class Port {
       this.added = true;
       this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple(), this.position());
     }
+  }
+
+  ngAfterViewChecked() {
+    (() => {
+      if (this.added) return;
+      const live = this.injectedType;
+      if (live == null) return;
+      this.nt = live;
+      this.added = true;
+      this.nt.addPort(this.portSide(), this.portKey(), this.type(), this.label(), this.multiple(), this.position());
+    })();
   }
 
   // $inject is typed `unknown` (Phase 36 D-4), which the STRICT BUNDLED-LEAF tsc

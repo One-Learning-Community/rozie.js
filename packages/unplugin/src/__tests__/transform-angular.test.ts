@@ -172,14 +172,14 @@ describe('load hook target="angular" — Counter.rozie compiles to Angular stand
     const { code, map } = result as { code: string; map: any };
     expect(typeof code).toBe('string');
     // Counter has @Component decorator with `selector: 'rozie-counter'` and
-    // signal API: model<number>() for `value` (model: true), input<number>()
+    // signal API: rozieModel over an aliased input for `value` (model: true), input<number>()
     // for `step`/`min`/`max`, signal() for hovering, computed() for
     // canIncrement/canDecrement.
     expect(code).toContain("from '@angular/core'");
     expect(code).toContain('@Component');
     expect(code).toContain("selector: 'rozie-counter'");
     expect(code).toContain('standalone: true');
-    expect(code).toContain('model<number>(0)');
+    expect(code).toContain("rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0)");
     expect(code).toContain('input<number>(');
     expect(code).toContain('signal(');
     expect(code).toContain('computed(');

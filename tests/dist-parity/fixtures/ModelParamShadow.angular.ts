@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, model, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-model-param-shadow',
@@ -28,7 +28,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class ModelParamShadow {
-  token = model<string>('');
+  readonly __rozieModelIn_token = input<string | undefined>(undefined, { alias: 'token' });
+  tokenChange = output<string>();
+  token = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_token, this.tokenChange, '');
   status = signal('');
   verify = output<unknown>();
 

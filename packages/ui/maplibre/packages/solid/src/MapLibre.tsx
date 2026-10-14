@@ -257,6 +257,70 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
+  createEffect(on(() => (() => center())(), (v) => untrack(() => ((v: any) => {
+    if (!instance || !Array.isArray(v) || v.length !== 2) return;
+    const c = instance.getCenter();
+    if (v[0] === c.lng && v[1] === c.lat) return;
+    instance.easeTo({
+      center: v,
+      animate: false
+    }, PROGRAMMATIC);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
+    if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
+    instance.easeTo({
+      zoom: v,
+      animate: false
+    }, PROGRAMMATIC);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => bearing())(), (v) => untrack(() => ((v: any) => {
+    if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
+    instance.easeTo({
+      bearing: v,
+      animate: false
+    }, PROGRAMMATIC);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => pitch())(), (v) => untrack(() => ((v: any) => {
+    if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
+    instance.easeTo({
+      pitch: v,
+      animate: false
+    }, PROGRAMMATIC);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.mapStyle)(), (v) => untrack(() => ((v: any) => {
+    if (!instance) return;
+    // a new style wipes imperatively-added sources/layers — reset the applied
+    // tracking and re-apply once the new style loads.
+    appliedLayerIds = [];
+    appliedSourceIds = [];
+    instance.setStyle(v ?? DEFAULT_STYLE);
+    instance.once('styledata', () => applyLayers());
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.minZoom)(), (v) => untrack(() => ((v: any) => {
+    if (instance && typeof v === 'number') instance.setMinZoom(v);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.maxZoom)(), (v) => untrack(() => ((v: any) => {
+    if (instance && typeof v === 'number') instance.setMaxZoom(v);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.maxBounds)(), (v) => untrack(() => ((v: any) => {
+    if (instance) instance.setMaxBounds(v || null);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.markers)(), (v) => untrack(() => ((v: any) => reconcileMarkers(v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.popups)(), (v) => untrack(() => ((v: any) => reconcilePopups(v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.sources)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => local.layers)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => sourceReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => layerReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
+  createEffect(on(() => (() => local.interactiveLayerIds)(), (v) => untrack(() => ((v: any) => reconcileInteractive(v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.controls)(), (v) => untrack(() => (() => applyControls())()), { defer: true }));
+  createEffect(on(() => (() => local.dragPan)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.dragRotate)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.scrollZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.doubleClickZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.boxZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.keyboard)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.touchZoomRotate)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
+  createEffect(on(() => (() => local.touchPitch)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     const el = containerElRef;
@@ -397,70 +461,6 @@ export default function MapLibre(_props: MapLibreProps): JSX.Element {
     if (instance) instance.remove();
   });
   });
-  createEffect(on(() => (() => center())(), (v) => untrack(() => ((v: any) => {
-    if (!instance || !Array.isArray(v) || v.length !== 2) return;
-    const c = instance.getCenter();
-    if (v[0] === c.lng && v[1] === c.lat) return;
-    instance.easeTo({
-      center: v,
-      animate: false
-    }, PROGRAMMATIC);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => zoom())(), (v) => untrack(() => ((v: any) => {
-    if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
-    instance.easeTo({
-      zoom: v,
-      animate: false
-    }, PROGRAMMATIC);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => bearing())(), (v) => untrack(() => ((v: any) => {
-    if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
-    instance.easeTo({
-      bearing: v,
-      animate: false
-    }, PROGRAMMATIC);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => pitch())(), (v) => untrack(() => ((v: any) => {
-    if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
-    instance.easeTo({
-      pitch: v,
-      animate: false
-    }, PROGRAMMATIC);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.mapStyle)(), (v) => untrack(() => ((v: any) => {
-    if (!instance) return;
-    // a new style wipes imperatively-added sources/layers — reset the applied
-    // tracking and re-apply once the new style loads.
-    appliedLayerIds = [];
-    appliedSourceIds = [];
-    instance.setStyle(v ?? DEFAULT_STYLE);
-    instance.once('styledata', () => applyLayers());
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.minZoom)(), (v) => untrack(() => ((v: any) => {
-    if (instance && typeof v === 'number') instance.setMinZoom(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.maxZoom)(), (v) => untrack(() => ((v: any) => {
-    if (instance && typeof v === 'number') instance.setMaxZoom(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.maxBounds)(), (v) => untrack(() => ((v: any) => {
-    if (instance) instance.setMaxBounds(v || null);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.markers)(), (v) => untrack(() => ((v: any) => reconcileMarkers(v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.popups)(), (v) => untrack(() => ((v: any) => reconcilePopups(v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.sources)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
-  createEffect(on(() => (() => local.layers)(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
-  createEffect(on(() => (() => sourceReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
-  createEffect(on(() => (() => layerReg())(), (v) => untrack(() => (() => applyLayers())()), { defer: true }));
-  createEffect(on(() => (() => local.interactiveLayerIds)(), (v) => untrack(() => ((v: any) => reconcileInteractive(v))(v)), { defer: true }));
-  createEffect(on(() => (() => local.controls)(), (v) => untrack(() => (() => applyControls())()), { defer: true }));
-  createEffect(on(() => (() => local.dragPan)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.dragRotate)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.scrollZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.doubleClickZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.boxZoom)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.keyboard)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.touchZoomRotate)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
-  createEffect(on(() => (() => local.touchPitch)(), (v) => untrack(() => (() => applyInteractionToggles())()), { defer: true }));
   let containerElRef: HTMLElement | null = null;
 
   let instance: any = null;

@@ -54,7 +54,6 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
 
     this.disposed = false;
     // Warm the script once for this sitekey. If opted in, run an initial execute.
-    // Warm the script once for this sitekey. If opted in, run an initial execute.
     loadRecaptchaV3(this.sitekey).then(() => {
       if (this.disposed || !this.executeOnMount) return;
       this.execute();

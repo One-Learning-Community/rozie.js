@@ -7,7 +7,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, getCurrentInstance, onMounted, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -43,12 +43,24 @@ const props = withDefaults(
   { length: 6, type: 'numeric', mask: false, autoFocus: false, disabled: false, placeholder: '', ariaLabel: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The assembled one-time code (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so an Otp **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Always a contiguous string of `0..length` characters; Otp writes the new code back on every edit (type, paste, backspace).
  * @example
  * <Otp v-model:value="code" :length="6" type="numeric" ariaLabel="Verification code" />
  */
-const value = defineModel<string>('value', { default: '' });
+const __rozieModel_value = defineModel<string>('value', { default: '' });
+const value = computed<string>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

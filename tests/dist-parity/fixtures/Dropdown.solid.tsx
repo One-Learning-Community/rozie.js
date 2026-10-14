@@ -44,14 +44,14 @@ export default function Dropdown(_props: DropdownProps): JSX.Element {
   onMount(() => { local.ref?.({ toggle, close }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
+  createEffect(on(() => (() => open())(), (v) => untrack(() => (() => {
+    if (open()) reposition();
+  })()), { defer: true }));
   onMount(() => {
     // Initial reposition only if the panel is open at mount time.
     if (open()) reposition();
   });
   onMount(() => {});
-  createEffect(on(() => (() => open())(), (v) => untrack(() => (() => {
-    if (open()) reposition();
-  })()), { defer: true }));
   let triggerElRef: HTMLElement | null = null;
   let panelElRef: HTMLElement | null = null;
 

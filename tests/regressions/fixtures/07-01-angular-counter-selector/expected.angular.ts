@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-counter',
@@ -24,7 +24,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Counter {
-  value = model<number>(0);
+  readonly __rozieModelIn_value = input<number | undefined>(undefined, { alias: 'value' });
+  valueChange = output<number>();
+  value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0);
 
   // 07-01 carry-forward (rozie-counter tag collision): pins the deterministic
   // Angular selector / Lit @customElement tag a component named `Counter` emits

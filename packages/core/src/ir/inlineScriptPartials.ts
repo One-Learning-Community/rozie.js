@@ -1385,6 +1385,26 @@ function inlineResolvedPartial(
     }
     const includedSorted = [...included].sort((a, b) => a.order - b.order);
 
+    // A comment between a spliced declaration and a tree-shaken one is attached
+    // to both (the first one's trailing, the second one's leading — the same
+    // object). It belongs to the declaration it precedes, so it goes with it:
+    // left on the spliced one's trailing comments it printed above whatever the
+    // host emits next (a section banner and a doc comment of `visibleOptions`
+    // landed above `close` in Select).
+    const droppedLeading = new Set<t.Comment>();
+    for (const decl of decls) {
+      if (included.has(decl)) continue;
+      for (const c of decl.stmt.leadingComments ?? []) droppedLeading.add(c);
+    }
+    if (droppedLeading.size > 0) {
+      for (const decl of includedSorted) {
+        const trailing = decl.stmt.trailingComments;
+        if (!trailing) continue;
+        const kept = trailing.filter((c) => !droppedLeading.has(c));
+        if (kept.length !== trailing.length) decl.stmt.trailingComments = kept.length > 0 ? kept : null;
+      }
+    }
+
     // Union of all identifiers referenced by the live closure — drives which
     // hoisted imports + nested partials are actually pulled in. Passthrough names
     // (above) are merged in directly since they have no decl to contribute

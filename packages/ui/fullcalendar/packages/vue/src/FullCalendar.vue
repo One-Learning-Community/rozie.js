@@ -116,7 +116,7 @@ export interface FullCalendarHandle {
 </script>
 
 <script setup lang="ts">
-import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+import { Fragment, computed, getCurrentInstance, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
 import { Calendar } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -183,12 +183,24 @@ const props = withDefaults(
 }), options: () => ({}) }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The two-way active view name (`'dayGridMonth'`, `'timeGridWeek'`, `'timeGridDay'`, …) — the sole `model: true` prop. The calendar's own toolbar writes the new view name back through the two-way path, and a consumer write switches the view via `changeView`.
  * @example
  * <FullCalendar v-model:view="view" :events="events" />
  */
-const view = defineModel<string>('view', { default: 'dayGridMonth' });
+const __rozieModel_view = defineModel<string>('view', { default: 'dayGridMonth' });
+const view = computed<string>({
+  get: () => __rozieModel_view.value,
+  set: (v) => { if (__rozieBound('view')) __rozieVm.emit('update:view', v); else __rozieModel_view.value = v; },
+});
 
 const emit = defineEmits<{
   eventClick: [payload: FullCalendarEventClick];

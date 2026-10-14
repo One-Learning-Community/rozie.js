@@ -670,10 +670,10 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     expect(code).toContain('_rozieExposeRef.current = { reset, focus };');
     expect(code).toContain('useImperativeHandle(ref, () => ({');
     expect(code).toContain(
-      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args))',
     );
     expect(code).toContain(
-      'focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args)',
+      'focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args))',
     );
     expect(code).toContain('}), []);');
 
@@ -714,10 +714,10 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     // 260618-ao9 — dispatch-wrapper handle (was `({ reset, setText }), []`).
     expect(code).toContain('const _rozieExposeRef = useRef({ reset, setText });');
     expect(code).toContain(
-      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args))',
     );
     expect(code).toContain(
-      'setText: (...args: Parameters<typeof setText>): ReturnType<typeof setText> => _rozieExposeRef.current.setText(...args)',
+      'setText: (...args: Parameters<typeof setText>): ReturnType<typeof setText> => flushSync(() => _rozieExposeRef.current.setText(...args))',
     );
   });
 
@@ -758,7 +758,7 @@ describe('emitReact — $expose forwardRef framing (Phase 21 Plan 02, REQ-5, D-0
     // 260618-ao9 — dispatch-wrapper handle on the legacy path too.
     expect(code).toContain('const _rozieExposeRef = useRef({ reset, focus });');
     expect(code).toContain(
-      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args)',
+      'reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args))',
     );
   });
 });

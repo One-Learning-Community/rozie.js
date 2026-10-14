@@ -1,6 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './CommandPalette.css';
 import Combobox, { type ComboboxHandle } from '@rozie-ui/combobox-react';
@@ -1694,7 +1695,7 @@ const CommandPalette = forwardRef<CommandPaletteHandle, CommandPaletteProps>(fun
 
   const _rozieExposeRef = useRef({ show, close, toggle, focus, goBack, openTo });
   _rozieExposeRef.current = { show, close, toggle, focus, goBack, openTo };
-  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => _rozieExposeRef.current.show(...args), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => _rozieExposeRef.current.close(...args), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), goBack: (...args: Parameters<typeof goBack>): ReturnType<typeof goBack> => _rozieExposeRef.current.goBack(...args), openTo: (...args: Parameters<typeof openTo>): ReturnType<typeof openTo> => _rozieExposeRef.current.openTo(...args) }), []);
+  useImperativeHandle(ref, () => ({ show: (...args: Parameters<typeof show>): ReturnType<typeof show> => flushSync(() => _rozieExposeRef.current.show(...args)), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => flushSync(() => _rozieExposeRef.current.close(...args)), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => flushSync(() => _rozieExposeRef.current.toggle(...args)), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), goBack: (...args: Parameters<typeof goBack>): ReturnType<typeof goBack> => flushSync(() => _rozieExposeRef.current.goBack(...args)), openTo: (...args: Parameters<typeof openTo>): ReturnType<typeof openTo> => flushSync(() => _rozieExposeRef.current.openTo(...args)) }), []);
 
   return (
     <>

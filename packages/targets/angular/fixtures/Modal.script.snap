@@ -1,5 +1,5 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, inject, input, model, output, untracked, viewChild } from '@angular/core';
-import { RozieSlot } from '@rozie/runtime-angular';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, computed, contentChildren, effect, inject, input, output, untracked, viewChild } from '@angular/core';
+import { RozieSlot, rozieModel } from '@rozie/runtime-angular';
 
 
 interface HeaderCtx {
@@ -17,7 +17,9 @@ interface FooterCtx {
   close: any;
 }
 
-open = model<boolean>(false);
+readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+openChange = output<boolean>();
+open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
 closeOnEscape = input<boolean>(true);
 closeOnBackdrop = input<boolean>(true);
 lockBodyScroll = input<boolean>(true);

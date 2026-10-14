@@ -526,6 +526,52 @@ export function clearSelection() {
   instance?.unselect();
 }
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => events)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
+  if (!instance) return;
+  eventsSource?.remove();
+  eventsSource = instance.addEventSource((v ?? []).map(normalizeEvent));
+})(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { const __watchVal = (() => view)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => {
+  if (!instance || !v) return;
+  if (v === instance.view.type) return;
+  suppressViewSync = true;
+  instance.changeView(v);
+})(__watchVal); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { const __watchVal = (() => weekends)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => instance?.setOption('weekends', v))(__watchVal); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.setOption('editable', v))(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => selectable)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.setOption('selectable', v))(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => height)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.setOption('height', normalizeHeight(v)))(__watchVal); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => locale)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.setOption('locale', v))(__watchVal); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => firstDay)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => {
+  if (!instance || typeof v !== 'number') return;
+  curatedKeys.add('firstDay');
+  instance.setOption('firstDay', v);
+})(__watchVal); }); });
+let __rozieWatchInitial_8 = true;
+$effect(() => { const __watchVal = (() => slotDuration)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => instance?.setOption('slotDuration', v))(__watchVal); }); });
+let __rozieWatchInitial_9 = true;
+$effect(() => { const __watchVal = (() => nowIndicator)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.setOption('nowIndicator', v))(__watchVal); }); });
+let __rozieWatchInitial_10 = true;
+$effect(() => { const __watchVal = (() => headerToolbar)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } ((v: any) => instance?.setOption('headerToolbar', v))(__watchVal); }); });
+let __rozieWatchInitial_11 = true;
+$effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } ((v: any) => {
+  if (!instance || !v) return;
+  for (const k in v) {
+    if (curatedKeys.has(k)) continue;
+    if (sameOptionValue(appliedOptions.get(k), v[k])) continue;
+    appliedOptions.set(k, v[k]);
+    instance.setOption(k, v[k]);
+  }
+})(__watchVal); }); });
+
 onMount(() => {
   // The curated config — every key the wrapper owns. The `:options`
   // passthrough below fills only the gaps (curated keys always win).
@@ -825,52 +871,6 @@ onMount(() => {
     eventsSource = null;
   };
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => events)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
-  if (!instance) return;
-  eventsSource?.remove();
-  eventsSource = instance.addEventSource((v ?? []).map(normalizeEvent));
-})(__watchVal); }); });
-let __rozieWatchInitial_1 = true;
-$effect(() => { const __watchVal = (() => view)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => {
-  if (!instance || !v) return;
-  if (v === instance.view.type) return;
-  suppressViewSync = true;
-  instance.changeView(v);
-})(__watchVal); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { const __watchVal = (() => weekends)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => instance?.setOption('weekends', v))(__watchVal); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => editable)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => instance?.setOption('editable', v))(__watchVal); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { const __watchVal = (() => selectable)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => instance?.setOption('selectable', v))(__watchVal); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => height)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => instance?.setOption('height', normalizeHeight(v)))(__watchVal); }); });
-let __rozieWatchInitial_6 = true;
-$effect(() => { const __watchVal = (() => locale)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => instance?.setOption('locale', v))(__watchVal); }); });
-let __rozieWatchInitial_7 = true;
-$effect(() => { const __watchVal = (() => firstDay)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => {
-  if (!instance || typeof v !== 'number') return;
-  curatedKeys.add('firstDay');
-  instance.setOption('firstDay', v);
-})(__watchVal); }); });
-let __rozieWatchInitial_8 = true;
-$effect(() => { const __watchVal = (() => slotDuration)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => instance?.setOption('slotDuration', v))(__watchVal); }); });
-let __rozieWatchInitial_9 = true;
-$effect(() => { const __watchVal = (() => nowIndicator)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => instance?.setOption('nowIndicator', v))(__watchVal); }); });
-let __rozieWatchInitial_10 = true;
-$effect(() => { const __watchVal = (() => headerToolbar)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } ((v: any) => instance?.setOption('headerToolbar', v))(__watchVal); }); });
-let __rozieWatchInitial_11 = true;
-$effect(() => { const __watchVal = (() => options)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } ((v: any) => {
-  if (!instance || !v) return;
-  for (const k in v) {
-    if (curatedKeys.has(k)) continue;
-    if (sameOptionValue(appliedOptions.get(k), v[k])) continue;
-    appliedOptions.set(k, v[k]);
-    instance.setOption(k, v[k]);
-  }
-})(__watchVal); }); });
 </script>
 
 <div class="rozie-fullcalendar" bind:this={__rozieRoot} data-rozie-s-5589629a></div>

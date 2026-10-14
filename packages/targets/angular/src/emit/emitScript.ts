@@ -104,6 +104,7 @@ import {
   isRecordOnlySlotDecl,
 } from './refineSlotTypes.js';
 import { functionExpressionAsArrow } from '../../../../core/src/codegen/functionExpressionAsArrow.js';
+import { blockHasOwnReturn } from '../../../../core/src/codegen/blockHasOwnReturn.js';
 
 // CJS interop normalization for @babel/generator default export.
 type GenerateFn = typeof import('@babel/generator').default;
@@ -475,6 +476,17 @@ function findClonedComputedBodies(clonedProgram: t.File): {
   return { bodies, casts };
 }
 
+/**
+ * Native events that bubble but are not composed: a Lit shadow root keeps them
+ * in, so an output of the same name never meets them on the host there.
+ */
+const NON_COMPOSED_BUBBLING_EVENTS = new Set(['change', 'submit', 'reset', 'select']);
+
+/** The private input field behind a two-way prop (see `rozieModel`). */
+function angularModelInputField(name: string): string {
+  return `__rozieModelIn_${name}`;
+}
+
 interface LifecycleClonedBody {
   setupCloned: t.Expression | t.BlockStatement;
   cleanupCloned: t.Expression | null;
@@ -581,7 +593,7 @@ function pairClonedLifecycle(
  */
 interface RenderedLifecycleHook {
   /** Which class member the rendered code belongs in. */
-  kind: 'constructor' | 'afterViewInit';
+  kind: 'constructor' | 'afterViewInit' | 'afterViewChecked';
   /** Generated source lines (already trimmed; caller handles indentation). */
   code: string;
   /**
@@ -611,8 +623,15 @@ interface RenderedLifecycleHook {
  *     preserves any locals declared in the setup body that the cleanup
  *     closure references (cleanup-return form).
  *   - phase 'unmount' standalone → constructor: `inject(DestroyRef).onDestroy(<cleanup>);`
- *   - phase 'update' → constructor: `effect(() => { ... })` (auto-tracks
- *     reactive reads; effect() must run in injection context).
+ *   - phase 'update' → `ngAfterViewChecked()`: runs after every check of this
+ *     component's view, the first one included — the post-render hook the
+ *     other five targets lower `$onUpdate` to (React `useEffect`, Vue
+ *     `onUpdated`, Lit `updated()`). NOT an `effect()`: an auto-tracking
+ *     effect only re-runs when a signal it read changes, so an array pushed
+ *     in place never re-ran it (and Angular 19's `effect` ignores a returned
+ *     function, so the old `effect(() => () => {…})` body never ran at all).
+ *     Not `afterRender` / `afterEveryRender` either: the first is gone in
+ *     Angular 21 and the second is missing from 19, the floor.
  */
 function renderLifecycleHook(
   hook: LifecycleClonedBody,
@@ -631,8 +650,8 @@ function renderLifecycleHook(
 
   if (phase === 'update') {
     return {
-      kind: 'constructor',
-      code: `effect(() => ${invokeOrPass(setupCloned, classMembers, collisionRenames, true)});`,
+      kind: 'afterViewChecked',
+      code: invokeAndExpand(setupCloned, classMembers, collisionRenames),
       needsDestroyRefField: false,
     };
   }
@@ -688,6 +707,10 @@ function invokeAndExpand(
   if (t.isArrowFunctionExpression(setup) || t.isFunctionExpression(setup)) {
     const fnBody = setup.body;
     if (t.isBlockStatement(fnBody)) {
+      // A body that `return`s early cannot be inlined: the hooks share one
+      // method, and the `return` would skip every hook after it. Called as
+      // an IIFE instead.
+      if (blockHasOwnReturn(fnBody)) return `(${genCode(setup)})();`;
       // Inline the body as a sequence of statements rather than as an
       // IIFE — this keeps the constructor reading naturally.
       const stmts = fnBody.body.map((s) => genCode(s)).join('\n');
@@ -1094,7 +1117,26 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     if (jsdoc) {
       for (const jl of jsdoc.replace(/\n$/, '').split('\n')) fieldLines.push(jl);
     }
-    if (defaultVal) {
+    if (p.isModel) {
+      // A two-way prop is an aliased input + its `<name>Change` output (the
+      // pair `[(name)]` binds), read and written through `rozieModel`: a
+      // write while the consumer binds a value only emits, so a consumer that
+      // refuses the change keeps the control on its value — the controlled
+      // rule of the React / Solid / Lit targets. Angular's `model()` updated
+      // its local value on every write, and a refused write stayed on screen.
+      const inField = angularModelInputField(p.name);
+      const inputDecl = p.required && !defaultVal
+        ? `input.required<${tsType}>({ alias: '${p.name}' })`
+        : `input<${tsType} | undefined>(undefined, { alias: '${p.name}' })`;
+      // Public: Angular rejects a private input (NG1053).
+      fieldLines.push(`readonly ${inField} = ${inputDecl};`);
+      fieldLines.push(`${p.name}Change = output<${tsType}>();`);
+      const initial = defaultVal || (p.required ? `undefined as unknown as ${tsType}` : 'undefined');
+      const modelType = defaultVal || p.required ? tsType : `${tsType} | undefined`;
+      fieldLines.push(
+        `${p.name} = rozieModel<${modelType}, import('@angular/core').ModelSignal<${modelType}>>(this.${inField}, this.${p.name}Change, ${initial});`,
+      );
+    } else if (defaultVal) {
       fieldLines.push(`${p.name} = ${fnName}<${tsType}>(${defaultVal});`);
     } else if (p.required) {
       // 260521-oao — `p.required` is the SOLE optionality determinant. A
@@ -1224,6 +1266,26 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     } else {
       fieldLines.push(`${fieldId} = output<${outputType}>({ alias: '${alias}' });`);
     }
+  }
+  // 6d.bis An output named like a native event that bubbles but is not composed
+  // (`change`, `submit`, …): a consumer's `(change)` on the host element hears
+  // the output AND, as a DOM listener, the native event bubbling out of this
+  // component's own template — one commit, two calls. On Lit the native event
+  // stays inside the shadow root, and the other targets bind a callback, not a
+  // DOM listener; here the native event is stopped at the host. The listener
+  // is registered while the component is constructed, before the parent
+  // template adds its own listener to the host, so it runs first.
+  const guardedEvents = angularOutputDecls(ir, emitsWithPayload)
+    .map((d) => d.alias ?? d.fieldId)
+    .filter((name) => NON_COMPOSED_BUBBLING_EVENTS.has(name));
+  if (guardedEvents.length > 0) {
+    imports.add('inject');
+    imports.add('ElementRef');
+    imports.add('Renderer2');
+    const list = guardedEvents.map((n) => `'${n}'`).join(', ');
+    fieldLines.push(
+      `private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => [${list}].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));`,
+    );
   }
 
   // 6e. @ContentChild slot tpl fields.
@@ -1403,10 +1465,12 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
 
   // 8. Build lifecycle blocks, bucketed per-phase:
   //    - mount → ngAfterViewInit() so viewChild() signals are populated
-  //    - unmount / update → constructor (inject() / effect() need injection context)
+  //    - unmount → constructor (inject() needs injection context)
+  //    - update → ngAfterViewChecked() (a post-render hook, like the other targets)
   //    See renderLifecycleHook for the bucketing rationale.
   const lifecycleConstructorLines: string[] = [];
   const lifecycleAfterViewInitLines: string[] = [];
+  const lifecycleAfterViewCheckedLines: string[] = [];
   // Quick task 260818-okc — the retimed empty-fill-map guard for a MIXED
   // producer lands here, emitted as `ngAfterContentInit()` (see the
   // diagnostics-gate comment above `hasRecordOnlySlot`/`eligibleFieldNames`).
@@ -1420,6 +1484,8 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
     );
     if (rendered.kind === 'afterViewInit') {
       lifecycleAfterViewInitLines.push(rendered.code);
+    } else if (rendered.kind === 'afterViewChecked') {
+      lifecycleAfterViewCheckedLines.push(rendered.code);
     } else {
       lifecycleConstructorLines.push(rendered.code);
     }
@@ -2055,6 +2121,17 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       )
       .join('\n');
     classBodyParts.push(`ngAfterViewInit() {\n${indented}\n}`);
+  }
+  if (lifecycleAfterViewCheckedLines.length > 0) {
+    const indented = lifecycleAfterViewCheckedLines
+      .map((l) =>
+        l
+          .split('\n')
+          .map((line) => (line.length > 0 ? '  ' + line : line))
+          .join('\n'),
+      )
+      .join('\n');
+    classBodyParts.push(`ngAfterViewChecked() {\n${indented}\n}`);
   }
   if (computedLines.length > 0) {
     classBodyParts.push(computedLines.join('\n'));

@@ -120,6 +120,8 @@ export const REACT_PORTAL_ROOT_IMPORTS =
   "import { createRoot, type Root } from 'react-dom/client';\nimport { flushSync } from 'react-dom';";
 /** `r-portal` element teleport. */
 export const REACT_ELEMENT_PORTAL_IMPORT = "import { createPortal } from 'react-dom';";
+/** `$expose` handle: each verb runs in `flushSync` (already imported with the portal roots). */
+export const REACT_FLUSH_SYNC_IMPORT = "import { flushSync } from 'react-dom';";
 /** `.d.ts` sidecar of an `$expose` component (forwardRef-typed default export). */
 export const REACT_SIDECAR_FORWARD_REF_IMPORTS =
   "import type { ForwardRefExoticComponent, RefAttributes } from 'react';\nimport type * as React from 'react';";
@@ -175,6 +177,8 @@ export const SOLID_RUNTIME_IMPORTS = [
   // so a provably-string / object-literal class component's
   // `@rozie/runtime-solid` import line stays byte-identical.
   'rozieClass',
+  // A `<select :value>` binding — re-applies the value as the options change.
+  'rozieSelectValue',
   // Phase 36 ($provide/$inject) — globalThis-backed Solid context registry.
   // Added by emitContext ONLY when ir.provides/ir.injects is non-empty, so a
   // non-context component's `@rozie/runtime-solid` import line stays
@@ -237,6 +241,7 @@ export const VUE_IMPORTS = [
   'h',
   'render',
   'Fragment',
+  'getCurrentInstance',
 ] as const;
 
 /** `import { … } from '@rozie/runtime-vue'` — `RuntimeVueImportCollector` + script-injection imports. */
@@ -381,6 +386,7 @@ export const ANGULAR_RUNTIME_IMPORTS = [
   'rozieToken',
   'createRozieAttrApplier',
   'createRozieHostAttrsReader',
+  'rozieModel',
 ] as const;
 
 /**
@@ -622,6 +628,7 @@ const CATALOG: readonly CatalogEntry[] = [
   { target: 'React', line: REACT_NODE_TYPE_IMPORT },
   { target: 'React', line: REACT_PORTAL_ROOT_IMPORTS },
   { target: 'React', line: REACT_ELEMENT_PORTAL_IMPORT },
+  { target: 'React', line: REACT_FLUSH_SYNC_IMPORT },
   { target: 'React', line: REACT_SIDECAR_FORWARD_REF_IMPORTS },
   { target: 'Solid', from: 'solid-js', names: SOLID_IMPORTS },
   { target: 'Solid', from: '@rozie/runtime-solid', names: SOLID_RUNTIME_IMPORTS },

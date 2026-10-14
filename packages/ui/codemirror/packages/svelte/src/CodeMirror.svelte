@@ -740,14 +740,6 @@ export function scrollToPos(pos: any, opts: any) {
   });
 }
 
-onMount(() => {
-  view = new EditorView({
-    state: buildState(value),
-    parent: hostEl!
-  });
-  return () => view?.destroy();
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => value)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => writeDoc(v))(__watchVal); }); });
 let __rozieWatchInitial_1 = true;
@@ -782,6 +774,14 @@ let __rozieWatchInitial_8 = true;
 $effect(() => { (() => decorations)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } (() => {
   scheduleReconfigure(decorationCompartment, () => rebuildDecorationExt());
 })(); }); });
+
+onMount(() => {
+  view = new EditorView({
+    state: buildState(value),
+    parent: hostEl!
+  });
+  return () => view?.destroy();
+});
 </script>
 
 <div class="rozie-codemirror" style:height={height + 'px'} data-rozie-s-34cfda5a><div class="cm-mount" bind:this={hostEl} data-rozie-s-34cfda5a></div></div>

@@ -28,14 +28,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{ title?: string }>(),
   { title: 'Todo' }
 );
 
-const items = defineModel<any[]>('items', { default: () => [] });
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
+const __rozieModel_items = defineModel<any[]>('items', { default: () => [] });
+const items = computed<any[]>({
+  get: () => __rozieModel_items.value,
+  set: (v) => { if (__rozieBound('items')) __rozieVm.emit('update:items', v); else __rozieModel_items.value = v; },
+});
 
 const emit = defineEmits<{
   add: [...args: any[]];

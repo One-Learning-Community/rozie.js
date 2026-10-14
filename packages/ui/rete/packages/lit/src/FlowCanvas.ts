@@ -1008,14 +1008,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // built-in OS-dark palette, themes/base.css's defaults and `.dark` palette, or a
     // shadcn/material/bootstrap bridge), then the historical literal — so the zero-import
     // light default stays byte-identical while dark and the bridges track automatically.
-    // Resolve a `--rozie-flow-*` token off the live canvas element for the imperative
-    // SVG attributes that can't take a raw `var()` (the arrowhead fill + the minimap
-    // node/mask/viewport colors). Reads post-mount (container is live here → ROZ123-safe)
-    // via getComputedStyle, in the same order the stylesheet's read sites use: the public
-    // token (set on any ancestor or on the canvas), then its private `--rfc-*` wiring (the
-    // built-in OS-dark palette, themes/base.css's defaults and `.dark` palette, or a
-    // shadcn/material/bootstrap bridge), then the historical literal — so the zero-import
-    // light default stays byte-identical while dark and the bridges track automatically.
     const flowToken = (name: any, fallback: any) => {
       try {
         if (!container) return fallback;
@@ -1039,12 +1031,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // lowers on React to the live `_portRegRef.current`, not a stale-empty mount-time
     // closure (the portTypeOf discipline). Used by both the socket-anchor offset below and
     // renderNode's socket layout.
-    // Resolve a port's VISUAL position (F2) from the per-TYPE port schema (portReg, keyed
-    // `type::side::key`), defaulting by DIRECTION (input → left, output → right) for exact
-    // back-compat. DEFINED HERE inside $onMount (NOT top level) so its $data.portReg read
-    // lowers on React to the live `_portRegRef.current`, not a stale-empty mount-time
-    // closure (the portTypeOf discipline). Used by both the socket-anchor offset below and
-    // renderNode's socket layout.
     const resolvePortPosition = (type: any, side: any, key: any) => {
       const entry = type != null && key != null ? this._portReg.value[type + '::' + side + '::' + key] : null;
       const p = entry && entry.position != null ? entry.position : null;
@@ -1052,13 +1038,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return side === 'input' ? 'left' : 'right';
     };
 
-    // DOM-based socket position watcher — feeds connection-path redraw + the
-    // ConnectionPlugin's drag-to-connect hit-testing. A CUSTOM `offset` (F2): the rete
-    // default shifts the anchor 12px OUTWARD on the X axis only (`x + 12·(input?−1:1)`) —
-    // correct for left/right, wrong for top/bottom. We resolve each socket's visual
-    // position and shift on the matching axis (±x for left/right — IDENTICAL to the default,
-    // so the rete-flow-align cell stays green; ±y for top/bottom). The position is looked up
-    // live via nodeMeta→type→portReg, so it tracks late-registered ports.
     // DOM-based socket position watcher — feeds connection-path redraw + the
     // ConnectionPlugin's drag-to-connect hit-testing. A CUSTOM `offset` (F2): the rete
     // default shifts the anchor 12px OUTWARD on the X axis only (`x + 12·(input?−1:1)`) —
@@ -1108,23 +1087,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // one-shot callback ResizeObserver fires on observe() is a harmless redundant re-measure
     // of a just-measured socket — and a useful one, since it lands after first layout has
     // settled.
-    // ISSUE-8: create the node-box ResizeObserver BEFORE the first reconcile, so every node
-    // built from here on is observed as it is created (renderNode's fresh build calls
-    // observe()). The callback replays that node's per-socket re-measure closures, which
-    // re-emit the `rendered` socket signal getDOMSocketPosition needs to recalculate and
-    // re-store the position; each stored position is pushed straight into the
-    // renderConnection `socketWatcher.listen` callbacks, which redraw the path. Nothing
-    // needs to call area.update('connection', …) — and in fact that would NOT work, because
-    // it redraws faithfully from the (stale) position store.
-    //
-    // The box→entry lookup is a WeakMap so a culled node's entry is collected with its DOM
-    // and no explicit delete is owed. Iterating nodeEntries per resized box instead would be
-    // O(n²) on the initial observe burst, which ResizeObserver delivers as ONE batch.
-    //
-    // Re-measuring cannot resize anything, so this can never feed back into itself. The
-    // one-shot callback ResizeObserver fires on observe() is a harmless redundant re-measure
-    // of a just-measured socket — and a useful one, since it lands after first layout has
-    // settled.
     if (typeof ResizeObserver === 'function') {
       this.nodeResizeObserver = new ResizeObserver((entries: any) => {
         for (const roEntry of entries as any) {
@@ -1141,16 +1103,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this.editor.use(this.area);
     this.area.use(this.connectionPlugin);
 
-    // ── T2.5 RECONNECT coalescing pipe (D-08 reconnectable edges, D-03 one-gesture-one-entry) ──
-    // `connectionpick` / `connectiondrop` are emitted on the ConnectionPlugin's OWN scope (they
-    // are NOT editor signals like connectioncreated/removed, nor area signals like nodepicked),
-    // so they must be observed via a pipe attached DIRECTLY to `connectionPlugin` — they do not
-    // propagate into editor.addPipe / area.addPipe. Grabbing an already-connected input socket
-    // fires connectionpick, then the classic preset removes the old edge + (on drop over a new
-    // socket) adds a new one — a remove+add pair that would push TWO history entries (Pitfall 2).
-    // We open a reconnect-in-flight window on connectionpick (capturing the PRE-gesture snapshot
-    // ONCE) and close it on connectiondrop (pushing that single snapshot iff the gesture actually
-    // changed the graph) — so the whole reconnect is ONE undoable step.
     // ── T2.5 RECONNECT coalescing pipe (D-08 reconnectable edges, D-03 one-gesture-one-entry) ──
     // `connectionpick` / `connectiondrop` are emitted on the ConnectionPlugin's OWN scope (they
     // are NOT editor signals like connectioncreated/removed, nor area signals like nodepicked),
@@ -1269,43 +1221,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // minimal child Scope and attach the watcher to it. Rete forwards every area
     // signal (render/nodetranslated/unmount/…) into this child's signal, so the
     // watcher sees socket renders + node moves and recomputes socket positions.
-    // The socket-position watcher (and, conceptually, our vanilla "render plugin")
-    // must attach to a CHILD scope of the area — `attach` calls
-    // `scope.parentScope(BaseAreaPlugin)`, which walks UP one level, so the scope's
-    // parent must BE the area. Attaching to `area` itself fails ("actual parent is
-    // not instance of type") because area's parent is the NodeEditor. So we add a
-    // minimal child Scope and attach the watcher to it. Rete forwards every area
-    // signal (render/nodetranslated/unmount/…) into this child's signal, so the
-    // watcher sees socket renders + node moves and recomputes socket positions.
     this.renderScope = new Scope('rozie-vanilla-render');
     this.area.use(this.renderScope);
     this.socketWatcher.attach(this.renderScope);
 
-    // ── T2.6 auto-layout (D-08, verb-only) ──
-    // NOTHING IS WIRED HERE (quick-260823-qgi). The AutoArrangePlugin used to be constructed
-    // and installed at this point in mount, which pulled elkjs into every consumer's bundle for
-    // a verb that is opt-in and never auto-triggered. autoArrange() now imports, constructs and
-    // area.use()-installs it on first call.
-    //
-    // Installing an area plugin AFTER mount is safe FOR THIS PLUGIN specifically, and that is a
-    // property of the plugin, not a general rule: AutoArrangePlugin registers no pipe handlers
-    // (no addPipe, no lifecycle subscription — its whole surface is addPreset/findPreset/
-    // getArea/getEditor/nodeToLayoutChild/connectionToLayoutEdge/graphToElk/getPortId/layout),
-    // and it resolves the area lazily via parentScope(BaseAreaPlugin) at layout() time. Contrast
-    // `selectableNodes` below, where pipe order IS registration order and a construction-time
-    // install was a real bug (quick-260803-s3m).
-
-    // ── selection (selectableNodes) — INSTALLED FURTHER DOWN, after the gate pipe ──
-    // quick-260803-s3m: the install used to sit HERE behind a construction-time
-    // `if ($props.selectable && !$props.readonly)`, which is exactly what made both props
-    // dead after mount. It now installs UNCONDITIONALLY, immediately after the
-    // "runtime-reactive interaction gate" pipe (search that string) — pipe order IS
-    // registration order, and the gate must register BEFORE `selectableNodes` for its
-    // `nodepicked` veto to land. Nothing between here and there reads `selector` /
-    // `nodeSelectApi` (the marquee, `selectedNodeIds()` and the $expose selection verbs all
-    // run later, post-mount), so the move is free.
-
-    // raise the picked node above its siblings.
     // ── T2.6 auto-layout (D-08, verb-only) ──
     // NOTHING IS WIRED HERE (quick-260823-qgi). The AutoArrangePlugin used to be constructed
     // and installed at this point in mount, which pulled elkjs into every consumer's bundle for
@@ -1342,15 +1261,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // escape hatch is preserved by the 0.01 / 100 fallbacks; the only changed case is
     // minZoom === 0 && maxZoom === 0, which now installs an effectively-unbounded
     // restrictor instead of none (same behaviour, one fewer branch).
-    // ── zoom clamp (restrictor) — unconditional, with a LIVE `scaling` FUNCTION ──
-    // quick-260803-s3m: `scaling` may be a FUNCTION. rete-area-plugin's restrictZoom does
-    // `typeof scaling === 'function' ? scaling() : scaling` and evaluates it on EVERY `zoom`
-    // event, so minZoom/maxZoom become live reads for free and a consumer can retune the
-    // clamp after mount. Do NOT "simplify" this back to an object literal — that
-    // re-snapshots both bounds at construction. The documented "0 disables the bound"
-    // escape hatch is preserved by the 0.01 / 100 fallbacks; the only changed case is
-    // minZoom === 0 && maxZoom === 0, which now installs an effectively-unbounded
-    // restrictor instead of none (same behaviour, one fewer branch).
     AreaExtensions.restrictor(this.area, {
       scaling: () => ({
         min: typeof this.minZoom === 'number' && this.minZoom > 0 ? this.minZoom : 0.01,
@@ -1358,38 +1268,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       })
     });
 
-    // ── snap-to-grid: deliberately NOT AreaExtensions.snapGrid ──
-    // quick-260803-s3m: the extension captures its `size` ONCE at install and has no
-    // function form, so it is structurally unusable for reactivity. Its entire behaviour is
-    // `Math.round(v / size) * size` on the `nodetranslate` signal — reimplemented inline in
-    // the gate pipe below off a LIVE `$props.snapGrid` read.
-
-    // ── interaction toggles: deliberately NOT setDragHandler(null)/setZoomHandler(null) ──
-    // quick-260803-s3m: those were IRREVERSIBLE (rete's `Drag`/`Zoom` classes are not
-    // exported, so a detached handler could never be re-instantiated — flipping
-    // pannable/zoomable back on was impossible). `pannable` / `zoomable` are now per-event
-    // VETOES in the gate pipe below: Area.translate / Area.zoom each AWAIT their guard emit
-    // and abort on a falsy result without touching the transform, so the handlers stay
-    // attached and simply have their effect refused — reversibly.
-
-    // ── Delete / Backspace key → cascading delete of the selected node(s) (Win 1) ──
-    // Attached to the engine container ($refs.canvasEl, which carries tabindex="0" in
-    // the template so it can receive key focus) rather than `document`: the listener
-    // lives INSIDE the Lit shadow root alongside the canvas, so a canvas-focused key
-    // reaches it on Lit too (a `:target="document"` listener does not reliably see
-    // shadow-scoped focus across all 6 — the canvas-element listener is the robust
-    // cross-target path). We guard against deleting while focus is in a node-body text
-    // field (INPUT/TEXTAREA/contenteditable) so typing in a node never nukes it. The
-    // listener is removed in the teardown.
-    //
-    // quick-260803-s3m: the listener installs UNCONDITIONALLY and the `selectable &&
-    // !readonly` rule became a LIVE guard inside the handler (below) — it used to gate the
-    // install, which is what made both props dead after mount. The rule itself is unchanged:
-    // every canvas shortcut (Delete/Backspace, edge-delete, Ctrl/Cmd+Z / +Shift+Z / +Y,
-    // Ctrl/Cmd+A, Ctrl/Cmd+D) is suppressed while selection is off or the canvas is
-    // readonly — as it already was. The imperative `undo()` / `redo()` $expose verbs were
-    // never gated and stay ungated: a readonly canvas can still be driven by its consumer,
-    // it just has no keyboard editing affordances of its own.
     // ── snap-to-grid: deliberately NOT AreaExtensions.snapGrid ──
     // quick-260803-s3m: the extension captures its `size` ONCE at install and has no
     // function form, so it is structurally unusable for reactivity. Its entire behaviour is
@@ -1520,11 +1398,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // ALWAYS returns context (returning undefined would halt the signal chain and
     // break the ConnectionPlugin / socket watcher downstream).
     // ─────────────────────────────────────────────────────────────────────────
-    // ─────────────────────────────────────────────────────────────────────────
-    // THE VANILLA RENDER PIPE. Intercepts the AreaPlugin's render/unmount signals.
-    // ALWAYS returns context (returning undefined would halt the signal chain and
-    // break the ConnectionPlugin / socket watcher downstream).
-    // ─────────────────────────────────────────────────────────────────────────
     this.area.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'render') {
@@ -1538,37 +1411,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return context;
     });
 
-    // ── node renderer ──
-    // Fills the engine-created nodeView element with: input sockets, the body
-    // (consumer `node` portal fragment OR default chrome), and output sockets.
-    // Re-render (area.update('node', id)) reuses the same element → update in place.
-    // The engine-node parameter is named `node` (matching the `node` portal slot) —
-    // a script-side `$slots.node` read inside a helper whose OWN parameter also
-    // shadows `node` is now AUTO-FIXED by the Svelte emitter (Phase 73 item #1):
-    // `findRForSlotNameCollisions` detects the script/param-scope shadow and renames
-    // the lowered slot-merge binding to `node$$slot` everywhere it's referenced
-    // (including this function's own `$slots.node` read below), so `if ($slots.node)`
-    // resolves to the true slot-presence check, never this local parameter.
-    // 260825-mip — resolve and apply a node's box size. THE single place width/height are
-    // decided, shared by renderNode's fresh-build and in-place branches so the two can never
-    // disagree.
-    //
-    //     effective = clamp( instance node.width ?? type width ?? auto )
-    //
-    // Instance beats type: an instance `width` is a deliberate act (a corner-drag write-back,
-    // or explicit authoring in the bound graph), while the type value is a template default.
-    // The clamp applies LAST, to whichever won — that is what makes minWidth/maxWidth genuine
-    // invariants of the TYPE rather than mere gesture bounds: nothing renders outside them,
-    // including auto-sized body content, which is exactly what a consumer setting
-    // `maxWidth: 400` means. (`clampResizeSize` is untouched and still clamps the value
-    // written back into the MODEL, so the graph never stores a number CSS silently corrects.)
-    //
-    // The clamp is expressed as CSS min-width/max-width rather than arithmetic because CSS
-    // clamps the `auto` case too, which JS cannot do without measuring.
-    //
-    // An explicit width ALSO writes minWidth: base.css gives .rozie-flow-node a 140px floor,
-    // which is a default for AUTO-sized nodes — a node authored `:width="120"` must render
-    // 120, not be silently clamped up to 140. Same for height, defensively.
     // ── node renderer ──
     // Fills the engine-created nodeView element with: input sockets, the body
     // (consumer `node` portal fragment OR default chrome), and output sockets.
@@ -1837,11 +1679,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
     // (the classic horizontal port row); top/bottom get a vertical port (socket above its
     // label) + a `--<position>` socket class so the socket straddles the matching edge.
-    // Render ONE socket into a zone and, crucially, EMIT its render signal so the
-    // ConnectionPlugin + position watcher register it. `position` is the socket's visual
-    // placement (left|right|top|bottom). For left/right the DOM is byte-identical to pre-F2
-    // (the classic horizontal port row); top/bottom get a vertical port (socket above its
-    // label) + a `--<position>` socket class so the socket straddles the matching edge.
     const renderSocketInto = (zone: any, node: any, side: any, key: any, position: any, socketDisposers: any, socketRemeasures: any) => {
       const port = (side === 'input' ? node.inputs : node.outputs)[key];
       if (!port) return;
@@ -1950,23 +1787,12 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // innerHTML — no injection, T-44-02-2 accept). The default branch stays
     // `classicConnectionPath` → byte-identical bezier (pixel-baseline safe).
     // straight: a single line, no curvature.
-    // ── hand-written edge-type path generators (T1.2, D-01) ───────────────────────
-    // `rete-render-utils` ships ONLY `classicConnectionPath` (bezier) + `loopConnectionPath`;
-    // step/smoothstep/straight do NOT exist in any installed rete package, so they are
-    // hand-written here matching React-Flow's `step|smoothstep|straight` semantics. Each is a
-    // PURE `(start, end) → d-string` function over `{x,y}` graph-screen points; the `d` is
-    // composed from numeric coords + literal SVG commands and written via setAttribute (never
-    // innerHTML — no injection, T-44-02-2 accept). The default branch stays
-    // `classicConnectionPath` → byte-identical bezier (pixel-baseline safe).
-    // straight: a single line, no curvature.
     const straightPath = (s: any, e: any) => `M ${s.x} ${s.y} L ${e.x} ${e.y}`;
-    // step: orthogonal HV-VH with a mid-X break.
     // step: orthogonal HV-VH with a mid-X break.
     const stepPath = (s: any, e: any) => {
       const mx = (s.x + e.x) / 2;
       return `M ${s.x} ${s.y} L ${mx} ${s.y} L ${mx} ${e.y} L ${e.x} ${e.y}`;
     };
-    // smoothstep: step with rounded corners (radius r, clamped to half the shorter leg).
     // smoothstep: step with rounded corners (radius r, clamped to half the shorter leg).
     const smoothstepPath = (s: any, e: any, r = 8) => {
       const mx = (s.x + e.x) / 2;
@@ -1975,20 +1801,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return [`M ${s.x} ${s.y}`, `L ${mx - rr} ${s.y}`, `Q ${mx} ${s.y} ${mx} ${s.y + dir * rr}`, `L ${mx} ${e.y - dir * rr}`, `Q ${mx} ${e.y} ${mx + rr} ${e.y}`, `L ${e.x} ${e.y}`].join(' ');
     };
 
-    // ── connection renderer ──
-    // Mounts an <svg><path> and redraws it whenever either endpoint socket moves
-    // (real connection) OR the dragged pointer moves (user drag-to-connect pseudo).
-    //
-    // A USER DRAG renders a *pseudo-connection* (rete-connection-plugin): the render
-    // signal carries a literal pointer coordinate (`endPointer`/`data.end` when
-    // dragging FROM an output, `startPointer`/`data.start` when dragging FROM an
-    // input) alongside a payload with ONE DANGLING endpoint — `target:''`/
-    // `targetInput:''` (output-side drag) or `source:''`/`sourceOutput:''`
-    // (input-side drag). The dangling side has no socket to watch, so its coordinate
-    // MUST come from the pointer; the live side stays watcher-driven. The
-    // ConnectionPlugin re-emits this render on EVERY pointermove with a fresh pointer
-    // — so the same pseudo element is re-rendered repeatedly and the dangling
-    // coordinate must update in place (no SVG rebuild, no listener re-subscribe).
     // ── connection renderer ──
     // Mounts an <svg><path> and redraws it whenever either endpoint socket moves
     // (real connection) OR the dragged pointer moves (user drag-to-connect pseudo).
@@ -2276,7 +2088,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     };
 
     // ── unmount cleanup (keyed by the engine element area hands back) ──
-    // ── unmount cleanup (keyed by the engine element area hands back) ──
     const cleanupElement = (element: any) => {
       for (const [id, entry] of this.nodeEntries as any) {
         if (entry.element === element) {
@@ -2310,12 +2121,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // HERE (inside $onMount) — NOT at top level — so its $data.portReg read lowers on React
     // to the live `_portRegRef.current` rather than a stale-empty closure snapshot captured
     // when this once-only mount effect first ran (the cross-type-reject-didn't-fire bug).
-    // Resolve a single port's TYPE for the validation pipe: look up the live node's
-    // `type` (via nodeMeta) then the portReg entry keyed `type::side::key`. Returns the
-    // portType string or null (null on either side ⇒ no type constraint ⇒ allow). DEFINED
-    // HERE (inside $onMount) — NOT at top level — so its $data.portReg read lowers on React
-    // to the live `_portRegRef.current` rather than a stale-empty closure snapshot captured
-    // when this once-only mount effect first ran (the cross-type-reject-didn't-fire bug).
     const portTypeOf = (nodeId: any, side: any, key: any) => {
       const meta = this.nodeMeta.get(nodeId);
       if (!meta || meta.type == null || key == null) return null;
@@ -2323,9 +2128,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return entry ? entry.portType : null;
     };
 
-    // ISSUE-6: clear the incompatible-port hint. Empty-set fast path so an idle handler
-    // costs nothing. Removing the class from an element that has since been detached is
-    // harmless, so no liveness check is needed.
     // ISSUE-6: clear the incompatible-port hint. Empty-set fast path so an idle handler
     // costs nothing. Removing the class from an element that has since been detached is
     // harmless, so no liveness check is needed.
@@ -2340,9 +2142,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       this.incompatibleMarked.clear();
     };
 
-    // ISSUE-6 (D-10/D-12/D-13): mark every type-mismatched, opposite-side socket on an
-    // OTHER node as incompatible. Clears first — a re-pick while a previous marking is
-    // still live must not accumulate.
     // ISSUE-6 (D-10/D-12/D-13): mark every type-mismatched, opposite-side socket on an
     // OTHER node as incompatible. Clears first — a re-pick while a previous marking is
     // still live must not accumulate.
@@ -2416,34 +2215,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     //     the rejection left it invisible on all three channels at once (the verb also
     //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
     //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
-    // ─── connection-validation gate (D2/D3 — typed-socket validation + override) ──
-    // Cancels Rete's cancellable `connectioncreate` pre-event when the connection is
-    // rejected. TWO independent reject paths, both surfacing `connection-rejected`:
-    //   1. AUTOMATIC typed validation (`:validate-types`, default ON, D3 option a):
-    //      resolve src/tgt port TYPE from the per-TYPE port schema (via each endpoint
-    //      node's `type`); if both are non-null and UNEQUAL → reject. A null on either
-    //      side (untyped port / unknown type) imposes no constraint → allow.
-    //   2. `canConnect` OVERRIDE (Phase-40 contract, SURVIVES): a consumer custom rule;
-    //      runs IN ADDITION to (after) the automatic check; returning false rejects.
-    // Each path TAGS its `connection-rejected` payload with a `reason` discriminator
-    // ('type-mismatch' | 'can-connect', quick-260803-qwh) so the consumer knows WHICH rule
-    // rejected. The tag goes on a FRESH payload object at each site — never mutated onto the
-    // shared `conn`, which is also handed to the consumer's `canConnect` predicate BEFORE the
-    // reason is known.
-    // Cancelling makes editor.addConnection return false WITHOUT pushing the connection
-    // or emitting `connectioncreated` — no ghost edge, no `connection-created`. Gates
-    // drag-to-connect, imperative addConnection, and reconcile uniformly. Both predicates
-    // are PURE (no $data write / engine call) — reads only. The block (return undefined)
-    // stays UNCONDITIONAL so rejection is enforced on every path; only the EMIT is
-    // echo-guarded, and the guard distinguishes WHICH programmatic path is running:
-    //   - props-driven RECONCILE stays suppressed — an edge in the bound graph that the
-    //     rule would reject is not a user-facing rejection, it is our own pass echoing
-    //     back (mirrors connection-created/connection-removed).
-    //   - the imperative $expose'd addConnection() verb DOES emit (`imperativeAdd`). The
-    //     consumer called it deliberately, on that tick, with those endpoints; swallowing
-    //     the rejection left it invisible on all three channels at once (the verb also
-    //     returned a truthy id — fixed in quick 260827-mtu). The reason discriminator is
-    //     resolved HERE, at the rule that rejected, and never re-derived by the caller.
     this.editor.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       if (context.type === 'connectioncreate') {
@@ -2488,7 +2259,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return context;
     });
 
-    // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
     // ─── forward engine events (echo-guarded via `programmatic`) ───────────────
     this.editor.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
@@ -2673,27 +2443,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     //     construction-time home) — or the pick has already happened and the veto lands too
     //     late.
     // All three hold simultaneously only here. Do not move it.
-    // ─── quick-260803-s3m — THE RUNTIME-REACTIVE INTERACTION GATE ────────────────────
-    // ONE persistent pipe that makes `selectable` / `readonly` / `pannable` / `zoomable` /
-    // `snapGrid` LIVE. Every one of them used to be applied once in $onMount (a
-    // construction-time `if`, an irreversible setDragHandler(null), a one-shot snapGrid
-    // install), so flipping any of them after mount did nothing. Here they are read fresh
-    // on EVERY event and enforced by VETO — returning `undefined` from a pipe halts the
-    // signal (rete's Signal.emit walks pipes in registration order and `return`s the moment
-    // one yields undefined), and rete's own engine is built for exactly this: Area.translate,
-    // Area.zoom and NodeView.translate each AWAIT their guard emit and abort on a falsy
-    // result WITHOUT touching the transform and WITHOUT emitting the past-tense signal.
-    //
-    // REGISTRATION POSITION IS LOAD-BEARING (pipe order == registration order):
-    //   - AFTER `simpleNodesOrder` — or a pick under `selectable=false` would stop z-raising
-    //     the node, a regression for the legal `selectable=false, readonly=false` drag case.
-    //   - AFTER the wrapper's own `nodepicked` branch (just above) — or a vetoed pick would
-    //     silently lose `@node-picked` AND `pendingDragSnapshot`, killing the per-gesture
-    //     undo entry for drags under `selectable=false`.
-    //   - BEFORE `selectableNodes` (installed immediately below, moved down from its old
-    //     construction-time home) — or the pick has already happened and the veto lands too
-    //     late.
-    // All three hold simultaneously only here. Do not move it.
     this.area.addPipe((context: any) => {
       if (!context || typeof context !== 'object' || !('type' in context)) return context;
       // THE ECHO GUARD, FIRST. Every programmatic viewport/node write in this wrapper is
@@ -2784,15 +2533,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // because the canvas happened to MOUNT with `selectable=false`, and the marquee branch
     // no longer has to defend against a null handle for that reason.
     // `accumulateOnCtrl` stays construction-time — it is not one of the five live props.
-    // ── selection (selectableNodes), relocated here from its old construction-time home ──
-    // Capture the returned handle ({ select(id, accumulate), unselect(id) }) so the T2.4
-    // marquee can PROGRAMMATICALLY select each intersecting node (select(id, true) =
-    // accumulate). quick-260803-s3m: the handle is now ALWAYS non-null — selection is gated
-    // per-pick by the live gate pipe above, not by whether this ever installed. So the
-    // $expose verbs (`selectNode` / `selectAll` / `clearSelection`) no longer no-op merely
-    // because the canvas happened to MOUNT with `selectable=false`, and the marquee branch
-    // no longer has to defend against a null handle for that reason.
-    // `accumulateOnCtrl` stays construction-time — it is not one of the five live props.
     this.selector = AreaExtensions.selector();
     this.nodeSelectApi = AreaExtensions.selectableNodes(this.area, this.selector, {
       accumulating: this.accumulateOnCtrl ? AreaExtensions.accumulateOnCtrl() : {
@@ -2800,14 +2540,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
     });
 
-    // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
-    // Nodes come ONLY from `$props.graph.nodes` (the single source of truth, D1/D2);
-    // sockets come from each node's TYPE port schema (portReg keyed `type::side::key`).
-    // A port-schema change ($data.portReg, when a <Port> registers late on Lit) ALSO
-    // drives this reconcile so a node whose type just gained ports re-renders. An
-    // imperative $expose addNode (provenance NOT in lastPropNodeIds) survives the reaper.
-    // Wrapped by reconcileNodes (below) with a re-entrancy guard so two passes never
-    // race the engine (the Lit "cannot find node" fix).
     // ─── reconciler off the bound graph, bridged to the top-level $watch ──────────
     // Nodes come ONLY from `$props.graph.nodes` (the single source of truth, D1/D2);
     // sockets come from each node's TYPE port schema (portReg keyed `type::side::key`).
@@ -2927,10 +2659,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
     };
 
-    // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
-    // return — the in-flight pass loops until no further request is pending. Serializing
-    // overlapping reconciles is what stops the Lit async-context cascade from racing the
-    // engine into "cannot find node" (which otherwise aborts the declarative graph build).
     // Re-entrancy-guarded entry point. If a pass is already running, mark a re-run and
     // return — the in-flight pass loops until no further request is pending. Serializing
     // overlapping reconciles is what stops the Lit async-context cascade from racing the
@@ -3074,17 +2802,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // needed for engine-style DOM). Node dims come from the MEASURED engine node-view
     // elements (area.nodeViews.get(id).element offsetW/H — target-agnostic, like the
     // render pipe) with a default-rect fallback for Lit's unmeasured first paint.
-    // ─── built-in MiniMap (opt-in :minimap, Phase 42) ────────────────────────────
-    // An absolute light-DOM SVG overlay (bottom-right) showing a scaled map of every
-    // node + the current viewport window (outside dimmed), PANNABLE (drag recenters via
-    // setCenter). The host div is COMPONENT-template DOM (carries the [data-rozie-s-*]
-    // scope attr → plain scoped CSS positions it); its SVG children are built
-    // IMPERATIVELY with createElementNS (the connection-renderer discipline) so SVG
-    // namespacing is identical on all 6 (no SVG-in-template cross-target risk) and styled
-    // with INLINE attributes (the arrowhead-marker lesson — no scoped-CSS / :root rule
-    // needed for engine-style DOM). Node dims come from the MEASURED engine node-view
-    // elements (area.nodeViews.get(id).element offsetW/H — target-agnostic, like the
-    // render pipe) with a default-rect fallback for Lit's unmeasured first paint.
     const measureNodeSize = (id: any) => {
       const view = this.area && this.area.nodeViews ? this.area.nodeViews.get(id) : null;
       const el = view && view.element ? view.element : null;
@@ -3110,11 +2827,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       return r;
     };
 
-    // Rebuild the minimap SVG: node rects (selected highlighted) + a dim mask outside the
-    // viewport (evenodd punch-out) + the viewport window outline. The bounds union the
-    // node rects AND the viewport window so the viewport indicator stays in-frame even
-    // when panned past the nodes. Stores `minimapMap` (the px↔graph mapping the pointer-
-    // pan handlers read). Cheap (a handful of rects) → a full rebuild per frame is fine.
     // Rebuild the minimap SVG: node rects (selected highlighted) + a dim mask outside the
     // viewport (evenodd punch-out) + the viewport window outline. The bounds union the
     // node rects AND the viewport window so the viewport indicator stays in-frame even
@@ -3201,8 +2913,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
     // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
     // when :minimap is off (the bridge stays callable everywhere, cheap).
-    // rAF-coalesced scheduler (bridged to the top-level $watch + the engine pipes). No-op
-    // when :minimap is off (the bridge stays callable everywhere, cheap).
     this.scheduleMinimapRedraw = () => {
       if (!this.minimap || this.minimapRedrawRaf) return;
       if (typeof requestAnimationFrame === 'function') {
@@ -3213,9 +2923,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       }
     };
 
-    // Map a minimap pointer event → graph coords (via the stored minimapMap) → setCenter.
-    // Pan is a view op → allowed even when readonly, but gated by `pannable` (mirror the
-    // main-canvas pannable gate). Pointer capture keeps the drag tracking off the box.
     // Map a minimap pointer event → graph coords (via the stored minimapMap) → setCenter.
     // Pan is a view op → allowed even when readonly, but gated by `pannable` (mirror the
     // main-canvas pannable gate). Pointer capture keeps the drag tracking off the box.
@@ -3285,32 +2992,11 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // Resolve the SINGLE selected node id the toolbar should track: the one picked node when
     // EXACTLY one is selected, else null (no toolbar over a multi-select or empty selection —
     // a per-node action needs an unambiguous target). Read-only.
-    // ─── T2.8 NodeToolbar (opt-in :node-toolbar) ─────────────────────────────────
-    // A floating component-template overlay over the SELECTED node. The host div
-    // (ref="toolbarEl") carries the [data-rozie-s-*] scope attr → PLAIN scoped CSS positions
-    // it absolutely (NOT the :root engine-DOM escape hatch — it's component DOM, like the
-    // marquee box + Controls). It is positioned from the engine node-view ELEMENT's rect
-    // (which the AreaPlugin transforms for pan/zoom/drag) relative to the canvas container, so
-    // the area transform is honored automatically — we read getBoundingClientRect() and
-    // subtract the container's rect (the screenToFlowPosition discipline, but the other way).
-    // Re-tracked on translated/zoomed/nodetranslated (the pipe branches that schedule the
-    // minimap redraw) + on every selection emit. OPT-IN (default OFF) → existing demos +
-    // FlowCanvasScreenshot are pixel-identical (the host div is r-if'd off when :node-toolbar
-    // is false; selecting a node never pops it).
-
-    // Resolve the SINGLE selected node id the toolbar should track: the one picked node when
-    // EXACTLY one is selected, else null (no toolbar over a multi-select or empty selection —
-    // a per-node action needs an unambiguous target). Read-only.
     const singleSelectedNodeId = () => {
       const ids = this.selectedNodeIds();
       return ids.length === 1 ? ids[0] : null;
     };
 
-    // Position the toolbar host over the tracked node's engine element, or hide it. The
-    // node-view element is already transformed by the AreaPlugin (pan/zoom/drag), so its
-    // client rect minus the container's client rect gives the toolbar's container-relative
-    // px — no manual transform math. Placed just ABOVE the node (bottom of the toolbar at the
-    // node's top edge); clamped so it never goes off the top of the container.
     // Position the toolbar host over the tracked node's engine element, or hide it. The
     // node-view element is already transformed by the AreaPlugin (pan/zoom/drag), so its
     // client rect minus the container's client rect gives the toolbar's container-relative
@@ -3357,11 +3043,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // tracked id changes: if the consumer fills `#toolbar`, (re)render the reactive portal
     // with the new node scope; else the default buttons stay put (they read the live tracked
     // id at click time, so no re-mount needed). Then reposition.
-    // Recompute the tracked node from the live selection + (re)mount the toolbar content for
-    // it. Called from the selection emit (a pick/unpick changed the selection). When the
-    // tracked id changes: if the consumer fills `#toolbar`, (re)render the reactive portal
-    // with the new node scope; else the default buttons stay put (they read the live tracked
-    // id at click time, so no re-mount needed). Then reposition.
     const syncToolbar = () => {
       if (!this.nodeToolbar || !this.toolbarHost) return;
       const id = singleSelectedNodeId();
@@ -3391,9 +3072,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     };
     this.syncToolbarSelection = syncToolbar;
 
-    // The @node-action emit helper for the toolbar's actions (the EXISTING emit — no new emit,
-    // T2.8). Carries the tracked node id. Handed to the `#toolbar` slot scope so a consumer
-    // override can raise its own actions too.
     // The @node-action emit helper for the toolbar's actions (the EXISTING emit — no new emit,
     // T2.8). Carries the tracked node id. Handed to the `#toolbar` slot scope so a consumer
     // override can raise its own actions too.
@@ -3477,18 +3155,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
 
     // Resolve the SINGLE selected+resizable node id the handles should track — the resize
     // analog of singleSelectedNodeId, additionally gated on the type's `resizable` flag.
-    // ─── Phase 74-03 NodeResizer (D-05..D-17, per-NodeType opt-in, selection-gated) ─
-    // 4 corner drag handles over the SINGLE selected node whose TYPE was registered
-    // resizable (typeReg[type].resizable, 74-02's NodeType.rozie declaration). Unlike
-    // NodeToolbar there is NO canvas-level opt-in prop (D-14) — the handles render
-    // UNCONDITIONALLY in the template (like the marquee box) and script-level
-    // display:none/block is the true gate (singleResizableSelectedId() below). Positioned
-    // from the engine node-view element's live rect exactly like trackToolbar
-    // (getBoundingClientRect() minus the container's rect — no manual transform math),
-    // just for 4 corner points instead of 1.
-
-    // Resolve the SINGLE selected+resizable node id the handles should track — the resize
-    // analog of singleSelectedNodeId, additionally gated on the type's `resizable` flag.
     const singleResizableSelectedId = () => {
       const id = singleSelectedNodeId();
       if (id == null) return null;
@@ -3501,8 +3167,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       el.style.top = corner[1] - half + 'px';
       el.style.display = 'block';
     };
-    // Position the 4 handles over the tracked node's engine element, or hide all 4. Same
-    // getBoundingClientRect()-minus-container-rect discipline as trackToolbar.
     // Position the 4 handles over the tracked node's engine element, or hide all 4. Same
     // getBoundingClientRect()-minus-container-rect discipline as trackToolbar.
     const trackResizer = () => {
@@ -3537,12 +3201,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // gating on the tracked id itself would mean a DESELECT (id -> null) never schedules
     // trackResizer, leaving the 4 handles stuck visible at their last position. Only the
     // in-flight-rAF guard remains; trackResizer's own id==null branch does the hiding.
-    // NOTE (Rule-1 deviation from the plan's literal guard text): scheduleResizerTrack does
-    // NOT early-return on `resizerTrackedId == null` (unlike scheduleToolbarTrack's
-    // `!$props.nodeToolbar` prop guard) — there is no canvas-level prop to gate on here, and
-    // gating on the tracked id itself would mean a DESELECT (id -> null) never schedules
-    // trackResizer, leaving the 4 handles stuck visible at their last position. Only the
-    // in-flight-rAF guard remains; trackResizer's own id==null branch does the hiding.
     this.scheduleResizerTrack = () => {
       if (this.resizerTrackRaf) return;
       if (typeof requestAnimationFrame === 'function') {
@@ -3552,7 +3210,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
         Promise.resolve().then(trackResizer);
       }
     };
-    // Recompute the tracked node from the live selection (called from the selection emit).
     // Recompute the tracked node from the live selection (called from the selection emit).
     this.syncResizerSelection = () => {
       const id = singleResizableSelectedId();
@@ -3564,11 +3221,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       this.scheduleResizerTrack();
     };
 
-    // quick-260803-s3m: the 4 corner listeners install UNCONDITIONALLY; the
-    // `selectable && !readonly` rule became a LIVE read at the top of `beginResize` (below).
-    // The handles are only ever REACHABLE while a resizable node is selected, so under
-    // either flag the D-10 selection-clearing $watch has already hidden them — this gate is
-    // the belt to that braces.
     // quick-260803-s3m: the 4 corner listeners install UNCONDITIONALLY; the
     // `selectable && !readonly` rule became a LIVE read at the top of `beginResize` (below).
     // The handles are only ever REACHABLE while a resizable node is selected, so under
@@ -3730,32 +3382,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // coords through the live transform) and nodeSelectApi.select(id, true) each intersector,
     // then scheduleSelectionEmit() (the existing @selection-change path — NO new emit).
     // Marquee changes only SELECTION (script-state), never the graph model → no history push.
-    // ─── T2.4 MARQUEE select (mode:'select') ─────────────────────────────────────
-    // A Figma-style rubber-band box. RESTORE-PATH resolution (RESEARCH Q2/A8): rete's
-    // internal `Drag` class is NOT exported, so setDragHandler(null) can't be cleanly
-    // reversed (re-instantiating Drag is impossible). Instead we leave the default pan Drag
-    // installed and intercept the EMPTY-canvas pointerdown in the CAPTURE phase on the
-    // container — the default Drag attaches its own bubble-phase pointerdown listener on the
-    // SAME container (verified rete-area-plugin@2.1.5: setDragHandler → Drag.initialize(
-    // this.container)), so a capture listener fires FIRST and stopPropagation() blocks pan
-    // before it starts. The interception is gated PURELY on the live `$props.mode` flag, so
-    // switching back to 'pan' restores pan with ZERO engine mutation (the persistent
-    // mode-guard the research preferred). A node drag is UNTOUCHED in both modes: we only act
-    // when the pointerdown target is NOT inside a node element (empty canvas).
-    //
-    // The box is a COMPONENT-TEMPLATE overlay div (ref="marqueeEl") — it carries the
-    // [data-rozie-s-*] scope attr so a PLAIN scoped rule styles it (NOT the :root engine-DOM
-    // escape hatch). On release we hit-test every graph node's rect (graph coords via
-    // area.nodeViews.get(id).position + measureNodeSize) against the box (converted to graph
-    // coords through the live transform) and nodeSelectApi.select(id, true) each intersector,
-    // then scheduleSelectionEmit() (the existing @selection-change path — NO new emit).
-    // Marquee changes only SELECTION (script-state), never the graph model → no history push.
     const nodeAt = (target: any) => {
       if (!target || typeof target.closest !== 'function') return null;
       return target.closest('.rozie-flow-node');
     };
-    // container-relative px → GRAPH coords (the inverse area transform, like
-    // screenToFlowPosition but already container-relative). px = transform + graph·k.
     // container-relative px → GRAPH coords (the inverse area transform, like
     // screenToFlowPosition but already container-relative). px = transform + graph·k.
     const containerPxToGraph = (px: any, py: any) => {
@@ -3820,9 +3450,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     // quick-260803-s3m: the marquee listeners install UNCONDITIONALLY; the
     // `selectable && !readonly` rule became a LIVE read inside the capture-phase guard,
     // alongside the `mode` read that was already live.
-    // quick-260803-s3m: the marquee listeners install UNCONDITIONALLY; the
-    // `selectable && !readonly` rule became a LIVE read inside the capture-phase guard,
-    // alongside the `mode` read that was already live.
     if (container && typeof container.addEventListener === 'function') {
       this.marqueeBox = this._refMarqueeEl || null;
       this.onCanvasPointerDownCapture = (e: any) => {
@@ -3874,9 +3501,6 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       container.addEventListener('pointerup', this.onMarqueePointerUp);
     }
 
-    // ─── initial graph: nodes first, then connections (connections reference live
-    // node instances), then optional fit. Sequenced via an async IIFE so the
-    // $onMount-returned teardown stays synchronous. ──────────────────────────────
     // ─── initial graph: nodes first, then connections (connections reference live
     // node instances), then optional fit. Sequenced via an async IIFE so the
     // $onMount-returned teardown stays synchronous. ──────────────────────────────

@@ -43,12 +43,12 @@ export default function EditorText(_props: EditorTextProps): JSX.Element {
 
   const [draft, setDraft] = createSignal('');
   const [touched, setTouched] = createSignal(false);
-  onMount(() => {
-    if (local.autofocus) inputElRef?.focus();
-  });
   createEffect(on(() => (() => local.autofocus)(), (v) => untrack(() => ((v: any) => {
     if (v) inputElRef?.focus();
   })(v)), { defer: true }));
+  onMount(() => {
+    if (local.autofocus) inputElRef?.focus();
+  });
   let inputElRef: HTMLElement | null = null;
 
   // Seed the draft once at setup from the incoming value (setup-once, NOT in the

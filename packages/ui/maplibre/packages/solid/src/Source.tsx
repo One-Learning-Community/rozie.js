@@ -25,6 +25,21 @@ export default function Source(_props: SourceProps): JSX.Element {
 
   const sources = useContext(rozieContext("maplibre:sources"));
   const __ctx_maplibre_source = rozieContext("maplibre:source");
+  createEffect(on(() => (() => sources)(), (v) => untrack(() => ((live: any) => {
+    if (didRegister || live == null) return;
+    reg = live;
+    didRegister = true;
+    reg.register(local.id, {
+      id: local.id,
+      spec: local.spec
+    });
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.spec)(), (v) => untrack(() => ((v: any) => {
+    if (reg) reg.update(local.id, {
+      id: local.id,
+      spec: v
+    });
+  })(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     // register this source's spec into the parent registry; the parent's
@@ -45,21 +60,6 @@ export default function Source(_props: SourceProps): JSX.Element {
     if (reg) reg.unregister(local.id);
   });
   });
-  createEffect(on(() => (() => sources)(), (v) => untrack(() => ((live: any) => {
-    if (didRegister || live == null) return;
-    reg = live;
-    didRegister = true;
-    reg.register(local.id, {
-      id: local.id,
-      spec: local.spec
-    });
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.spec)(), (v) => untrack(() => ((v: any) => {
-    if (reg) reg.update(local.id, {
-      id: local.id,
-      spec: v
-    });
-  })(v)), { defer: true }));
 
   // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
   // STRICT BUNDLED-LEAF tsc rejects on `.register(...)` (TS2339). The .rozie-native

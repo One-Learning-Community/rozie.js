@@ -8,10 +8,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed, getCurrentInstance, ref } from 'vue';
 import { debounce } from '@rozie/runtime-vue';
 
-const value = defineModel<string>('value', { default: '' });
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
+const __rozieModel_value = defineModel<string>('value', { default: '' });
+const value = computed<string>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 const n = ref(0);
 const q = ref('');

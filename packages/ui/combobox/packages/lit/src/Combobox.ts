@@ -500,6 +500,7 @@ export default class Combobox extends SignalWatcher(LitElement) {
   @query('[data-rozie-ref="inputEl"]') private _refInputEl!: HTMLElement;
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+private __rozieWatchPrev_1: unknown;
 private __rozieWatchInitial_1 = true;
 private __rozieFirstUpdateDone = false;
 
@@ -625,7 +626,7 @@ private __rozieFirstUpdateDone = false;
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this.syncQueryToValue();
     })(); }); }));
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this.options ? this.options.length : 0) + '|' + this._inputText.value)(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => (this.options ? this.options.length : 0) + '|' + this._inputText.value)(); untracked(() => { this.__rozieWatchPrev_1 = __watchVal; if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       if (this._expandedGroups.value && Object.keys(this._expandedGroups.value).length) this._expandedGroups.value = {};
       this.syncRows();
       if (this.virtual && this.virtualizer) {
@@ -643,13 +644,20 @@ private __rozieFirstUpdateDone = false;
     // Routes through the SAME buildVirtualizer() the virtual $watch calls below
     // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
     // path.
-    // Routes through the SAME buildVirtualizer() the virtual $watch calls below
-    // (VIRT-BUILD) — one construction site, so the mount path cannot drift from the flip
-    // path.
     if (this.virtual) this.buildVirtualizer();
   }
 
   updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('options'))) { const __watchVal = untracked(() => (this.options ? this.options.length : 0) + '|' + this._inputText.value); if (!Object.is(__watchVal, this.__rozieWatchPrev_1)) { this.__rozieWatchPrev_1 = __watchVal; untracked(() => (() => {
+      if (this._expandedGroups.value && Object.keys(this._expandedGroups.value).length) this._expandedGroups.value = {};
+      this.syncRows();
+      if (this.virtual && this.virtualizer) {
+        this.virtualizer.setOptions(this.virtualizerOptions());
+        this.virtualizer._willUpdate();
+        this._windowVer.value = this._windowVer.value + 1;
+        this.scheduleRemeasure();
+      }
+    })()); } }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('virtual'))) { const __watchVal = (() => this.virtual)(); (() => {
       if (this._expandedGroups.value && Object.keys(this._expandedGroups.value).length) this._expandedGroups.value = {};
       if (this.virtual) {
@@ -808,8 +816,6 @@ private __rozieFirstUpdateDone = false;
   return false;
 };
 
-  // `idRoot()` is a HOST function (the host's id base: its id prop, else a generated
-  // per-instance id) so the option ids follow the host's auto-id fallback.
   // ══ Generic vertical windowing math (Phase 64, D-04) — the target-agnostic virtual-core bridge ══
   // Lifted verbatim from the DataTable virtualization.rzts (the Phase 53/63 B13 baseline). This partial
   // holds ONLY the PURE windowing math; every DOM/refs/virtualizer-instance impurity stays per-consumer
@@ -895,11 +901,6 @@ private __rozieFirstUpdateDone = false;
   return src && src[i] ? src[i].id : undefined;
 };
 
-  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
   // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
   // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
   // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -971,10 +972,6 @@ private __rozieFirstUpdateDone = false;
   if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
 };
 
-  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -986,8 +983,6 @@ private __rozieFirstUpdateDone = false;
   return Math.round(this.measuredRowTotal / this.measuredRowCount);
 };
 
-  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
   // source), so the re-feed MUST pass the complete set, exactly like every TanStack adapter.
@@ -1198,12 +1193,6 @@ private __rozieFirstUpdateDone = false;
   return true;
 };
 
-  // ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-  // rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-  // a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-  // returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-  // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-  // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
   virtualizer: any = null;
 
   virtualizerCleanup: any = null;

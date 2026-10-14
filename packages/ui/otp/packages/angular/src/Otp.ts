@@ -1,7 +1,7 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { firstEmptyIndex as firstEmpty, isAllowedChar, planEmits, planWrite } from './internal/otpWrite';
 
@@ -75,7 +75,9 @@ export class Otp {
    * @example
    * <rozie-otp [(value)]="code" [length]="6" type="numeric" ariaLabel="Verification code" />
    */
-  value = model<string>('');
+  readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string>();
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
   /**
    * Number of input cells to render.
    */
@@ -107,6 +109,7 @@ export class Otp {
   root = viewChild<ElementRef<HTMLDivElement>>('root');
   change = output<unknown>();
   complete = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
 
   ngAfterViewInit() {
     if (this.autoFocus()) this.focusIndex(this.firstEmptyIndex());

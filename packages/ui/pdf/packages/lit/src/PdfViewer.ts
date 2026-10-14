@@ -180,16 +180,10 @@ private __rozieFirstUpdateDone = false;
     // itself gates on the current $props.autoFit so toggling it at runtime needs
     // no observer teardown/recreation. No-ops via applyFit's own instance/
     // containerEl guard before a document has loaded.
-    // autoFit resize sensor — always observing (cheap when idle); the callback
-    // itself gates on the current $props.autoFit so toggling it at runtime needs
-    // no observer teardown/recreation. No-ops via applyFit's own instance/
-    // containerEl guard before a document has loaded.
     this.resizeObserver = new ResizeObserver(() => {
       if (this.autoFit) this.applyFit(this.autoFit === 'width' ? 'width' : 'page');
     });
     this.resizeObserver.observe(this.containerEl);
-    // lazy-load the engine (SSR-safe + code-split), then configure the worker and
-    // load the document.
     // lazy-load the engine (SSR-safe + code-split), then configure the worker and
     // load the document.
     import('pdfjs-dist').then((mod: any) => {

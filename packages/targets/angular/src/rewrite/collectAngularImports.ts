@@ -229,7 +229,10 @@ export function collectAngularImports(ir: IRComponent): AngularImportCollector {
   const hasModelProps = ir.props.some((p) => p.isModel);
   const hasNonModelProps = ir.props.some((p) => !p.isModel);
   if (hasModelProps) {
-    collector.add('model');
+    // input + output + `rozieModel` (see emitScript's two-way prop fields).
+    collector.add('input');
+    collector.add('output');
+    collector.addRuntime('rozieModel');
   }
   if (hasNonModelProps) {
     collector.add('input');

@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 interface TriggerCtx {
   $implicit: { open: any; toggle: any };
@@ -58,7 +58,9 @@ interface DefaultCtx {
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Dropdown {
-  open = model<boolean>(false);
+  readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+  openChange = output<boolean>();
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
   closeOnOutsideClick = input<boolean>(true);
   closeOnEscape = input<boolean>(true);
   triggerEl = viewChild<ElementRef<HTMLDivElement>>('triggerEl');

@@ -149,6 +149,40 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
   const [zoom, setZoom] = createSignal(1);
   const [rot, setRot] = createSignal(0);
   const [engineReady, setEngineReady] = createSignal(0);
+  createEffect(on(() => (() => engineReady())(), (v) => untrack(() => (() => load())()), { defer: true }));
+  createEffect(on(() => (() => local.src)(), (v) => untrack(() => (() => load())()), { defer: true }));
+  createEffect(on(() => (() => local.password)(), (v) => untrack(() => (() => load())()), { defer: true }));
+  createEffect(on(() => (() => local.workerSrc)(), (v) => untrack(() => ((v: any) => {
+    if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => page())(), (v) => untrack(() => ((v: any) => {
+    if (typeof v === 'number' && v >= 1 && v !== current()) {
+      setCurrent(v);
+      if (local.renderAllPages) scrollToPage(v);
+    }
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.scale)(), (v) => untrack(() => ((v: any) => {
+    if (typeof v === 'number' && v > 0) setZoom(v);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.rotation)(), (v) => untrack(() => ((v: any) => {
+    if (typeof v === 'number') setRot((v % 360 + 360) % 360);
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => current())(), (v) => untrack(() => ((v: any) => {
+    setPage(v);
+    _props.onPagechange?.({
+      page: v
+    });
+    if (!local.renderAllPages) renderView();
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => zoom())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
+  createEffect(on(() => (() => rot())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
+  createEffect(on(() => (() => local.renderAllPages)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
+  createEffect(on(() => (() => local.textLayer)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
+  createEffect(on(() => (() => local.query)(), (v) => untrack(() => ((v: any) => {
+    if (v == null) return;
+    const q = String(v);
+    if (q) find(q);else clearFind();
+  })(v)), { defer: true }));
   onMount(() => {
     // mount-local (not a top-level script `let`) — set here so a late-resolving
     // dynamic import() below bails, and read by the returned teardown. Emitter-
@@ -196,40 +230,6 @@ export default function PdfViewer(_props: PdfViewerProps): JSX.Element {
       instance = null;
     });
   });
-  createEffect(on(() => (() => engineReady())(), (v) => untrack(() => (() => load())()), { defer: true }));
-  createEffect(on(() => (() => local.src)(), (v) => untrack(() => (() => load())()), { defer: true }));
-  createEffect(on(() => (() => local.password)(), (v) => untrack(() => (() => load())()), { defer: true }));
-  createEffect(on(() => (() => local.workerSrc)(), (v) => untrack(() => ((v: any) => {
-    if (pdfjsLib && v) pdfjsLib.GlobalWorkerOptions.workerSrc = v;
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => page())(), (v) => untrack(() => ((v: any) => {
-    if (typeof v === 'number' && v >= 1 && v !== current()) {
-      setCurrent(v);
-      if (local.renderAllPages) scrollToPage(v);
-    }
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.scale)(), (v) => untrack(() => ((v: any) => {
-    if (typeof v === 'number' && v > 0) setZoom(v);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.rotation)(), (v) => untrack(() => ((v: any) => {
-    if (typeof v === 'number') setRot((v % 360 + 360) % 360);
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => current())(), (v) => untrack(() => ((v: any) => {
-    setPage(v);
-    _props.onPagechange?.({
-      page: v
-    });
-    if (!local.renderAllPages) renderView();
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => zoom())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
-  createEffect(on(() => (() => rot())(), (v) => untrack(() => (() => renderView())()), { defer: true }));
-  createEffect(on(() => (() => local.renderAllPages)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
-  createEffect(on(() => (() => local.textLayer)(), (v) => untrack(() => (() => renderView())()), { defer: true }));
-  createEffect(on(() => (() => local.query)(), (v) => untrack(() => ((v: any) => {
-    if (v == null) return;
-    const q = String(v);
-    if (q) find(q);else clearFind();
-  })(v)), { defer: true }));
   let viewerElRef: HTMLElement | null = null;
 
   // pdfjs is DYNAMICALLY imported in $onMount, NOT a top-level import: pdfjs's main

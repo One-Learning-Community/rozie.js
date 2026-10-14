@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, useControllableState, useOutsideClick, useThrottledCallback } from '@rozie/runtime-react';
 import './Dropdown.css';
 import './Dropdown.global.css';
@@ -103,7 +104,7 @@ const Dropdown = forwardRef<DropdownHandle, DropdownProps>(function Dropdown(_pr
 
   const _rozieExposeRef = useRef({ toggle, close });
   _rozieExposeRef.current = { toggle, close };
-  useImperativeHandle(ref, () => ({ toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => _rozieExposeRef.current.close(...args) }), []);
+  useImperativeHandle(ref, () => ({ toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => flushSync(() => _rozieExposeRef.current.toggle(...args)), close: (...args: Parameters<typeof close>): ReturnType<typeof close> => flushSync(() => _rozieExposeRef.current.close(...args)) }), []);
 
   return (
     <>

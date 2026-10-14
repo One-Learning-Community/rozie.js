@@ -694,12 +694,39 @@ function emitPropsDecl(ir: IRComponent, genericParams?: readonly string[]): stri
   );
 }
 
+/** The `defineModel` ref behind the two-way prop `name` (see emitDefineModels). */
+function vueModelRef(name: string): string {
+  return `__rozieModel_${name}`;
+}
+
 /**
  * Emit one `const X = defineModel<T>('X', { default: ... })` per model prop.
  * Per Pitfall 3: model props are EXCLUDED from defineProps.
+ *
+ * The prop the script and template use is a writable `computed` over that
+ * model, with the controlled rule of the React / Solid / Lit targets: while the
+ * consumer binds a value (one-way `:x` or `v-model:x`, anything but
+ * `undefined`), a write only emits `update:x` — the control keeps showing the
+ * consumer's value, so a consumer that refuses the change is respected. With
+ * nothing bound, the write goes to `defineModel`'s local value. (`defineModel`
+ * alone updates locally whenever no `onUpdate:x` listener is bound, so a
+ * one-way consumer that refused a change saw the refused value.)
  */
-function emitDefineModels(ir: IRComponent): string[] {
+function emitDefineModels(ir: IRComponent, imports: VueImportCollector): string[] {
   const lines: string[] = [];
+  if (!ir.props.some((p) => p.isModel)) return lines;
+  imports.use('computed');
+  imports.use('getCurrentInstance');
+  lines.push(
+    'const __rozieVm = getCurrentInstance()!;',
+    '/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */',
+    'const __rozieBound = (name: string): boolean => {',
+    '  const raw = __rozieVm.vnode.props;',
+    '  if (!raw) return false;',
+    "  const kebab = name.replace(/\\B([A-Z])/g, '-$1').toLowerCase();",
+    '  return (name in raw ? raw[name] : raw[kebab]) !== undefined;',
+    '};',
+  );
   for (const p of ir.props) {
     if (!p.isModel) continue;
     // Spike-012 R5 (C5) — `renderType` no longer bakes `| null` into a Function
@@ -722,17 +749,24 @@ function emitDefineModels(ir: IRComponent): string[] {
       // lowerProps, so a defaultValue here means the prop was NOT required).
       const dflt = genCode(p.defaultValue);
       lines.push(
-        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}', { default: ${dflt} });`,
+        `${jsdoc}const ${vueModelRef(p.name)} = defineModel<${tsType}>('${p.name}', { default: ${dflt} });`,
       );
     } else if (p.required) {
       // 260521-oao — a required no-default model prop emits the Vue
       // `required: true` options form so the consumer MUST pass it.
       lines.push(
-        `${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}', { required: true });`,
+        `${jsdoc}const ${vueModelRef(p.name)} = defineModel<${tsType}>('${p.name}', { required: true });`,
       );
     } else {
-      lines.push(`${jsdoc}const ${p.name} = defineModel<${tsType}>('${p.name}');`);
+      lines.push(`${jsdoc}const ${vueModelRef(p.name)} = defineModel<${tsType}>('${p.name}');`);
     }
+    const valueType = p.defaultValue !== null || p.required ? tsType : `${tsType} | undefined`;
+    lines.push(
+      `const ${p.name} = computed<${valueType}>({`,
+      `  get: () => ${vueModelRef(p.name)}.value,`,
+      `  set: (v) => { if (__rozieBound('${p.name}')) __rozieVm.emit('update:${p.name}', v); else ${vueModelRef(p.name)}.value = v; },`,
+      '});',
+    );
   }
   return lines;
 }
@@ -1464,7 +1498,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
 
   // 3. Emit blocks in canonical order.
   const propsLine = emitPropsDecl(ir, opts.genericParams);
-  const modelLines = emitDefineModels(ir);
+  const modelLines = emitDefineModels(ir, imports);
   const emitsLine = emitDefineEmitsCall(ir);
   const slotsLine = emitDefineSlotsStub(ir);
   // Phase 07.7 fix — script-level $slots references rewrite to `slots.X`

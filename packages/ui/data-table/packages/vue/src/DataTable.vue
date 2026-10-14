@@ -357,7 +357,7 @@ export interface DataTableHandle {
 <script setup lang="ts">
 import Popover from '@rozie-ui/popover-vue';
 
-import { onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, onUpdated, provide, ref, watch } from 'vue';
 
 import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
@@ -471,62 +471,118 @@ const props = withDefaults(
   { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The row data — `model: true`, so a committed cell/row edit writes a **fresh** array back through the two-way `data` binding (uncontrolled fallback `dataDefault`). A stable reference per Rozie's setup-once model — fed directly into table-core (never map/cloned in the watcher).
  * @example
  * <DataTable v-model:data="rows" :columns="cols" />
  */
-const data = defineModel<any[]>('data', { required: true });
+const __rozieModel_data = defineModel<any[]>('data', { required: true });
+const data = computed<any[]>({
+  get: () => __rozieModel_data.value,
+  set: (v) => { if (__rozieBound('data')) __rozieVm.emit('update:data', v); else __rozieModel_data.value = v; },
+});
 /**
  * `SortingState` — `[{ id, desc }]`. Uncontrolled fallback when unbound. Two-way: writes funnel a fresh value through the `sort-change` event regardless of binding.
  */
-const sorting = defineModel<any[]>('sorting', { default: () => [] });
+const __rozieModel_sorting = defineModel<any[]>('sorting', { default: () => [] });
+const sorting = computed<any[]>({
+  get: () => __rozieModel_sorting.value,
+  set: (v) => { if (__rozieBound('sorting')) __rozieVm.emit('update:sorting', v); else __rozieModel_sorting.value = v; },
+});
 /**
  * The global search string — narrows all columns. Feeds `getFilteredRowModel()`. Surfaces through `filter-change`. Two-way: fires `filter-change` regardless of binding.
  */
-const globalFilter = defineModel<string>('globalFilter', { default: '' });
+const __rozieModel_globalFilter = defineModel<string>('globalFilter', { default: '' });
+const globalFilter = computed<string>({
+  get: () => __rozieModel_globalFilter.value,
+  set: (v) => { if (__rozieBound('globalFilter')) __rozieVm.emit('update:globalFilter', v); else __rozieModel_globalFilter.value = v; },
+});
 /**
  * `ColumnFiltersState` — `[{ id, value }]` per-column narrowing (gated by each column's `filterable`). Two-way: whole-array replace on write, fires `filter-change`.
  */
-const columnFilters = defineModel<any[]>('columnFilters', { default: () => [] });
+const __rozieModel_columnFilters = defineModel<any[]>('columnFilters', { default: () => [] });
+const columnFilters = computed<any[]>({
+  get: () => __rozieModel_columnFilters.value,
+  set: (v) => { if (__rozieBound('columnFilters')) __rozieVm.emit('update:columnFilters', v); else __rozieModel_columnFilters.value = v; },
+});
 /**
  * `{ pageIndex, pageSize }`. Defaults to `{ pageIndex: 0, pageSize: 10 }`; feeds the prev/next + page-size chrome (and `getPaginationRowModel()`). Two-way: funnels a fresh object through `page-change`.
  */
-const pagination = defineModel<Record<string, any>>('pagination', { default: () => ({
+const __rozieModel_pagination = defineModel<Record<string, any>>('pagination', { default: () => ({
   pageIndex: 0,
   pageSize: 10
 }) });
+const pagination = computed<Record<string, any>>({
+  get: () => __rozieModel_pagination.value,
+  set: (v) => { if (__rozieBound('pagination')) __rozieVm.emit('update:pagination', v); else __rozieModel_pagination.value = v; },
+});
 /**
  * `ExpandedState` — `{ [rowId]: true }`, or the `true` literal after `expandAll` (declared `type: [Object, Boolean]`). Multi-expand (multiple rows open at once). Surfaces through `expand-change`; uncontrolled fallback (`$data.expandedDefault`) when unbound — the default is `null` so the uncontrolled fallback AND the grouping auto-expand default are reachable (a non-null default would short-circuit them). When grouping is active and `expanded` is untouched, group subtrees auto-expand.
  */
-const expanded = defineModel<Record<string, any> | boolean | null>('expanded', { default: null });
+const __rozieModel_expanded = defineModel<Record<string, any> | boolean | null>('expanded', { default: null });
+const expanded = computed<Record<string, any> | boolean | null>({
+  get: () => __rozieModel_expanded.value,
+  set: (v) => { if (__rozieBound('expanded')) __rozieVm.emit('update:expanded', v); else __rozieModel_expanded.value = v; },
+});
 /**
  * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding the two-way `grouping` model (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
  */
-const grouping = defineModel<any[] | null>('grouping', { default: null });
+const __rozieModel_grouping = defineModel<any[] | null>('grouping', { default: null });
+const grouping = computed<any[] | null>({
+  get: () => __rozieModel_grouping.value,
+  set: (v) => { if (__rozieBound('grouping')) __rozieVm.emit('update:grouping', v); else __rozieModel_grouping.value = v; },
+});
 /**
  * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
  */
-const rowSelection = defineModel<Record<string, any>>('rowSelection', { default: () => ({}) });
+const __rozieModel_rowSelection = defineModel<Record<string, any>>('rowSelection', { default: () => ({}) });
+const rowSelection = computed<Record<string, any>>({
+  get: () => __rozieModel_rowSelection.value,
+  set: (v) => { if (__rozieBound('rowSelection')) __rozieVm.emit('update:rowSelection', v); else __rozieModel_rowSelection.value = v; },
+});
 /**
  * `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through `visibility-change`.
  */
-const columnVisibility = defineModel<Record<string, any>>('columnVisibility', { default: () => ({}) });
+const __rozieModel_columnVisibility = defineModel<Record<string, any>>('columnVisibility', { default: () => ({}) });
+const columnVisibility = computed<Record<string, any>>({
+  get: () => __rozieModel_columnVisibility.value,
+  set: (v) => { if (__rozieBound('columnVisibility')) __rozieVm.emit('update:columnVisibility', v); else __rozieModel_columnVisibility.value = v; },
+});
 /**
  * `ColumnSizingState` — `{ [colId]: number }`. Driven live by the pointer-drag resize handle (`columnResizeMode: 'onChange'`). Two-way: fires `resize-change`.
  */
-const columnSizing = defineModel<Record<string, any>>('columnSizing', { default: () => ({}) });
+const __rozieModel_columnSizing = defineModel<Record<string, any>>('columnSizing', { default: () => ({}) });
+const columnSizing = computed<Record<string, any>>({
+  get: () => __rozieModel_columnSizing.value,
+  set: (v) => { if (__rozieBound('columnSizing')) __rozieVm.emit('update:columnSizing', v); else __rozieModel_columnSizing.value = v; },
+});
 /**
  * `ColumnOrderState` — `string[]`. A fresh order array on reorder (never an in-place splice). Two-way: fires `reorder-change`.
  */
-const columnOrder = defineModel<any[]>('columnOrder', { default: () => [] });
+const __rozieModel_columnOrder = defineModel<any[]>('columnOrder', { default: () => [] });
+const columnOrder = computed<any[]>({
+  get: () => __rozieModel_columnOrder.value,
+  set: (v) => { if (__rozieBound('columnOrder')) __rozieVm.emit('update:columnOrder', v); else __rozieModel_columnOrder.value = v; },
+});
 /**
  * `ColumnPinningState` — `{ left: string[], right: string[] }`. Pinned columns get `position: sticky` + computed offsets. Defaults to `{ left: [], right: [] }`. Two-way: fires `pin-change`.
  */
-const columnPinning = defineModel<Record<string, any>>('columnPinning', { default: () => ({
+const __rozieModel_columnPinning = defineModel<Record<string, any>>('columnPinning', { default: () => ({
   left: [],
   right: []
 }) });
+const columnPinning = computed<Record<string, any>>({
+  get: () => __rozieModel_columnPinning.value,
+  set: (v) => { if (__rozieBound('columnPinning')) __rozieVm.emit('update:columnPinning', v); else __rozieModel_columnPinning.value = v; },
+});
 
 const emit = defineEmits<{
   'activecell-change': [payload: DataTableActiveCellChangePayload];
@@ -3694,9 +3750,6 @@ const pageRowOffset = () => {
 };
 // page-relative active row → absolute (display-order) index.
 const toAbsRow = (localRow: any) => localRow + pageRowOffset();
-// A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
-// aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
-// directly (already absolute). Reactive via rowIndexOf's tick().
 // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
 // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
 // non-virtual paginated body $data.rows is only the page slice, so read the live model.

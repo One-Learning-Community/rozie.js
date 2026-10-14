@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, useControllableState } from '@rozie/runtime-react';
 // The v3 api.js loader (inject-once-per-sitekey singleton + ready-gate + token
 // execute) lives in a vendored internal module so its branchy logic is
@@ -121,7 +122,7 @@ const RecaptchaV3 = forwardRef<RecaptchaV3Handle, RecaptchaV3Props>(function Rec
 
   const _rozieExposeRef = useRef({ execute });
   _rozieExposeRef.current = { execute };
-  useImperativeHandle(ref, () => ({ execute: (...args: Parameters<typeof execute>): ReturnType<typeof execute> => _rozieExposeRef.current.execute(...args) }), []);
+  useImperativeHandle(ref, () => ({ execute: (...args: Parameters<typeof execute>): ReturnType<typeof execute> => flushSync(() => _rozieExposeRef.current.execute(...args)) }), []);
 
   return (
     <>

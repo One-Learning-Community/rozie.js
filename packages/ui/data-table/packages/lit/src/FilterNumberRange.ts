@@ -36,7 +36,9 @@ export default class FilterNumberRange extends SignalWatcher(LitElement) {
   private _minDraft = signal('');
   private _maxDraft = signal('');
   private _touched = signal(false);
+private __rozieWatchPrev_0: unknown;
 private __rozieWatchInitial_0 = true;
+private __rozieFirstUpdateDone = false;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -44,9 +46,16 @@ private __rozieWatchInitial_0 = true;
   private _rozieTornDown = false;
 
   firstUpdated(): void {
-    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => Array.isArray(this.value) ? String(this.value[0]) + '\u0000' + String(this.value[1]) : '')(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => Array.isArray(this.value) ? String(this.value[0]) + '\u0000' + String(this.value[1]) : '')(); untracked(() => { this.__rozieWatchPrev_0 = __watchVal; if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this._touched.value = false;
     })(); }); }));
+  }
+
+  updated(changedProperties: Map<string, unknown>): void {
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('value'))) { const __watchVal = untracked(() => Array.isArray(this.value) ? String(this.value[0]) + '\u0000' + String(this.value[1]) : ''); if (!Object.is(__watchVal, this.__rozieWatchPrev_0)) { this.__rozieWatchPrev_0 = __watchVal; untracked(() => (() => {
+      this._touched.value = false;
+    })()); } }
+    this.__rozieFirstUpdateDone = true;
   }
 
   disconnectedCallback(): void {

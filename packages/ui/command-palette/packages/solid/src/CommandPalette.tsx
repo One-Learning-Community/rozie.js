@@ -550,15 +550,6 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
   const [actionMenuTop, setActionMenuTop] = createSignal(0);
   const [argsState, setArgsState] = createSignal<any>(null);
   const [platformIsApple, setPlatformIsApple] = createSignal(false);
-  onMount(() => {
-    setPlatformIsApple(sniffApplePlatform());
-  });
-  onMount(() => {
-    if (open()) onOpen();
-  });
-  onCleanup(() => {
-    if (debounceTimerId != null) clearTimeout(debounceTimerId);
-  });
   createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
     if (isOpen) onOpen();else {
       setQuery('');
@@ -577,6 +568,15 @@ export default function CommandPalette(_props: CommandPaletteProps): JSX.Element
       requestToken = nextRequestToken(requestToken);
     }
   })(v)), { defer: true }));
+  onMount(() => {
+    setPlatformIsApple(sniffApplePlatform());
+  });
+  onMount(() => {
+    if (open()) onOpen();
+  });
+  onCleanup(() => {
+    if (debounceTimerId != null) clearTimeout(debounceTimerId);
+  });
   let frameRef: HTMLElement | null = null;
   let panelRef: HTMLElement | null = null;
   let comboboxRef: ComboboxHandle | null = null;

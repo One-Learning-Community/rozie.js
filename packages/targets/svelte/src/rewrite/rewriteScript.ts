@@ -216,7 +216,8 @@ export function rewriteRozieIdentifiers(
   // identifier (the `const X = $props.X` / `const X = $refs.X` self-reference TDZ
   // and the silent param-capture wrong-value variant). Each arm is gated on an
   // actual `<accessor>.<name>` read so the corpus stays byte-identical. Ref names
-  // are disjoint from prop names (ROZ621), so the groups never double-rename.
+  // are disjoint from prop names (ROZ621), and data names from both, so the
+  // groups never double-rename.
   // PUBLIC-CONTRACT guard: $expose verb names are never renamed — a `const open`
   // that is the exposed `open()` handle must NOT be renamed even when it shadows
   // a prop/data accessor. Prop NAMES are deliberately NOT protected here: the
@@ -238,6 +239,10 @@ export function rewriteRozieIdentifiers(
   const svelteBindingNames = new Set<string>([...SVELTE_EMITTER_NAMES, ...SVELTE_IMPORT_NAMES]);
   const svelteGroups: GeneratedSymbolGroup[] = [
     { names: propNames, trigger: { kind: 'accessor', accessor: '$props' } },
+    // `$data.<key>` lowers to the bare `$state` local `<key>`: a param / local of
+    // that name (`(open) => { $data.open = open }`) captured the rewrite
+    // (`open = open`, a write to the param). Same gate as Vue's `$data` arm.
+    { names: dataNames, trigger: { kind: 'accessor', accessor: '$data' } },
     { names: refNames, trigger: { kind: 'accessor', accessor: '$refs' } },
     {
       names: svelteBindingNames,

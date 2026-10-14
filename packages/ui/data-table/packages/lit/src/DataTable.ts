@@ -872,8 +872,10 @@ export default class DataTable extends SignalWatcher(LitElement) {
   private _liveAnnounce = signal('');
   @query('[data-rozie-ref="__rozieRoot"]') private _ref__rozieRoot!: HTMLElement;
 private __rozieWatchInitial_0 = true;
+private __rozieWatchPrev_1: unknown;
 private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_2 = true;
+private __rozieFirstUpdateDone = false;
 private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { context: __rozieCtx_data_table_columns, initialValue: ((__rozieCtxHost) => ({
   registerColumn: (id: any, spec: any) => {
     if (id == null) return;
@@ -1152,7 +1154,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
     // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
     // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
-    this.columns, this._colReg.value])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    this.columns, this._colReg.value])(); untracked(() => { this.__rozieWatchPrev_1 = __watchVal; if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
       // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
       // table-core receives on this same tick (rather than landing a frame late and re-ordering
       // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
@@ -1208,14 +1210,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // re-ordering a render later. Covers the `:columns` config-array form, which is available
     // now; `<Column>` children register during mount and are covered by the re-feed watch's own
     // call. One-shot and self-latching — see seedColumnPinning() in stateAssembly.rzts.
-    // Apply any per-column `pinned` declaration as the INITIAL pinning state BEFORE createTable
-    // reads currentState() below, so the first row model table-core builds is already correctly
-    // ordered (getVisibleCells() returns [left-pinned, center, right-pinned]) rather than
-    // re-ordering a render later. Covers the `:columns` config-array form, which is available
-    // now; `<Column>` children register during mount and are covered by the re-feed watch's own
-    // call. One-shot and self-latching — see seedColumnPinning() in stateAssembly.rzts.
     this.seedColumnPinning();
-    // Build the table instance HERE so the closures below capture the live `table`.
     // Build the table instance HERE so the closures below capture the live `table`.
     this.table = createTable({
       // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
@@ -1400,21 +1395,13 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     };
 
     // initial pull
-    // initial pull
     this.refreshRowModel();
 
     // ── Grid mode: capture the table root ──────────────────────────────────────────────
     // $el is the component root; the <table class="rozie-data-table"> is the grid root the
     // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
     // (post-mount) so it is non-null and ROZ123-clean.
-    // ── Grid mode: capture the table root ──────────────────────────────────────────────
-    // $el is the component root; the <table class="rozie-data-table"> is the grid root the
-    // cell selectors hang off (the exact idiom proven ×6 by plan 01's probe). Captured here
-    // (post-mount) so it is non-null and ROZ123-clean.
     this.gridRoot = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rozie-data-table') : null;
-    // B-02: the click-away detector. `composedPath()` rather than `ev.target` because on Lit the
-    // grid lives in a shadow root and a document-level listener sees the retargeted HOST element,
-    // which is never `gridRoot.contains(...)` — every in-grid click would read as "outside".
     // B-02: the click-away detector. `composedPath()` rather than `ev.target` because on Lit the
     // grid lives in a shadow root and a document-level listener sees the retargeted HOST element,
     // which is never `gridRoot.contains(...)` — every in-grid click would read as "outside".
@@ -1444,20 +1431,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // guards: when both axes are off, NO virtual-core runtime code executes (byte-identical-off).
     // _didMount() registers the scroll-element ResizeObserver and returns the teardown stored for
     // $onUnmount.
-    // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
-    // page load AND was non-deterministic on React/Solid (the entry cell may not be
-    // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
-    // cell IS the first Tab-in target (matching the Wave-0 probe's "no auto-focus on
-    // mount"); the consumer drives focus by Tabbing/clicking in, never the component.
-
-    // ── Windowing: capture the scroll element + construct the row virtualizer (req-1/2 — the
-    // row virtual-core instance ONLY when rows are windowed; the scroll-element capture whenever
-    // EITHER axis is windowed, since both axes observe the SAME .rdt-scroll element — D-03). Built
-    // HERE (post-mount) so getScrollElement resolves the rendered .rdt-scroll div and
-    // getPrePaginationRowModel reads the live table. ENTIRELY inside the isWindowed()/rowsWindowed()
-    // guards: when both axes are off, NO virtual-core runtime code executes (byte-identical-off).
-    // _didMount() registers the scroll-element ResizeObserver and returns the teardown stored for
-    // $onUnmount.
     if (this.isWindowed()) {
       this.gridScrollEl = this._ref__rozieRoot ? this._ref__rozieRoot.querySelector('.rdt-scroll') : null;
     }
@@ -1465,9 +1438,6 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       this.virtualizer = new Virtualizer(this.virtualizerOptions());
       this.virtualizerCleanup = this.virtualizer._didMount();
     }
-    // Phase 87 87-04: construct the SECOND, horizontal Virtualizer instance when the COLUMN
-    // axis is windowed — entirely inside its own colsWindowed() guard, byte-identical-off for
-    // 'rows'/true/false.
     // Phase 87 87-04: construct the SECOND, horizontal Virtualizer instance when the COLUMN
     // axis is windowed — entirely inside its own colsWindowed() guard, byte-identical-off for
     // 'rows'/true/false.
@@ -1493,33 +1463,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // idiom lowers to a functional React setState update and is safe regardless of ordering, the
     // same reasoning virtualizerOptions()'s onChange documents), but collapsing to one bump avoids
     // manufacturing the false-positive warning at all rather than accepting it.
-    // FINE-GRAINED FIRST-WINDOW KICK (Solid/Svelte), either axis: the windowed <For>/{#each}
-    // accessor was first evaluated at initial render — while `virtualizer`/`colVirtualizer` were
-    // still null — and (because windowedRows()/windowedColIndices() read $data.windowVer up top)
-    // subscribed to windowVer then returned []/the full set. Both `let`s are non-reactive, so
-    // their assignment above does NOT notify the accessor; we must bump the SIGNAL it subscribed
-    // to. _didMount() computes the first window synchronously but its onChange only fires on
-    // SUBSEQUENT scroll/resize, so without this explicit bump the first window would never paint
-    // on the fine-grained targets. Idempotent + harmless on the coarse targets (they re-render
-    // wholesale anyway). ONE bump here (not one per axis, Rule 1 — see the ROZ138 note below)
-    // covers both: windowedRows()/windowedColIndices() each simply re-derive against their own
-    // now-non-null virtualizer instance off the SAME counter (87-02 checkpoint decision (b): no
-    // separate $data.colWindowVer). Gated on isWindowed() (either axis) rather than two separate
-    // per-axis bumps: a second `$data.windowVer = $data.windowVer + 1` write later in this SAME
-    // $onMount body would dominate-flag ROZ138 (React stale-read) on its own right-hand-side read
-    // of the counter it had just written a few lines above — a false positive (this increment
-    // idiom lowers to a functional React setState update and is safe regardless of ordering, the
-    // same reasoning virtualizerOptions()'s onChange documents), but collapsing to one bump avoids
-    // manufacturing the false-positive warning at all rather than accepting it.
     if (this.isWindowed()) {
       this._windowVer.value = this._windowVer.value + 1;
     }
-    // After the first window commits (next frame), refine heights + fire the dev-mode warns ONCE.
-    // Entirely inside the isWindowed() guard so the off (neither axis windowed) emitted path adds
-    // NO code and these warns can never fire there (req-1 byte-identical-off preserved). The
-    // row-specific measurement + warns stay further guarded by rowsWindowed() (byte-identical to
-    // before this restructure); the column-axis warn (Phase 87 D-07(a)) is guarded by
-    // colsWindowed() so it can fire ONLY on the 'columns'/'both' path, never on 'rows'/true/false.
     // After the first window commits (next frame), refine heights + fire the dev-mode warns ONCE.
     // Entirely inside the isWindowed() guard so the off (neither axis windowed) emitted path adds
     // NO code and these warns can never fire there (req-1 byte-identical-off preserved). The
@@ -1595,50 +1541,61 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
     // watch's first fire — a real user sort/filter — compares against the true starting values and
     // is classified correctly (a null sentinel would misread the first filter change as a sort change).
-    // #14: seed the sort/filter announce baseline from the initial (post-mount) state so the LAZY
-    // watch's first fire — a real user sort/filter — compares against the true starting values and
-    // is classified correctly (a null sentinel would misread the first filter change as a sort change).
     this.announceState.sorting = this.effectiveSorting();
     this.announceState.columnFilters = this.effectiveColumnFilters();
     this.announceState.globalFilter = this.effectiveGlobalFilter();
   }
 
   updated(changedProperties: Map<string, unknown>): void {
-    this.maybeClearHistoryOnExternalSwap();
-    // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
-    // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
-    // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
-    // the window where it was emits nothing.
-    // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
-    // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
-    // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
-    // the window where it was emits nothing.
-    this.emitVisibleRangeIfChanged();
-    // A-02: the post-render hook is the one place that observes EVERY column-width change on all
-    // six targets — an interactive resize writes `columnSizing` through table-core under
-    // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
-    // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
-    // signature, so a tick that changed no width costs one loop over the leaf columns.
-    // A-02: the post-render hook is the one place that observes EVERY column-width change on all
-    // six targets — an interactive resize writes `columnSizing` through table-core under
-    // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
-    // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
-    // signature, so a tick that changed no width costs one loop over the leaf columns.
-    this.remeasureColumnSizes();
-    if (!this.table) return;
-    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
-    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
-    // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
-    // identical length) still re-feeds.
-    // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
-    // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
-    // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
-    // identical length) still re-feeds.
-    const d = this.currentData() || [];
-    if (d === this.lastData && d.length === this.lastDataLen) return;
-    this.lastData = d;
-    this.lastDataLen = d.length;
-    this.reFeed();
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('rowCount') || changedProperties.has('pageCount') || changedProperties.has('expandable') || changedProperties.has('groupable') || changedProperties.has('selectionMode') || changedProperties.has('columns'))) { const __watchVal = untracked(() => [this.sorting, this.globalFilter, this.columnFilters, this.pagination, // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
+    // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
+    // Next button availability track the new total.
+    this.rowCount, this.pageCount, this.rowSelection, this.expanded, this.expandable, this.grouping, this.groupable, this.columnVisibility, this.columnSizing, this.columnOrder, this.columnPinning, this.selectionMode, (this.data || []).length, // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
+    // even when the fresh array is the SAME length (a single-cell edit replaces one row
+    // object → new array ref, identical length → the .length key alone would miss it). The
+    // controlled path observes $props.data; the uncontrolled path observes $data.dataDefault.
+    // writeData is echo-guarded (programmatic) and reFeed writes neither sink, so no loop.
+    this.data, this._dataDefault.value, // Column CONFIG prop (the `:columns` array form) — the sibling column source to
+    // $data.colReg (the `<Column>` children). Watch it so a runtime `:columns` swap re-feeds:
+    // columnDefs()/tableColumns() build the UNION of both, and reFeed re-passes columns.
+    // (Consumers memoize the array as with $props.data/$props.sorting; the uncontrolled
+    // <Column>-children path leaves $props.columns undefined — a stable no-op getter.)
+    this.columns, this._colReg.value]); if (!Object.is(__watchVal, this.__rozieWatchPrev_1)) { this.__rozieWatchPrev_1 = __watchVal; untracked(() => (() => {
+      // Seed BEFORE the re-feed so the pinning this call may write is part of the state object
+      // table-core receives on this same tick (rather than landing a frame late and re-ordering
+      // getVisibleCells() a render after the columns appear). One-shot and self-latching — see
+      // seedColumnPinning() in stateAssembly.rzts. This is the `<Column>`-children entry point:
+      // those register during mount, so the $onMount call below can find zero columns.
+      this.seedColumnPinning();
+      this.reFeed();
+      this.maybeClearHistoryOnExternalSwap();
+    })()); } }
+    this.__rozieFirstUpdateDone = true;
+
+    (() => {
+      this.maybeClearHistoryOnExternalSwap();
+      // visible-range-change backstop (quick 260925-dtl part 2): a re-render from new data can move
+      // the rendered window WITHOUT a window-version bump (measured on React: filling placeholders
+      // shifted the window by two rows and nothing was reported). Deduped, so a render that leaves
+      // the window where it was emits nothing.
+      this.emitVisibleRangeIfChanged();
+      // A-02: the post-render hook is the one place that observes EVERY column-width change on all
+      // six targets — an interactive resize writes `columnSizing` through table-core under
+      // `columnResizeMode: 'onChange'` and never reaches the coarse re-feed watch (which keys on
+      // `$props.columnSizing`, undefined on the uncontrolled path). Self-guarded on the width
+      // signature, so a tick that changed no width costs one loop over the leaf columns.
+      this.remeasureColumnSizes();
+      if (!this.table) return;
+      // Phase 51 req-4: track currentData() (the bound prop OR the uncontrolled
+      // $data.dataDefault) so a committed edit re-feeds on Lit whether or not the two-way
+      // `data` model is bound. Compare by reference AND length so a same-length single-cell edit (fresh array,
+      // identical length) still re-feeds.
+      const d = this.currentData() || [];
+      if (d === this.lastData && d.length === this.lastDataLen) return;
+      this.lastData = d;
+      this.lastDataLen = d.length;
+      this.reFeed();
+    })();
   }
 
   disconnectedCallback(): void {
@@ -5278,9 +5235,6 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // page-relative active row → absolute (display-order) index.
   toAbsRow = (localRow: any) => localRow + this.pageRowOffset();
 
-  // A body row's ABSOLUTE display-order index = its page-relative index + the page offset. Drives
-  // aria-rowindex on the non-virtual paginated body (B27); the virtual path uses wr.vi.index
-  // directly (already absolute). Reactive via rowIndexOf's tick().
   // Total filtered+sorted PRE-pagination row count — the clamp bound for an absolute focusCell.
   // In virtual mode $data.rows IS the full pre-pagination model (bodyRowCount suffices); in the
   // non-virtual paginated body $data.rows is only the page slice, so read the live model.

@@ -19,7 +19,7 @@
 <script setup lang="ts">
 defineOptions({ inheritAttrs: false });
 
-import { Fragment, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
+import { Fragment, computed, getCurrentInstance, h, onBeforeUnmount, onMounted, ref, render, useSlots, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -63,12 +63,24 @@ const props = withDefaults(
   { language: 'javascript', theme: 'light' as any, readOnly: false, height: 240, placeholder: '', extensions: () => [], basicSetup: false, gutterLines: () => [], decorations: () => [] }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The two-way document text (`r-model:value`) — the editor's contents as a string. Typing in the editor writes the new text back through the model path (CodeMirror's `updateListener` extension); a consumer write reflects into the live document, echo-guarded so a programmatic set does not ping-pong. As the sole `model: true` prop this **is** the only change channel — there are no events.
  * @example
  * <CodeMirror v-model:value="source" language="javascript" theme="dark" />
  */
-const value = defineModel<string>('value', { default: '' });
+const __rozieModel_value = defineModel<string>('value', { default: '' });
+const value = computed<string>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 defineSlots<{
   panel(props: { view: any }): any;

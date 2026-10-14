@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -57,12 +57,24 @@ const props = withDefaults(
   { min: null, max: null, step: 1, largeStep: 10, formatOptions: () => ({}), allowScrub: false, disabled: false, readonly: false, ariaLabel: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The numeric value of the field (two-way `r-model`). `null` means the field is empty. As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a number field **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). The value is clamped to `[min, max]` and snapped to `step` on every commit.
  * @example
  * <NumberField v-model:modelValue="qty" :min="0" :max="10" />
  */
-const modelValue = defineModel<number | null>('modelValue', { default: null });
+const __rozieModel_modelValue = defineModel<number | null>('modelValue', { default: null });
+const modelValue = computed<number | null>({
+  get: () => __rozieModel_modelValue.value,
+  set: (v) => { if (__rozieBound('modelValue')) __rozieVm.emit('update:modelValue', v); else __rozieModel_modelValue.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

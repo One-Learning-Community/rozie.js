@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, mergeListeners, pickListeners, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Switch.css';
 
@@ -118,7 +119,7 @@ const Switch = forwardRef<SwitchHandle, SwitchProps>(function Switch(_props: Swi
 
   const _rozieExposeRef = useRef({ focus, toggle });
   _rozieExposeRef.current = { focus, toggle };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => _rozieExposeRef.current.toggle(...args) }), []);
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), toggle: (...args: Parameters<typeof toggle>): ReturnType<typeof toggle> => flushSync(() => _rozieExposeRef.current.toggle(...args)) }), []);
 
   return (
     <>

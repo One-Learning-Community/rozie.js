@@ -373,82 +373,10 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (!open$local() || activeIndex() < 0) return null;
     return optionId(activeIndex());
   });
-  onMount(() => {
-    // A remount of the SAME instance (React StrictMode mounts, unmounts and mounts again
-    // synchronously). Frames the first mount queued are still queued: the unmount set
-    // `disposed`, this line clears it again before any of them has run, so they do run —
-    // against this remounted instance. That is harmless (the re-measure sweep, the kick
-    // and the reveal are idempotent and read live state). What must not carry over is the
-    // re-measure latch: the unmount already cleared it, and it is cleared here as well so
-    // that a mount never starts with a sweep believed to be in flight.
-    disposed = false;
-    remeasurePending = false;
-    if (!local.idBase) setAutoId('rozie-select-' + nextAutoId());
-    // The coarse-pointer probe must never throw out of $onMount (the windowing setup
-    // below runs for every Select), and older engines only have addListener().
-    try {
-      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-        coarseQuery = window.matchMedia('(pointer: coarse)');
-        setCoarse(!!coarseQuery.matches);
-        // Only records the new state: this closure is the mount-time one, so the reaction
-        // (closing the custom popup) lives in the `$data.coarse` watcher below.
-        coarseListener = (e: any) => {
-          setCoarse(!!e.matches);
-        };
-        if (typeof coarseQuery.addEventListener === 'function') coarseQuery.addEventListener('change', coarseListener);else if (typeof coarseQuery.addListener === 'function') coarseQuery.addListener(coarseListener);
-        // The first paint of the native element. Not left to the `$data.coarse` watcher:
-        // on Svelte and Solid a write made here in $onMount lands before that watcher's
-        // (skipped) first run, so it never fires — a select mounted with a value showed
-        // the placeholder on those two. Not gated on nativeActive() either: on React the
-        // `$data.coarse` just written is not readable yet. syncNative() is a no-op when
-        // no native element was rendered.
-        if (local.nativePicker && coarseQuery.matches) armNativeSync();
-      }
-    } catch (err: any) {
-      coarseQuery = null;
-    }
-    syncRows();
-    if (local.virtual) {
-      // The list renders at mount when virtual, so the .rozie-select-list scroll container
-      // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
-      // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
-      // Solid/Lit, which leaves the virtualizer with no scroll element.
-      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-select-list') : null;
-      virtualizer = new Virtualizer(virtualizerOptions());
-      virtualizerCleanup = virtualizer._didMount();
-      setWindowVer(windowVer() + 1);
-      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
-    }
-  });
-  createEffect(() => {
-    if (local.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
-    // The native element's selection is DOM state: after any render that may have added
-    // or removed <option>s, write the model into it again (a no-op when it already shows it).
-    if (nativeActive()) syncNative();
-  });
-  onCleanup(() => {
-    // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
-    // this and does nothing.
-    disposed = true;
-    remeasurePending = false;
-    if (resyncTimer !== null) clearTimeout(resyncTimer);
-    if (typeTimer !== null) clearTimeout(typeTimer);
-    if (nativeSyncTimer !== null) clearTimeout(nativeSyncTimer);
-    if (coarseQuery && coarseListener) {
-      if (typeof coarseQuery.removeEventListener === 'function') coarseQuery.removeEventListener('change', coarseListener);else if (typeof coarseQuery.removeListener === 'function') coarseQuery.removeListener(coarseListener);
-    }
-    // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
-    if (virtualizerCleanup) virtualizerCleanup();
-    virtualizerCleanup = null;
-    virtualizer = null;
-  });
-  createEffect(on(() => (() => open$local())(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => (open$local() ? 'o' : '-') + (local.hideEmpty ? 'h' : 's') + (local.options ? local.options.length : 0))(), (v) => untrack(() => (() => {
     syncPanel();
   })()), { defer: true }));
   createEffect(on(() => (() => session())(), (v) => untrack(() => (() => {
-    syncPanel();
-  })()), { defer: true }));
-  createEffect(on(() => (() => (local.hideEmpty ? 'h' : 's') + (local.options ? local.options.length : 0))(), (v) => untrack(() => (() => {
     syncPanel();
   })()), { defer: true }));
   createEffect(on(() => (() => !!local.disabled)(), (v) => untrack(() => (() => {
@@ -475,10 +403,7 @@ export default function Select(_props: SelectProps): JSX.Element {
   createEffect(on(() => (() => local.options ? local.options.length : 0)(), (v) => untrack(() => (() => {
     if (activeIndex() >= visibleOptions().length) setActiveIndex(visibleOptions().length > 0 ? nextEnabled(-1, 1) : -1);
   })()), { defer: true }));
-  createEffect(on(() => (() => coarse())(), (v) => untrack(() => (() => {
-    yieldToNative();
-  })()), { defer: true }));
-  createEffect(on(() => (() => (local.nativePicker ? 'n' : '-') + (local.virtual ? 'v' : '-') + (local.inline ? 'i' : '-') + (local.multiple ? 'm' : '-'))(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => (coarse() ? 'c' : '-') + (local.nativePicker ? 'n' : '-') + (local.virtual ? 'v' : '-') + (local.inline ? 'i' : '-') + (local.multiple ? 'm' : '-'))(), (v) => untrack(() => (() => {
     yieldToNative();
   })()), { defer: true }));
   createEffect(on(() => (() => value())(), (v) => untrack(() => (() => {
@@ -493,6 +418,69 @@ export default function Select(_props: SelectProps): JSX.Element {
   createEffect(on(() => (() => local.groups)(), (v) => untrack(() => (() => {
     scheduleNativeSync();
   })()), { defer: true }));
+  onMount(() => {
+    // A remount of the SAME instance (React StrictMode mounts, unmounts and mounts again
+    // synchronously). Frames the first mount queued are still queued: the unmount set
+    // `disposed`, this line clears it again before any of them has run, so they do run —
+    // against this remounted instance. That is harmless (the re-measure sweep, the kick
+    // and the reveal are idempotent and read live state). What must not carry over is the
+    // re-measure latch: the unmount already cleared it, and it is cleared here as well so
+    // that a mount never starts with a sweep believed to be in flight.
+    disposed = false;
+    remeasurePending = false;
+    if (!local.idBase) setAutoId('rozie-select-' + nextAutoId());
+    // The coarse-pointer probe must never throw out of $onMount (the windowing setup
+    // below runs for every Select), and older engines only have addListener().
+    try {
+      if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+        coarseQuery = window.matchMedia('(pointer: coarse)');
+        setCoarse(!!coarseQuery.matches);
+        // Only records the new state: this closure is the mount-time one, so the reaction
+        // (closing the custom popup, the first paint of the native element) lives in the
+        // `$data.coarse` watcher below.
+        coarseListener = (e: any) => {
+          setCoarse(!!e.matches);
+        };
+        if (typeof coarseQuery.addEventListener === 'function') coarseQuery.addEventListener('change', coarseListener);else if (typeof coarseQuery.addListener === 'function') coarseQuery.addListener(coarseListener);
+      }
+    } catch (err: any) {
+      coarseQuery = null;
+    }
+    syncRows();
+    if (local.virtual) {
+      // The list renders at mount when virtual, so the .rozie-select-list scroll container
+      // exists here. Capture it via $el.querySelector (the data-table gridScrollEl precedent,
+      // proven ×6 incl Lit shadow + Solid) — $refs on a conditionally-rendered node is null on
+      // Solid/Lit, which leaves the virtualizer with no scroll element.
+      gridScrollEl = __rozieRootRef! ? __rozieRootRef!.querySelector('.rozie-select-list') : null;
+      virtualizer = new Virtualizer(virtualizerOptions());
+      virtualizerCleanup = virtualizer._didMount();
+      setWindowVer(windowVer() + 1);
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => kickWindow(8));else setTimeout(() => kickWindow(8), 0);
+    }
+  });
+  createEffect(() => {
+    if (local.virtual && virtualizer && virtualizer.options.count !== windowSource().length) refeedWindow();
+    // The native element's selection is DOM state: after any render that may have added
+    // or removed <option>s, write the model into it again (a no-op when it already shows it).
+    if (nativeActive()) syncNative();
+  });
+  onCleanup(() => {
+    // Every animation-frame chain still queued (reveal, settle, re-measure, kick) sees
+    // this and does nothing.
+    disposed = true;
+    remeasurePending = false;
+    if (resyncTimer !== null) clearTimeout(resyncTimer);
+    if (typeTimer !== null) clearTimeout(typeTimer);
+    if (nativeSyncTimer !== null) clearTimeout(nativeSyncTimer);
+    if (coarseQuery && coarseListener) {
+      if (typeof coarseQuery.removeEventListener === 'function') coarseQuery.removeEventListener('change', coarseListener);else if (typeof coarseQuery.removeListener === 'function') coarseQuery.removeListener(coarseListener);
+    }
+    // Tear down the virtualizer's scroll-element ResizeObserver (no-op when virtual off).
+    if (virtualizerCleanup) virtualizerCleanup();
+    virtualizerCleanup = null;
+    virtualizer = null;
+  });
   let controlElRef: HTMLElement | null = null;
   let triggerElRef: HTMLElement | null = null;
   let listElRef: HTMLElement | null = null;
@@ -586,15 +574,6 @@ export default function Select(_props: SelectProps): JSX.Element {
   function optionId(index: any) {
     return idRoot() + '-opt-' + index;
   }
-
-  // ---- derived state -----------------------------------------------------
-  // The visible option list: identity in select-only / non-filtering mode,
-  // a case-insensitive substring filter when a combobox query is present.
-  // A plain function (not `$computed`) so it reads uniformly across all six
-  // targets — a `$computed` is a value on React but an accessor on Solid, so
-  // aliasing it to a local (`const opts = visibleOptions()`) diverges; calling a
-  // plain function is identical everywhere.
-
   function close() {
     if (!open$local()) return;
     setOpen$local(false);
@@ -612,8 +591,6 @@ export default function Select(_props: SelectProps): JSX.Element {
       option: null
     });
   }
-
-  // ---- keyboard navigation over the VISIBLE list -------------------------
 
   // Pointer hover sets the virtual highlight (matches native <select> feel).
   function onOptionPointerMove(index: any) {
@@ -848,12 +825,9 @@ export default function Select(_props: SelectProps): JSX.Element {
     return null;
   }
   // Write the model into the native element. Imperative on purpose: a <select>'s
-  // selection is DOM state, and the declarative shape — `:value` on the <select> plus
-  // `:selected` on each <option> — did not behave the same on six targets when it was
-  // tried (and `selected` on an <option> is a dev-mode console error on React). It is
-  // also the only way to put the element back when a choice is not accepted (the
-  // placeholder entry, or a consumer that keeps the old value), where nothing reactive
-  // changes.
+  // selection is DOM state, and a choice that is not accepted (the placeholder entry, or
+  // a consumer that keeps the old value) changes nothing reactive — a declarative `:value`
+  // would not be re-applied, and the element would keep showing the refused option.
   function syncNative() {
     const el = nativeEl();
     if (!el) return;
@@ -1027,8 +1001,8 @@ export default function Select(_props: SelectProps): JSX.Element {
   // The gate in front of the spine's `open` (`openCore` above). The exposed `open` verb
   // and every internal caller (`toggle`, `move`, `moveEdge`, type-ahead, Space) go
   // through it, so the custom popup can never open while the native picker is active.
-  // It carries the public name because `$expose` binds a verb to the script binding of
-  // that name — an aliased key (`{ open: someOtherFn }`) is ignored by the emitters.
+  // It carries the public name because the spine copies above call `open()`, and those
+  // calls must reach the gate too.
   // It also asks for the highlighted option to be scrolled into view once the list is
   // there: opening starts the highlight on the SELECTED option, which in a long list can
   // be far below the fold, and in a windowed one is not even rendered — the trigger's
@@ -1038,7 +1012,7 @@ export default function Select(_props: SelectProps): JSX.Element {
   // And a windowed list is re-fed here when its row count is not the option count: the
   // rows are only read while the popup is open, and every open passes through this gate,
   // so an `options` array grown or shrunk in place is caught on every target — including
-  // those where no watcher and no post-render hook sees such a change (Angular, Solid).
+  // Solid, where no watcher and no post-render hook sees such a change.
   function open() {
     if (nativeActive()) return;
     if (local.virtual && virtualizer && virtualizer.options.count !== optionCount()) refeedWindow();
@@ -1153,12 +1127,6 @@ export default function Select(_props: SelectProps): JSX.Element {
     return src && src[i] ? src[i].id : undefined;
   }
 
-  // COL_OVERSCAN (D-07): the column axis's own hardcoded overscan constant, separate from the
-  // row axis's `overscan: 8` below. Columns are far wider than rows are tall, so one number
-  // cannot serve both axes; no prop is exposed because no consumer has asked to tune the row
-  // overscan across the four phases it has shipped. Unused until 87-04 constructs the second,
-  // horizontal Virtualizer instance (see the AXIS MECHANISM note above).
-
   // ══ Phase 87 87-07 (D-15/D-18) — content-driven auto-measure: the shared engine's FIRST
   // mutable top-level state. Hoisted to `useRef` PER-INSTANCE by the React emitter's
   // hoistModuleLet — the SAME mechanism already load-bearing for `table`, `virtualizer`,
@@ -1228,11 +1196,6 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (typeof queueMicrotask !== 'undefined') queueMicrotask(flush);else setTimeout(flush, 0);
   }
 
-  // ESTIMATE_REFEED_DELTA_PX (D-15): the hysteresis threshold gating a re-feed into
-  // virtual-core. Without it, a mean nudging by a fraction of a pixel on every fold would
-  // re-feed on every window commit — the T-87-07-01 DoS control, paired with virtual-core's
-  // own measureElement/resizeItem idempotence (see refineRowEstimate() below).
-
   // estimateRowSize(i) (D-15/D-17): the estimateSize() resolver. MUST check !autoMeasureOn()
   // FIRST so the off path touches zero accumulator state and returns $props.estimateRowHeight
   // verbatim (D-17's byte-behavioral no-op). The zero-measurements case (first paint,
@@ -1243,9 +1206,6 @@ export default function Select(_props: SelectProps): JSX.Element {
     if (measuredRowCount === 0) return local.estimateRowHeight;
     return Math.round(measuredRowTotal / measuredRowCount);
   }
-
-  // foldMeasuredRow(index, height): fold ONE measured row's height into the running-mean
-  // accumulator, UPDATING (not double-adding) an already-folded index (T-87-07-03).
 
   // The FULL virtualizer options. virtual-core's setOptions REPLACES options with
   // `{ ...defaults, ...opts }` (it does NOT merge with prior options — verified in the 3.17.1
@@ -1457,15 +1417,6 @@ export default function Select(_props: SelectProps): JSX.Element {
     for (const it of items as any) if (it.index === r) return false;
     return true;
   }
-
-  // ══ Phase 87 87-04 — the column-axis analogs of windowedRows()/padTop()/padBottom()/
-  // rowIsOutsideWindow() above. The column axis has no "row-shaped" identity to carry alongside
-  // a VirtualItem (a column is not a full-model object the way a row is), so windowedColIndices()
-  // returns bare ABSOLUTE leaf-column indices; the template resolves each index back to a header/
-  // cell through the host's own header-group / visibleCellsFor lookups (D-08/D-09). ══
-
-  // windowedColIndices(): the ordered array of ABSOLUTE leaf-column indices to render.
-
   // Windowing instance state (the `let table` precedent — React hoists reassigned
   // module-`let`s to useRef; do NOT const). NULL until $onMount, and ONLY constructed
   // when $props.virtual. gridScrollEl is the captured .rozie-select-list scroll div the
@@ -1933,10 +1884,7 @@ export default function Select(_props: SelectProps): JSX.Element {
       setPanelOpen(false);
     }
   }
-  // select -> popover: everything popupVisible() reads, as TWO watchers — one whose getter
-  // reads only $data, one whose getter reads only props. A getter that mixes the two is
-  // routed through a signal effect on Lit, which a plain property change does not re-run
-  // (measured: with `hideEmpty`, options arriving while open never showed the popup there).
+  // select -> popover: everything popupVisible() reads.
 
   // popover -> select: the popover's own write.
   function takePanelWrite() {
@@ -2147,15 +2095,11 @@ export default function Select(_props: SelectProps): JSX.Element {
   // Reactive re-feed: when the option set changes, re-sync the indexable rows + push fresh
   // options into the virtualizer and re-pull the window (the data-table
   // setOptions+_willUpdate re-feed precedent). The getter is the `options` prop itself and
-  // nothing else:
-  //  - the reference, not its length: an array replaced by another of the SAME length is a
-  //    new option set too (a length-keyed getter kept the old rows on Vue);
-  //  - props only: mixed with a $data read, the getter is routed through a signal effect on
-  //    Lit, which a plain property change does not re-run (the windowed list kept the old
-  //    rows there until something else re-rendered it).
+  // nothing else — the reference, not its length: an array replaced by another of the SAME
+  // length is a new option set too (a length-keyed getter kept the old rows on Vue).
   // Nothing in a select-only host writes `$data.query`, so there is no query to follow.
   //
-  // A second watcher follows the LENGTH (props only, again): a list grown or shrunk in
+  // A second watcher follows the LENGTH: a list grown or shrunk in
   // place keeps its reference. And because a watcher only hears what the framework
   // reports — an in-place change is reported on Vue and Svelte, not on the other four —
   // the post-render hook below re-feeds too, whenever the virtualizer's count is not the
@@ -2187,11 +2131,11 @@ export default function Select(_props: SelectProps): JSX.Element {
           <div class={"rozie-select-control"} ref={(el) => { controlElRef = el as HTMLElement; }} onClick={($event: MouseEvent & { currentTarget: HTMLDivElement; target: Element }) => { onControlClick($event); }} data-rozie-s-6e3ebfa6="">
             {<Show when={local.multiple}><Key each={chipRows() as readonly any[]} by={(row) => row.key}>{(row, idx) => <span class={"rozie-select-chip"} data-rozie-s-6e3ebfa6="">
               {(_props.chipSlot ?? _props.slots?.['chip'])?.({ get option() { return row().option; }, remove: () => onChipRemove(row()), get index() { return idx(); } }) ?? <><span class={"rozie-select-chip__label"} data-rozie-s-6e3ebfa6="">{rozieDisplay(row().label)}</span><button type="button" aria-label={rozieAttr(chipRemoveLabel(row()))} class={"rozie-select-chip__remove"} tabIndex={-1} disabled={!!local.disabled} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); noop(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onChipRemove(row()); }} data-rozie-s-6e3ebfa6="">×</button></>}
-            </span>}</Key></Show>}<div role="combobox" aria-haspopup="listbox" aria-hidden={(nativeActive() ? 'true' : null) ?? undefined} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)} aria-label={rozieAttr(local.ariaLabel)} aria-disabled={!!local.disabled} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} tabIndex={rozieAttr(triggerTabindex())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
+            </span>}</Key></Show>}<div role="combobox" aria-haspopup="listbox" aria-hidden={(nativeActive() ? true : null) ?? undefined} aria-expanded={!!popupVisible()} aria-controls={rozieAttr(idRoot() + '-list')} aria-activedescendant={rozieAttr(popupVisible() && activeIndex() < visibleOptions().length ? activeDescendant() : null)} aria-label={rozieAttr(local.ariaLabel)} aria-disabled={!!local.disabled} ref={(el) => { triggerElRef = el as HTMLElement; }} class={"rozie-select-trigger"} tabIndex={rozieAttr(triggerTabindex())} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onTriggerKeyDown($event); }} data-rozie-s-6e3ebfa6="">
               {<Show when={!local.multiple}>{(_props.selectedSlot ?? _props.slots?.['selected'])?.({ get selected() { return selectedLabel(); }, get value() { return value(); } }) ?? <Show when={selectedLabel()} fallback={<span class={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{local.placeholder}</span>}><span class={"rozie-select-selected"} data-rozie-s-6e3ebfa6="">{rozieDisplay(selectedLabel())}</span></Show>}</Show>}{<Show when={local.multiple && selectedValues().length === 0}><span class={"rozie-select-placeholder"} data-rozie-s-6e3ebfa6="">{local.placeholder}</span></Show>}</div>
             {<Show when={local.clearable && hasValue() && !local.disabled}><button type="button" aria-label={local.clearLabel} class={"rozie-select-clear"} tabIndex={-1} onMouseDown={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { $event.preventDefault(); noop(); }} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { onClearClick(); }} data-rozie-s-6e3ebfa6="">×</button></Show>}<span class={"rozie-select-arrow"} aria-hidden="true" data-rozie-s-6e3ebfa6="">▾</span>
             
-            {<Show when={nativeActive()}><select aria-label={rozieAttr(local.ariaLabel ? local.ariaLabel : null)} class={"rozie-select-native"} disabled={!!local.disabled} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { $event.stopPropagation(); onNativeChange($event); }} data-rozie-s-6e3ebfa6="">
+            {<Show when={nativeActive()}><select aria-label={rozieAttr(local.ariaLabel ? local.ariaLabel : null)} class={"rozie-select-native"} disabled={!!local.disabled} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onNativeChange($event); }} data-rozie-s-6e3ebfa6="">
               <option value="" disabled={!!nativePlaceholderDisabled()} data-rozie-s-6e3ebfa6="">{local.placeholder}</option>
               <Key each={nativeRows().loose as readonly any[]} by={(row) => 'n-' + row.index}>{(row) => <option value={rozieAttr(row().index)} disabled={!!disabledOf(row().opt)} data-rozie-s-6e3ebfa6="">{rozieDisplay(labelOf(row().opt))}</option>}</Key>
               <Key each={nativeRows().grouped as readonly any[]} by={(blk) => 'ng-' + blk.group.id}>{(blk) => <optgroup label={rozieAttr(blk().group.label)} data-rozie-s-6e3ebfa6="">

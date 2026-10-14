@@ -33,5 +33,7 @@ export { pickListeners } from './pickListeners.js';
 export { __rozieInjectStyle } from './injectStyle.js';
 export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
+export type { RozieAttrValue } from './rozieAttr.js';
+export { rozieSelectValue } from './rozieSelectValue.js';
 export { rozieClass } from './rozieClass.js';
 export { rozieContext } from './rozieContext.js';

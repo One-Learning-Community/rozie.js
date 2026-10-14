@@ -119,6 +119,9 @@ export default function Dialog(_props: DialogProps): JSX.Element {
   onMount(() => { local.ref?.({ show, hide }); });
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
+  createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
+    sync(isOpen);
+  })(v)), { defer: true }));
   onMount(() => {
     sync(open());
   });
@@ -140,9 +143,6 @@ export default function Dialog(_props: DialogProps): JSX.Element {
       if (back.isConnected && lost) back.focus();
     }, 0);
   });
-  createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
-    sync(isOpen);
-  })(v)), { defer: true }));
   let panelElRef: HTMLElement | null = null;
 
   // ---- native reconcile ---------------------------------------------------

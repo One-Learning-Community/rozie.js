@@ -68,6 +68,9 @@ export default function Column(_props: ColumnProps): JSX.Element {
   const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'groupable', 'aggregationFn', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));
+  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.groupable, local.aggregationFn, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
+    if (reg) reg.registerColumn(colId(), buildSpec());
+  })()), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     // register this column's spec. On Lit the injected registry may still be undefined
@@ -91,9 +94,6 @@ export default function Column(_props: ColumnProps): JSX.Element {
     registered = true;
     reg.registerColumn(colId(), buildSpec());
   });
-  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.groupable, local.aggregationFn, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
-    if (reg) reg.registerColumn(colId(), buildSpec());
-  })()), { defer: true }));
 
   // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
   // STRICT BUNDLED-LEAF tsc rejects on `.registerColumn(...)` (TS2339). The .rozie-native

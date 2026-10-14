@@ -558,18 +558,6 @@ private portals = {
     // browser's default goes ahead; the bubble listener clears the mark so
     // listeners further up the tree can still prevent it. An Escape something DID
     // handle (a suggestion popup, the link editor) is prevented as before.
-    // Escape pass-through. ProseMirror calls `preventDefault()` on EVERY Escape
-    // keydown in an editor (prosemirror-view's `captureKeyDown`), handled or not,
-    // and a default-prevented Escape never becomes a close request — so a native
-    // `<dialog>` around the editor (rozie Dialog included) would not get `cancel`
-    // while focus is in the editor. `escapePassthrough` (below) is the
-    // lowest-priority Escape shortcut: it is reached only when no extension
-    // keymap and no consumer `editorProps.handleKeyDown` consumed the key, and it
-    // marks that Escape as unhandled. The capture listener gives the event a
-    // `preventDefault` that ignores the call while that mark is set, so the
-    // browser's default goes ahead; the bubble listener clears the mark so
-    // listeners further up the tree can still prevent it. An Escape something DID
-    // handle (a suggestion popup, the link editor) is prevented as before.
     let escapeUnhandled = false;
     let removeEscapeListeners: any = null;
     const escapePassthrough = Extension.create({
@@ -596,11 +584,6 @@ private portals = {
       escapeUnhandled = false;
     };
 
-    // Which optional extensions this editor needs. Read ONCE here (setup-once, like
-    // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
-    // synchronously; otherwise after their import() settles. Either way `ready` fires
-    // with the live Editor once it exists — the signal a consumer waits on before
-    // focusEditor() or any other verb.
     // Which optional extensions this editor needs. Read ONCE here (setup-once, like
     // placeholder/nodeSpecs). When none is needed the editor is constructed right now,
     // synchronously; otherwise after their import() settles. Either way `ready` fires
@@ -884,17 +867,6 @@ private portals = {
       }));
     };
 
-    // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
-    // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
-    // reject the shared Promise.all (which would otherwise leave the `.then()` below
-    // never firing: no editor, no `ready`, no error, permanently — an unhandled
-    // rejection that just evaporates). A caught failure is reported (console.error +
-    // the `error` event, mirroring RecaptchaV3/Captcha/MapLibre/PdfViewer/Waveform's
-    // `$emit('error', ...)` convention) and resolves `null` — construct() already
-    // treats a `null` mod exactly like "this extension wasn't needed" (see the
-    // `floatingMod ? floatingMod.FloatingMenu : null` guards below), so the editor
-    // still constructs, just degraded (missing that one extension) instead of never
-    // constructing at all.
     // A failed optional-extension chunk (a real-world CDN/network blip) must NOT sink
     // the whole editor — each import() is caught INDIVIDUALLY so one rejection can't
     // reject the shared Promise.all (which would otherwise leave the `.then()` below

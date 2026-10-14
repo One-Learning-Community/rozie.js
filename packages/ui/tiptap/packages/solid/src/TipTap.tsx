@@ -392,6 +392,18 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
+  createEffect(on(() => (() => html())(), (v) => untrack(() => ((v: any) => {
+    if (!editor) return;
+    if (v === lastHtml) return;
+    lastHtml = v;
+    editor.commands.setContent(v, {
+      emitUpdate: false
+    });
+    refreshActive();
+    refreshCount();
+    refreshLink();
+  })(v)), { defer: true }));
+  createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => editor?.setEditable(v, false))(v)), { defer: true }));
   onMount(() => {
     // mount-local (NOT a top-level script `let`) — set here so a late-resolving
     // dynamic import() below bails, and read by the returned teardown. Emitter-
@@ -755,18 +767,6 @@ export default function TipTap(_props: TipTapProps): JSX.Element {
       editor?.destroy();
     });
   });
-  createEffect(on(() => (() => html())(), (v) => untrack(() => ((v: any) => {
-    if (!editor) return;
-    if (v === lastHtml) return;
-    lastHtml = v;
-    editor.commands.setContent(v, {
-      emitUpdate: false
-    });
-    refreshActive();
-    refreshCount();
-    refreshLink();
-  })(v)), { defer: true }));
-  createEffect(on(() => (() => local.editable)(), (v) => untrack(() => ((v: any) => editor?.setEditable(v, false))(v)), { defer: true }));
   let toolbarElRef: HTMLElement | null = null;
   let editorElRef: HTMLElement | null = null;
 

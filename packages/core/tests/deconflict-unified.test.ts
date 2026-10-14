@@ -111,7 +111,7 @@ $expose({ open, close })
     // dispatches through `_rozieExposeRef.current.<verb>`. Assert the `open` verb
     // is present in the handle factory body via its dispatch wrapper.
     expect(code).toMatch(/useImperativeHandle\(ref,\s*\(\)\s*=>\s*\(\{/);
-    expect(code).toMatch(/open:\s*\(\.\.\.args[^)]*\)[^=]*=>\s*_rozieExposeRef\.current\.open\(\.\.\.args\)/);
+    expect(code).toMatch(/open:\s*\(\.\.\.args[^)]*\)[^=]*=>\s*flushSync\(\(\) => _rozieExposeRef\.current\.open\(\.\.\.args\)\)/);
     expect(code).toMatch(/const\s+\[open\$local\s*,\s*setOpen\$local\]\s*=\s*useState/);
     expect(code).not.toMatch(/function open\$local|const open\$local\s*=\s*\(\)/);
   });

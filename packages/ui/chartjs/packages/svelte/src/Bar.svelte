@@ -348,24 +348,6 @@ export function getDatasetMeta(datasetIndex: any) {
   return instance ? instance.getDatasetMeta(datasetIndex) : null;
 }
 
-onMount(() => {
-  canvasEl$local = canvasEl;
-  instance = new ChartJS(canvasEl$local, buildConfig());
-  return () => {
-    tooltipDispose?.();
-    tooltipEl?.remove();
-    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
-    // can finish. The captured `dying` instance is destroyed after the grace;
-    // 0 (default) destroys synchronously.
-    const dying = instance;
-    if (destroyDelay > 0) {
-      setTimeout(() => dying?.destroy(), destroyDelay);
-    } else {
-      dying?.destroy();
-    }
-  };
-});
-
 $effect(() => { const __watchVal = (() => data)(); untrack(() => ((v: any) => {
   if (!instance) return;
   if (redraw) {
@@ -431,6 +413,24 @@ $effect(() => { (() => options)(); untrack(() => { if (__rozieWatchInitial_1) { 
 })(); }); });
 let __rozieWatchInitial_2 = true;
 $effect(() => { (() => plugins)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } (() => recreate())(); }); });
+
+onMount(() => {
+  canvasEl$local = canvasEl;
+  instance = new ChartJS(canvasEl$local, buildConfig());
+  return () => {
+    tooltipDispose?.();
+    tooltipEl?.remove();
+    // destroyDelay (vue-chartjs parity): defer destroy() so any exit transition
+    // can finish. The captured `dying` instance is destroyed after the grace;
+    // 0 (default) destroys synchronously.
+    const dying = instance;
+    if (destroyDelay > 0) {
+      setTimeout(() => dying?.destroy(), destroyDelay);
+    } else {
+      dying?.destroy();
+    }
+  };
+});
 </script>
 
 <div class="rozie-chart" style:height={height + 'px'} style:width={width ? width + 'px' : undefined} data-rozie-s-ed04b5ca><canvas bind:this={canvasEl} role="img" aria-label={ariaLabel} data-rozie-s-ed04b5ca>{@render fallback?.()}</canvas></div>

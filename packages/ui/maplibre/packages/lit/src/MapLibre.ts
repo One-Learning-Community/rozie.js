@@ -442,19 +442,10 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
 
     // seed the null-let tracking arrays (declared null so typeNeutralize types them
     // `any`; the reconcile/teardown code only runs after this mount init).
-    // seed the null-let tracking arrays (declared null so typeNeutralize types them
-    // `any`; the reconcile/teardown code only runs after this mount init).
     this.controlInstances = [];
     this.appliedLayerIds = [];
     this.appliedSourceIds = [];
 
-    // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
-    // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
-    // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
-    // loosely-typed .rozie props (any[] / unknown) don't satisfy under the strict
-    // react/solid/lit tsc. Routing the construction through an `any` options object
-    // is the .rozie-native fix (no codegen type-aid, no lang="ts") — the same
-    // null-let idiom `let instance = null` already relies on.
     // mapOptions is a null-let so the bundled-leaf typeNeutralize pass annotates it
     // `any` — MapLibre's MapOptions strict-types center (LngLatLike tuple), style
     // (string|StyleSpecification) and maxBounds/bounds (LngLatBoundsLike), which the
@@ -487,14 +478,6 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     };
     this.instance = new maplibregl.Map(mapOptions);
 
-    // ─── forward map events ─────────────────────────────────────────────────
-    // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
-    // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
-    // named emit collides with the model on Vue (defineModel vs defineEmits) and
-    // Angular (ModelSignal vs OutputEmitterRef). The two-way binding already conveys
-    // zoom/pitch changes; consumers wanting an event get the terminal `zoomend` /
-    // `pitchend` below. `move`/`rotate` have no such clash (the models are `center`
-    // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     // ─── forward map events ─────────────────────────────────────────────────
     // NOTE: the CONTINUOUS `zoom` and `pitch` events are deliberately NOT forwarded
     // — `zoom` and `pitch` are also two-way `model: true` camera props, and a same-
@@ -575,7 +558,6 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     })));
 
     // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
-    // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
     this.instance.on('moveend', (e: any) => {
       this.dispatchEvent(new CustomEvent("moveend", {
         detail: e,
@@ -621,7 +603,6 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     });
 
     // ─── mount-once custom CONTROL portal slot ──────────────────────────────
-    // ─── mount-once custom CONTROL portal slot ──────────────────────────────
     if (this.control !== undefined) {
       const host = document.createElement('div');
       host.className = 'maplibregl-ctrl rozie-maplibre-control';
@@ -640,17 +621,14 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     }
 
     // standard controls + interaction toggles don't need style load.
-    // standard controls + interaction toggles don't need style load.
     this.applyControls();
     this.applyInteractionToggles();
 
-    // markers/popups/interactive are DOM/event overlays — no style-load gate.
     // markers/popups/interactive are DOM/event overlays — no style-load gate.
     this.reconcileMarkers(this.markers);
     this.reconcilePopups(this.popups);
     this.reconcileInteractive(this.interactiveLayerIds);
 
-    // sources/layers need the style loaded.
     // sources/layers need the style loaded.
     if (this.instance.isStyleLoaded()) this.applyLayers();else this.instance.on('load', this.applyLayers);
   }

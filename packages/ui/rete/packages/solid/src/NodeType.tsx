@@ -86,6 +86,9 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     for (const dispose of portalDisposers) dispose();
     portalDisposers.clear();
   });
+  createEffect(on(() => (() => local.type)(), (v) => untrack(() => (() => {
+    if (cv) cv.registerType(local.type, buildSpec());
+  })()), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
     // register this TYPE's spec INCLUDING the bodyRenderer callback. The canvas's
@@ -123,9 +126,6 @@ export default function NodeType(_props: NodeTypeProps): JSX.Element {
     registered = true;
     cv.registerType(local.type, buildSpec());
   });
-  createEffect(on(() => (() => local.type)(), (v) => untrack(() => (() => {
-    if (cv) cv.registerType(local.type, buildSpec());
-  })()), { defer: true }));
 
   // $inject is typed `unknown` (Phase 36 D-4: no rich type synthesis yet), which the
   // STRICT BUNDLED-LEAF tsc rejects on `.registerType(...)` (TS2339). The .rozie-native

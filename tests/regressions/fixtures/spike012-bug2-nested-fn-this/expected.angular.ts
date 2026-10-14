@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-nested-fn-this',
@@ -23,7 +23,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozi
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class NestedFnThis {
-  value = model<string | Record<string, any>>('');
+  readonly __rozieModelIn_value = input<string | Record<string, any> | undefined>(undefined, { alias: 'value' });
+  valueChange = output<string | Record<string, any>>();
+  value = rozieModel<string | Record<string, any>, import('@angular/core').ModelSignal<string | Record<string, any>>>(this.__rozieModelIn_value, this.valueChange, '');
   tag = signal('x');
 
   selected = (): string => {

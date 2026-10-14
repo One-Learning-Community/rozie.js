@@ -1,6 +1,6 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, model, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormsModule, NG_VALUE_ACCESSOR } from '@angular/forms';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-checkbox-rmodel',
@@ -29,7 +29,9 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class CheckboxRModel {
-  checked = model<boolean>(false);
+  readonly __rozieModelIn_checked = input<boolean | undefined>(undefined, { alias: 'checked' });
+  checkedChange = output<boolean>();
+  checked = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_checked, this.checkedChange, false);
 
   private __rozieCvaOnChange: (v: boolean) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};

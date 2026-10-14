@@ -1,5 +1,6 @@
-import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, rozieAttr, rozieDisplay, useControllableState, useKeynav } from '@rozie/runtime-react';
 import './DatePicker.css';
 import { addMonths, buildMonthGrid, buildMonthList, buildYearGrid, dayLabel, isDayDisabled, isInRange, isIsoDate, monthLabel, normalizeRange, rangeFromPreset, rangeSpansDisabled, resolveLabel, resolveRovingDayIndex, resolveRovingDrillIndex, resolveViewIso, ROVING_DAY_NONE, toIso, weekdayLabels } from './internal/buildMonthGrid';
@@ -480,7 +481,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
   // chain is ever in flight — mirrors the `rafId`-cancellation idiom already
   // used throughout this codebase (Angular's `__rozieKeynavRafId`,
   // virtualization.rzts's `remeasureRaf`).
-  const DAY_SETTLE_MAX_FRAMES = useMemo(() => 10, []);
+  const DAY_SETTLE_MAX_FRAMES = 10;
   //
   // `applyFocus` (the `focus()` expose handle only): once the cell has landed,
   // focus it directly. The r-keynav controller applies DOM focus on an
@@ -1178,7 +1179,7 @@ const DatePicker = forwardRef<DatePickerHandle, DatePickerProps>(function DatePi
 
   const _rozieExposeRef = useRef({ focus, goToToday, clear });
   _rozieExposeRef.current = { focus, goToToday, clear };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), goToToday: (...args: Parameters<typeof goToToday>): ReturnType<typeof goToToday> => _rozieExposeRef.current.goToToday(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args) }), []);
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), goToToday: (...args: Parameters<typeof goToToday>): ReturnType<typeof goToToday> => flushSync(() => _rozieExposeRef.current.goToToday(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)) }), []);
 
   return (
     <>

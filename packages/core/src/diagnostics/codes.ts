@@ -675,6 +675,15 @@ export const RozieErrorCode = {
   // no runtime presence on any target.
   REMOVED_MEMBER_REFERENCED: 'ROZ158', // error — the component itself uses a member it declares removed: $emit('x') of an <emits> tombstone, or a $props.x / $model.x read or write of a <props> tombstone. The tombstone has no runtime presence; fire or read the replacement named in its message instead.
   REMOVED_MEMBER_INVALID: 'ROZ159', // error — a removed-member tombstone is malformed: it must be exactly `{ removed: '<non-empty message>' }` — no payload/docs (<emits>) or type/default/model/required/docs (<props>) alongside `removed`, and the message must be a non-empty string literal.
+  // ROZ160 is the next free code after ROZ159. An aliased / inline / method
+  // `$expose` verb is bound to a script binding of its own name (core's
+  // expandExposeAliases); when that name is taken, the verb is rejected here
+  // instead of being silently dropped by the emitters.
+  EXPOSE_ALIAS_NAME_TAKEN: 'ROZ160', // error — $expose({ open: openGated }) / { open: () => … } / { open() {} } where `open` is already a top-level <script> binding; the verb would need a binding of that name. Use the shorthand for the existing binding, or rename one.
+  // ROZ161 — an r-for alias named like a <data> key or a prop: every target
+  // lowers `$data.x` / `$props.x` to a bare `x`, which the alias shadows, and
+  // each resolved the clash differently (all wrong). Rejected instead.
+  RFOR_ALIAS_SHADOWS_STATE: 'ROZ161', // error — r-for="open in items" where `open` is a <data> key or a prop; inside the loop `open` and `$data.open` / `$props.open` lower to the same bare name. Rename the alias.
 
   // ---- Compile-time correctness errors (Phase 2 Plan 02) — ROZ200..ROZ299 ----
   WRITE_TO_NON_MODEL_PROP: 'ROZ200', // error — SEM-02: $props.foo = … where foo lacks model: true (Phase 2 success criterion 2)

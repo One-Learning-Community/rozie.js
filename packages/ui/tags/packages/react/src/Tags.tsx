@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './Tags.css';
 import './Tags.global.css';
@@ -327,7 +328,7 @@ const Tags = forwardRef<TagsHandle, TagsProps>(function Tags(_props: TagsProps, 
 
   const _rozieExposeRef = useRef({ clear, focus });
   _rozieExposeRef.current = { clear, focus };
-  useImperativeHandle(ref, () => ({ clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args) }), []);
+  useImperativeHandle(ref, () => ({ clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)), focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)) }), []);
 
   return (
     <>

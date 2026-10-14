@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { paginationItems } from './internal/paginationItems';
 
@@ -164,7 +164,9 @@ export class Pagination {
   /**
    * The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.
    */
-  modelValue = model<number>(1);
+  readonly __rozieModelIn_modelValue = input<number | undefined>(undefined, { alias: 'modelValue' });
+  modelValueChange = output<number>();
+  modelValue = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_modelValue, this.modelValueChange, 1);
   /**
    * Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.
    */
@@ -195,6 +197,7 @@ export class Pagination {
   ariaLabel = input<string>('Pagination');
   nav = viewChild<ElementRef<HTMLElement>>('nav');
   change = output<unknown>();
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('prevControl', { read: TemplateRef }) prevControlTpl?: TemplateRef<PrevControlCtx>;
   @ContentChild('ellipsis', { read: TemplateRef }) ellipsisTpl?: TemplateRef<EllipsisCtx>;
   @ContentChild('item', { read: TemplateRef }) itemTpl?: TemplateRef<ItemCtx>;

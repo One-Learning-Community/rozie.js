@@ -1,6 +1,6 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, afterRenderEffect, computed, contentChild, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, afterRenderEffect, computed, contentChild, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieToken } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel, rozieToken } from '@rozie/runtime-angular';
 
 import { NodeEditor, ClassicPreset, Scope } from 'rete';
 import { AreaPlugin, AreaExtensions } from 'rete-area-plugin';
@@ -513,7 +513,9 @@ export class FlowCanvas {
    * @example
    * <rozie-flow-canvas [(graph)]="graph" [validateTypes]="true" />
    */
-  graph = model<Record<string, any>>((() => ({
+  readonly __rozieModelIn_graph = input<Record<string, any> | undefined>(undefined, { alias: 'graph' });
+  graphChange = output<Record<string, any>>();
+  graph = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_graph, this.graphChange, (() => ({
     nodes: [],
     connections: []
   }))());
@@ -524,7 +526,9 @@ export class FlowCanvas {
   /**
    * The viewport zoom level (two-way `r-model`). Scroll/pinch writes the new zoom back through the model (echo-guarded against the wrapper's own programmatic zooms); a consumer write zooms the live area. There is deliberately no `zoom`/`zoomed` emit — a same-named emit collides with the model on Vue and Angular — so the two-way binding is the channel for zoom changes.
    */
-  zoom = model<number>(1);
+  readonly __rozieModelIn_zoom = input<number | undefined>(undefined, { alias: 'zoom' });
+  zoomChange = output<number>();
+  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1);
   /**
    * Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
@@ -588,7 +592,9 @@ export class FlowCanvas {
   /**
    * Two-way interaction mode (`r-model`) — the Figma-style pan ↔ select toggle, `'pan'` (default) or `'select'`. In `'pan'` an empty-canvas drag pans the viewport (unchanged). In `'select'` an empty-canvas drag draws a rubber-band marquee box that multi-selects the intersecting nodes (surfacing `@selection-change`). A node drag still drags the node in both modes — only the empty-canvas drag changes. The canvas writes it back when the built-in mode button toggles (see `marquee`).
    */
-  mode = model<string>('pan');
+  readonly __rozieModelIn_mode = input<string | undefined>(undefined, { alias: 'mode' });
+  modeChange = output<string>();
+  mode = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_mode, this.modeChange, 'pan');
   /**
    * Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.
    */

@@ -56,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, getCurrentInstance, onMounted, ref } from 'vue';
 import { useKeynav } from '@rozie/runtime-vue';
 
 const props = withDefaults(
@@ -123,12 +123,24 @@ const props = withDefaults(
   { selectionMode: 'single', min: null, max: null, disabledDates: () => [], weekStartsOn: 0, disabled: false, locale: 'en-US', labels: () => ({}), presetRanges: () => [], monthYearNav: true, numberOfMonths: 1, showFooter: false, disabledDaysOfWeek: () => [], isDateDisabled: null }
 );
 
+const __rozieVm = getCurrentInstance()!;
+/** Whether the consumer binds a value (not `undefined`) to the two-way prop `name`. */
+const __rozieBound = (name: string): boolean => {
+  const raw = __rozieVm.vnode.props;
+  if (!raw) return false;
+  const kebab = name.replace(/\B([A-Z])/g, '-$1').toLowerCase();
+  return (name in raw ? raw[name] : raw[kebab]) !== undefined;
+};
 /**
  * The selected value (two-way `r-model`). **Polymorphic** on `selectionMode`: in `single` mode an ISO `YYYY-MM-DD` string (`""` = nothing selected); in `range` mode a `{ start, end }` object of ISO endpoints (`""` = an unset endpoint). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so a DatePicker **is** a form control (`[(ngModel)]` / `[formControl]` bind directly). Selecting a day writes the new value back and emits `change`. **Lit caveat (range mode):** the object form must be delivered via a *property* binding (`.value=${obj}` / `r-model`), never a string `value="..."` attribute — the same rule already in force for `disabledDates`.
  * @example
  * <DatePicker v-model:value="date" :min="'2026-01-01'" @change="onPick" />
  */
-const value = defineModel<string | Record<string, any>>('value', { default: '' });
+const __rozieModel_value = defineModel<string | Record<string, any>>('value', { default: '' });
+const value = computed<string | Record<string, any>>({
+  get: () => __rozieModel_value.value,
+  set: (v) => { if (__rozieBound('value')) __rozieVm.emit('update:value', v); else __rozieModel_value.value = v; },
+});
 
 const emit = defineEmits<{
   change: [...args: any[]];

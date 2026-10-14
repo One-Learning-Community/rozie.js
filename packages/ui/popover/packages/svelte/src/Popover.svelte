@@ -563,34 +563,6 @@ export function reposition() {
   position();
 }
 
-onMount(() => {
-  if (!idBase) autoId = 'rozie-popover-' + nextAutoId();
-  // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
-  // and may be null until open (or keepMounted); startTracking re-reads via the
-  // watch path.
-  anchorNode = anchorEl;
-  liveReference = reference;
-  if (open && !disabled) {
-    // floatingNode is populated by its r-if having rendered; read it lazily inside
-    // the watch/handlers too. Position on next tick when it exists.
-    floatingNode = floatingEl;
-    arrowNode = arrowEl;
-    startTracking();
-  } else if (keepMounted && !disabled) {
-    // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
-    // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
-    // strictly open-gated (D-11) — so the hidden panel already carries real
-    // coordinates before the first open instead of painting at 0,0. position()
-    // itself no-ops when disablePositioning is set.
-    floatingNode = floatingEl;
-    arrowNode = arrowEl;
-    position();
-  }
-  return () => {
-    stopTracking();
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { const __watchVal = (() => open)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((isOpen: any) => {
   if (isOpen && !disabled) {
@@ -648,6 +620,34 @@ $effect(() => { (() => reference)(); untrack(() => { if (__rozieWatchInitial_9) 
     position();
   }
 })(); }); });
+
+onMount(() => {
+  if (!idBase) autoId = 'rozie-popover-' + nextAutoId();
+  // $refs read ONLY here (ROZ123). The floating + arrow elements live behind r-if
+  // and may be null until open (or keepMounted); startTracking re-reads via the
+  // watch path.
+  anchorNode = anchorEl;
+  liveReference = reference;
+  if (open && !disabled) {
+    // floatingNode is populated by its r-if having rendered; read it lazily inside
+    // the watch/handlers too. Position on next tick when it exists.
+    floatingNode = floatingEl;
+    arrowNode = arrowEl;
+    startTracking();
+  } else if (keepMounted && !disabled) {
+    // keepMounted (D-03): the panel is mounted-but-hidden. Read the refs and run
+    // a ONE-SHOT position() — never startTracking()/autoUpdate, which stays
+    // strictly open-gated (D-11) — so the hidden panel already carries real
+    // coordinates before the first open instead of painting at 0,0. position()
+    // itself no-ops when disablePositioning is set.
+    floatingNode = floatingEl;
+    arrowNode = arrowEl;
+    position();
+  }
+  return () => {
+    stopTracking();
+  };
+});
 
 $effect(() => {
   if (!(open && !disableDismiss)) return;

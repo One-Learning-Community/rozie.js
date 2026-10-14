@@ -546,54 +546,6 @@ export function clearFind() {
   });
 }
 
-onMount(() => {
-  // mount-local (not a top-level script `let`) — set here so a late-resolving
-  // dynamic import() below bails, and read by the returned teardown. Emitter-
-  // hardening backlog item #2 (project_emitter_hardening_backlog): every
-  // target keeps a $onMount setup-local in scope for its own returned
-  // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
-  let cancelled = false;
-  containerEl = viewerEl;
-  current = Math.max(1, page);
-  zoom = scale;
-  rot = rotation;
-  // autoFit resize sensor — always observing (cheap when idle); the callback
-  // itself gates on the current $props.autoFit so toggling it at runtime needs
-  // no observer teardown/recreation. No-ops via applyFit's own instance/
-  // containerEl guard before a document has loaded.
-  resizeObserver = new ResizeObserver(() => {
-    if (autoFit) applyFit(autoFit === 'width' ? 'width' : 'page');
-  });
-  resizeObserver.observe(containerEl);
-  // lazy-load the engine (SSR-safe + code-split), then configure the worker and
-  // load the document.
-  import('pdfjs-dist').then((mod: any) => {
-    if (cancelled) return;
-    pdfjsLib = mod;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc || cdnBase() + '/build/pdf.worker.min.mjs';
-    // hand off to the lazy $watch below rather than calling load() from this
-    // (React: mount-frozen) closure — see the $data.engineReady note above.
-    engineReady++;
-  });
-  return () => {
-    cancelled = true;
-    renderToken++;
-    if (observer) {
-      observer.disconnect();
-      observer = null;
-    }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    if (loadingTask) {
-      loadingTask.destroy();
-      loadingTask = null;
-    }
-    instance = null;
-  };
-});
-
 let __rozieWatchInitial_0 = true;
 $effect(() => { (() => engineReady)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => load())(); }); });
 let __rozieWatchInitial_1 = true;
@@ -641,6 +593,54 @@ $effect(() => { const __watchVal = (() => query)(); untrack(() => { if (__rozieW
   const q = String(v);
   if (q) find(q);else clearFind();
 })(__watchVal); }); });
+
+onMount(() => {
+  // mount-local (not a top-level script `let`) — set here so a late-resolving
+  // dynamic import() below bails, and read by the returned teardown. Emitter-
+  // hardening backlog item #2 (project_emitter_hardening_backlog): every
+  // target keeps a $onMount setup-local in scope for its own returned
+  // teardown, so this no longer needs the prior TOP-LEVEL-`let` workaround.
+  let cancelled = false;
+  containerEl = viewerEl;
+  current = Math.max(1, page);
+  zoom = scale;
+  rot = rotation;
+  // autoFit resize sensor — always observing (cheap when idle); the callback
+  // itself gates on the current $props.autoFit so toggling it at runtime needs
+  // no observer teardown/recreation. No-ops via applyFit's own instance/
+  // containerEl guard before a document has loaded.
+  resizeObserver = new ResizeObserver(() => {
+    if (autoFit) applyFit(autoFit === 'width' ? 'width' : 'page');
+  });
+  resizeObserver.observe(containerEl);
+  // lazy-load the engine (SSR-safe + code-split), then configure the worker and
+  // load the document.
+  import('pdfjs-dist').then((mod: any) => {
+    if (cancelled) return;
+    pdfjsLib = mod;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc || cdnBase() + '/build/pdf.worker.min.mjs';
+    // hand off to the lazy $watch below rather than calling load() from this
+    // (React: mount-frozen) closure — see the $data.engineReady note above.
+    engineReady++;
+  });
+  return () => {
+    cancelled = true;
+    renderToken++;
+    if (observer) {
+      observer.disconnect();
+      observer = null;
+    }
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
+    if (loadingTask) {
+      loadingTask.destroy();
+      loadingTask = null;
+    }
+    instance = null;
+  };
+});
 </script>
 
 <div bind:this={viewerEl} {...__rozieAttrs} class={["rozie-pdf", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-3c863364></div>

@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './NumberField.css';
 
@@ -340,7 +341,7 @@ const NumberField = forwardRef<NumberFieldHandle, NumberFieldProps>(function Num
 
   const _rozieExposeRef = useRef({ focus, increment, decrement, clear });
   _rozieExposeRef.current = { focus, increment, decrement, clear };
-  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => _rozieExposeRef.current.focus(...args), increment: (...args: Parameters<typeof increment>): ReturnType<typeof increment> => _rozieExposeRef.current.increment(...args), decrement: (...args: Parameters<typeof decrement>): ReturnType<typeof decrement> => _rozieExposeRef.current.decrement(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args) }), []);
+  useImperativeHandle(ref, () => ({ focus: (...args: Parameters<typeof focus>): ReturnType<typeof focus> => flushSync(() => _rozieExposeRef.current.focus(...args)), increment: (...args: Parameters<typeof increment>): ReturnType<typeof increment> => flushSync(() => _rozieExposeRef.current.increment(...args)), decrement: (...args: Parameters<typeof decrement>): ReturnType<typeof decrement> => flushSync(() => _rozieExposeRef.current.decrement(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)) }), []);
 
   return (
     <>

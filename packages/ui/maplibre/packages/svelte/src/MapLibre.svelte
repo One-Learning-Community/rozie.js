@@ -716,6 +716,95 @@ setContext('maplibre:layers', {
   }
 });
 
+let __rozieWatchInitial_0 = true;
+$effect(() => { const __watchVal = (() => center)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
+  if (!instance || !Array.isArray(v) || v.length !== 2) return;
+  const c = instance.getCenter();
+  if (v[0] === c.lng && v[1] === c.lat) return;
+  instance.easeTo({
+    center: v,
+    animate: false
+  }, PROGRAMMATIC);
+})(__watchVal); }); });
+let __rozieWatchInitial_1 = true;
+$effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
+  instance.easeTo({
+    zoom: v,
+    animate: false
+  }, PROGRAMMATIC);
+})(__watchVal); }); });
+let __rozieWatchInitial_2 = true;
+$effect(() => { const __watchVal = (() => bearing)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
+  instance.easeTo({
+    bearing: v,
+    animate: false
+  }, PROGRAMMATIC);
+})(__watchVal); }); });
+let __rozieWatchInitial_3 = true;
+$effect(() => { const __watchVal = (() => pitch)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
+  if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
+  instance.easeTo({
+    pitch: v,
+    animate: false
+  }, PROGRAMMATIC);
+})(__watchVal); }); });
+let __rozieWatchInitial_4 = true;
+$effect(() => { const __watchVal = (() => mapStyle)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
+  if (!instance) return;
+  // a new style wipes imperatively-added sources/layers — reset the applied
+  // tracking and re-apply once the new style loads.
+  appliedLayerIds = [];
+  appliedSourceIds = [];
+  instance.setStyle($state.snapshot(v) ?? DEFAULT_STYLE);
+  instance.once('styledata', () => applyLayers());
+})(__watchVal); }); });
+let __rozieWatchInitial_5 = true;
+$effect(() => { const __watchVal = (() => minZoom)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
+  if (instance && typeof v === 'number') instance.setMinZoom(v);
+})(__watchVal); }); });
+let __rozieWatchInitial_6 = true;
+$effect(() => { const __watchVal = (() => maxZoom)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => {
+  if (instance && typeof v === 'number') instance.setMaxZoom(v);
+})(__watchVal); }); });
+let __rozieWatchInitial_7 = true;
+$effect(() => { const __watchVal = (() => maxBounds)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => {
+  if (instance) instance.setMaxBounds($state.snapshot(v) || null);
+})(__watchVal); }); });
+let __rozieWatchInitial_8 = true;
+$effect(() => { const __watchVal = (() => markers)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => reconcileMarkers(v))(__watchVal); }); });
+let __rozieWatchInitial_9 = true;
+$effect(() => { const __watchVal = (() => popups)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => reconcilePopups(v))(__watchVal); }); });
+let __rozieWatchInitial_10 = true;
+$effect(() => { (() => sources)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_11 = true;
+$effect(() => { (() => layers)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_12 = true;
+$effect(() => { (() => sourceReg)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_13 = true;
+$effect(() => { (() => layerReg)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => applyLayers())(); }); });
+let __rozieWatchInitial_14 = true;
+$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } ((v: any) => reconcileInteractive(v))(__watchVal); }); });
+let __rozieWatchInitial_15 = true;
+$effect(() => { (() => controls)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => applyControls())(); }); });
+let __rozieWatchInitial_16 = true;
+$effect(() => { (() => dragPan)(); untrack(() => { if (__rozieWatchInitial_16) { __rozieWatchInitial_16 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_17 = true;
+$effect(() => { (() => dragRotate)(); untrack(() => { if (__rozieWatchInitial_17) { __rozieWatchInitial_17 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_18 = true;
+$effect(() => { (() => scrollZoom)(); untrack(() => { if (__rozieWatchInitial_18) { __rozieWatchInitial_18 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_19 = true;
+$effect(() => { (() => doubleClickZoom)(); untrack(() => { if (__rozieWatchInitial_19) { __rozieWatchInitial_19 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_20 = true;
+$effect(() => { (() => boxZoom)(); untrack(() => { if (__rozieWatchInitial_20) { __rozieWatchInitial_20 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_21 = true;
+$effect(() => { (() => keyboard)(); untrack(() => { if (__rozieWatchInitial_21) { __rozieWatchInitial_21 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_22 = true;
+$effect(() => { (() => touchZoomRotate)(); untrack(() => { if (__rozieWatchInitial_22) { __rozieWatchInitial_22 = false; return; } (() => applyInteractionToggles())(); }); });
+let __rozieWatchInitial_23 = true;
+$effect(() => { (() => touchPitch)(); untrack(() => { if (__rozieWatchInitial_23) { __rozieWatchInitial_23 = false; return; } (() => applyInteractionToggles())(); }); });
+
 onMount(() => {
   const el = containerEl;
 
@@ -853,95 +942,6 @@ onMount(() => {
     if (instance) instance.remove();
   };
 });
-
-let __rozieWatchInitial_0 = true;
-$effect(() => { const __watchVal = (() => center)(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } ((v: any) => {
-  if (!instance || !Array.isArray(v) || v.length !== 2) return;
-  const c = instance.getCenter();
-  if (v[0] === c.lng && v[1] === c.lat) return;
-  instance.easeTo({
-    center: v,
-    animate: false
-  }, PROGRAMMATIC);
-})(__watchVal); }); });
-let __rozieWatchInitial_1 = true;
-$effect(() => { const __watchVal = (() => zoom)(); untrack(() => { if (__rozieWatchInitial_1) { __rozieWatchInitial_1 = false; return; } ((v: any) => {
-  if (!instance || typeof v !== 'number' || v === instance.getZoom()) return;
-  instance.easeTo({
-    zoom: v,
-    animate: false
-  }, PROGRAMMATIC);
-})(__watchVal); }); });
-let __rozieWatchInitial_2 = true;
-$effect(() => { const __watchVal = (() => bearing)(); untrack(() => { if (__rozieWatchInitial_2) { __rozieWatchInitial_2 = false; return; } ((v: any) => {
-  if (!instance || typeof v !== 'number' || v === instance.getBearing()) return;
-  instance.easeTo({
-    bearing: v,
-    animate: false
-  }, PROGRAMMATIC);
-})(__watchVal); }); });
-let __rozieWatchInitial_3 = true;
-$effect(() => { const __watchVal = (() => pitch)(); untrack(() => { if (__rozieWatchInitial_3) { __rozieWatchInitial_3 = false; return; } ((v: any) => {
-  if (!instance || typeof v !== 'number' || v === instance.getPitch()) return;
-  instance.easeTo({
-    pitch: v,
-    animate: false
-  }, PROGRAMMATIC);
-})(__watchVal); }); });
-let __rozieWatchInitial_4 = true;
-$effect(() => { const __watchVal = (() => mapStyle)(); untrack(() => { if (__rozieWatchInitial_4) { __rozieWatchInitial_4 = false; return; } ((v: any) => {
-  if (!instance) return;
-  // a new style wipes imperatively-added sources/layers — reset the applied
-  // tracking and re-apply once the new style loads.
-  appliedLayerIds = [];
-  appliedSourceIds = [];
-  instance.setStyle($state.snapshot(v) ?? DEFAULT_STYLE);
-  instance.once('styledata', () => applyLayers());
-})(__watchVal); }); });
-let __rozieWatchInitial_5 = true;
-$effect(() => { const __watchVal = (() => minZoom)(); untrack(() => { if (__rozieWatchInitial_5) { __rozieWatchInitial_5 = false; return; } ((v: any) => {
-  if (instance && typeof v === 'number') instance.setMinZoom(v);
-})(__watchVal); }); });
-let __rozieWatchInitial_6 = true;
-$effect(() => { const __watchVal = (() => maxZoom)(); untrack(() => { if (__rozieWatchInitial_6) { __rozieWatchInitial_6 = false; return; } ((v: any) => {
-  if (instance && typeof v === 'number') instance.setMaxZoom(v);
-})(__watchVal); }); });
-let __rozieWatchInitial_7 = true;
-$effect(() => { const __watchVal = (() => maxBounds)(); untrack(() => { if (__rozieWatchInitial_7) { __rozieWatchInitial_7 = false; return; } ((v: any) => {
-  if (instance) instance.setMaxBounds($state.snapshot(v) || null);
-})(__watchVal); }); });
-let __rozieWatchInitial_8 = true;
-$effect(() => { const __watchVal = (() => markers)(); untrack(() => { if (__rozieWatchInitial_8) { __rozieWatchInitial_8 = false; return; } ((v: any) => reconcileMarkers(v))(__watchVal); }); });
-let __rozieWatchInitial_9 = true;
-$effect(() => { const __watchVal = (() => popups)(); untrack(() => { if (__rozieWatchInitial_9) { __rozieWatchInitial_9 = false; return; } ((v: any) => reconcilePopups(v))(__watchVal); }); });
-let __rozieWatchInitial_10 = true;
-$effect(() => { (() => sources)(); untrack(() => { if (__rozieWatchInitial_10) { __rozieWatchInitial_10 = false; return; } (() => applyLayers())(); }); });
-let __rozieWatchInitial_11 = true;
-$effect(() => { (() => layers)(); untrack(() => { if (__rozieWatchInitial_11) { __rozieWatchInitial_11 = false; return; } (() => applyLayers())(); }); });
-let __rozieWatchInitial_12 = true;
-$effect(() => { (() => sourceReg)(); untrack(() => { if (__rozieWatchInitial_12) { __rozieWatchInitial_12 = false; return; } (() => applyLayers())(); }); });
-let __rozieWatchInitial_13 = true;
-$effect(() => { (() => layerReg)(); untrack(() => { if (__rozieWatchInitial_13) { __rozieWatchInitial_13 = false; return; } (() => applyLayers())(); }); });
-let __rozieWatchInitial_14 = true;
-$effect(() => { const __watchVal = (() => interactiveLayerIds)(); untrack(() => { if (__rozieWatchInitial_14) { __rozieWatchInitial_14 = false; return; } ((v: any) => reconcileInteractive(v))(__watchVal); }); });
-let __rozieWatchInitial_15 = true;
-$effect(() => { (() => controls)(); untrack(() => { if (__rozieWatchInitial_15) { __rozieWatchInitial_15 = false; return; } (() => applyControls())(); }); });
-let __rozieWatchInitial_16 = true;
-$effect(() => { (() => dragPan)(); untrack(() => { if (__rozieWatchInitial_16) { __rozieWatchInitial_16 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_17 = true;
-$effect(() => { (() => dragRotate)(); untrack(() => { if (__rozieWatchInitial_17) { __rozieWatchInitial_17 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_18 = true;
-$effect(() => { (() => scrollZoom)(); untrack(() => { if (__rozieWatchInitial_18) { __rozieWatchInitial_18 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_19 = true;
-$effect(() => { (() => doubleClickZoom)(); untrack(() => { if (__rozieWatchInitial_19) { __rozieWatchInitial_19 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_20 = true;
-$effect(() => { (() => boxZoom)(); untrack(() => { if (__rozieWatchInitial_20) { __rozieWatchInitial_20 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_21 = true;
-$effect(() => { (() => keyboard)(); untrack(() => { if (__rozieWatchInitial_21) { __rozieWatchInitial_21 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_22 = true;
-$effect(() => { (() => touchZoomRotate)(); untrack(() => { if (__rozieWatchInitial_22) { __rozieWatchInitial_22 = false; return; } (() => applyInteractionToggles())(); }); });
-let __rozieWatchInitial_23 = true;
-$effect(() => { (() => touchPitch)(); untrack(() => { if (__rozieWatchInitial_23) { __rozieWatchInitial_23 = false; return; } (() => applyInteractionToggles())(); }); });
 </script>
 
 <div bind:this={containerEl} {...__rozieAttrs} class={["rozie-maplibre", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-f1ee1082></div>{@render children?.()}

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx } from '@rozie/runtime-react';
 
 interface RefExposeVerbShadowProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'children' | 'dangerouslySetInnerHTML'> {}
@@ -22,7 +23,7 @@ const RefExposeVerbShadow = forwardRef<RefExposeVerbShadowHandle, RefExposeVerbS
 
   const _rozieExposeRef = useRef({ box });
   _rozieExposeRef.current = { box };
-  useImperativeHandle(ref, () => ({ box: (...args: Parameters<typeof box>): ReturnType<typeof box> => _rozieExposeRef.current.box(...args) }), []);
+  useImperativeHandle(ref, () => ({ box: (...args: Parameters<typeof box>): ReturnType<typeof box> => flushSync(() => _rozieExposeRef.current.box(...args)) }), []);
 
   return (
     <>

@@ -60,7 +60,7 @@ describe('Angular <data> initializer sigil reads are this.-qualified', () => {
     const code = emit('{ out: $model.open }');
     expect(code).toContain('out = signal(this.open());');
     expect(code).not.toContain('$model');
-    const modelAt = code.indexOf('open = model<');
+    const modelAt = code.indexOf('open = rozieModel<');
     expect(modelAt).toBeGreaterThan(-1);
     expect(modelAt).toBeLessThan(code.indexOf('out = signal('));
   });

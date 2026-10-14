@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, useControllableState } from '@rozie/runtime-react';
 import './Resizable.css';
 import { clampPercent, percentFromPointer, nudge } from './internal/resizeMath';
@@ -175,7 +176,7 @@ const Resizable = forwardRef<ResizableHandle, ResizableProps>(function Resizable
 
   const _rozieExposeRef = useRef({ applySize, reset });
   _rozieExposeRef.current = { applySize, reset };
-  useImperativeHandle(ref, () => ({ applySize: (...args: Parameters<typeof applySize>): ReturnType<typeof applySize> => _rozieExposeRef.current.applySize(...args), reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => _rozieExposeRef.current.reset(...args) }), []);
+  useImperativeHandle(ref, () => ({ applySize: (...args: Parameters<typeof applySize>): ReturnType<typeof applySize> => flushSync(() => _rozieExposeRef.current.applySize(...args)), reset: (...args: Parameters<typeof reset>): ReturnType<typeof reset> => flushSync(() => _rozieExposeRef.current.reset(...args)) }), []);
 
   return (
     <>

@@ -113,7 +113,7 @@ describe('Angular reserved-member deconfliction (Phase 61 Plan 04, SC-2)', () =>
     // Sanity: the renamed names are ONLY the colliding ones; the prop `value`
     // (public contract) keeps its name.
     const out = compileAngular(SRC, FILE);
-    expect(out).toContain('value = model');
+    expect(out).toContain('value = rozieModel');
     expect(out).not.toContain('value$local');
   });
 

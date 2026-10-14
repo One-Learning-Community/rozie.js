@@ -590,21 +590,22 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // maybeEmitSelectionChange + the 3 area pipes (nodetranslated/translated/zoomed) so a
   // pick/unpick / pan / zoom / drag re-tracks the resize handles over the selected node.
   // MiniMap geometry (px) — MUST match the .rozie-flow-minimap CSS box below.
-  const MINIMAP_W = useMemo(() => 200, []);
-  const MINIMAP_H = useMemo(() => 150, []);
+  const MINIMAP_W = 200;
+  const MINIMAP_H = 150;
   // Fallback node-rect dims when a node-view element isn't measurable yet (Lit async
   // first paint, REQ-30) — re-measured on the next render (the render pipe re-schedules).
-  const MINIMAP_DEFAULT_NODE_W = useMemo(() => 140, []);
-  const MINIMAP_DEFAULT_NODE_H = useMemo(() => 52, []);
+  const MINIMAP_DEFAULT_NODE_W = 140;
+  const MINIMAP_DEFAULT_NODE_H = 52;
   // Phase 74-03 (D-17) — the resize floor when a resizable NodeType declares no
   // minWidth/minHeight: a small sane default so an unconstrained drag can't shrink a
   // node to 0px (belt-and-suspenders with the double-click-to-auto-size reset, D-08).
-  const RESIZE_MIN_FALLBACK = useMemo(() => 40, []);
+  const RESIZE_MIN_FALLBACK = 40;
   // WR-02: types whose maxWidth/maxHeight has already been warned-about as inverted
   // (below the effective minWidth/minHeight) — a one-time-per-type warning, not a
   // per-pointermove spam during a live resize drag.
   const clampInversionWarnedTypes = useMemo(() => new Set(), []);
-  const SVGNS = useMemo(() => 'http://www.w3.org/2000/svg', []);
+  const SVGNS = 'http://www.w3.org/2000/svg';
+
   // One Socket shared by every port (Rete sockets gate compatibility by identity;
   // a single socket = "anything connects to anything", the common editor default).
   const SOCKET = useMemo(() => new ClassicPreset.Socket('flow'), []);
@@ -648,7 +649,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // place. The settle delay is 500ms rather than 0 because a late port registration
   // lands through a reactive write that arrives in a LATER macrotask (a React commit
   // / Angular CD tick), not just the microtask queue a 0ms timeout would clear.
-  const CONN_WARN_SETTLE_MS = useMemo(() => 500, []);
+  const CONN_WARN_SETTLE_MS = 500;
   function warnConn(msg: any) {
     if (typeof console !== 'undefined' && console.warn) {
       console.warn(`[@rozie-ui/rete] ${msg}`);
@@ -732,7 +733,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // Undo is ALWAYS on for v1; `:history=false` (the `history` prop) is the cheap escape
   // hatch that skips every push (the stacks stay empty → undo/redo are no-ops).
   // COMPONENT-scope so the stack survives across area events + the Solid-hoisted teardown.
-  const HISTORY_CAP = useMemo(() => 100, []);
+  const HISTORY_CAP = 100;
   // Two-stack model (simpler + correct than a single cursor): `historyStack` holds
   // PRE-gesture snapshots (the states to UNDO back to, newest last); `redoStack` holds
   // snapshots an undo popped off (the states to REDO forward to, newest last). A new
@@ -740,6 +741,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // redoStack (a fresh edit discards the redo branch). undo() pops historyStack → pushes
   // the CURRENT (pre-undo) graph onto redoStack → restores the popped snapshot. redo()
   // pops redoStack → pushes the current graph back onto historyStack → restores it.
+
   // One-shot per-drag guard: a drag fires `nodetranslated` (→ flushDragWriteBack) on EVERY
   // pointermove frame, so a push-per-flush would record many entries for ONE gesture. We
   // snapshot the PRE-drag graph on `nodepicked` (pointer-DOWN, definitively before any
@@ -749,6 +751,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // the history stack on the FIRST `nodetranslated` of the gesture (a pick WITHOUT a drag
   // must not create a history entry). `dragGestureActive` then holds until the drag-ending
   // `pointerup` resets it. D-03: a drag = ONE undo step.
+
   // One-shot per-NATIVE-EVENT guard for `contextmenu` (quick-260803-uwb, found by VR).
   // rete-area-plugin@2.1.5 attaches TWO `contextmenu` DOM listeners that both bubble from
   // the same native event and neither of which stops propagation:
@@ -762,6 +765,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // signal we already surfaced and ignore any later signal carrying the SAME event, keeping
   // the FIRST (most specific) one: one right-click = one emit. `preventDefault()` still runs
   // on every pass (idempotent, and the native menu must be suppressed either way).
+
   // T2.5 — RECONNECT coalescing (D-08 reconnectable edges, D-03 one-gesture-one-entry).
   // Dragging an existing edge endpoint to a new socket is a SINGLE user gesture, but the
   // shipped `Presets.classic.setup()` implements it as `editor.removeConnection(old)` then
@@ -780,9 +784,11 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // write-back's own pushHistory is suppressed and the one coalesced snapshot is pushed on drop
   // instead, so the per-gesture count stays exactly one either way. Counter form (not a bool)
   // so a re-pick mid-gesture can't desync. COMPONENT-scope (survives across area events).
+
   // Set true if a write-back (remove or add) actually ran during the in-flight window, so a
   // connectionpick→drop that changed NOTHING (e.g. clicking a socket then releasing on the
   // pane with no edge created/removed) does NOT push an empty history entry.
+
   // One-shot guard for the DEFERRED close (the drop fires BEFORE the trailing remove+add
   // writeBacks, so the window must close on a macrotask AFTER they settle — see the
   // connectiondrop branch). A re-pick before the deferred close runs cancels it.
@@ -1677,7 +1683,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
   // clamping the step to [minZoom, maxZoom] so a button never exceeds the restrictor
   // bounds. Zoom/fit are view-only, so they stay enabled even when readonly (they do not
   // edit the graph). A no-op before the area mounts.
-  const ZOOM_STEP = useMemo(() => 1.2, []);
+  const ZOOM_STEP = 1.2;
   function clampZoom(k: any) {
     let lo = typeof props.minZoom === 'number' && props.minZoom > 0 ? props.minZoom : 0.01;
     let hi = typeof props.maxZoom === 'number' && props.maxZoom > 0 ? props.maxZoom : 100;
@@ -4792,7 +4798,7 @@ const FlowCanvas = forwardRef<FlowCanvasHandle, FlowCanvasProps>(function FlowCa
 
   const _rozieExposeRef = useRef({ getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode });
   _rozieExposeRef.current = { getEditor, getArea, addNode, removeNode, deleteNode, duplicateNode, addConnection, removeConnection, clear, zoomToFit, zoomTo, setCenter, setViewport, screenToFlowPosition, getNodes, getConnections, getTransform, autoArrange, undo, redo, canUndo, canRedo, getSelectedNodes, selectNode, clearSelection, selectAll, centerOnNode };
-  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => _rozieExposeRef.current.getEditor(...args), getArea: (...args: Parameters<typeof getArea>): ReturnType<typeof getArea> => _rozieExposeRef.current.getArea(...args), addNode: (...args: Parameters<typeof addNode>): ReturnType<typeof addNode> => _rozieExposeRef.current.addNode(...args), removeNode: (...args: Parameters<typeof removeNode>): ReturnType<typeof removeNode> => _rozieExposeRef.current.removeNode(...args), deleteNode: (...args: Parameters<typeof deleteNode>): ReturnType<typeof deleteNode> => _rozieExposeRef.current.deleteNode(...args), duplicateNode: (...args: Parameters<typeof duplicateNode>): ReturnType<typeof duplicateNode> => _rozieExposeRef.current.duplicateNode(...args), addConnection: (...args: Parameters<typeof addConnection>): ReturnType<typeof addConnection> => _rozieExposeRef.current.addConnection(...args), removeConnection: (...args: Parameters<typeof removeConnection>): ReturnType<typeof removeConnection> => _rozieExposeRef.current.removeConnection(...args), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => _rozieExposeRef.current.clear(...args), zoomToFit: (...args: Parameters<typeof zoomToFit>): ReturnType<typeof zoomToFit> => _rozieExposeRef.current.zoomToFit(...args), zoomTo: (...args: Parameters<typeof zoomTo>): ReturnType<typeof zoomTo> => _rozieExposeRef.current.zoomTo(...args), setCenter: (...args: Parameters<typeof setCenter>): ReturnType<typeof setCenter> => _rozieExposeRef.current.setCenter(...args), setViewport: (...args: Parameters<typeof setViewport>): ReturnType<typeof setViewport> => _rozieExposeRef.current.setViewport(...args), screenToFlowPosition: (...args: Parameters<typeof screenToFlowPosition>): ReturnType<typeof screenToFlowPosition> => _rozieExposeRef.current.screenToFlowPosition(...args), getNodes: (...args: Parameters<typeof getNodes>): ReturnType<typeof getNodes> => _rozieExposeRef.current.getNodes(...args), getConnections: (...args: Parameters<typeof getConnections>): ReturnType<typeof getConnections> => _rozieExposeRef.current.getConnections(...args), getTransform: (...args: Parameters<typeof getTransform>): ReturnType<typeof getTransform> => _rozieExposeRef.current.getTransform(...args), autoArrange: (...args: Parameters<typeof autoArrange>): ReturnType<typeof autoArrange> => _rozieExposeRef.current.autoArrange(...args), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => _rozieExposeRef.current.undo(...args), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => _rozieExposeRef.current.redo(...args), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => _rozieExposeRef.current.canUndo(...args), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => _rozieExposeRef.current.canRedo(...args), getSelectedNodes: (...args: Parameters<typeof getSelectedNodes>): ReturnType<typeof getSelectedNodes> => _rozieExposeRef.current.getSelectedNodes(...args), selectNode: (...args: Parameters<typeof selectNode>): ReturnType<typeof selectNode> => _rozieExposeRef.current.selectNode(...args), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => _rozieExposeRef.current.clearSelection(...args), selectAll: (...args: Parameters<typeof selectAll>): ReturnType<typeof selectAll> => _rozieExposeRef.current.selectAll(...args), centerOnNode: (...args: Parameters<typeof centerOnNode>): ReturnType<typeof centerOnNode> => _rozieExposeRef.current.centerOnNode(...args) }), []);
+  useImperativeHandle(ref, () => ({ getEditor: (...args: Parameters<typeof getEditor>): ReturnType<typeof getEditor> => flushSync(() => _rozieExposeRef.current.getEditor(...args)), getArea: (...args: Parameters<typeof getArea>): ReturnType<typeof getArea> => flushSync(() => _rozieExposeRef.current.getArea(...args)), addNode: (...args: Parameters<typeof addNode>): ReturnType<typeof addNode> => flushSync(() => _rozieExposeRef.current.addNode(...args)), removeNode: (...args: Parameters<typeof removeNode>): ReturnType<typeof removeNode> => flushSync(() => _rozieExposeRef.current.removeNode(...args)), deleteNode: (...args: Parameters<typeof deleteNode>): ReturnType<typeof deleteNode> => flushSync(() => _rozieExposeRef.current.deleteNode(...args)), duplicateNode: (...args: Parameters<typeof duplicateNode>): ReturnType<typeof duplicateNode> => flushSync(() => _rozieExposeRef.current.duplicateNode(...args)), addConnection: (...args: Parameters<typeof addConnection>): ReturnType<typeof addConnection> => flushSync(() => _rozieExposeRef.current.addConnection(...args)), removeConnection: (...args: Parameters<typeof removeConnection>): ReturnType<typeof removeConnection> => flushSync(() => _rozieExposeRef.current.removeConnection(...args)), clear: (...args: Parameters<typeof clear>): ReturnType<typeof clear> => flushSync(() => _rozieExposeRef.current.clear(...args)), zoomToFit: (...args: Parameters<typeof zoomToFit>): ReturnType<typeof zoomToFit> => flushSync(() => _rozieExposeRef.current.zoomToFit(...args)), zoomTo: (...args: Parameters<typeof zoomTo>): ReturnType<typeof zoomTo> => flushSync(() => _rozieExposeRef.current.zoomTo(...args)), setCenter: (...args: Parameters<typeof setCenter>): ReturnType<typeof setCenter> => flushSync(() => _rozieExposeRef.current.setCenter(...args)), setViewport: (...args: Parameters<typeof setViewport>): ReturnType<typeof setViewport> => flushSync(() => _rozieExposeRef.current.setViewport(...args)), screenToFlowPosition: (...args: Parameters<typeof screenToFlowPosition>): ReturnType<typeof screenToFlowPosition> => flushSync(() => _rozieExposeRef.current.screenToFlowPosition(...args)), getNodes: (...args: Parameters<typeof getNodes>): ReturnType<typeof getNodes> => flushSync(() => _rozieExposeRef.current.getNodes(...args)), getConnections: (...args: Parameters<typeof getConnections>): ReturnType<typeof getConnections> => flushSync(() => _rozieExposeRef.current.getConnections(...args)), getTransform: (...args: Parameters<typeof getTransform>): ReturnType<typeof getTransform> => flushSync(() => _rozieExposeRef.current.getTransform(...args)), autoArrange: (...args: Parameters<typeof autoArrange>): ReturnType<typeof autoArrange> => flushSync(() => _rozieExposeRef.current.autoArrange(...args)), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => flushSync(() => _rozieExposeRef.current.undo(...args)), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => flushSync(() => _rozieExposeRef.current.redo(...args)), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => flushSync(() => _rozieExposeRef.current.canUndo(...args)), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => flushSync(() => _rozieExposeRef.current.canRedo(...args)), getSelectedNodes: (...args: Parameters<typeof getSelectedNodes>): ReturnType<typeof getSelectedNodes> => flushSync(() => _rozieExposeRef.current.getSelectedNodes(...args)), selectNode: (...args: Parameters<typeof selectNode>): ReturnType<typeof selectNode> => flushSync(() => _rozieExposeRef.current.selectNode(...args)), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => flushSync(() => _rozieExposeRef.current.clearSelection(...args)), selectAll: (...args: Parameters<typeof selectAll>): ReturnType<typeof selectAll> => flushSync(() => _rozieExposeRef.current.selectAll(...args)), centerOnNode: (...args: Parameters<typeof centerOnNode>): ReturnType<typeof centerOnNode> => flushSync(() => _rozieExposeRef.current.centerOnNode(...args)) }), []);
 
   return (
     <__ctx_rete_canvas.Provider value={{

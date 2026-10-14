@@ -56,6 +56,9 @@ export default function Modal(_props: ModalProps): JSX.Element {
   const resolved = children(() => local.children as JSX.Element);
 
   const [open, setOpen] = createControllableSignal<boolean>(_props as unknown as Record<string, unknown>, 'open', false);
+  createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
+    if (isOpen) lockScroll();else unlockScroll();
+  })(v)), { defer: true }));
   onMount(() => {
     const _cleanup = (lockScroll)() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
@@ -64,9 +67,6 @@ export default function Modal(_props: ModalProps): JSX.Element {
   onMount(() => {
     dialogElRef?.focus();
   });
-  createEffect(on(() => (() => open())(), (v) => untrack(() => ((isOpen: any) => {
-    if (isOpen) lockScroll();else unlockScroll();
-  })(v)), { defer: true }));
   let backdropElRef: HTMLElement | null = null;
   let dialogElRef: HTMLElement | null = null;
 

@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import EmblaCarousel from 'embla-carousel';
 import Autoplay from 'embla-carousel-autoplay';
@@ -246,7 +246,9 @@ export class Carousel {
    * @example
    * <rozie-carousel [slides]="items" [(selectedIndex)]="idx" />
    */
-  selectedIndex = model<number>(0);
+  readonly __rozieModelIn_selectedIndex = input<number | undefined>(undefined, { alias: 'selectedIndex' });
+  selectedIndexChange = output<number>();
+  selectedIndex = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_selectedIndex, this.selectedIndexChange, 0);
   snaps = signal<any[]>([]);
   selected = signal(0);
   canPrev = signal(false);
@@ -257,6 +259,7 @@ export class Carousel {
   settle = output<void>();
   reInit = output<void>();
   pointerDown = output<void>({ alias: 'pointer-down' });
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['select'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('slide', { read: TemplateRef }) slideTpl?: TemplateRef<SlideCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('thumb', { read: TemplateRef }) thumbTpl?: TemplateRef<ThumbCtx>;
