@@ -1,5 +1,15 @@
 # @rozie-ui/command-palette-lit
 
+## 0.5.2
+
+### Patch Changes
+
+- 0e2ac44: Combobox:
+  - `@tanstack/virtual-core` is a required peer. Combobox imports it at module top level whether or not `virtual` is set, so it was never optional; the README install line now includes it (command-palette's too, which composes Combobox).
+  - `--rozie-combobox-color` reaches the chips and the popup options, not only the input.
+  - `--rozie-combobox-option-selected-color` is declared in `themes/base.css` (default: the accent), like the other public tokens; it was read but never declared.
+  - @rozie/runtime-lit@0.10.0
+
 ## 0.5.1
 
 ### Patch Changes

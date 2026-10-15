@@ -1,5 +1,11 @@
 # @rozie-ui/chartjs-angular
 
+## 0.1.12
+
+### Patch Changes
+
+- @rozie/runtime-angular@0.10.0
+
 ## 0.1.11
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/date-picker-solid
 
+## 0.1.17
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.10.0
+
 ## 0.1.16
 
 ### Patch Changes

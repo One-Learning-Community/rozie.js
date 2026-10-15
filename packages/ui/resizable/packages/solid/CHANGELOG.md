@@ -1,5 +1,11 @@
 # @rozie-ui/resizable-solid
 
+## 0.1.7
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.10.0
+
 ## 0.1.6
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/tags-solid
 
+## 0.1.15
+
+### Patch Changes
+
+- @rozie/runtime-solid@0.10.0
+
 ## 0.1.14
 
 ### Patch Changes

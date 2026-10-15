@@ -1,5 +1,11 @@
 # @rozie-ui/toast-svelte
 
+## 0.4.1
+
+### Patch Changes
+
+- @rozie/runtime-svelte@0.10.0
+
 ## 0.4.0
 
 ### Minor Changes

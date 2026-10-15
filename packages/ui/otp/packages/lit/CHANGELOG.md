@@ -1,5 +1,11 @@
 # @rozie-ui/otp-lit
 
+## 0.1.14
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.10.0
+
 ## 0.1.13
 
 ### Patch Changes

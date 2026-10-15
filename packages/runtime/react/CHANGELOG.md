@@ -1,5 +1,11 @@
 # @rozie/runtime-react
 
+## 0.10.0
+
+### Patch Changes
+
+- @rozie/runtime-keynav-core@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes

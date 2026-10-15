@@ -1,5 +1,11 @@
 # @rozie-ui/wavesurfer-lit
 
+## 0.1.12
+
+### Patch Changes
+
+- @rozie/runtime-lit@0.10.0
+
 ## 0.1.11
 
 ### Patch Changes

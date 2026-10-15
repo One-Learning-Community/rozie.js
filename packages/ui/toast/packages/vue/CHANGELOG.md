@@ -1,5 +1,11 @@
 # @rozie-ui/toast-vue
 
+## 0.3.1
+
+### Patch Changes
+
+- @rozie/runtime-vue@0.10.0
+
 ## 0.3.0
 
 ### Minor Changes
