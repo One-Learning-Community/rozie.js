@@ -77,6 +77,7 @@ accent — the single color most consumers will set; focus ring + selected optio
 | `--rozie-combobox-option-radius` | `0.375rem` |
 | `--rozie-combobox-option-active-bg` | `rgba(0, 102, 204, 0.12)` |
 | `--rozie-combobox-option-selected-weight` | `600` |
+| `--rozie-combobox-option-selected-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-option-disabled-opacity` | `0.45` |
 | `--rozie-combobox-option-color` | `inherit` |
 
@@ -149,7 +150,6 @@ Public, but declared nowhere by `base.css`: the fallback below applies only whil
 | `--rozie-combobox-chip-remove-hover-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-create-color` | `var(--rozie-combobox-accent, #0066cc)` |
 | `--rozie-combobox-focus-border-color` | `var(--rozie-combobox-accent, #0066cc)` |
-| `--rozie-combobox-option-selected-color` | `var(--rozie-combobox-accent, #0066cc)` |
 
 ## Design-system bridges
 

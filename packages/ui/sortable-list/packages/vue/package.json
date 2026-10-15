@@ -39,7 +39,8 @@
   "files": [
     "dist",
     "src",
-    "web-types.json"
+    "web-types.json",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "vue": "^3.4",

@@ -14,12 +14,13 @@ Peer dependencies: `lit + @lit-labs/preact-signals + @preact/signals-core`. Inst
 
 - `@rozie-ui/combobox-lit` `^0.5.0 || ^0.6.0 || ^0.7.0 || ^0.8.0` — required by `@rozie-ui/command-palette-lit`
 - `@rozie-ui/popover-lit` `^0.2.0 || ^0.3.0` — required by `@rozie-ui/combobox-lit`
+- `@tanstack/virtual-core` `^3` — required by `@rozie-ui/combobox-lit`
 - `@floating-ui/dom` `^1.7.2` — required by `@rozie-ui/popover-lit`
 
 Install the whole chain in one line:
 
 ```bash
-npm i @rozie-ui/command-palette-lit @rozie-ui/combobox-lit @rozie-ui/popover-lit @floating-ui/dom
+npm i @rozie-ui/command-palette-lit @rozie-ui/combobox-lit @rozie-ui/popover-lit @tanstack/virtual-core @floating-ui/dom
 ```
 
 Also installed: `@rozie/runtime-lit` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).

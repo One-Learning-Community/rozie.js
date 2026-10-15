@@ -73,6 +73,7 @@
   --rcb-option-radius: var(--rozie-combobox-option-radius, 0.375rem);
   --rcb-option-active-bg: var(--rozie-combobox-option-active-bg, rgba(0, 102, 204, 0.12));
   --rcb-option-selected-weight: var(--rozie-combobox-option-selected-weight, 600);
+  --rcb-option-selected-color: var(--rozie-combobox-option-selected-color, var(--rozie-combobox-accent, #0066cc));
   --rcb-option-disabled-opacity: var(--rozie-combobox-option-disabled-opacity, 0.45);
   --rozie-combobox-option-color: inherit;
 

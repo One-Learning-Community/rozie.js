@@ -20,12 +20,14 @@ function publicSuffixes(css: string, family: string): Set<string> {
   return new Set([...stripped.matchAll(new RegExp(`--rozie-${family}-([a-z0-9-]+)`, 'g'))].map((m) => m[1]!));
 }
 
-const COMBOBOX_ONLY = new Set(['chips-padding', 'create-bg', 'inline-input-min-width', 'inline-input-padding', 'inline-padding', 'input-padding', 'input-underline', 'more-color', 'more-size']);
+const COMBOBOX_ONLY = new Set(['chips-padding', 'create-bg', 'inline-input-min-width', 'inline-input-padding', 'inline-padding', 'input-padding', 'input-underline', 'more-color', 'more-size', 'option-selected-color']);
 /** check-color and popup-radius are Select-only too, but derived (accent / radius) and so declared in no base.css. */
 const SELECT_ONLY = new Set(['control-padding', 'gap', 'placeholder', 'arrow-color', 'arrow-opacity', 'clear-color', 'clear-size', 'active-fg', 'selected-bg', 'selected-fg', 'check', 'z']);
 
 /** Tokens whose default is ANOTHER token of the family (accent / radius), so base.css declares none. */
 const DERIVED = new Set(['check-color', 'popup-radius', 'focus-border-color']);
+/** Combobox's tokens that default to its accent, so its base.css declares none. */
+const CB_DERIVED = new Set(['chip-remove-hover-color', 'create-color', 'focus-border-color']);
 /** every `--rozie-select-*` token READ (`var(...)`) anywhere in Select.rozie, comments and prose included */
 const readTokens = (): Set<string> => {
   const src = readFileSync(resolve(import.meta.dirname, '..', 'src/Select.rozie'), 'utf8');
@@ -53,6 +55,12 @@ describe('select ↔ combobox token parity', () => {
   it('the derived list holds no stale entries', () => {
     const read = readTokens();
     expect([...DERIVED].filter((t) => !read.has(t) || slPub.has(t))).toEqual([]);
+  });
+  it('every token Combobox.rozie reads is declared in base.css or listed as derived', () => {
+    const src = readFileSync(resolve(UI, 'combobox/src/Combobox.rozie'), 'utf8');
+    const cbRead = new Set([...src.matchAll(/var\(--rozie-combobox-([a-z0-9-]+)/g)].map((m) => m[1]!));
+    expect([...cbRead].filter((t) => !cbPub.has(t) && !CB_DERIVED.has(t))).toEqual([]);
+    expect([...CB_DERIVED].filter((t) => !cbRead.has(t) || cbPub.has(t))).toEqual([]);
   });
   it('shared tokens have identical defaults', () => {
     const diffs = [...slDef].filter(([s, d]) => cbDef.has(s) && cbDef.get(s) !== d).map(([s, d]) => `${s}: select=${d} combobox=${cbDef.get(s)}`);

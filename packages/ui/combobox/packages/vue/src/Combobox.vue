@@ -2016,6 +2016,8 @@ defineExpose({ focus, clear, seedQuery, pinOpen, activeOption, query } as Combob
   display: inline-block;
   width: var(--rozie-combobox-width, var(--rcb-width, 16rem));
   font: var(--rozie-combobox-font, inherit);
+  /* The text color reaches everything inside the root (input, chips), not only the input. */
+  color: var(--rozie-combobox-color, var(--rcb-color, inherit));
 }
 .rozie-combobox-input {
   box-sizing: border-box;
@@ -2077,6 +2079,8 @@ defineExpose({ focus, clear, seedQuery, pinOpen, activeOption, query } as Combob
   max-height: var(--rozie-combobox-list-max-height, var(--rcb-list-max-height, 16rem));
   overflow-y: auto;
   background: var(--rozie-combobox-list-bg, var(--rcb-list-bg, #fff));
+  /* Set here too: the list sits inside the composed popover, which sets its own text color. */
+  color: var(--rozie-combobox-color, var(--rcb-color, inherit));
   border: var(--rozie-combobox-border-width, var(--rcb-border-width, 1px)) solid var(--rozie-combobox-list-border-color, var(--rcb-list-border-color, rgba(0, 0, 0, 0.15)));
   border-radius: var(--rozie-combobox-radius, var(--rcb-radius, 0.5rem));
   box-shadow: var(--rozie-combobox-list-shadow, var(--rcb-list-shadow, 0 10px 24px rgba(0, 0, 0, 0.16)));

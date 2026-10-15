@@ -21,7 +21,7 @@ Every visual value is a CSS custom property, so the control re-skins to any desi
 | `@rozie-ui/combobox-solid` | `npm i @rozie-ui/combobox-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/solid/README.md) |
 | `@rozie-ui/combobox-lit` | `npm i @rozie-ui/combobox-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/combobox/packages/lit/README.md) |
 
-Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` `^0.2.0` — composed internally for the floating popup — which in turn requires `@floating-ui/dom` `^1.7.2`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
+Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` `^0.2.0` — composed internally for the floating popup — which in turn requires `@floating-ui/dom` `^1.7.2`. The leaves also require `@tanstack/virtual-core` (`^3`), the windowing engine behind `virtual`: Combobox imports it whether or not you set `virtual`, so install it in every project. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
 
 ## Quick start
 

@@ -212,4 +212,20 @@ for (const target of TARGETS) {
     await expect.poll(async () => deepActiveTestId(page), POLL).toBe('after-plain');
     expect(await readout(page, 'readout-plain')).toBe('[]');
   });
+
+  runner(`combobox-token-input [${target}]: the color token reaches the options and the chips, not only the input`, async ({ page }) => {
+    await open(page, target);
+    await page.evaluate(() => document.body.style.setProperty('--rozie-combobox-color', 'rgb(200, 0, 0)'));
+    const colorOf = (el: Element) => getComputedStyle(el).color;
+
+    await plainInput(page).click();
+    const option = page.locator('#token-plain-opt-1');
+    await expect(option).toBeVisible();
+    expect(await option.evaluate(colorOf)).toBe('rgb(200, 0, 0)');
+
+    await page.locator('#token-plain-opt-0').click();
+    const chip = page.locator('.rozie-combobox-chip').filter({ hasText: 'Apple' });
+    await expect(chip).toBeVisible();
+    expect(await chip.evaluate(colorOf)).toBe('rgb(200, 0, 0)');
+  });
 }
