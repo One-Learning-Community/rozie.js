@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -162,7 +162,7 @@ export class Tags {
    */
   readonly __rozieModelIn_modelValue = input<any[] | undefined>(undefined, { alias: 'modelValue' });
   modelValueChange = output<any[]>();
-  modelValue = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_modelValue, this.modelValueChange, (() => [])());
+  modelValue = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_modelValue, this.modelValueChange, (() => [])(), { signal, computed, untracked });
   /**
    * The keys that commit the current draft as a token (matched against the key event's `key`). Default `[',', 'Enter']`. Non-`'Enter'` entries also act as the split characters when pasting bulk text: a paste containing one is split and every part is added, and the parts that are rejected (by `validate` or `max`) are inserted at the caret, so the typed draft is kept. A paste with no split character is ordinary text. Use e.g. `[' ', 'Enter']` for a space-delimited input.
    */

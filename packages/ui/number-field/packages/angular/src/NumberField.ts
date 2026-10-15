@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -91,7 +91,7 @@ export class NumberField {
    */
   readonly __rozieModelIn_modelValue = input<(number) | null | undefined>(undefined, { alias: 'modelValue' });
   modelValueChange = output<(number) | null>();
-  modelValue = rozieModel<(number) | null, import('@angular/core').ModelSignal<(number) | null>>(this.__rozieModelIn_modelValue, this.modelValueChange, null);
+  modelValue = rozieModel<(number) | null, import('@angular/core').ModelSignal<(number) | null>>(this.__rozieModelIn_modelValue, this.modelValueChange, null, { signal, computed, untracked });
   /**
    * Inclusive lower bound. Every commit clamps the value to `>= min`, and the **Home** key jumps to `min`. `null` (the default) means no lower bound. Also emitted as `aria-valuemin`.
    */

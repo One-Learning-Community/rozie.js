@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
@@ -57,7 +57,7 @@ export class Cropper {
    */
   readonly __rozieModelIn_data = input<unknown | undefined>(undefined, { alias: 'data' });
   dataChange = output<unknown>();
-  data = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_data, this.dataChange, undefined);
+  data = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_data, this.dataChange, undefined, { signal, computed, untracked });
   /**
    * The crop box aspect ratio. `NaN` (the default) is Cropper's sentinel for a free ratio. Reconciled at runtime via `setAspectRatio`.
    */

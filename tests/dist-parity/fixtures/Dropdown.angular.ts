@@ -60,7 +60,7 @@ interface DefaultCtx {
 export class Dropdown {
   readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
   openChange = output<boolean>();
-  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   closeOnOutsideClick = input<boolean>(true);
   closeOnEscape = input<boolean>(true);
   triggerEl = viewChild<ElementRef<HTMLDivElement>>('triggerEl');

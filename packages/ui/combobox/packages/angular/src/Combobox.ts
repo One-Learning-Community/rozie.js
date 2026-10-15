@@ -554,7 +554,7 @@ export class Combobox {
    */
   readonly __rozieModelIn_value = input<(unknown) | null | undefined>(undefined, { alias: 'value' });
   valueChange = output<(unknown) | null>();
-  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null);
+  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null, { signal, computed, untracked });
   /**
    * The option list — `[{ value, label, disabled?, group? }]`. `label` is the displayed text (and what client filtering matches against), `value` is what `r-model:value` reads and writes, an optional `disabled` flag makes an option non-selectable, and an optional `group` string buckets the option under a matching entry of the `groups` prop (or a first-appearance fallback section) when grouping is active.
    */

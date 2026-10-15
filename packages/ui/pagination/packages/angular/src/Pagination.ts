@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -166,7 +166,7 @@ export class Pagination {
    */
   readonly __rozieModelIn_modelValue = input<number | undefined>(undefined, { alias: 'modelValue' });
   modelValueChange = output<number>();
-  modelValue = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_modelValue, this.modelValueChange, 1);
+  modelValue = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_modelValue, this.modelValueChange, 1, { signal, computed, untracked });
   /**
    * Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.
    */

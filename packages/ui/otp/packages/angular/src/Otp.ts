@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -77,7 +77,7 @@ export class Otp {
    */
   readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
   valueChange = output<string>();
-  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '', { signal, computed, untracked });
   /**
    * Number of input cells to render.
    */

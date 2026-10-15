@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, inject, input, output, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, EmbeddedViewRef, Renderer2, TemplateRef, ViewContainerRef, ViewEncapsulation, computed, contentChild, contentChildren, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RozieSlot, rozieModel } from '@rozie/runtime-angular';
 
@@ -176,7 +176,7 @@ export class FullCalendar {
    */
   readonly __rozieModelIn_view = input<string | undefined>(undefined, { alias: 'view' });
   viewChange = output<string>();
-  view = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_view, this.viewChange, 'dayGridMonth');
+  view = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_view, this.viewChange, 'dayGridMonth', { signal, computed, untracked });
   /**
    * Show the Saturday/Sunday columns. Runtime-updatable via `setOption`.
    */

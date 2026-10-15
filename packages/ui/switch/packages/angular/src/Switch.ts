@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -96,7 +96,7 @@ export class Switch {
    */
   readonly __rozieModelIn_modelValue = input<boolean | undefined>(undefined, { alias: 'modelValue' });
   modelValueChange = output<boolean>();
-  modelValue = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_modelValue, this.modelValueChange, false);
+  modelValue = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_modelValue, this.modelValueChange, false, { signal, computed, untracked });
   /**
    * Disable the control entirely — it becomes non-focusable (`tabindex` is dropped), non-toggleable (click and keyboard are ignored), and `aria-disabled` is set. Also sets the Angular `ControlValueAccessor` disabled state.
    */

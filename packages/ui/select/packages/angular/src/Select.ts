@@ -417,7 +417,7 @@ export class Select {
    */
   readonly __rozieModelIn_value = input<(unknown) | null | undefined>(undefined, { alias: 'value' });
   valueChange = output<(unknown) | null>();
-  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null);
+  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null, { signal, computed, untracked });
   /**
    * Enable multi-select: `value` becomes an array, selecting an option toggles its membership, and the popup stays open after each commit. Selected values render as removable chips inside the control (a value missing from `options` keeps a chip labelled by its raw value), and Backspace removes the last chip while the popup is closed. A value the array holds more than once shows a single chip; removing that chip, or picking its option again, removes every occurrence. Backspace removes the last chip shown.
    */

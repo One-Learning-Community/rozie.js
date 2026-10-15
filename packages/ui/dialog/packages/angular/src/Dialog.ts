@@ -102,7 +102,7 @@ export class Dialog {
    */
   readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
   openChange = output<boolean>();
-  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   /**
    * Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: 'backdrop'`; set this to require an explicit action.
    */

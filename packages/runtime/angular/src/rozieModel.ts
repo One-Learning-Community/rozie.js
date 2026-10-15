@@ -20,14 +20,26 @@
  *
  * The returned function keeps the public shape `model()` gave the field — a
  * `ModelSignal`: callable, `set` / `update` / `asReadonly`, and `subscribe`
- * (delegated to the `<name>Change` output). It carries the computed's `SIGNAL`
+ * (delegated to the `<name>Change` output). It carries the computed's signal
  * node, so a template can still pass it on to a child's `[(x)]`.
+ *
+ * The component passes its own `signal` / `computed` / `untracked`: this package
+ * may resolve another copy of `@angular/core` than the app (another version, or
+ * the same version installed twice), and a signal from that copy is invisible to
+ * the app's change detection — the template never re-read it (measured: the
+ * analogjs demo on Angular 21 with this package resolving Angular 19). For the
+ * same reason the signal node is copied by symbol, not through `SIGNAL`.
  *
  * @public — runtime API consumed by emitted Angular components.
  */
-import { computed, signal, untracked } from '@angular/core';
 import type { ModelSignal, OutputRefSubscription, Signal } from '@angular/core';
-import { SIGNAL } from '@angular/core/primitives/signals';
+
+/** The component's own reactive primitives (see above). Typed by shape, like `input` / `change`. */
+export interface RozieModelPrimitives {
+  signal: <U>(initial: U) => { (): U; set(value: U): void };
+  computed: <U>(fn: () => U) => () => U;
+  untracked: <U>(fn: () => U) => U;
+}
 
 // `input` and `change` are typed by shape, not as `InputSignal` / `OutputEmitterRef`:
 // a consumer whose `@angular/core` is another copy (another version, or the same
@@ -39,6 +51,7 @@ export function rozieModel<T, M = ModelSignal<T>>(
   input: () => T | undefined,
   change: { emit(value: T): void; subscribe(callback: (value: T) => void): OutputRefSubscription },
   initial: T,
+  { signal, computed, untracked }: RozieModelPrimitives,
 ): M {
   const local = signal<T>(initial);
   // A required prop (`input.required`) that nothing binds throws NG0950 when read.
@@ -55,14 +68,17 @@ export function rozieModel<T, M = ModelSignal<T>>(
     const value = bound();
     return value === undefined ? local() : value;
   });
-  const model = (() => read()) as ModelSignal<T>;
-  (model as unknown as Record<symbol, unknown>)[SIGNAL] = (read as unknown as Record<symbol, unknown>)[SIGNAL];
+  const model = (() => read()) as unknown as ModelSignal<T>;
+  // The computed's signal node, under the app's own `SIGNAL` symbol.
+  for (const key of Object.getOwnPropertySymbols(read)) {
+    (model as unknown as Record<symbol, unknown>)[key] = (read as unknown as Record<symbol, unknown>)[key];
+  }
   model.set = (value: T): void => {
     if (untracked(bound) === undefined) local.set(value);
     change.emit(value);
   };
   model.update = (fn: (value: T) => T): void => model.set(fn(untracked(read)));
-  model.asReadonly = (): Signal<T> => read;
+  model.asReadonly = (): Signal<T> => read as unknown as Signal<T>;
   model.subscribe = (callback: (value: T) => void): OutputRefSubscription => change.subscribe(callback);
   return model as unknown as M;
 }

@@ -74,7 +74,7 @@ export class SortableList {
    */
   readonly __rozieModelIn_items = input<any[] | undefined>(undefined, { alias: 'items' });
   itemsChange = output<any[]>();
-  items = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_items, this.itemsChange, (() => [])());
+  items = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_items, this.itemsChange, (() => [])(), { signal, computed, untracked });
   /**
    * The per-row key the framework reconciler tracks each item by across a reorder — either a property name (e.g. `itemKey="id"` reads `item.id`) or an `(item, index) => key` function. With neither, id-less object items get a stable synthetic key via an internal `WeakMap` (survives reorder by object identity); primitive items fall back to index — pass a function for reorderable duplicate primitives.
    */

@@ -154,7 +154,7 @@ export class CodeMirror {
    */
   readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });
   valueChange = output<string>();
-  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '');
+  value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, '', { signal, computed, untracked });
   /**
    * Convenience language. `javascript` loads the bundled `@codemirror/lang-javascript`; any other value falls back to plain text (no syntax highlighting, no throw). Add other languages through `:extensions`. Runtime-updatable via a `langCompartment` reconfigure — switching the prop re-highlights without a remount.
    */

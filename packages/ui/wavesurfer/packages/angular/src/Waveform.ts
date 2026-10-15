@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, output, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 // Default import is `WaveSurfer` (≠ the component name `Waveform`, so no import⇄
@@ -126,7 +126,7 @@ export class Waveform {
    */
   readonly __rozieModelIn_regions = input<unknown | undefined>(undefined, { alias: 'regions' });
   regionsChange = output<unknown>();
-  regions = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_regions, this.regionsChange, undefined);
+  regions = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_regions, this.regionsChange, undefined, { signal, computed, untracked });
   /**
    * Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.
    */
@@ -144,7 +144,7 @@ export class Waveform {
    */
   readonly __rozieModelIn_currentTime = input<unknown | undefined>(undefined, { alias: 'currentTime' });
   currentTimeChange = output<unknown>();
-  currentTime = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_currentTime, this.currentTimeChange, undefined);
+  currentTime = rozieModel<unknown, import('@angular/core').ModelSignal<unknown>>(this.__rozieModelIn_currentTime, this.currentTimeChange, undefined, { signal, computed, untracked });
   container = viewChild<ElementRef<HTMLDivElement>>('container');
   regionCreated = output<unknown>();
   regionUpdated = output<unknown>();

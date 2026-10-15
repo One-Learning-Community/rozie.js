@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -256,7 +256,7 @@ export class Slider {
    */
   readonly __rozieModelIn_value = input<(unknown) | null | undefined>(undefined, { alias: 'value' });
   valueChange = output<(unknown) | null>();
-  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null);
+  value = rozieModel<(unknown) | null, import('@angular/core').ModelSignal<(unknown) | null>>(this.__rozieModelIn_value, this.valueChange, null, { signal, computed, untracked });
   /**
    * Switch to dual-thumb range mode: `value` becomes a sorted `[lo, hi]` array driven by two overlapping native inputs. The exact analog of listbox's `multiple` (scalar↔array). A bare attribute (`<Slider range>`) coerces to `true`.
    */

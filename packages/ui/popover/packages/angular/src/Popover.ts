@@ -138,7 +138,7 @@ export class Popover {
    */
   readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
   openChange = output<boolean>();
-  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   /**
    * Floating UI placement of the content relative to the anchor — one of `top`/`right`/`bottom`/`left`, each optionally suffixed `-start`/`-end` (e.g. `bottom-start`). With `disableFlip` off, the content flips to the opposite side when it would overflow the viewport, and a `left`/`right` placement with no room on either side falls back to below or above the anchor. Reconciled at runtime.
    */

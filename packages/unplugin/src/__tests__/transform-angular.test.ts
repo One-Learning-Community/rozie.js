@@ -179,7 +179,7 @@ describe('load hook target="angular" — Counter.rozie compiles to Angular stand
     expect(code).toContain('@Component');
     expect(code).toContain("selector: 'rozie-counter'");
     expect(code).toContain('standalone: true');
-    expect(code).toContain("rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0)");
+    expect(code).toContain("rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0, { signal, computed, untracked })");
     expect(code).toContain('input<number>(');
     expect(code).toContain('signal(');
     expect(code).toContain('computed(');

@@ -1202,7 +1202,7 @@ export class DataTable {
    */
   readonly __rozieModelIn_data = input.required<any[]>({ alias: 'data' });
   dataChange = output<any[]>();
-  data = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_data, this.dataChange, undefined as unknown as any[]);
+  data = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_data, this.dataChange, undefined as unknown as any[], { signal, computed, untracked });
   /**
    * Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `'left'` or `'right'` is applied once as the table's initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial two-way `columnPinning` model value or an interactive pin) owns the slice and this declaration is ignored.
    */
@@ -1216,19 +1216,19 @@ export class DataTable {
    */
   readonly __rozieModelIn_sorting = input<any[] | undefined>(undefined, { alias: 'sorting' });
   sortingChange = output<any[]>();
-  sorting = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_sorting, this.sortingChange, (() => [])());
+  sorting = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_sorting, this.sortingChange, (() => [])(), { signal, computed, untracked });
   /**
    * The global search string — narrows all columns. Feeds `getFilteredRowModel()`. Surfaces through `filter-change`. Two-way: fires `filter-change` regardless of binding.
    */
   readonly __rozieModelIn_globalFilter = input<string | undefined>(undefined, { alias: 'globalFilter' });
   globalFilterChange = output<string>();
-  globalFilter = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_globalFilter, this.globalFilterChange, '');
+  globalFilter = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_globalFilter, this.globalFilterChange, '', { signal, computed, untracked });
   /**
    * `ColumnFiltersState` — `[{ id, value }]` per-column narrowing (gated by each column's `filterable`). Two-way: whole-array replace on write, fires `filter-change`.
    */
   readonly __rozieModelIn_columnFilters = input<any[] | undefined>(undefined, { alias: 'columnFilters' });
   columnFiltersChange = output<any[]>();
-  columnFilters = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnFilters, this.columnFiltersChange, (() => [])());
+  columnFilters = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnFilters, this.columnFiltersChange, (() => [])(), { signal, computed, untracked });
   /**
    * `{ pageIndex, pageSize }`. Defaults to `{ pageIndex: 0, pageSize: 10 }`; feeds the prev/next + page-size chrome (and `getPaginationRowModel()`). Two-way: funnels a fresh object through `page-change`.
    */
@@ -1237,7 +1237,7 @@ export class DataTable {
   pagination = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_pagination, this.paginationChange, (() => ({
     pageIndex: 0,
     pageSize: 10
-  }))());
+  }))(), { signal, computed, untracked });
   /**
    * Server-side hook: sets `manualPagination` / `manualFiltering` / `manualSorting` so table-core trusts the consumer-supplied rows and only emits the change events (the consumer fetches each page).
    */
@@ -1259,7 +1259,7 @@ export class DataTable {
    */
   readonly __rozieModelIn_expanded = input<(Record<string, any> | boolean) | null | undefined>(undefined, { alias: 'expanded' });
   expandedChange = output<(Record<string, any> | boolean) | null>();
-  expanded = rozieModel<(Record<string, any> | boolean) | null, import('@angular/core').ModelSignal<(Record<string, any> | boolean) | null>>(this.__rozieModelIn_expanded, this.expandedChange, null);
+  expanded = rozieModel<(Record<string, any> | boolean) | null, import('@angular/core').ModelSignal<(Record<string, any> | boolean) | null>>(this.__rozieModelIn_expanded, this.expandedChange, null, { signal, computed, untracked });
   /**
    * Row identity `(originalRow, index, parentRow?) => string | number` — the key `rowSelection`, `expanded` and the per-row caches use. Default null → table-core keys rows by position (`"0"`, `"1"`, … and `"0.1"` for sub-rows), so inserting or removing rows above a selected or expanded row moves that state onto whatever row now sits at its index. Supply it whenever rows can be added or removed while state is held (server push, live lists); the result is coerced to a string.
    */
@@ -1277,31 +1277,31 @@ export class DataTable {
    */
   readonly __rozieModelIn_grouping = input<(any[]) | null | undefined>(undefined, { alias: 'grouping' });
   groupingChange = output<(any[]) | null>();
-  grouping = rozieModel<(any[]) | null, import('@angular/core').ModelSignal<(any[]) | null>>(this.__rozieModelIn_grouping, this.groupingChange, null);
+  grouping = rozieModel<(any[]) | null, import('@angular/core').ModelSignal<(any[]) | null>>(this.__rozieModelIn_grouping, this.groupingChange, null, { signal, computed, untracked });
   /**
    * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
    */
   readonly __rozieModelIn_rowSelection = input<Record<string, any> | undefined>(undefined, { alias: 'rowSelection' });
   rowSelectionChange = output<Record<string, any>>();
-  rowSelection = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_rowSelection, this.rowSelectionChange, (() => ({}))());
+  rowSelection = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_rowSelection, this.rowSelectionChange, (() => ({}))(), { signal, computed, untracked });
   /**
    * `VisibilityState` — `{ [colId]: boolean }`. Hidden columns drop automatically from header + body. Two-way: funnels a fresh object through `visibility-change`.
    */
   readonly __rozieModelIn_columnVisibility = input<Record<string, any> | undefined>(undefined, { alias: 'columnVisibility' });
   columnVisibilityChange = output<Record<string, any>>();
-  columnVisibility = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnVisibility, this.columnVisibilityChange, (() => ({}))());
+  columnVisibility = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnVisibility, this.columnVisibilityChange, (() => ({}))(), { signal, computed, untracked });
   /**
    * `ColumnSizingState` — `{ [colId]: number }`. Driven live by the pointer-drag resize handle (`columnResizeMode: 'onChange'`). Two-way: fires `resize-change`.
    */
   readonly __rozieModelIn_columnSizing = input<Record<string, any> | undefined>(undefined, { alias: 'columnSizing' });
   columnSizingChange = output<Record<string, any>>();
-  columnSizing = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnSizing, this.columnSizingChange, (() => ({}))());
+  columnSizing = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnSizing, this.columnSizingChange, (() => ({}))(), { signal, computed, untracked });
   /**
    * `ColumnOrderState` — `string[]`. A fresh order array on reorder (never an in-place splice). Two-way: fires `reorder-change`.
    */
   readonly __rozieModelIn_columnOrder = input<any[] | undefined>(undefined, { alias: 'columnOrder' });
   columnOrderChange = output<any[]>();
-  columnOrder = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnOrder, this.columnOrderChange, (() => [])());
+  columnOrder = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_columnOrder, this.columnOrderChange, (() => [])(), { signal, computed, untracked });
   /**
    * `ColumnPinningState` — `{ left: string[], right: string[] }`. Pinned columns get `position: sticky` + computed offsets. Defaults to `{ left: [], right: [] }`. Two-way: fires `pin-change`.
    */
@@ -1310,7 +1310,7 @@ export class DataTable {
   columnPinning = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_columnPinning, this.columnPinningChange, (() => ({
     left: [],
     right: []
-  }))());
+  }))(), { signal, computed, untracked });
   /**
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */

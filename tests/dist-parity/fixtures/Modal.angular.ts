@@ -93,7 +93,7 @@ interface FooterCtx {
 export class Modal {
   readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
   openChange = output<boolean>();
-  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   closeOnEscape = input<boolean>(true);
   closeOnBackdrop = input<boolean>(true);
   lockBodyScroll = input<boolean>(true);

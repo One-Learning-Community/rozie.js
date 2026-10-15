@@ -123,25 +123,25 @@ export class MapLibre {
    */
   readonly __rozieModelIn_center = input<any[] | undefined>(undefined, { alias: 'center' });
   centerChange = output<any[]>();
-  center = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_center, this.centerChange, (() => [0, 0])());
+  center = rozieModel<any[], import('@angular/core').ModelSignal<any[]>>(this.__rozieModelIn_center, this.centerChange, (() => [0, 0])(), { signal, computed, untracked });
   /**
    * The zoom level. Two-way: scroll / pinch writes the new zoom back, and a consumer write `easeTo`s the camera. Echo-guarded against the wrapper's own programmatic moves.
    */
   readonly __rozieModelIn_zoom = input<number | undefined>(undefined, { alias: 'zoom' });
   zoomChange = output<number>();
-  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1);
+  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1, { signal, computed, untracked });
   /**
    * The map rotation (bearing) in degrees. Two-way via the `rotateend` echo and the `easeTo` reconcile.
    */
   readonly __rozieModelIn_bearing = input<number | undefined>(undefined, { alias: 'bearing' });
   bearingChange = output<number>();
-  bearing = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_bearing, this.bearingChange, 0);
+  bearing = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_bearing, this.bearingChange, 0, { signal, computed, untracked });
   /**
    * The map tilt (pitch) in degrees. Two-way via the `pitchend` echo and the `easeTo` reconcile.
    */
   readonly __rozieModelIn_pitch = input<number | undefined>(undefined, { alias: 'pitch' });
   pitchChange = output<number>();
-  pitch = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_pitch, this.pitchChange, 0);
+  pitch = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_pitch, this.pitchChange, 0, { signal, computed, untracked });
   /**
    * The map style — a `StyleSpecification` object **or** a style-URL string. Named `mapStyle` (not `style`) because `style` is a reserved attribute across the targets — `react-map-gl` and `vue-maplibre-gl` use the same name for the same reason. Defaults to MapLibre's official no-token demo tiles, so the component "just works" with zero config. Changing it calls `setStyle` and re-applies your `sources` / `layers` once the new style loads.
    */

@@ -1,4 +1,4 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgClass, NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
@@ -470,7 +470,7 @@ export class DatePicker {
    */
   readonly __rozieModelIn_value = input<string | Record<string, any> | undefined>(undefined, { alias: 'value' });
   valueChange = output<string | Record<string, any>>();
-  value = rozieModel<string | Record<string, any>, import('@angular/core').ModelSignal<string | Record<string, any>>>(this.__rozieModelIn_value, this.valueChange, '');
+  value = rozieModel<string | Record<string, any>, import('@angular/core').ModelSignal<string | Record<string, any>>>(this.__rozieModelIn_value, this.valueChange, '', { signal, computed, untracked });
   /**
    * Selection mode: `'single'` (the default — `value` is one ISO `YYYY-MM-DD` string, fully backward-compatible) or `'range'` (`value` becomes a `{ start, end }` object selected with two clicks plus a live hover preview, direction-agnostic). In `range` mode a completed selection additionally emits `rangeComplete`.
    */

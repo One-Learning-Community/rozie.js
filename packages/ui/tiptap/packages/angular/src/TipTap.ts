@@ -280,7 +280,7 @@ export class TipTap {
    */
   readonly __rozieModelIn_html = input<string | undefined>(undefined, { alias: 'html' });
   htmlChange = output<string>();
-  html = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_html, this.htmlChange, '<p>Start writing…</p>');
+  html = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_html, this.htmlChange, '<p>Start writing…</p>', { signal, computed, untracked });
   /**
    * Whether the document is editable. Toggling it calls TipTap's `setEditable` with `emitUpdate: false` (no spurious `update`). When `false`, the internal toolbar is hidden and the wrapper gets an `is-readonly` class.
    */

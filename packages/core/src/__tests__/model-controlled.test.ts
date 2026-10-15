@@ -35,7 +35,7 @@ describe('two-way prop, controlled while bound', () => {
     const code = compile(SRC, { target: 'angular', filename: 'M.rozie' }).code;
     expect(code).toContain("readonly __rozieModelIn_value = input<string | undefined>(undefined, { alias: 'value' });");
     expect(code).toContain('valueChange = output<string>();');
-    expect(code).toContain("value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, 'a');");
+    expect(code).toContain("value = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_value, this.valueChange, 'a', { signal, computed, untracked });");
     expect(code).toMatch(/import \{[^}]*\brozieModel\b[^}]*\} from '@rozie\/runtime-angular'/);
     expect(code).not.toMatch(/\bmodel</);
   });

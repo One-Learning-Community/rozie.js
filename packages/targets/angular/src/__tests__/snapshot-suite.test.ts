@@ -89,7 +89,7 @@ describe('emitAngular — substring invariants (Plan 05-04a Task 3 acceptance cr
   it('Counter.ts.snap contains the `value` rozieModel AND `console.log("hello from rozie")` (DX-03)', () => {
     const { ir, src, filename } = loadExample('Counter');
     const { code } = emitAngular(ir, { filename, source: src });
-    expect(code).toContain("value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0)");
+    expect(code).toContain("value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0, { signal, computed, untracked })");
     expect(code).toContain('console.log("hello from rozie")');
     expect(code).toContain('signal(false)');
     expect(code).toContain('computed(() =>');

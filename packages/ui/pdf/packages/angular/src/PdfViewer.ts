@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
@@ -84,7 +84,7 @@ export class PdfViewer {
    */
   readonly __rozieModelIn_page = input<number | undefined>(undefined, { alias: 'page' });
   pageChange = output<number>();
-  page = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_page, this.pageChange, 1);
+  page = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_page, this.pageChange, 1, { signal, computed, untracked });
   /**
    * The zoom scale (`1` = 100%). One-way: the `setScale` / `zoomIn` / `zoomOut` / `fitWidth` / `fitPage` handle verbs override it imperatively, while a consumer write reconciles the live render.
    */

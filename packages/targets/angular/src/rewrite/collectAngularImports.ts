@@ -232,6 +232,9 @@ export function collectAngularImports(ir: IRComponent): AngularImportCollector {
     // input + output + `rozieModel` (see emitScript's two-way prop fields).
     collector.add('input');
     collector.add('output');
+    collector.add('signal');
+    collector.add('computed');
+    collector.add('untracked');
     collector.addRuntime('rozieModel');
   }
   if (hasNonModelProps) {

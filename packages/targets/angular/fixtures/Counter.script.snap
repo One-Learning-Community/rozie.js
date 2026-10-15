@@ -1,10 +1,10 @@
-import { Component, ViewEncapsulation, computed, input, output, signal } from '@angular/core';
+import { Component, ViewEncapsulation, computed, input, output, signal, untracked } from '@angular/core';
 import { rozieModel } from '@rozie/runtime-angular';
 
 
 readonly __rozieModelIn_value = input<number | undefined>(undefined, { alias: 'value' });
 valueChange = output<number>();
-value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0);
+value = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_value, this.valueChange, 0, { signal, computed, untracked });
 step = input<number>(1);
 min = input<number>(-Infinity);
 max = input<number>(Infinity);

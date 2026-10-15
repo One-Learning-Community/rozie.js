@@ -248,7 +248,7 @@ export class Carousel {
    */
   readonly __rozieModelIn_selectedIndex = input<number | undefined>(undefined, { alias: 'selectedIndex' });
   selectedIndexChange = output<number>();
-  selectedIndex = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_selectedIndex, this.selectedIndexChange, 0);
+  selectedIndex = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_selectedIndex, this.selectedIndexChange, 0, { signal, computed, untracked });
   snaps = signal<any[]>([]);
   selected = signal(0);
   canPrev = signal(false);

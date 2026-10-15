@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, forwardRef, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, computed, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
@@ -52,7 +52,7 @@ export class RecaptchaV3 {
    */
   readonly __rozieModelIn_token = input<string | undefined>(undefined, { alias: 'token' });
   tokenChange = output<string>();
-  token = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_token, this.tokenChange, '');
+  token = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_token, this.tokenChange, '', { signal, computed, untracked });
   /**
    * Opt in to running one `execute()` at mount and emitting `@verify` with the initial token. Off by default — v3 is imperative-first and tokens are short-lived (~2 min), so fetch one at the moment of submission rather than eagerly at mount.
    */

@@ -96,7 +96,7 @@ describe('ANGULAR-POPOVER-TYPED-SURFACE — open: ModelSignal<boolean>, typed an
     expect(r0.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
     // `open` keeps the ModelSignal surface (pinned by the consumer below); it is built by
     // `rozieModel` so a consumer that refuses a change keeps the control on its value.
-    expect(ng).toMatch(/open = rozieModel<boolean, import\('@angular\/core'\)\.ModelSignal<boolean>>\(this\.__rozieModelIn_open, this\.openChange, false\);/);
+    expect(ng).toMatch(/open = rozieModel<boolean, import\('@angular\/core'\)\.ModelSignal<boolean>>\(this\.__rozieModelIn_open, this\.openChange, false, \{ signal, computed, untracked \}\);/);
     expect(ng).not.toMatch(/\bchange = output/);
   });
 

@@ -629,13 +629,13 @@ export class CommandPalette {
    */
   readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
   openChange = output<boolean>();
-  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false);
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   /**
    * The current search text (two-way `r-model`). Two-way bind it to read the query, or pre-seed it by setting a value alongside `open` — an open no longer clears it, so the palette opens filtered to that query. The component ranks `items` by this string via `score` (fuzzy-subsequence by default, matched over each item `label` plus its `keywords`, label weighted above keywords). Reset to `""` when the palette closes, so each plain open starts with a fresh search box.
    */
   readonly __rozieModelIn_query = input<string | undefined>(undefined, { alias: 'query' });
   queryChange = output<string>();
-  query = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_query, this.queryChange, '');
+  query = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_query, this.queryChange, '', { signal, computed, untracked });
   /**
    * Custom ranking/exclusion hook: `(item, query, defaultScore) => number | null`. Return `null` to exclude an item from the results; otherwise higher numbers rank first. Leave unset (`default: null`) to use the built-in fuzzy-subsequence scorer (label weighted above keywords). The third argument is that built-in scorer, `(item, query) => number | null`, so a hook can adjust the default ranking instead of replacing it: a recency/frecency boost is `const base = defaultScore(item, query); return base === null ? null : base + recencyBonus(item.id)`, and a row pinned last (e.g. a synthetic "Create '…'" row) is `item.id === 'create' ? -Infinity : defaultScore(item, query)`. The `query` passed in is trimmed.
    * @example

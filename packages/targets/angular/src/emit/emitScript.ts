@@ -1124,6 +1124,9 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       // refuses the change keeps the control on its value — the controlled
       // rule of the React / Solid / Lit targets. Angular's `model()` updated
       // its local value on every write, and a refused write stayed on screen.
+      // The component hands over its own `signal` / `computed` / `untracked`:
+      // the runtime package may resolve another `@angular/core` copy, whose
+      // signals this component's change detection would not see.
       const inField = angularModelInputField(p.name);
       const inputDecl = p.required && !defaultVal
         ? `input.required<${tsType}>({ alias: '${p.name}' })`
@@ -1134,7 +1137,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOptions = {}): EmitS
       const initial = defaultVal || (p.required ? `undefined as unknown as ${tsType}` : 'undefined');
       const modelType = defaultVal || p.required ? tsType : `${tsType} | undefined`;
       fieldLines.push(
-        `${p.name} = rozieModel<${modelType}, import('@angular/core').ModelSignal<${modelType}>>(this.${inField}, this.${p.name}Change, ${initial});`,
+        `${p.name} = rozieModel<${modelType}, import('@angular/core').ModelSignal<${modelType}>>(this.${inField}, this.${p.name}Change, ${initial}, { signal, computed, untracked });`,
       );
     } else if (defaultVal) {
       fieldLines.push(`${p.name} = ${fnName}<${tsType}>(${defaultVal});`);

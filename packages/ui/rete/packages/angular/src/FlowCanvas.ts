@@ -518,7 +518,7 @@ export class FlowCanvas {
   graph = rozieModel<Record<string, any>, import('@angular/core').ModelSignal<Record<string, any>>>(this.__rozieModelIn_graph, this.graphChange, (() => ({
     nodes: [],
     connections: []
-  }))());
+  }))(), { signal, computed, untracked });
   /**
    * Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).
    */
@@ -528,7 +528,7 @@ export class FlowCanvas {
    */
   readonly __rozieModelIn_zoom = input<number | undefined>(undefined, { alias: 'zoom' });
   zoomChange = output<number>();
-  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1);
+  zoom = rozieModel<number, import('@angular/core').ModelSignal<number>>(this.__rozieModelIn_zoom, this.zoomChange, 1, { signal, computed, untracked });
   /**
    * Whether the canvas can be panned by dragging the background. **Applied live** — flipping it after mount takes effect on the next gesture.
    */
@@ -594,7 +594,7 @@ export class FlowCanvas {
    */
   readonly __rozieModelIn_mode = input<string | undefined>(undefined, { alias: 'mode' });
   modeChange = output<string>();
-  mode = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_mode, this.modeChange, 'pan');
+  mode = rozieModel<string, import('@angular/core').ModelSignal<string>>(this.__rozieModelIn_mode, this.modeChange, 'pan', { signal, computed, untracked });
   /**
    * Render the 4th Controls button — the pan ↔ select mode toggle (it two-way-writes `mode`). Default OFF so the default Controls overlay keeps its three buttons. The marquee behavior works whenever `mode === 'select'` regardless of this flag (a consumer can drive `mode` directly); this only governs the built-in button.
    */
