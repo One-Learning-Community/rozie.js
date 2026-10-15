@@ -42,11 +42,14 @@ describe('two-way prop, controlled while bound', () => {
 });
 
 describe('vue: one `vue` import line', () => {
-  it('a template-hoisted `computed` joins the script import instead of redeclaring it', async () => {
-    const { readFileSync } = await import('node:fs');
-    const { resolve } = await import('node:path');
-    const file = resolve(__dirname, '../../../ui/command-palette/src/CommandPalette.rozie');
-    const code = compile(readFileSync(file, 'utf8'), { target: 'vue', filename: file }).code;
+  it('a template-hoisted `computed` joins the script import instead of redeclaring it', () => {
+    // r-portal hoists `computed` from the template; the two-way prop brings it into the script.
+    const src = `<rozie name="Hoist">
+<props>{ open: { type: Boolean, default: false, model: true } }</props>
+<template><div><div r-portal="'body'" r-if="$props.open">x</div></div></template>
+</rozie>`;
+    const code = compile(src, { target: 'vue', filename: 'Hoist.rozie' }).code;
+    expect(code).toContain('__roziePortalTo');
     expect(code.match(/^import \{[^}]*\} from 'vue';$/gm)).toHaveLength(1);
   });
 });

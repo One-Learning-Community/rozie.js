@@ -1912,8 +1912,13 @@ private __rozieFirstUpdateDone = false;
   // Called — on all three list branches — for a wheel, a touch move, and a press of any
   // mouse button inside the list (a scrollbar drag, middle-button autoscroll). Keys do not scroll the list by themselves:
   // DOM focus stays on the trigger.
+  // It also ends virtual-core's own in-flight scrollToIndex: that reconciles toward its target
+  // for up to 5s and never notices the user moved, and while it is pending recordScrollEnd() and
+  // keepScrollEnd() stand aside — a list opened and scrolled straight to the end was left 93px
+  // short once the options in view measured taller (measured on Linux CI, five targets).
   cancelReveal = () => {
   this.revealGen = this.revealGen + 1;
+  if (this.virtualizer) this.virtualizer.scrollState = null;
 };
 
   // Scroll option `index` into view inside the scrolling listbox, for reveal `gen`, giving
