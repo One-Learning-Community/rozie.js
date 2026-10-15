@@ -104,7 +104,15 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced to `cf49212a9b23cdd68a6f6fa6c7fadc38dcbba7a9`
+ * 4b). Advanced to `e2e327a91eabc9b0d28d1172ac99a4dcd538dfae`
+ * (e2e327a91): `rozieModel(...)` takes the component's own
+ * `{ signal, computed, untracked }` (the runtime's own `@angular/core` copy made
+ * signals the app's change detection could not see), and `untracked` joins the
+ * `@angular/core` import of every component with a two-way prop. The owed
+ * prohibition-5 hand-diff (performed, not deferred): over all 188 Angular
+ * fixtures tracked at cf49212a9, every one containing `rozieModel<` changed
+ * (15: 8 dist-parity, 7 regressions) and no other fixture did.
+ * Previously advanced to `cf49212a9b23cdd68a6f6fa6c7fadc38dcbba7a9`
  * (cf49212a9), the compiler-fixes-from-select commit: two-way props lower to
  * `rozieModel` over an aliased input + `<name>Change` output (was `model()`),
  * `$onUpdate` to `ngAfterViewChecked()`, an output named `change`/`submit`/
@@ -167,7 +175,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'cf49212a9';
+const BASELINE_COMMIT = 'e2e327a91';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
