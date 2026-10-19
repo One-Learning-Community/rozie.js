@@ -279,13 +279,17 @@ function emitStaticText(node: TemplateStaticTextIR, _ctx: EmitNodeCtx): string {
  * path. Single-child fast-paths elsewhere intentionally bypass this — a lone
  * child has no sibling boundary, so its text is emitted verbatim.
  */
-function emitChildren(children: readonly TemplateNode[], ctx: EmitNodeCtx): string {
+function emitChildren(
+  children: readonly TemplateNode[],
+  ctx: EmitNodeCtx,
+  ctxFor?: (child: TemplateNode) => EmitNodeCtx,
+): string {
   const len = children.length;
   return children
     .map((c, i) =>
       c.type === 'TemplateStaticText'
         ? jsxBoundaryText(c.text, i > 0, i < len - 1)
-        : emitNode(c, ctx),
+        : emitNode(c, ctxFor ? ctxFor(c) : ctx),
     )
     .join('');
 }
@@ -399,7 +403,23 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // parent needs a single keyed JSX element. We use the JSX shorthand
     // `<Fragment key={k}>...</Fragment>` only if pendingKey was not consumed;
     // otherwise concatenate.
-    const parts = emitChildren(node.body, childCtx);
+    // quick 261019-9g1 (add-on A) — when the loop is keyed, the enclosing
+    // `<Fragment key>` below already keys each row. A conditional (r-if chain) or
+    // r-match CHILD must therefore not repeat the key on its branch elements:
+    // the repeat is redundant, and when the key expression re-tests the
+    // discriminant the branch narrows (`item === 'gap' ? … : item` inside
+    // `item !== 'gap' && <span key=…>`) it is a strict-tsc TS2367. Element
+    // children keep consuming `pendingKey`, so existing output is unchanged.
+    const parts = emitChildren(
+      node.body,
+      childCtx,
+      keyCode !== null
+        ? (c) =>
+            c.type === 'TemplateConditional' || c.type === 'TemplateMatch'
+              ? { ...childCtx, pendingKey: null }
+              : childCtx
+        : undefined,
+    );
     if (keyCode !== null) {
       // A keyed multi-root loop body needs a keyed Fragment (the `<>` shorthand
       // cannot carry a key). Use the NAMED `Fragment` import (registered on the

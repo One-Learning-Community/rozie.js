@@ -261,7 +261,7 @@ export default class Pagination extends SignalWatcher(LitElement) {
   </slot>`}
 
   
-  ${repeat<any>(this.model().pages, (item, index) => this.itemKey(item, index), (item, index) => html`
+  ${repeat<any>(this.model().pages, (item, index) => item === 'ellipsis' ? 'ellipsis-' + index : item, (item, index) => html`
     ${item === 'ellipsis' ? html`<span class="rozie-pagination-ellipsis" aria-hidden="true" data-rozie-s-de247ae2>
       ${this.ellipsis !== undefined ? this.ellipsis({index: index}) : html`<slot name="ellipsis" data-rozie-params=${(() => { try { return JSON.stringify({index: index}); } catch { return '{}'; } })()}>…</slot>`}
     </span>` : nothing}${item !== 'ellipsis' ? html`<span class="rozie-pagination-item" data-rozie-s-de247ae2>
@@ -286,13 +286,6 @@ export default class Pagination extends SignalWatcher(LitElement) {
   siblingCount: this.siblingCount,
   boundaryCount: this.boundaryCount
 });
-
-  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
-  // sliding by one keeps the button that was just activated, and with it keyboard
-  // focus), an ellipsis marker — which has no identity — by its position. A helper
-  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
-  // where `item` is already narrowed, and TS then rejects the comparison.
-  itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
 
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow

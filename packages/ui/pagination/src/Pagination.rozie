@@ -153,13 +153,6 @@ const model = () =>
     boundaryCount: $props.boundaryCount,
   })
 
-// The r-for key of a page item: a page NUMBER is keyed by its value (so the window
-// sliding by one keeps the button that was just activated, and with it keyboard
-// focus), an ellipsis marker — which has no identity — by its position. A helper
-// rather than an inline ternary: the emitters repeat the key on each r-if branch,
-// where `item` is already narrowed, and TS then rejects the comparison.
-const itemKey = (item, index) => (item === 'ellipsis' ? 'ellipsis-' + index : item)
-
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -297,13 +290,13 @@ $expose(
 
   <!-- The windowed page items: numbers interleaved with ellipses. The :key on
        the <template r-for> satisfies Angular's @for track requirement (ROZ720).
-       A page number is keyed by its VALUE (`itemKey`), so the window sliding by one
+       A page number is keyed by its VALUE, so the window sliding by one
        keeps the button that was just activated (and its focus) instead of
        re-creating it; the ellipsis markers, which have no identity, are keyed by
        position. Two
        independent r-if branches (NOT r-if/r-else with a <slot> else, which does
        not lower cleanly when the else is a slot expansion). -->
-  <template r-for="item, index in model().pages" :key="itemKey(item, index)">
+  <template r-for="item, index in model().pages" :key="item === 'ellipsis' ? 'ellipsis-' + index : item">
     <span
       r-if="item === 'ellipsis'"
       class="rozie-pagination-ellipsis"

@@ -117,15 +117,6 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     });
   }
 
-  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
-  // sliding by one keeps the button that was just activated, and with it keyboard
-  // focus), an ellipsis marker — which has no identity — by its position. A helper
-  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
-  // where `item` is already narrowed, and TS then rejects the comparison.
-  function itemKey(item: any, index: any) {
-    return item === 'ellipsis' ? 'ellipsis-' + index : item;
-  }
-
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -272,10 +263,10 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
       {(props.renderPrevControl ?? props.slots?.['prevControl']) ? ((props.renderPrevControl ?? props.slots?.['prevControl']) as Function)({ disabled: !canPrev() || props.disabled, goto: goPrev, page: currentPage() - 1 }) : <button type="button" className={"rozie-pagination-control rozie-pagination-prev"} data-page-control="" tabIndex={tabIndexFor(true)} disabled={!canPrev() || props.disabled} aria-disabled={!!(!canPrev() || props.disabled)} aria-label="Previous page" onClick={goPrev} data-rozie-s-de247ae2="">‹</button>}
 
       
-      {model().pages.map((item, index) => <Fragment key={itemKey(item, index)}>
-        {!!(item === 'ellipsis') && <span key={itemKey(item, index)} className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
+      {model().pages.map((item, index) => <Fragment key={item === 'ellipsis' ? 'ellipsis-' + index : item}>
+        {!!(item === 'ellipsis') && <span className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(props.renderEllipsis ?? props.slots?.['ellipsis']) ? ((props.renderEllipsis ?? props.slots?.['ellipsis']) as Function)({ index }) : "…"}
-        </span>}{!!(item !== 'ellipsis') && <span key={itemKey(item, index)} className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
+        </span>}{!!(item !== 'ellipsis') && <span className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
           {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: item, selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={tabIndexFor(isActive(item))} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
         </span>}</Fragment>)}
 

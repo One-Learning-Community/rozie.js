@@ -7,7 +7,7 @@
   </slot>
 
   
-  <template v-for="(item, index) in model().pages" :key="itemKey(item, index)">
+  <template v-for="(item, index) in model().pages" :key="item === 'ellipsis' ? 'ellipsis-' + index : item">
     <span v-if="item === 'ellipsis'" class="rozie-pagination-ellipsis" aria-hidden="true">
       <slot name="ellipsis" :index="index">…</slot>
     </span><span v-if="item !== 'ellipsis'" class="rozie-pagination-item">
@@ -123,12 +123,6 @@ const model = () => paginationItems({
   siblingCount: props.siblingCount,
   boundaryCount: props.boundaryCount
 });
-// The r-for key of a page item: a page NUMBER is keyed by its value (so the window
-// sliding by one keeps the button that was just activated, and with it keyboard
-// focus), an ellipsis marker — which has no identity — by its position. A helper
-// rather than an inline ternary: the emitters repeat the key on each r-if branch,
-// where `item` is already narrowed, and TS then rejects the comparison.
-const itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`

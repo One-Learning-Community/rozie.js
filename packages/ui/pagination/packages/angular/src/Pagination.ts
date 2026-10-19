@@ -61,7 +61,7 @@ interface NextControlCtx {
     }
 
       
-      @for (item of model().pages; track itemKey(item, index); let index = $index) {
+      @for (item of model().pages; track item === 'ellipsis' ? 'ellipsis-' + index : item; let index = $index) {
 
         @if (item === 'ellipsis') {
     <span class="rozie-pagination-ellipsis" aria-hidden="true">
@@ -229,12 +229,6 @@ export class Pagination {
     siblingCount: this.siblingCount(),
     boundaryCount: this.boundaryCount()
   });
-  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
-  // sliding by one keeps the button that was just activated, and with it keyboard
-  // focus), an ellipsis marker — which has no identity — by its position. A helper
-  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
-  // where `item` is already narrowed, and TS then rejects the comparison.
-  itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
