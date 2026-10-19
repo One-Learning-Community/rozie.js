@@ -28,6 +28,9 @@
       `$model.modelValue` (never `$props.x =` → ROZ204).
     - aria booleans bound from a CALL (`aria-disabled`) use `!!` so the JSX
       targets emit an unwrapped boolean, not a rozieAttr string (TS2322).
+    - Tab order: the ACTIVE page and the prev/next controls are tab stops
+      (tabindex 0); the other pages are tabindex -1 and reached with the arrow
+      keys, Home and End (roving focus).
     - `aria-current` is the literal string `"page"` on the active control,
       dropped (null) otherwise — never a boolean.
     - `$refs.nav` (the roving-focus container) is read ONLY inside handlers /
@@ -50,6 +53,14 @@
 -->
 
 <rozie name="Pagination">
+
+<types>
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number
+}
+</types>
 
 <props>
 {
@@ -117,6 +128,12 @@
 }
 </props>
 
+<emits>
+{
+  change: { payload: 'PaginationChangePayload', docs: { description: 'Fired whenever the current page changes (a page button, prev/next, or a programmatic `goto`/`next`/`prev`/`first`/`last`). Payload `{ page }` — the new clamped 1-based page. Not fired when the target page equals the current page.' } },
+}
+</emits>
+
 <script lang="ts">
 import { paginationItems } from './internal/paginationItems'
 
@@ -136,6 +153,18 @@ const model = () =>
     boundaryCount: $props.boundaryCount,
   })
 
+// The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+// sliding by one keeps the button that was just activated, and with it keyboard
+// focus), an ellipsis marker — which has no identity — by its position. A helper
+// rather than an inline ternary: the emitters repeat the key on each r-if branch,
+// where `item` is already narrowed, and TS then rejects the comparison.
+const itemKey = (item, index) => (item === 'ellipsis' ? 'ellipsis-' + index : item)
+
+// A loop item that is not the ellipsis marker is a page number. The `r-if` that
+// guards the `item` slot narrows it for the compiler on some targets only (Solid's
+// <Show> is not a type guard), so state it once here instead of per target.
+const asPage = (item): number => item as number
+
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -148,8 +177,9 @@ const canPrev = () => model().hasPrev
 const canNext = () => model().hasNext
 const isActive = (page) => page === currentPage()
 
-// Roving-tabindex value for a control: the active page is the single tab stop
-// (0), the rest are -1. The return type is annotated `number | undefined` ON
+// Roving-tabindex value for a control: the active page is a tab stop (0), the
+// other pages are -1 (arrow keys reach them). The prev/next controls always pass
+// `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
 // PURPOSE: the React emitter wraps every numeric `:attr` binding in
 // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
 // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -198,13 +228,18 @@ const focusControlAt = (idx) => {
 const focusedIndex = () => {
   const els = controls()
   const nav = $refs.nav
-  const active = nav ? nav.ownerDocument.activeElement : null
+  // The focused element within the nav's OWN root (the document, or the shadow
+  // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+  // would never match a control.
+  const root = nav ? (nav.getRootNode() as Document | ShadowRoot) : null
+  const active = root ? root.activeElement : null
   return els.indexOf(active as HTMLElement)
 }
 
 // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-// to the ends. Each control keeps tabindex via the template (the active page is
-// 0, the rest -1) so the group is a single tab stop.
+// to the ends. Each page control keeps its tabindex via the template (the active
+// page is 0, the other pages -1), so only the active page is a tab stop among the
+// page numbers.
 const onControlKeydown = ($event) => {
   if ($props.disabled) return
   const key = $event.key
@@ -234,7 +269,10 @@ const prev = () => goPrev()
 const first = () => goFirst()
 const last = () => goLast()
 
-$expose({ goto, next, prev, first, last })
+$expose(
+  { goto, next, prev, first, last },
+  { goto: '(page: number) => void', next: '() => void', prev: '() => void', first: '() => void', last: '() => void' },
+)
 </script>
 
 <template>
@@ -249,7 +287,7 @@ $expose({ goto, next, prev, first, last })
        Named `prevControl` (NOT `prev`) so it does not collide with the `prev`
        $expose verb, which on Lit becomes a class method of the SAME name as the
        slot's class field (TS2300). -->
-  <slot name="prevControl" :disabled="!canPrev() || $props.disabled" :goto="goPrev" :page="currentPage() - 1">
+  <slot name="prevControl" :disabled="!canPrev() || $props.disabled" :goto="goPrev" :page="currentPage() - 1" :param-types="{ disabled: 'boolean', goto: '() => void', page: 'number' }">
     <button
       type="button"
       class="rozie-pagination-control rozie-pagination-prev"
@@ -263,24 +301,28 @@ $expose({ goto, next, prev, first, last })
   </slot>
 
   <!-- The windowed page items: numbers interleaved with ellipses. The :key on
-       the <template r-for> satisfies Angular's @for track requirement (ROZ720);
-       it mixes the item value + index so ellipsis markers stay distinct. Two
+       the <template r-for> satisfies Angular's @for track requirement (ROZ720).
+       A page number is keyed by its VALUE (`itemKey`), so the window sliding by one
+       keeps the button that was just activated (and its focus) instead of
+       re-creating it; the ellipsis markers, which have no identity, are keyed by
+       position. Two
        independent r-if branches (NOT r-if/r-else with a <slot> else, which does
        not lower cleanly when the else is a slot expansion). -->
-  <template r-for="item, index in model().pages" :key="item + '-' + index">
+  <template r-for="item, index in model().pages" :key="itemKey(item, index)">
     <span
       r-if="item === 'ellipsis'"
       class="rozie-pagination-ellipsis"
       aria-hidden="true"
     >
-      <slot name="ellipsis" :index="index">…</slot>
+      <slot name="ellipsis" :index="index" :param-types="{ index: 'number' }">…</slot>
     </span>
     <span r-if="item !== 'ellipsis'" class="rozie-pagination-item">
       <slot
         name="item"
-        :page="item"
+        :page="asPage(item)"
         :selected="isActive(item)"
         :goto="() => goToPage(item)"
+        :param-types="{ page: 'number', selected: 'boolean', goto: '() => void' }"
       >
         <button
           type="button"
@@ -301,7 +343,7 @@ $expose({ goto, next, prev, first, last })
   <!-- Next control. Scoped #nextControl slot overrides the default button.
        Named `nextControl` (NOT `next`) — see #prevControl above (Lit slot/verb
        collision). -->
-  <slot name="nextControl" :disabled="!canNext() || $props.disabled" :goto="goNext" :page="currentPage() + 1">
+  <slot name="nextControl" :disabled="!canNext() || $props.disabled" :goto="goNext" :page="currentPage() + 1" :param-types="{ disabled: 'boolean', goto: '() => void', page: 'number' }">
     <button
       type="button"
       class="rozie-pagination-control rozie-pagination-next"

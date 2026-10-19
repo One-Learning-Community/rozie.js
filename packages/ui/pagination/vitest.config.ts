@@ -3,9 +3,13 @@
 // Two test surfaces:
 //   • tests/surface.test.ts — the Pagination.rozie compile()/lowerToIR surface
 //     gate (the same contract scripts/compile-pagination-check.mjs checks), so a
-//     drift in the 8-prop / 1-model / 1-emit / 4-slot / 5-expose surface or a
-//     new compile() error fails the test gate under `turbo run test`, not just
-//     the standalone script.
+//     drift in the props / model / emits / slots / expose surface its EXPECT block
+//     pins, or a new compile() error, fails the test gate under `turbo run test`,
+//     not just the standalone script.
+//   • tests/typed-events.test.ts — the compiled `change` payload type on every target.
+//   • tests/sidecars.test.ts — the IDE sidecars (Vue web-types.json, Lit
+//     custom-elements.json): version lockstep with the leaf, package.json wiring,
+//     and component coverage.
 //   • src/internal/paginationItems.test.ts — the pure page-item algorithm
 //     (ellipsis / sibling / boundary edge cases with concrete expected arrays).
 //     The `*.test.ts` is EXCLUDED from the leaf vendoring (codegen's

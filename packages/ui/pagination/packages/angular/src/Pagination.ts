@@ -12,30 +12,36 @@ import { paginationItems } from './internal/paginationItems';
 // accessor divergence. Returns a FRESH object each call — never feed it to a
 // reference-equality $watch getter.
 
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+
 interface PrevControlCtx {
-  $implicit: { disabled: any; goto: any; page: any };
-  disabled: any;
-  goto: any;
-  page: any;
+  $implicit: { disabled: boolean; goto: () => void; page: number };
+  disabled: boolean;
+  goto: () => void;
+  page: number;
 }
 
 interface EllipsisCtx {
-  $implicit: { index: any };
-  index: any;
+  $implicit: { index: number };
+  index: number;
 }
 
 interface ItemCtx {
-  $implicit: { page: any; selected: any; goto: any };
-  page: any;
-  selected: any;
-  goto: any;
+  $implicit: { page: number; selected: boolean; goto: () => void };
+  page: number;
+  selected: boolean;
+  goto: () => void;
 }
 
 interface NextControlCtx {
-  $implicit: { disabled: any; goto: any; page: any };
-  disabled: any;
-  goto: any;
-  page: any;
+  $implicit: { disabled: boolean; goto: () => void; page: number };
+  disabled: boolean;
+  goto: () => void;
+  page: number;
 }
 
 @Component({
@@ -55,7 +61,7 @@ interface NextControlCtx {
     }
 
       
-      @for (item of model().pages; track item + '-' + index; let index = $index) {
+      @for (item of model().pages; track itemKey(item, index); let index = $index) {
 
         @if (item === 'ellipsis') {
     <span class="rozie-pagination-ellipsis" aria-hidden="true">
@@ -196,7 +202,7 @@ export class Pagination {
    */
   ariaLabel = input<string>('Pagination');
   nav = viewChild<ElementRef<HTMLElement>>('nav');
-  change = output<unknown>();
+  change = output<PaginationChangePayload>();
   private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('prevControl', { read: TemplateRef }) prevControlTpl?: TemplateRef<PrevControlCtx>;
   @ContentChild('ellipsis', { read: TemplateRef }) ellipsisTpl?: TemplateRef<EllipsisCtx>;
@@ -223,6 +229,16 @@ export class Pagination {
     siblingCount: this.siblingCount(),
     boundaryCount: this.boundaryCount()
   });
+  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+  // sliding by one keeps the button that was just activated, and with it keyboard
+  // focus), an ellipsis marker — which has no identity — by its position. A helper
+  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
+  // where `item` is already narrowed, and TS then rejects the comparison.
+  itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
+  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
+  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
+  // <Show> is not a type guard), so state it once here instead of per target.
+  asPage = (item: any): number => item as number;
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -234,8 +250,9 @@ export class Pagination {
   canPrev = () => this.model().hasPrev;
   canNext = () => this.model().hasNext;
   isActive = (page: any) => page === this.currentPage();
-  // Roving-tabindex value for a control: the active page is the single tab stop
-  // (0), the rest are -1. The return type is annotated `number | undefined` ON
+  // Roving-tabindex value for a control: the active page is a tab stop (0), the
+  // other pages are -1 (arrow keys reach them). The prev/next controls always pass
+  // `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
   // PURPOSE: the React emitter wraps every numeric `:attr` binding in
   // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
   // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -287,12 +304,17 @@ export class Pagination {
   focusedIndex = () => {
     const els = this.controls();
     const nav = this.nav()?.nativeElement;
-    const active = nav ? nav.ownerDocument.activeElement : null;
+    // The focused element within the nav's OWN root (the document, or the shadow
+    // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+    // would never match a control.
+    const root = nav ? nav.getRootNode() as Document | ShadowRoot : null;
+    const active = root ? root.activeElement : null;
     return els.indexOf(active as HTMLElement);
   };
   // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-  // to the ends. Each control keeps tabindex via the template (the active page is
-  // 0, the rest -1) so the group is a single tab stop.
+  // to the ends. Each page control keeps its tabindex via the template (the active
+  // page is 0, the other pages -1), so only the active page is a tab stop among the
+  // page numbers.
   onControlKeydown = ($event: any) => {
     if ((this.disabled() || this.__rozieCvaDisabled())) return;
     const key = $event.key;
@@ -315,11 +337,11 @@ export class Pagination {
   // Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
   // bounds-aware steppers. None collide with an emit name (`change`) or the React
   // model setter (`setModelValue`).
-  goto = (page: any) => this.goToPage(page);
-  next = () => this.goNext();
-  prev = () => this.goPrev();
-  first = () => this.goFirst();
-  last = () => this.goLast();
+  goto: (page: number) => void = (page: any) => this.goToPage(page);
+  next: () => void = () => this.goNext();
+  prev: () => void = () => this.goPrev();
+  first: () => void = () => this.goFirst();
+  last: () => void = () => this.goLast();
 
   private __rozieCvaOnChange: (v: number) => void = () => {};
   private __rozieCvaOnTouchedFn: () => void = () => {};
@@ -392,7 +414,7 @@ export class Pagination {
     }
   });
 
-  private _item_ctx_2 = (item: any, index: any) => ({ $implicit: { page: item, selected: this.isActive(item), goto: () => this.goToPage(item) }, page: item, selected: this.isActive(item), goto: () => this.goToPage(item) });
+  private _item_ctx_2 = (item: any, index: any) => ({ $implicit: { page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item) }, page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item) });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 

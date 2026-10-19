@@ -1281,6 +1281,10 @@ export const EXAMPLES = [
   'TagsBehavior',
   'NumberFieldBehavior',
   'PaginationBehavior',
+  // PaginationSurface — the handle / change rules / windowing / disabled / scoped slots /
+  // roving-keyboard coverage that PaginationBehavior's page-wide locators cannot share a page
+  // with (examples/demos/PaginationSurfaceDemo.rozie; pagination-surface.spec.ts). Behavioral-only.
+  'PaginationSurface',
   // Phase 60 — the three content-STABLE SCREENSHOT cells (loaders →
   // examples/demos/{Tags,NumberField,Pagination}ScreenshotDemo.rozie). All render
   // INLINE → standard mount-clipped matrix cells (matrix.spec.ts). Each seeds a
@@ -1924,6 +1928,7 @@ export const LIT_TAGS: Record<Example, string> = {
   TagsBehavior: 'rozie-tags-behavior',
   NumberFieldBehavior: 'rozie-number-field-behavior',
   PaginationBehavior: 'rozie-pagination-behavior',
+  PaginationSurface: 'rozie-pagination-surface',
   TagsScreenshot: 'rozie-tags-screenshot',
   NumberFieldScreenshot: 'rozie-number-field-screenshot',
   PaginationScreenshot: 'rozie-pagination-screenshot',
@@ -2479,6 +2484,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TagsBehavior: {},
   NumberFieldBehavior: {},
   PaginationBehavior: {},
+  PaginationSurface: {},
   TagsScreenshot: {},
   NumberFieldScreenshot: {},
   PaginationScreenshot: {},

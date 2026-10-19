@@ -7,11 +7,11 @@
   </slot>
 
   
-  <template v-for="(item, index) in model().pages" :key="item + '-' + index">
+  <template v-for="(item, index) in model().pages" :key="itemKey(item, index)">
     <span v-if="item === 'ellipsis'" class="rozie-pagination-ellipsis" aria-hidden="true">
       <slot name="ellipsis" :index="index">…</slot>
     </span><span v-if="item !== 'ellipsis'" class="rozie-pagination-item">
-      <slot name="item" :page="item" :selected="isActive(item)" :goto="() => goToPage(item)">
+      <slot name="item" :page="asPage(item)" :selected="isActive(item)" :goto="() => goToPage(item)">
         <button type="button" :class="['rozie-pagination-page', { 'is-active': isActive(item) }]" data-page-control="" :tabindex="(tabIndexFor(isActive(item))) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-current="isActive(item) ? 'page' : undefined" :aria-label="'Go to page ' + item" @click="goToPage(item)">{{ item }}</button>
       </slot>
     </span></template>
@@ -24,8 +24,26 @@
 
 </template>
 
+<script lang="ts">
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+
+export interface PaginationHandle {
+  goto: (page: number) => void;
+  next: () => void;
+  prev: () => void;
+  first: () => void;
+  last: () => void;
+}
+</script>
+
 <script setup lang="ts">
 import { computed, getCurrentInstance, ref } from 'vue';
+
+import { paginationItems } from './internal/paginationItems';
 
 const props = withDefaults(
   defineProps<{
@@ -79,19 +97,18 @@ const modelValue = computed<number>({
 });
 
 const emit = defineEmits<{
-  change: [...args: any[]];
+  change: [payload: PaginationChangePayload];
 }>();
 
 defineSlots<{
-  prevControl(props: { disabled: any; goto: any; page: any }): any;
-  ellipsis(props: { index: any }): any;
-  item(props: { page: any; selected: any; goto: any }): any;
-  nextControl(props: { disabled: any; goto: any; page: any }): any;
+  prevControl(props: { disabled: boolean; goto: () => void; page: number }): any;
+  ellipsis(props: { index: number }): any;
+  item(props: { page: number; selected: boolean; goto: () => void }): any;
+  nextControl(props: { disabled: boolean; goto: () => void; page: number }): any;
 }>();
 
 const navRef = ref<HTMLElement>();
 
-import { paginationItems } from './internal/paginationItems';
 // ---- derived view (ONE plain function, uniform x6) ---------------------
 // The whole render model in a single call: { totalPages, page, pages,
 // hasPrev, hasNext }. A PLAIN function (not $computed) so it reads uniformly
@@ -106,6 +123,16 @@ const model = () => paginationItems({
   siblingCount: props.siblingCount,
   boundaryCount: props.boundaryCount
 });
+// The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+// sliding by one keeps the button that was just activated, and with it keyboard
+// focus), an ellipsis marker — which has no identity — by its position. A helper
+// rather than an inline ternary: the emitters repeat the key on each r-if branch,
+// where `item` is already narrowed, and TS then rejects the comparison.
+const itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
+// A loop item that is not the ellipsis marker is a page number. The `r-if` that
+// guards the `item` slot narrows it for the compiler on some targets only (Solid's
+// <Show> is not a type guard), so state it once here instead of per target.
+const asPage = (item: any): number => item as number;
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -117,8 +144,9 @@ const currentPage = () => model().page;
 const canPrev = () => model().hasPrev;
 const canNext = () => model().hasNext;
 const isActive = (page: any) => page === currentPage();
-// Roving-tabindex value for a control: the active page is the single tab stop
-// (0), the rest are -1. The return type is annotated `number | undefined` ON
+// Roving-tabindex value for a control: the active page is a tab stop (0), the
+// other pages are -1 (arrow keys reach them). The prev/next controls always pass
+// `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
 // PURPOSE: the React emitter wraps every numeric `:attr` binding in
 // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
 // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -170,12 +198,17 @@ const focusControlAt = (idx: any) => {
 const focusedIndex = () => {
   const els = controls();
   const nav = navRef.value;
-  const active = nav ? nav.ownerDocument.activeElement : null;
+  // The focused element within the nav's OWN root (the document, or the shadow
+  // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+  // would never match a control.
+  const root = nav ? nav.getRootNode() as Document | ShadowRoot : null;
+  const active = root ? root.activeElement : null;
   return els.indexOf(active as HTMLElement);
 };
 // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-// to the ends. Each control keeps tabindex via the template (the active page is
-// 0, the rest -1) so the group is a single tab stop.
+// to the ends. Each page control keeps its tabindex via the template (the active
+// page is 0, the other pages -1), so only the active page is a tab stop among the
+// page numbers.
 const onControlKeydown = ($event: any) => {
   if (props.disabled) return;
   const key = $event.key;
@@ -204,7 +237,7 @@ const prev = () => goPrev();
 const first = () => goFirst();
 const last = () => goLast();
 
-defineExpose({ goto, next, prev, first, last });
+defineExpose({ goto, next, prev, first, last } as PaginationHandle);
 </script>
 
 <style scoped>

@@ -10,6 +10,12 @@ import { paginationItems } from './internal/paginationItems';
 // accessor divergence. Returns a FRESH object each call — never feed it to a
 // reference-equality $watch getter.
 
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+
 __rozieInjectStyle('Pagination-de247ae2', `.rozie-pagination[data-rozie-s-de247ae2] {
   display: inline-flex;
   align-items: center;
@@ -70,13 +76,13 @@ __rozieInjectStyle('Pagination-de247ae2', `.rozie-pagination[data-rozie-s-de247a
   user-select: none;
 }`);
 
-interface PrevControlSlotCtx { disabled: any; goto: any; page: any; }
+interface PrevControlSlotCtx { disabled: boolean; goto: () => void; page: number; }
 
-interface EllipsisSlotCtx { index: any; }
+interface EllipsisSlotCtx { index: number; }
 
-interface ItemSlotCtx { page: any; selected: any; goto: any; }
+interface ItemSlotCtx { page: number; selected: boolean; goto: () => void; }
 
-interface NextControlSlotCtx { disabled: any; goto: any; page: any; }
+interface NextControlSlotCtx { disabled: boolean; goto: () => void; page: number; }
 
 interface PaginationProps extends Omit<import('solid-js').ComponentProps<'nav'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'totalPages' | 'total' | 'pageSize' | 'siblingCount' | 'boundaryCount' | 'disabled' | 'ariaLabel' | 'onChange' | 'prevControlSlot' | 'ellipsisSlot' | 'itemSlot' | 'nextControlSlot' | 'slots' | 'ref' | 'children' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
@@ -113,7 +119,7 @@ interface PaginationProps extends Omit<import('solid-js').ComponentProps<'nav'>,
    * Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.
    */
   ariaLabel?: string;
-  onChange?: (...args: any[]) => void;
+  onChange?: (payload: PaginationChangePayload) => void;
   prevControlSlot?: (ctx: PrevControlSlotCtx) => JSX.Element;
   ellipsisSlot?: (ctx: EllipsisSlotCtx) => JSX.Element;
   itemSlot?: (ctx: ItemSlotCtx) => JSX.Element;
@@ -123,11 +129,11 @@ interface PaginationProps extends Omit<import('solid-js').ComponentProps<'nav'>,
 }
 
 export interface PaginationHandle {
-  goto: (...args: any[]) => any;
-  next: (...args: any[]) => any;
-  prev: (...args: any[]) => any;
-  first: (...args: any[]) => any;
-  last: (...args: any[]) => any;
+  goto: (page: number) => void;
+  next: () => void;
+  prev: () => void;
+  first: () => void;
+  last: () => void;
 }
 
 export default function Pagination(_props: PaginationProps): JSX.Element {
@@ -155,6 +161,22 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
     });
   }
 
+  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+  // sliding by one keeps the button that was just activated, and with it keyboard
+  // focus), an ellipsis marker — which has no identity — by its position. A helper
+  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
+  // where `item` is already narrowed, and TS then rejects the comparison.
+  function itemKey(item: any, index: any) {
+    return item === 'ellipsis' ? 'ellipsis-' + index : item;
+  }
+
+  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
+  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
+  // <Show> is not a type guard), so state it once here instead of per target.
+  function asPage(item: any): number {
+    return item as number;
+  }
+
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -177,8 +199,9 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
     return page === currentPage();
   }
 
-  // Roving-tabindex value for a control: the active page is the single tab stop
-  // (0), the rest are -1. The return type is annotated `number | undefined` ON
+  // Roving-tabindex value for a control: the active page is a tab stop (0), the
+  // other pages are -1 (arrow keys reach them). The prev/next controls always pass
+  // `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
   // PURPOSE: the React emitter wraps every numeric `:attr` binding in
   // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
   // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -238,13 +261,18 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
   function focusedIndex() {
     const els = controls();
     const nav = navRef;
-    const active = nav ? nav.ownerDocument.activeElement : null;
+    // The focused element within the nav's OWN root (the document, or the shadow
+    // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+    // would never match a control.
+    const root = nav ? nav.getRootNode() as Document | ShadowRoot : null;
+    const active = root ? root.activeElement : null;
     return els.indexOf(active as HTMLElement);
   }
 
   // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-  // to the ends. Each control keeps tabindex via the template (the active page is
-  // 0, the rest -1) so the group is a single tab stop.
+  // to the ends. Each page control keeps its tabindex via the template (the active
+  // page is 0, the other pages -1), so only the active page is a tab stop among the
+  // page numbers.
   function onControlKeydown($event: any) {
     if (local.disabled) return;
     const key = $event.key;
@@ -295,7 +323,7 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
         {<Show when={item === 'ellipsis'}><span class={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(_props.ellipsisSlot ?? _props.slots?.['ellipsis'])?.({ get index() { return index(); } }) ?? "…"}
         </span></Show>}{<Show when={item !== 'ellipsis'}><span class={"rozie-pagination-item"} data-rozie-s-de247ae2="">
-          {(_props.itemSlot ?? _props.slots?.['item'])?.({ get page() { return item; }, get selected() { return isActive(item); }, goto: () => goToPage(item) }) ?? <button type="button" data-page-control="" aria-disabled={!!local.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} class={"rozie-pagination-page" + " " + rozieClass({ 'is-active': isActive(item) })} tabIndex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!local.disabled} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
+          {(_props.itemSlot ?? _props.slots?.['item'])?.({ get page() { return asPage(item); }, get selected() { return isActive(item); }, goto: () => goToPage(item) }) ?? <button type="button" data-page-control="" aria-disabled={!!local.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} class={"rozie-pagination-page" + " " + rozieClass({ 'is-active': isActive(item) })} tabIndex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!local.disabled} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
         </span></Show>}</>}</For>
 
       

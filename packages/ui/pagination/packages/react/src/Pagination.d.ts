@@ -2,6 +2,12 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+
 export interface PaginationProps extends Omit<import('react').ComponentPropsWithoutRef<'nav'>, 'modelValue' | 'defaultModelValue' | 'onModelValueChange' | 'totalPages' | 'total' | 'pageSize' | 'siblingCount' | 'boundaryCount' | 'disabled' | 'ariaLabel' | 'onChange' | 'renderPrevControl' | 'renderEllipsis' | 'renderItem' | 'renderNextControl' | 'slots' | 'children' | 'dangerouslySetInnerHTML'> {
   /**
    * The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.
@@ -37,20 +43,20 @@ export interface PaginationProps extends Omit<import('react').ComponentPropsWith
    * Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.
    */
   ariaLabel?: string;
-  onChange?: (...args: any[]) => void;
-  renderPrevControl?: (params: { disabled: unknown; goto: (...args: any[]) => any; page: unknown }) => ReactNode;
-  renderEllipsis?: (params: { index: unknown }) => ReactNode;
-  renderItem?: (params: { page: unknown; selected: unknown; goto: unknown }) => ReactNode;
-  renderNextControl?: (params: { disabled: unknown; goto: (...args: any[]) => any; page: unknown }) => ReactNode;
+  onChange?: (payload: PaginationChangePayload) => void;
+  renderPrevControl?: (params: { disabled: boolean; goto: () => void; page: number }) => ReactNode;
+  renderEllipsis?: (params: { index: number }) => ReactNode;
+  renderItem?: (params: { page: number; selected: boolean; goto: () => void }) => ReactNode;
+  renderNextControl?: (params: { disabled: boolean; goto: () => void; page: number }) => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }
 
 export interface PaginationHandle {
-  goto: (...args: any[]) => any;
-  next: (...args: any[]) => any;
-  prev: (...args: any[]) => any;
-  first: (...args: any[]) => any;
-  last: (...args: any[]) => any;
+  goto: (page: number) => void;
+  next: () => void;
+  prev: () => void;
+  first: () => void;
+  last: () => void;
 }
 
 declare const Pagination: React.ForwardRefExoticComponent<PaginationProps & React.RefAttributes<PaginationHandle>>;

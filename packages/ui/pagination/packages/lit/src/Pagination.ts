@@ -12,26 +12,37 @@ import { paginationItems } from './internal/paginationItems';
 // accessor divergence. Returns a FRESH object each call — never feed it to a
 // reference-equality $watch getter.
 
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+
+export interface RoziePaginationEventMap extends Omit<HTMLElementEventMap, 'change' | 'model-value-change'> {
+  'change': CustomEvent<PaginationChangePayload>;
+  'model-value-change': CustomEvent<number>;
+}
+
 interface RoziePrevControlSlotCtx {
-  disabled: any;
-  goto: any;
-  page: any;
+  disabled: boolean;
+  goto: () => void;
+  page: number;
 }
 
 interface RozieEllipsisSlotCtx {
-  index: any;
+  index: number;
 }
 
 interface RozieItemSlotCtx {
-  page: any;
-  selected: any;
-  goto: any;
+  page: number;
+  selected: boolean;
+  goto: () => void;
 }
 
 interface RozieNextControlSlotCtx {
-  disabled: any;
-  goto: any;
-  page: any;
+  disabled: boolean;
+  goto: () => void;
+  page: number;
 }
 
 @customElement('rozie-pagination')
@@ -140,16 +151,16 @@ export default class Pagination extends SignalWatcher(LitElement) {
 
   @state() private _hasSlotPrevControl = false;
   @queryAssignedElements({ slot: 'prevControl', flatten: true }) private _slotPrevControlElements!: Element[];
-  @property({ attribute: false }) prevControl?: (scope: { disabled: any; goto: any; page: any }) => unknown;
+  @property({ attribute: false }) prevControl?: (scope: { disabled: boolean; goto: () => void; page: number }) => unknown;
   @state() private _hasSlotEllipsis = false;
   @queryAssignedElements({ slot: 'ellipsis', flatten: true }) private _slotEllipsisElements!: Element[];
-  @property({ attribute: false }) ellipsis?: (scope: { index: any }) => unknown;
+  @property({ attribute: false }) ellipsis?: (scope: { index: number }) => unknown;
   @state() private _hasSlotItem = false;
   @queryAssignedElements({ slot: 'item', flatten: true }) private _slotItemElements!: Element[];
-  @property({ attribute: false }) item?: (scope: { page: any; selected: any; goto: any }) => unknown;
+  @property({ attribute: false }) item?: (scope: { page: number; selected: boolean; goto: () => void }) => unknown;
   @state() private _hasSlotNextControl = false;
   @queryAssignedElements({ slot: 'nextControl', flatten: true }) private _slotNextControlElements!: Element[];
-  @property({ attribute: false }) nextControl?: (scope: { disabled: any; goto: any; page: any }) => unknown;
+  @property({ attribute: false }) nextControl?: (scope: { disabled: boolean; goto: () => void; page: number }) => unknown;
   // Phase 79 Plan 08 (R4) contract for 79-09: the record intake for
   // record-routed slot fills. 79-09's consumer-side emitSlotFiller
   // accumulates an object literal onto the SAME `.rozieSlots=${{ ... }}`
@@ -250,11 +261,11 @@ export default class Pagination extends SignalWatcher(LitElement) {
   </slot>`}
 
   
-  ${repeat<any>(this.model().pages, (item, index) => item + '-' + index, (item, index) => html`
+  ${repeat<any>(this.model().pages, (item, index) => this.itemKey(item, index), (item, index) => html`
     ${item === 'ellipsis' ? html`<span class="rozie-pagination-ellipsis" aria-hidden="true" data-rozie-s-de247ae2>
       ${this.ellipsis !== undefined ? this.ellipsis({index: index}) : html`<slot name="ellipsis" data-rozie-params=${(() => { try { return JSON.stringify({index: index}); } catch { return '{}'; } })()}>…</slot>`}
     </span>` : nothing}${item !== 'ellipsis' ? html`<span class="rozie-pagination-item" data-rozie-s-de247ae2>
-      ${this.item !== undefined ? this.item({page: item, selected: this.isActive(item), goto: () => this.goToPage(item)}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({page: item, selected: this.isActive(item)}); } catch { return '{}'; } })()} @rozie-item-goto=${($event: CustomEvent) => ((() => this.goToPage(item)) as (...args: any[]) => any)($event.detail)}>
+      ${this.item !== undefined ? this.item({page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item)}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({page: this.asPage(item), selected: this.isActive(item)}); } catch { return '{}'; } })()} @rozie-item-goto=${($event: CustomEvent) => ((() => this.goToPage(item)) as (...args: any[]) => any)($event.detail)}>
         <button class="${Object.entries({ "rozie-pagination-page": true, 'is-active': this.isActive(item) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-page-control="" tabindex=${rozieAttr(this.tabIndexFor(this.isActive(item)))} ?disabled=${!!this.disabled} aria-disabled=${!!this.disabled} aria-current=${rozieAttr(this.isActive(item) ? 'page' : null)} aria-label=${rozieAttr('Go to page ' + item)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.goToPage(item); }} data-rozie-s-de247ae2>${rozieDisplay(item)}</button>
       </slot>`}
     </span>` : nothing}`)}
@@ -276,6 +287,18 @@ export default class Pagination extends SignalWatcher(LitElement) {
   boundaryCount: this.boundaryCount
 });
 
+  // The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+  // sliding by one keeps the button that was just activated, and with it keyboard
+  // focus), an ellipsis marker — which has no identity — by its position. A helper
+  // rather than an inline ternary: the emitters repeat the key on each r-if branch,
+  // where `item` is already narrowed, and TS then rejects the comparison.
+  itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
+
+  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
+  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
+  // <Show> is not a type guard), so state it once here instead of per target.
+  asPage = (item: any): number => item as number;
+
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -292,8 +315,9 @@ export default class Pagination extends SignalWatcher(LitElement) {
 
   isActive = (page: any) => page === this.currentPage();
 
-  // Roving-tabindex value for a control: the active page is the single tab stop
-  // (0), the rest are -1. The return type is annotated `number | undefined` ON
+  // Roving-tabindex value for a control: the active page is a tab stop (0), the
+  // other pages are -1 (arrow keys reach them). The prev/next controls always pass
+  // `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
   // PURPOSE: the React emitter wraps every numeric `:attr` binding in
   // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
   // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -313,7 +337,7 @@ export default class Pagination extends SignalWatcher(LitElement) {
   if (target > tp) target = tp;
   if (target === this.currentPage()) return;
   this._modelValueControllable.write(target);
-  this.dispatchEvent(new CustomEvent("change", {
+  this.dispatchEvent(new CustomEvent<PaginationChangePayload>("change", {
     detail: {
       page: target
     },
@@ -357,13 +381,18 @@ export default class Pagination extends SignalWatcher(LitElement) {
   focusedIndex = () => {
   const els = this.controls();
   const nav = this._refNav;
-  const active = nav ? nav.ownerDocument.activeElement : null;
+  // The focused element within the nav's OWN root (the document, or the shadow
+  // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+  // would never match a control.
+  const root = nav ? nav.getRootNode() as Document | ShadowRoot : null;
+  const active = root ? root.activeElement : null;
   return els.indexOf(active as HTMLElement);
 };
 
   // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-  // to the ends. Each control keeps tabindex via the template (the active page is
-  // 0, the rest -1) so the group is a single tab stop.
+  // to the ends. Each page control keeps its tabindex via the template (the active
+  // page is 0, the other pages -1), so only the active page is a tab stop among the
+  // page numbers.
   onControlKeydown = ($event: any) => {
   if (this.disabled) return;
   const key = $event.key;
@@ -387,18 +416,29 @@ export default class Pagination extends SignalWatcher(LitElement) {
   // Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
   // bounds-aware steppers. None collide with an emit name (`change`) or the React
   // model setter (`setModelValue`).
-  goto = (page: any) => this.goToPage(page);
+  goto: (page: number) => void = (page: any) => this.goToPage(page);
 
-  next = () => this.goNext();
+  next: () => void = () => this.goNext();
 
-  prev = () => this.goPrev();
+  prev: () => void = () => this.goPrev();
 
-  first = () => this.goFirst();
+  first: () => void = () => this.goFirst();
 
-  last = () => this.goLast();
+  last: () => void = () => this.goLast();
 
   get modelValue(): number { return this._modelValueControllable.read(); }
   set modelValue(v: number) { this._modelValueControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RoziePaginationEventMap>(type: K, listener: (this: Pagination, ev: RoziePaginationEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RoziePaginationEventMap>(type: K, listener: (this: Pagination, ev: RoziePaginationEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

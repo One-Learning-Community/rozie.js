@@ -1,3 +1,10 @@
+<script module lang="ts">
+/** The `change` event payload: the page that was just navigated to. */
+export interface PaginationChangePayload {
+  /** The new, clamped, 1-based current page. */
+  page: number;
+}
+</script>
 <script lang="ts">
 import { applyListeners, rozieAttr, rozieDisplay } from '@rozie/runtime-svelte';
 
@@ -36,12 +43,12 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['nav']
    * Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `"Pagination"`.
    */
   ariaLabel?: string;
-  prevControl?: Snippet<[{ disabled: any; goto: any; page: any }]>;
-  ellipsis?: Snippet<[{ index: any }]>;
-  item?: Snippet<[{ page: any; selected: any; goto: any }]>;
-  nextControl?: Snippet<[{ disabled: any; goto: any; page: any }]>;
+  prevControl?: Snippet<[{ disabled: boolean; goto: () => void; page: number }]>;
+  ellipsis?: Snippet<[{ index: number }]>;
+  item?: Snippet<[{ page: number; selected: boolean; goto: () => void }]>;
+  nextControl?: Snippet<[{ disabled: boolean; goto: () => void; page: number }]>;
   snippets?: Record<string, any>;
-  onchange?: (...args: any[]) => void;
+  onchange?: (payload: PaginationChangePayload) => void;
 }
 
 let {
@@ -84,6 +91,16 @@ const model = () => paginationItems({
   siblingCount: siblingCount,
   boundaryCount: boundaryCount
 });
+// The r-for key of a page item: a page NUMBER is keyed by its value (so the window
+// sliding by one keeps the button that was just activated, and with it keyboard
+// focus), an ellipsis marker — which has no identity — by its position. A helper
+// rather than an inline ternary: the emitters repeat the key on each r-if branch,
+// where `item` is already narrowed, and TS then rejects the comparison.
+const itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
+// A loop item that is not the ellipsis marker is a page number. The `r-if` that
+// guards the `item` slot narrows it for the compiler on some targets only (Solid's
+// <Show> is not a type guard), so state it once here instead of per target.
+const asPage = (item: any): number => item as number;
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -95,8 +112,9 @@ const currentPage = () => model().page;
 const canPrev = () => model().hasPrev;
 const canNext = () => model().hasNext;
 const isActive = (page: any) => page === currentPage();
-// Roving-tabindex value for a control: the active page is the single tab stop
-// (0), the rest are -1. The return type is annotated `number | undefined` ON
+// Roving-tabindex value for a control: the active page is a tab stop (0), the
+// other pages are -1 (arrow keys reach them). The prev/next controls always pass
+// `true`, so they stay tab stops of their own. The return type is annotated `number | undefined` ON
 // PURPOSE: the React emitter wraps every numeric `:attr` binding in
 // `(expr) ?? undefined`, and a PROVABLY non-null value (a bare `0`/`-1` or a
 // `0 : -1` ternary) trips TS2869 "right operand of ?? is unreachable". Routing
@@ -148,12 +166,17 @@ const focusControlAt = (idx: any) => {
 const focusedIndex = () => {
   const els = controls();
   const nav$local = nav;
-  const active = nav$local ? nav$local.ownerDocument.activeElement : null;
+  // The focused element within the nav's OWN root (the document, or the shadow
+  // root on Lit): `ownerDocument.activeElement` stops at the shadow host there and
+  // would never match a control.
+  const root = nav$local ? nav$local.getRootNode() as Document | ShadowRoot : null;
+  const active = root ? root.activeElement : null;
   return els.indexOf(active as HTMLElement);
 };
 // Roving keyboard navigation: arrows move focus between controls, Home/End jump
-// to the ends. Each control keeps tabindex via the template (the active page is
-// 0, the rest -1) so the group is a single tab stop.
+// to the ends. Each page control keeps its tabindex via the template (the active
+// page is 0, the other pages -1), so only the active page is a tab stop among the
+// page numbers.
 const onControlKeydown = ($event: any) => {
   if (disabled) return;
   const key = $event.key;
@@ -176,14 +199,14 @@ const onControlKeydown = ($event: any) => {
 // Consumer-callable verbs. `goto` clamps; `next`/`prev`/`first`/`last` are the
 // bounds-aware steppers. None collide with an emit name (`change`) or the React
 // model setter (`setModelValue`).
-export const goto = (page: any) => goToPage(page);
-export const next = () => goNext();
-export const prev = () => goPrev();
-export const first = () => goFirst();
-export const last = () => goLast();
+export const goto: (page: number) => void = (page: any) => goToPage(page);
+export const next: () => void = () => goNext();
+export const prev: () => void = () => goPrev();
+export const first: () => void = () => goFirst();
+export const last: () => void = () => goLast();
 </script>
 
-<nav bind:this={nav} aria-label={ariaLabel} {...__rozieAttrs} class={["rozie-pagination", { 'rozie-pagination--disabled': disabled }, (__rozieAttrs)?.class]} onkeydown={($event) => { onControlKeydown($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-de247ae2>{#if prevControl}{@render prevControl({ disabled: !canPrev() || disabled, goto: goPrev, page: currentPage() - 1 })}{:else}<button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" tabindex={rozieAttr(tabIndexFor(true))} disabled={!canPrev() || disabled} aria-disabled={!!(!canPrev() || disabled)} aria-label="Previous page" onclick={goPrev} data-rozie-s-de247ae2>‹</button>{/if}{#each model().pages as item, index (item + '-' + index)}{#if item === 'ellipsis'}<span class="rozie-pagination-ellipsis" aria-hidden="true" data-rozie-s-de247ae2>{#if ellipsis}{@render ellipsis({ index })}{:else}…{/if}</span>{/if}{#if item !== 'ellipsis'}<span class="rozie-pagination-item" data-rozie-s-de247ae2>{#if item$$slot}{@render item$$slot({ page: item, selected: isActive(item), goto: () => goToPage(item) })}{:else}<button type="button" class={["rozie-pagination-page", { 'is-active': isActive(item) }]} data-page-control="" tabindex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!disabled} aria-disabled={!!disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} onclick={($event) => { goToPage(item); }} data-rozie-s-de247ae2>{rozieDisplay(item)}</button>{/if}</span>{/if}{/each}{#if nextControl}{@render nextControl({ disabled: !canNext() || disabled, goto: goNext, page: currentPage() + 1 })}{:else}<button type="button" class="rozie-pagination-control rozie-pagination-next" data-page-control="" tabindex={rozieAttr(tabIndexFor(true))} disabled={!canNext() || disabled} aria-disabled={!!(!canNext() || disabled)} aria-label="Next page" onclick={goNext} data-rozie-s-de247ae2>›</button>{/if}</nav>
+<nav bind:this={nav} aria-label={ariaLabel} {...__rozieAttrs} class={["rozie-pagination", { 'rozie-pagination--disabled': disabled }, (__rozieAttrs)?.class]} onkeydown={($event) => { onControlKeydown($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-de247ae2>{#if prevControl}{@render prevControl({ disabled: !canPrev() || disabled, goto: goPrev, page: currentPage() - 1 })}{:else}<button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" tabindex={rozieAttr(tabIndexFor(true))} disabled={!canPrev() || disabled} aria-disabled={!!(!canPrev() || disabled)} aria-label="Previous page" onclick={goPrev} data-rozie-s-de247ae2>‹</button>{/if}{#each model().pages as item, index (itemKey(item, index))}{#if item === 'ellipsis'}<span class="rozie-pagination-ellipsis" aria-hidden="true" data-rozie-s-de247ae2>{#if ellipsis}{@render ellipsis({ index })}{:else}…{/if}</span>{/if}{#if item !== 'ellipsis'}<span class="rozie-pagination-item" data-rozie-s-de247ae2>{#if item$$slot}{@render item$$slot({ page: asPage(item), selected: isActive(item), goto: () => goToPage(item) })}{:else}<button type="button" class={["rozie-pagination-page", { 'is-active': isActive(item) }]} data-page-control="" tabindex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!disabled} aria-disabled={!!disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} onclick={($event) => { goToPage(item); }} data-rozie-s-de247ae2>{rozieDisplay(item)}</button>{/if}</span>{/if}{/each}{#if nextControl}{@render nextControl({ disabled: !canNext() || disabled, goto: goNext, page: currentPage() + 1 })}{:else}<button type="button" class="rozie-pagination-control rozie-pagination-next" data-page-control="" tabindex={rozieAttr(tabIndexFor(true))} disabled={!canNext() || disabled} aria-disabled={!!(!canNext() || disabled)} aria-label="Next page" onclick={goNext} data-rozie-s-de247ae2>›</button>{/if}</nav>
 
 <style>
 :global {

@@ -1,0 +1,157 @@
+<!--
+  PaginationSurfaceDemo — VR behavioral cell for the parts of @rozie-ui/pagination's
+  surface that PaginationBehaviorDemo does not reach: the imperative handle
+  (goto clamps / first / last / next / prev), `change` firing rules, windowing via
+  siblingCount / boundaryCount, the `total` + `pageSize` page-count source,
+  `disabled`, the four scoped slots with their params, and roving keyboard focus.
+  See pagination-surface.spec.ts. Behavioral-only (no pixel baseline).
+
+  A separate demo (rather than extra pagers inside PaginationBehaviorDemo) because
+  pagination.spec.ts addresses its pager with page-wide locators
+  (`[aria-current="page"]`, "Go to page 5"), which a second pager would break.
+-->
+<rozie name="PaginationSurfaceDemo">
+
+<components>
+{
+  Pagination: '../../packages/ui/pagination/src/Pagination.rozie',
+}
+</components>
+
+<data>
+{
+  pageA: 10,
+  changesA: 0,
+  lastChangeA: '',
+  pageB: 5,
+  pageC: 3,
+  changesC: 0,
+  pageD: 5,
+  pageE: 1,
+}
+</data>
+
+<script>
+const onChangeA = (p) => {
+  // The @emit payload arrives as arg0 directly on all 6 targets (playbook §5).
+  $data.changesA = $data.changesA + 1
+  $data.lastChangeA = p && p.page != null ? String(p.page) : ''
+}
+const onChangeC = () => {
+  $data.changesC = $data.changesC + 1
+}
+// Handle verbs, driven from OUTSIDE the pager.
+const gotoFar = () => {
+  $refs.pgA.goto(999)
+}
+const gotoZero = () => {
+  $refs.pgA.goto(0)
+}
+const gotoSame = () => {
+  $refs.pgA.goto($data.pageA)
+}
+const goFirst = () => {
+  $refs.pgA.first()
+}
+const goLast = () => {
+  $refs.pgA.last()
+}
+const goNext = () => {
+  $refs.pgA.next()
+}
+const goPrev = () => {
+  $refs.pgA.prev()
+}
+const pageAText = () => String($data.pageA)
+const pageDText = () => String($data.pageD)
+</script>
+
+<template>
+<div class="pagination-surface">
+  <h3>Pagination — surface</h3>
+
+  <!-- A: 195 items / 10 per page = 20 pages (the page count comes from total +
+       pageSize), default sibling/boundary windowing, driven through the handle. -->
+  <div class="controls">
+    <span class="readout" data-testid="a-page">{{ pageAText() }}</span>
+    <span class="readout" data-testid="a-change-count">{{ String($data.changesA) }}</span>
+    <span class="readout" data-testid="a-last-change">{{ $data.lastChangeA }}</span>
+    <button type="button" data-testid="a-goto-far" @click="gotoFar()">goto(999)</button>
+    <button type="button" data-testid="a-goto-zero" @click="gotoZero()">goto(0)</button>
+    <button type="button" data-testid="a-goto-same" @click="gotoSame()">goto(current)</button>
+    <button type="button" data-testid="a-first" @click="goFirst()">first()</button>
+    <button type="button" data-testid="a-last" @click="goLast()">last()</button>
+    <button type="button" data-testid="a-next" @click="goNext()">next()</button>
+    <button type="button" data-testid="a-prev" @click="goPrev()">prev()</button>
+  </div>
+  <Pagination
+    ref="pgA"
+    r-model:modelValue="$data.pageA"
+    :total="195"
+    :pageSize="10"
+    ariaLabel="Pager A"
+    @change="onChangeA($event)"
+  />
+
+  <!-- B: siblingCount 0 + boundaryCount 2 over 10 pages, at page 5 -> 1 2 … 5 … 9 10 -->
+  <Pagination
+    r-model:modelValue="$data.pageB"
+    :totalPages="10"
+    :siblingCount="0"
+    :boundaryCount="2"
+    ariaLabel="Pager B"
+  />
+
+  <!-- C: disabled -->
+  <span class="readout" data-testid="c-change-count">{{ String($data.changesC) }}</span>
+  <Pagination
+    r-model:modelValue="$data.pageC"
+    :totalPages="5"
+    :disabled="true"
+    ariaLabel="Pager C"
+    @change="onChangeC()"
+  />
+
+  <!-- D: all four scoped slots with their params -->
+  <span class="readout" data-testid="d-page">{{ pageDText() }}</span>
+  <Pagination r-model:modelValue="$data.pageD" :totalPages="10" ariaLabel="Pager D">
+    <template #item="{ page, selected, goto }">
+      <button type="button" data-testid="slot-item" :data-page="page" :data-selected="selected ? 'yes' : 'no'" @click="goto()">p{{ page }}</button>
+    </template>
+    <template #ellipsis="{ index }">
+      <i data-testid="slot-ellipsis">~{{ index }}</i>
+    </template>
+    <template #prevControl="{ disabled, goto, page }">
+      <button type="button" data-testid="slot-prev" :data-target="page" :disabled="disabled" @click="goto()">prev{{ page }}</button>
+    </template>
+    <template #nextControl="{ disabled, goto, page }">
+      <button type="button" data-testid="slot-next" :data-target="page" :disabled="disabled" @click="goto()">next{{ page }}</button>
+    </template>
+  </Pagination>
+
+  <!-- E: single-page pager (page count floors at 1) -->
+  <Pagination r-model:modelValue="$data.pageE" :totalPages="1" ariaLabel="Pager E" />
+</div>
+</template>
+
+<style>
+.pagination-surface {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 720px;
+}
+.pagination-surface .controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+.pagination-surface .readout {
+  font-variant-numeric: tabular-nums;
+  min-width: 2ch;
+}
+</style>
+
+</rozie>
