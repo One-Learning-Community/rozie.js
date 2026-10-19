@@ -7,7 +7,7 @@ export interface DialogClosePayload {
 }
 </script>
 <script lang="ts">
-import { applyListeners } from '@rozie/runtime-svelte';
+import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onDestroy, onMount, untrack } from 'svelte';
@@ -42,7 +42,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['dialo
    */
   ariaLabel?: (string) | null;
   /**
-   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
+   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.
    */
   ariaLabelledby?: (string) | null;
   children?: Snippet;
@@ -78,6 +78,11 @@ let holdsLock = false;
 // The element focused when the dialog opened, for the unmount-while-open
 // focus return (a normal close gets the native return from close()).
 let returnFocusTo: HTMLElement | null = null;
+// Whether the press that is about to produce a `click` began INSIDE the panel.
+// A press that starts on content (selecting text, a drag) and is released over
+// the scrim yields a `click` whose target is the common ancestor, the <dialog>
+// itself; without this it would be mistaken for a backdrop click.
+let pressStartedInside = false;
 // Lock/unlock <html> scroll for this instance. The actual lock/unlock is
 // REF-COUNTED (./internal/scrollLock) across every Dialog instance sharing this
 // leaf's module, because a naive per-instance toggle unlocks scrolling the
@@ -120,6 +125,22 @@ const focusInitial = (panel: any) => {
   }
   if (node && typeof node.focus === 'function') node.focus();
 };
+// `aria-labelledby` is an IDREF, and an IDREF never crosses a shadow-root
+// boundary. Where the <dialog> lives inside an element's shadow root (the Lit
+// target) the heading it names is slotted LIGHT DOM, so the attribute resolves to
+// nothing and the dialog has no accessible name. Element reflection can point
+// across the boundary (to an element in an ancestor tree), so when the id is not
+// reachable from the dialog's own root, hand the browser the element directly.
+// A no-op outside a shadow root, and where the browser lacks the property.
+const bridgeLabelledBy = (el: any) => {
+  const id = ariaLabelledby;
+  const root: any = el.getRootNode();
+  if (!id || !root || !root.host || typeof root.getElementById !== 'function') return;
+  if (root.getElementById(id) || !('ariaLabelledByElements' in el)) return;
+  const outer: any = root.host.getRootNode();
+  const heading = outer && typeof outer.getElementById === 'function' ? outer.getElementById(id) : null;
+  if (heading) el.ariaLabelledByElements = [heading];
+};
 // Reconcile the native <dialog> to the desired open state. Guarded on the
 // native `el.open` flag (showModal throws if already open; close is a no-op when
 // closed). Reads $refs in a post-mount callback (ROZ123-safe).
@@ -139,6 +160,7 @@ const sync = (isOpen: any) => {
     if (!el.open) {
       const active = deepActiveElement();
       returnFocusTo = active instanceof HTMLElement ? active : null;
+      bridgeLabelledBy(el);
       el.showModal();
       focusInitial(panel);
     }
@@ -164,24 +186,50 @@ const onCancel = (e: any) => {
   if (disableEscapeClose) return;
   closeWith('escape');
 };
+// Remember whether a press began on the panel's content (anywhere but the
+// <dialog> box itself), so the `click` that follows can tell a real scrim click
+// from the end of a drag that merely finished over the scrim.
+const onPointerDown = (e: any) => {
+  const panel = panelEl;
+  const el = panel && panel.parentElement;
+  pressStartedInside = !!(e && el && e.target !== el);
+};
 // A click whose target IS the <dialog> element (not its panel/children) is a
 // backdrop click — the ::backdrop is part of the dialog box. We compare the
 // real `e.target` (reliable even under Solid's event delegation) to the dialog
-// element resolved via the panel ref's parent.
+// element resolved via the panel ref's parent. A click whose press started
+// inside the panel is not one (see `pressStartedInside`).
 const onClick = (e: any) => {
-  if (disableBackdropClose) return;
+  const startedInside = pressStartedInside;
+  pressStartedInside = false;
+  if (disableBackdropClose || startedInside) return;
   const panel = panelEl;
   const el = panel && panel.parentElement;
   if (e && el && e.target === el) closeWith('backdrop');
+};
+// The native `close` event: fired by `el.close()` from our own reconcile (by then
+// the model is already false, and the dialog may even have been re-opened), but
+// also by closes WE did not drive — a `<form method="dialog">` submit, a stray
+// `dialog.close()`. For those the model is still true over a closed dialog and
+// would stay stuck (writing `open = true` again changes nothing), so fold them
+// into the close funnel. Not during teardown: $onUnmount closes the dialog
+// itself after clearing `dialogEl`.
+const onNativeClose = () => {
+  const el = dialogEl;
+  if (!el || el.open || !open) return;
+  closeWith('programmatic');
 };
 
 // ---- lifecycle ---------------------------------------------------------
 // ---- imperative handle -------------------------------------------------
 // show()/hide() — named to avoid the `open` model + `@close` event collisions.
-export const show = () => {
+// hide() on a dialog that is not open is a no-op: there is nothing to dismiss, so
+// it must not emit a `close` for a dismissal that never happened.
+export const show: () => void = () => {
   open = true;
 };
-export const hide = () => {
+export const hide: () => void = () => {
+  if (!open) return;
   closeWith('programmatic');
 };
 
@@ -195,6 +243,7 @@ onMount(() => {
 });
 onDestroy(() => (() => {
   setScrollLock(false);
+  pressStartedInside = false;
   const el = dialogEl;
   const back = returnFocusTo;
   dialogEl = null;
@@ -213,7 +262,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<dialog aria-label={ariaLabel} aria-labelledby={ariaLabelledby} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
+<dialog aria-label={rozieAttr(ariaLabel ?? undefined)} aria-labelledby={rozieAttr(ariaLabelledby ?? undefined)} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclose={($event) => { onNativeClose(); }} onpointerdown={($event) => { onPointerDown($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
 
 <style>
 :global {

@@ -3,9 +3,13 @@
 // Two test surfaces:
 //   • tests/surface.test.ts — the Dialog.rozie compile()/lowerToIR surface gate
 //     (the same contract scripts/compile-dialog-check.mjs checks), so a drift in
-//     the 6-prop / 1-model / 1-emit / 1-slot / 2-expose surface or a new
-//     compile() error fails the test gate under `turbo run test`, not just the
-//     standalone script.
+//     the props / model / emits / slots / expose surface its EXPECT block pins, or
+//     a new compile() error, fails the test gate under `turbo run test`, not just
+//     the standalone script.
+//   • tests/typed-events.test.ts — the compiled `close` payload type on every target.
+//   • tests/sidecars.test.ts — the IDE sidecars (Vue web-types.json, Lit
+//     custom-elements.json): version lockstep with the leaf, package.json wiring,
+//     and component coverage.
 //   • src/internal/scrollLock.test.ts — the ref-counted scroll-lock unit tests
 //     (a duck-typed `document` stub, no real DOM needed).
 //

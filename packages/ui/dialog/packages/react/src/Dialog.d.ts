@@ -41,7 +41,7 @@ export interface DialogProps extends Omit<import('react').ComponentPropsWithoutR
    */
   ariaLabel?: (string) | null;
   /**
-   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
+   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.
    */
   ariaLabelledby?: (string) | null;
   onClose?: (payload: DialogClosePayload) => void;
@@ -50,8 +50,8 @@ export interface DialogProps extends Omit<import('react').ComponentPropsWithoutR
 }
 
 export interface DialogHandle {
-  show: (...args: any[]) => any;
-  hide: (...args: any[]) => any;
+  show: () => void;
+  hide: () => void;
 }
 
 declare const Dialog: React.ForwardRefExoticComponent<DialogProps & React.RefAttributes<DialogHandle>>;

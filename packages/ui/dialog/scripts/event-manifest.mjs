@@ -10,7 +10,7 @@
  */
 export const eventManifest = {
   close:
-    'Fired whenever the dialog dismisses — through a backdrop click, the Escape key, or a programmatic `hide()`. Payload `{ reason }` where `reason` is `\'backdrop\'`, `\'escape\'`, or `\'programmatic\'`. The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel).',
+    'Fired whenever the dialog dismisses — through a backdrop click, the Escape key, a programmatic `hide()`, or a native close that did not go through the component (such as a `<form method="dialog">` submit). Payload `{ reason }` where `reason` is `\'backdrop\'`, `\'escape\'`, or `\'programmatic\'` (the last covers `hide()` and any native close). The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel).',
 };
 
 export default eventManifest;

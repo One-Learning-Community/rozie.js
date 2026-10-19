@@ -11,6 +11,7 @@
 <components>
 {
   Dialog: '../../packages/ui/dialog/src/Dialog.rozie',
+  Popover: '../../packages/ui/popover/src/Popover.rozie',
 }
 </components>
 
@@ -20,6 +21,14 @@
   lastReason: '',
   removableMounted: false,
   removableOpen: false,
+  noBackdrop: false,
+  noEscape: false,
+  noLock: false,
+  closeCount: 0,
+  popOpen: false,
+  titledOpen: false,
+  focusOpen: false,
+  focusEl: null,
 }
 </data>
 
@@ -49,6 +58,40 @@ const removeIt = () => {
 }
 const onClose = (e) => {
   $data.lastReason = e && e.reason != null ? e.reason : ''
+  $data.closeCount = $data.closeCount + 1
+}
+// Opt-out toggles live OUTSIDE the modal (clickable only while it is closed).
+const toggleBackdrop = () => {
+  $data.noBackdrop = !$data.noBackdrop
+}
+const toggleEscape = () => {
+  $data.noEscape = !$data.noEscape
+}
+const toggleLock = () => {
+  $data.noLock = !$data.noLock
+}
+// show()/hide() through the handle from OUTSIDE the modal: show() while closed
+// opens it; hide() while closed must be a no-op (no phantom `close`).
+const showViaHandle = () => {
+  $refs.dlg.show()
+}
+const hideWhileClosed = () => {
+  $refs.dlg.hide()
+}
+const openTitled = () => {
+  $data.titledOpen = true
+}
+const closeTitled = () => {
+  $data.titledOpen = false
+}
+// initialFocus as an ELEMENT (not a selector): the target is read from $refs in a
+// handler (post-mount) and handed to the prop.
+const openFocusEl = () => {
+  $data.focusEl = $refs.focusTarget
+  $data.focusOpen = true
+}
+const closeFocusEl = () => {
+  $data.focusOpen = false
 }
 </script>
 
@@ -60,17 +103,59 @@ const onClose = (e) => {
     <button type="button" data-testid="open-dialog" @click="openIt()">Open</button>
     <span class="readout" data-testid="readout-open">{{ String($data.open) }}</span>
     <span class="readout" data-testid="readout-reason">{{ $data.lastReason }}</span>
+    <span class="readout" data-testid="readout-close-count">{{ String($data.closeCount) }}</span>
   </div>
 
-  <Dialog ref="dlg" r-model:open="$data.open" ariaLabel="Demo dialog" @close="onClose($event)">
+  <div class="controls">
+    <button type="button" data-testid="toggle-no-backdrop" @click="toggleBackdrop()">Toggle disableBackdropClose</button>
+    <button type="button" data-testid="toggle-no-escape" @click="toggleEscape()">Toggle disableEscapeClose</button>
+    <button type="button" data-testid="toggle-no-lock" @click="toggleLock()">Toggle disableScrollLock</button>
+    <button type="button" data-testid="show-dialog" @click="showViaHandle()">show()</button>
+    <button type="button" data-testid="hide-closed" @click="hideWhileClosed()">hide() while closed</button>
+  </div>
+
+  <Dialog
+    ref="dlg"
+    r-model:open="$data.open"
+    ariaLabel="Demo dialog"
+    :disableBackdropClose="$data.noBackdrop"
+    :disableEscapeClose="$data.noEscape"
+    :disableScrollLock="$data.noLock"
+    @close="onClose($event)"
+  >
     <h2>Confirm</h2>
     <p data-testid="dialog-body">Dialog content is visible.</p>
+    <!-- A native <form method="dialog"> closes the <dialog> WITHOUT going through
+         the component's close funnel: the model must still follow. -->
+    <form method="dialog">
+      <button type="submit" data-testid="form-close">Done (form)</button>
+    </form>
+    <!-- A Popover inside the top-layer modal: its panel must paint above the scrim. -->
+    <Popover r-model:open="$data.popOpen" trigger="click" placement="bottom" :offset="8">
+      <template #anchor>
+        <button type="button" data-testid="dlg-popover-anchor">More</button>
+      </template>
+      <div data-testid="dlg-popover-content">Popover inside a dialog</div>
+    </Popover>
     <!-- Both buttons live INSIDE the dialog: a modal <dialog> makes the rest of
          the page inert, so controls outside it can't be clicked while open.
          close-dialog = consumer model-write close (no emit); hide-dialog = the
          $expose hide() handle (emits @close reason 'programmatic'). -->
     <button type="button" data-testid="hide-dialog" @click="hideViaHandle()">Hide</button>
     <button type="button" data-testid="close-dialog" @click="closeIt()">Close</button>
+  </Dialog>
+
+  <button type="button" data-testid="open-titled" @click="openTitled()">Open titled</button>
+  <Dialog r-model:open="$data.titledOpen" ariaLabelledby="titled-heading">
+    <h2 id="titled-heading" data-testid="titled-heading">Titled dialog</h2>
+    <button type="button" data-testid="close-titled" @click="closeTitled()">Close titled</button>
+  </Dialog>
+
+  <button type="button" data-testid="open-focus-el" @click="openFocusEl()">Open focus-element</button>
+  <Dialog r-model:open="$data.focusOpen" ariaLabel="Focus element dialog" :initialFocus="$data.focusEl">
+    <input type="text" data-testid="focus-first" aria-label="First field" />
+    <input type="text" data-testid="focus-target" ref="focusTarget" aria-label="Target field" />
+    <button type="button" data-testid="close-focus" @click="closeFocusEl()">Close focus-element</button>
   </Dialog>
 
   <button type="button" data-testid="open-removable" @click="openRemovable()">Open removable</button>
@@ -92,7 +177,9 @@ const onClose = (e) => {
 .dialog-demo .controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
+  margin-bottom: 0.5rem;
 }
 .dialog-demo .readout {
   min-width: 4ch;

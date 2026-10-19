@@ -20,7 +20,7 @@ export const handleManifest = {
   show:
     'Open the dialog imperatively (sets the two-way `open` model to `true`). Equivalent to a consumer write of `open = true`; the native `<dialog>.showModal()` runs on the next reconcile.',
   hide:
-    'Close the dialog imperatively. Sets `open` to `false` and emits `close` with `{ reason: \'programmatic\' }`.',
+    'Close the dialog imperatively. Sets `open` to `false` and emits `close` with `{ reason: \'programmatic\' }`. A no-op when the dialog is not open (nothing is dismissed, so no `close` is emitted).',
 };
 
 export default handleManifest;

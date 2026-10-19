@@ -155,4 +155,247 @@ for (const target of TARGETS) {
     await expect(page.getByTestId('dialog-body')).toBeVisible({ timeout: 10_000 });
     await expect.poll(overflow, { timeout: 10_000 }).toBe('hidden');
   });
+
+  // ---- Surface coverage (quick 261018-vdu): every close path, every opt-out, ----
+  // ---- the verbs, the a11y wiring, and the interplay with a nested Popover.   ----
+  const text = async (loc: import('@playwright/test').Locator) => (await loc.textContent())?.trim() ?? '';
+  const settle = (page: import('@playwright/test').Page) => page.waitForTimeout(350);
+
+  runner(`dialog [${target}]: backdrop click closes with reason 'backdrop'; Escape closes with reason 'escape'; a click inside the panel does not close`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const body = page.getByTestId('dialog-body');
+    const reason = page.getByTestId('readout-reason');
+    const count = page.getByTestId('readout-close-count');
+
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+
+    // A click on the panel content is NOT a backdrop click.
+    await body.click();
+    await settle(page);
+    await expect(body).toBeVisible();
+    expect(await text(count)).toBe('0');
+
+    // A click on the scrim (the <dialog> box itself) closes with 'backdrop'.
+    await page.mouse.click(5, 5);
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('backdrop');
+    expect(await text(count)).toBe('1');
+
+    // Escape (focus inside the modal) closes with 'escape'.
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('close-dialog').focus();
+    await page.keyboard.press('Escape');
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('escape');
+    expect(await text(count)).toBe('2');
+  });
+
+  runner(`dialog [${target}]: disableBackdropClose / disableEscapeClose keep the dialog open`, async ({ page }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const body = page.getByTestId('dialog-body');
+    const reason = page.getByTestId('readout-reason');
+    const count = page.getByTestId('readout-close-count');
+
+    // disableBackdropClose: the scrim click is ignored, Escape still closes.
+    await page.getByTestId('toggle-no-backdrop').click();
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await page.mouse.click(5, 5);
+    await settle(page);
+    await expect(body).toBeVisible();
+    expect(await text(count)).toBe('0');
+    await page.getByTestId('close-dialog').focus();
+    await page.keyboard.press('Escape');
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('escape');
+
+    // disableEscapeClose: Escape is ignored, the scrim click closes.
+    await page.getByTestId('toggle-no-backdrop').click(); // back to default
+    await page.getByTestId('toggle-no-escape').click();
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('close-dialog').focus();
+    await page.keyboard.press('Escape');
+    await settle(page);
+    await expect(body).toBeVisible();
+    expect(await text(count)).toBe('1');
+    await page.mouse.click(5, 5);
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('backdrop');
+  });
+
+  runner(`dialog [${target}]: disableScrollLock leaves <html> scrollable while open`, async ({ page }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const overflow = () => page.evaluate(() => document.documentElement.style.overflow);
+    const body = page.getByTestId('dialog-body');
+
+    await page.getByTestId('toggle-no-lock').click();
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await settle(page);
+    expect(await overflow()).toBe('');
+    await page.getByTestId('close-dialog').click();
+    await expect(body).toBeHidden({ timeout: 10_000 });
+
+    await page.getByTestId('toggle-no-lock').click(); // back to the default (locking)
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await expect.poll(overflow, { timeout: 10_000 }).toBe('hidden');
+    await page.getByTestId('close-dialog').click();
+    await expect.poll(overflow, { timeout: 10_000 }).toBe('');
+  });
+
+  // A press that STARTS inside the panel (selecting text, a drag) and is released
+  // over the scrim produces a `click` whose target is the common ancestor — the
+  // <dialog> itself. It must not be treated as a backdrop click.
+  runner(`dialog [${target}]: a press that starts inside the panel and ends on the scrim does not close it`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const body = page.getByTestId('dialog-body');
+    const count = page.getByTestId('readout-close-count');
+
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    const box = await body.boundingBox();
+    await page.mouse.move(box!.x + 5, box!.y + 5);
+    await page.mouse.down();
+    await page.mouse.move(5, 5, { steps: 6 });
+    await page.mouse.up();
+    await settle(page);
+    await expect(body).toBeVisible();
+    expect(await text(count)).toBe('0');
+
+    // ...and a genuine scrim click afterwards still closes it.
+    await page.mouse.click(5, 5);
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    expect(await text(count)).toBe('1');
+  });
+
+  // A native close that does not go through the component's close funnel (a
+  // <form method="dialog"> inside the panel) must bring the `open` model along,
+  // report a `close`, and leave the dialog re-openable.
+  runner(`dialog [${target}]: a native <form method="dialog"> close resyncs the open model and the dialog can reopen`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const body = page.getByTestId('dialog-body');
+    const open = page.getByTestId('readout-open');
+    const reason = page.getByTestId('readout-reason');
+    const count = page.getByTestId('readout-close-count');
+
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    if (target === 'lit') {
+      // On Lit the <dialog> sits in the element's shadow root and the slotted <form> is
+      // light DOM: a form closes its nearest ANCESTOR dialog in the DOM tree, so the
+      // submit has no dialog to close (a platform limit). Close the native dialog directly
+      // instead, which is the same unrouted native close.
+      await page.locator('dialog[aria-label="Demo dialog"]').evaluate((d) => (d as HTMLDialogElement).close());
+    } else {
+      await page.getByTestId('form-close').click();
+    }
+    await expect(body).toBeHidden({ timeout: 10_000 });
+    await expect.poll(() => text(open), { timeout: 10_000 }).toBe('false');
+    await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('programmatic');
+    expect(await text(count)).toBe('1');
+
+    await page.getByTestId('open-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => text(open), { timeout: 10_000 }).toBe('true');
+  });
+
+  runner(`dialog [${target}]: show() opens through the handle; hide() on a closed dialog is a no-op (no phantom close)`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    const body = page.getByTestId('dialog-body');
+    const reason = page.getByTestId('readout-reason');
+    const count = page.getByTestId('readout-close-count');
+
+    await page.getByTestId('hide-closed').click();
+    await settle(page);
+    expect(await text(count)).toBe('0');
+    expect(await text(reason)).toBe('');
+
+    await page.getByTestId('show-dialog').click();
+    await expect(body).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => text(page.getByTestId('readout-open')), { timeout: 10_000 }).toBe('true');
+  });
+
+  runner(`dialog [${target}]: ariaLabel / ariaLabelledby reach the <dialog> (and give it an accessible name); a null one is dropped`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    // ariaLabel only: aria-label present, aria-labelledby absent.
+    const labelled = page.locator('dialog[aria-label="Demo dialog"]');
+    await expect(labelled).toHaveCount(1);
+    await expect(labelled).not.toHaveAttribute('aria-labelledby', /.*/);
+
+    // ariaLabelledby only: aria-labelledby present, aria-label absent.
+    const titled = page.locator('dialog[aria-labelledby="titled-heading"]');
+    await expect(titled).toHaveCount(1);
+    await expect(titled).not.toHaveAttribute('aria-label', /.*/);
+
+    // The accessible name comes out of the browser's own accessibility tree.
+    await page.getByTestId('open-titled').click();
+    await expect(page.getByTestId('titled-heading')).toBeVisible({ timeout: 10_000 });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Accessibility.enable');
+    const { nodes } = await cdp.send('Accessibility.getFullAXTree');
+    const names = nodes
+      .filter((n: any) => n.role?.value === 'dialog' && !n.ignored)
+      .map((n: any) => n.name?.value);
+    expect(names).toContain('Titled dialog');
+  });
+
+  runner(`dialog [${target}]: initialFocus accepts an Element; focus returns to the opener on a normal close`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+
+    await page.getByTestId('open-focus-el').click();
+    await expect(page.getByTestId('focus-target')).toBeFocused({ timeout: 10_000 });
+    await page.getByTestId('close-focus').click();
+    await expect(page.getByTestId('focus-target')).toBeHidden({ timeout: 10_000 });
+    await expect(page.getByTestId('open-focus-el')).toBeFocused({ timeout: 10_000 });
+
+    const opener = page.getByTestId('open-dialog');
+    await opener.click();
+    await expect(page.getByTestId('dialog-body')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('close-dialog').click();
+    await expect(page.getByTestId('dialog-body')).toBeHidden({ timeout: 10_000 });
+    await expect(opener).toBeFocused({ timeout: 10_000 });
+  });
+
+  // Interplay: a Popover placed inside the modal. showModal() promotes the dialog to
+  // the top layer; the popover panel lives in the dialog's subtree, so it must paint
+  // above the scrim and receive pointer events (a trial click proves the hit target).
+  runner(`dialog [${target}]: a Popover opened inside the modal is painted above the scrim and hit-testable`, async ({
+    page,
+  }) => {
+    await page.goto(`/?example=DialogBehavior&target=${target}`);
+    await expect(page.getByTestId('rozie-mount')).toBeVisible();
+    await page.getByTestId('open-dialog').click();
+    await expect(page.getByTestId('dialog-body')).toBeVisible({ timeout: 10_000 });
+    await page.getByTestId('dlg-popover-anchor').click();
+    const content = page.getByTestId('dlg-popover-content');
+    await expect(content).toBeVisible({ timeout: 10_000 });
+    await content.click({ trial: true, timeout: 5_000 });
+    // The dialog is still open (the popover did not close it).
+    await expect(page.getByTestId('dialog-body')).toBeVisible();
+  });
 }

@@ -48,7 +48,7 @@ interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dia
    */
   ariaLabel?: (string) | null;
   /**
-   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog.
+   * The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.
    */
   ariaLabelledby?: (string) | null;
   onClose?: (payload: DialogClosePayload) => void;
@@ -57,8 +57,8 @@ interface DialogProps extends Omit<import('react').ComponentPropsWithoutRef<'dia
 }
 
 export interface DialogHandle {
-  show: (...args: any[]) => any;
-  hide: (...args: any[]) => any;
+  show: () => void;
+  hide: () => void;
 }
 
 const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: DialogProps, ref): JSX.Element {
@@ -79,6 +79,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   const dialogEl = useRef<HTMLDialogElement | null>(null);
   const returnFocusTo = useRef<HTMLElement | null>(null);
   const holdsLock = useRef(false);
+  const pressStartedInside = useRef(false);
   const [open, setOpen] = useControllableState({
     value: props.open,
     defaultValue: props.defaultOpen ?? false,
@@ -89,6 +90,10 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   const panelEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
 
+  // Whether the press that is about to produce a `click` began INSIDE the panel.
+  // A press that starts on content (selecting text, a drag) and is released over
+  // the scrim yields a `click` whose target is the common ancestor, the <dialog>
+  // itself; without this it would be mistaken for a backdrop click.
   // The element focused when the dialog opened, for the unmount-while-open
   // focus return (a normal close gets the native return from close()).
   // Whether THIS instance currently holds one count of the shared scroll lock.
@@ -138,6 +143,23 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     if (node && typeof node.focus === 'function') node.focus();
   }
 
+  // `aria-labelledby` is an IDREF, and an IDREF never crosses a shadow-root
+  // boundary. Where the <dialog> lives inside an element's shadow root (the Lit
+  // target) the heading it names is slotted LIGHT DOM, so the attribute resolves to
+  // nothing and the dialog has no accessible name. Element reflection can point
+  // across the boundary (to an element in an ancestor tree), so when the id is not
+  // reachable from the dialog's own root, hand the browser the element directly.
+  // A no-op outside a shadow root, and where the browser lacks the property.
+  function bridgeLabelledBy(el: any) {
+    const id = props.ariaLabelledby;
+    const root: any = el.getRootNode();
+    if (!id || !root || !root.host || typeof root.getElementById !== 'function') return;
+    if (root.getElementById(id) || !('ariaLabelledByElements' in el)) return;
+    const outer: any = root.host.getRootNode();
+    const heading = outer && typeof outer.getElementById === 'function' ? outer.getElementById(id) : null;
+    if (heading) el.ariaLabelledByElements = [heading];
+  }
+
   // Reconcile the native <dialog> to the desired open state. Guarded on the
   // native `el.open` flag (showModal throws if already open; close is a no-op when
   // closed). Reads $refs in a post-mount callback (ROZ123-safe).
@@ -157,6 +179,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
       if (!el.open) {
         const active = deepActiveElement();
         returnFocusTo.current = active instanceof HTMLElement ? active : null;
+        bridgeLabelledBy(el);
         el.showModal();
         focusInitial(panel);
       }
@@ -166,7 +189,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
       returnFocusTo.current = null;
       setScrollLock(false);
     }
-  }, [deepActiveElement, focusInitial, setScrollLock]);
+  }, [bridgeLabelledBy, deepActiveElement, focusInitial, setScrollLock]);
   // ---- close funnel (single $emit site) ----------------------------------
   function closeWith(reason: any) {
     setOpen(false);
@@ -183,23 +206,49 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     if (props.disableEscapeClose) return;
     closeWith('escape');
   }, [closeWith, props.disableEscapeClose]);
+  // Remember whether a press began on the panel's content (anywhere but the
+  // <dialog> box itself), so the `click` that follows can tell a real scrim click
+  // from the end of a drag that merely finished over the scrim.
+  const onPointerDown = useCallback((e: any) => {
+    const panel = panelEl.current;
+    const el = panel && panel.parentElement;
+    pressStartedInside.current = !!(e && el && e.target !== el);
+  }, []);
   // A click whose target IS the <dialog> element (not its panel/children) is a
   // backdrop click — the ::backdrop is part of the dialog box. We compare the
   // real `e.target` (reliable even under Solid's event delegation) to the dialog
-  // element resolved via the panel ref's parent.
+  // element resolved via the panel ref's parent. A click whose press started
+  // inside the panel is not one (see `pressStartedInside`).
   const onClick = useCallback((e: any) => {
-    if (props.disableBackdropClose) return;
+    const startedInside = pressStartedInside.current;
+    pressStartedInside.current = false;
+    if (props.disableBackdropClose || startedInside) return;
     const panel = panelEl.current;
     const el = panel && panel.parentElement;
     if (e && el && e.target === el) closeWith('backdrop');
   }, [closeWith, props.disableBackdropClose]);
+  // The native `close` event: fired by `el.close()` from our own reconcile (by then
+  // the model is already false, and the dialog may even have been re-opened), but
+  // also by closes WE did not drive — a `<form method="dialog">` submit, a stray
+  // `dialog.close()`. For those the model is still true over a closed dialog and
+  // would stay stuck (writing `open = true` again changes nothing), so fold them
+  // into the close funnel. Not during teardown: $onUnmount closes the dialog
+  // itself after clearing `dialogEl`.
+  const onNativeClose = useCallback(() => {
+    const el = dialogEl.current;
+    if (!el || el.open || !open) return;
+    closeWith('programmatic');
+  }, [closeWith, open]);
   // ---- lifecycle ---------------------------------------------------------
   // ---- imperative handle -------------------------------------------------
   // show()/hide() — named to avoid the `open` model + `@close` event collisions.
+  // hide() on a dialog that is not open is a no-op: there is nothing to dismiss, so
+  // it must not emit a `close` for a dismissal that never happened.
   function show() {
     setOpen(true);
   }
   function hide() {
+    if (!open) return;
     closeWith('programmatic');
   }
 
@@ -211,6 +260,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
   useEffect(() => {
     return () => {
       setScrollLock(false);
+      pressStartedInside.current = false;
       const el = dialogEl.current;
       const back = returnFocusTo.current;
       dialogEl.current = null;
@@ -240,7 +290,8 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
 
   return (
     <>
-    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
+
+    <dialog aria-label={rozieAttr(props.ariaLabel ?? undefined)} aria-labelledby={rozieAttr(props.ariaLabelledby ?? undefined)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClose: ($event) => { onNativeClose(); }, onPointerDown: ($event) => { onPointerDown($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
       
       <div className={"rozie-dialog-panel"} ref={panelEl} data-rozie-s-2a679072="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}

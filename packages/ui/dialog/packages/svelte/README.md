@@ -51,7 +51,7 @@ import '@rozie-ui/dialog-svelte/themes/shadcn.css';    // or material.css, boots
 | `disableBackdropClose` | `Boolean` | `false` |  |  |
 | `disableEscapeClose` | `Boolean` | `false` |  |  |
 | `disableScrollLock` | `Boolean` | `false` |  |  |
-| `initialFocus` | `String | Element` | `null` |  |  |
+| `initialFocus` | `String \| Element` | `null` |  |  |
 | `ariaLabel` | `String` | `null` |  |  |
 | `ariaLabelledby` | `String` | `null` |  |  |
 
@@ -59,7 +59,7 @@ import '@rozie-ui/dialog-svelte/themes/shadcn.css';    // or material.css, boots
 
 | Event | Description |
 | --- | --- |
-| `close` | Fired whenever the dialog dismisses — through a backdrop click, the Escape key, or a programmatic `hide()`. Payload `{ reason }` where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'`. The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel). |
+| `close` | Fired whenever the dialog dismisses — through a backdrop click, the Escape key, a programmatic `hide()`, or a native close that did not go through the component (such as a `<form method="dialog">` submit). Payload `{ reason }` where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'` (the last covers `hide()` and any native close). The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel). |
 
 ## Imperative handle
 
@@ -68,7 +68,7 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Method | Description |
 | --- | --- |
 | `show` | Open the dialog imperatively (sets the two-way `open` model to `true`). Equivalent to a consumer write of `open = true`; the native `<dialog>.showModal()` runs on the next reconcile. |
-| `hide` | Close the dialog imperatively. Sets `open` to `false` and emits `close` with `{ reason: 'programmatic' }`. |
+| `hide` | Close the dialog imperatively. Sets `open` to `false` and emits `close` with `{ reason: 'programmatic' }`. A no-op when the dialog is not open (nothing is dismissed, so no `close` is emitted). |
 
 ```svelte
 <script>

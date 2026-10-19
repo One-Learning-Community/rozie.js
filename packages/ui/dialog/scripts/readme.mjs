@@ -361,7 +361,8 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('| Name | Type | Default | Two-way (model) | Required |');
   lines.push('| --- | --- | --- | :---: | :---: |');
   for (const p of ir.props) {
-    const type = renderPropType(p.typeAnnotation);
+    // A union renders as `A | B`; a bare pipe would split the table row, so escape it.
+    const type = renderPropType(p.typeAnnotation).replace(/\|/g, '\\|');
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';

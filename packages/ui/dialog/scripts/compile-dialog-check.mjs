@@ -23,7 +23,7 @@ const source = readFileSync(SRC, 'utf8');
 
 const EXPECT = {
   name: 'Dialog',
-  props: ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'ariaLabel', 'ariaLabelledby'],
+  props: ['open', 'disableBackdropClose', 'disableEscapeClose', 'disableScrollLock', 'initialFocus', 'ariaLabel', 'ariaLabelledby'],
   models: ['open'],
   emits: ['close'],
   slots: [''],
