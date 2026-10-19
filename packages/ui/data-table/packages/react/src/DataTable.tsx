@@ -8523,7 +8523,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
           
           {!!(colsWindowed()) && <td className={"rdt-col-spacer"} aria-hidden="true" style={parseInlineStyle('width:' + colPadRight() + 'px;padding:0;border:0')} data-rozie-s-d5dcab4c="" />}</tr>
         
-        {!!(rowShowsDetail(wr.row)) && <tr key={wr.row.id} className={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(wr.row.id)} data-rozie-s-d5dcab4c="">
+        {!!(rowShowsDetail(wr.row)) && <tr className={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(wr.row.id)} data-rozie-s-d5dcab4c="">
           <td className={"rdt-detail-cell"} colSpan={windowedColSpan()} data-rozie-s-d5dcab4c="">
             {(props.renderDetail ?? props.slots?.['detail'])?.({ row: wr.row.original })}
           </td>
@@ -8601,7 +8601,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
             </span>}{!!(isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
         </tr>
         
-        {!!(rowShowsDetail(row)) && <tr key={row.id} className={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c="">
+        {!!(rowShowsDetail(row)) && <tr className={"rdt-detail-row"} role="row" data-detail-row={rozieAttr(row.id)} data-rozie-s-d5dcab4c="">
           <td className={"rdt-detail-cell"} colSpan={visibleColCount()} data-rozie-s-d5dcab4c="">
             {(props.renderDetail ?? props.slots?.['detail'])?.({ row: row.original })}
           </td>
