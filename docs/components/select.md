@@ -4,20 +4,18 @@
 
 There is no vanilla-JS dependency: selection state, keyboard navigation, type-ahead, and focus management are implemented directly against the platform. Every visual value is a CSS custom property, so the select re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
-<PublishedTargetsNotice family="select" :published="[]" />
-
 ## The `@rozie-ui/select` packages
 
-`Select` is designed to ship as six pre-compiled, per-framework packages, but none of them is published to npm yet — all six are still in dogfooding. (The earlier `@rozie-ui/listbox-solid` package is superseded by this family.) The rows below link to each workspace README for review:
+`Select` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up. (The earlier `@rozie-ui/listbox-solid` package is superseded by this family.)
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/select-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/react/README.md) |
-| `@rozie-ui/select-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/vue/README.md) |
-| `@rozie-ui/select-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/svelte/README.md) |
-| `@rozie-ui/select-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/angular/README.md) |
-| `@rozie-ui/select-solid` | *not yet published (dogfooding)* | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/solid/README.md) |
-| `@rozie-ui/select-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/lit/README.md) |
+| `@rozie-ui/select-react` | `npm i @rozie-ui/select-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/react/README.md) |
+| `@rozie-ui/select-vue` | `npm i @rozie-ui/select-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/vue/README.md) |
+| `@rozie-ui/select-svelte` | `npm i @rozie-ui/select-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/svelte/README.md) |
+| `@rozie-ui/select-angular` | `npm i @rozie-ui/select-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/angular/README.md) |
+| `@rozie-ui/select-solid` | `npm i @rozie-ui/select-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/solid/README.md) |
+| `@rozie-ui/select-lit` | `npm i @rozie-ui/select-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/packages/lit/README.md) |
 
 Each package carries its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`) **plus a required non-optional peer chain**: `@rozie-ui/popover-<target>` — composed internally for the floating popup — which in turn requires `@floating-ui/dom`. Each leaf's own README gives one copy-paste `npm i` line covering the whole chain.
 

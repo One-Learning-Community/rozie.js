@@ -38,7 +38,6 @@ export const TARGET_LABELS = {
 // its Solid leaf, e.g. `lexical` — no content read/write API yet).
 export const PARTIAL_DEBUTS = {
   dialog: ['solid'],
-  select: [],
   maplibre: ['solid'],
   'number-field': ['solid'],
   pagination: ['solid'],

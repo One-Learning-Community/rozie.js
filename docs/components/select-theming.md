@@ -159,4 +159,4 @@ import '@rozie-ui/select-react/themes/shadcn.css';
 - [Select — showcase & API](/components/select) — the full prop / event / slot / handle reference.
 - [Select — usage examples](/components/select-usage) — idiomatic per-framework consumption code.
 - [Select comparison](/components/select-comparison) — how it stacks up against the per-framework libraries.
-- [Select — live demo](/components/select-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).
+- [Select — live demo](/components/select-demo) — the real package running in the page.
