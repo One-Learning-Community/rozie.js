@@ -54,6 +54,15 @@ export interface EmitAttrCtx {
    */
   elementTagName?: string;
   /**
+   * EB-1 (quick 261019-9g1) — the host node's kind (`'html'` | `'component'` |
+   * `'self'`). Optional; absent means an HTML host, matching the
+   * `elementTagName` back-compat convention. The plain-string ARIA drop
+   * (`NULLABLE_DOM_STRING_ARIA_SLOTS`) applies to HTML hosts only: on a
+   * component host the slot is the child's own prop type, and passing
+   * `undefined` there would select the child prop's default — a runtime change.
+   */
+  elementTagKind?: 'html' | 'component' | 'self';
+  /**
    * WR-03 (12-REVIEW) — optional diagnostics sink. When present, the
    * custom-modifier hand-emit path pushes a warning here for an unsupported
    * host element instead of silently producing wrong output.
@@ -147,6 +156,9 @@ function normalizeNullAttrBinding(expr: t.Expression): t.Expression {
  * plus the string-ARIA names react routes through `rozieAttr` (a fallback Vue
  * lacks). The wrap is gated ADDITIONALLY on the shape exclusion below so a
  * provably-non-null operand is never wrapped (TS2869 guard).
+ *
+ * The 12 plain-string ARIA names live in the sibling set
+ * `NULLABLE_DOM_STRING_ARIA_SLOTS` (EB-1, HTML hosts only).
  */
 const NULLABLE_DOM_ATTR_SLOTS: ReadonlySet<string> = new Set([
   // Numeric DOM-attr slots (react NUMERIC_HTML_ATTRS).
@@ -191,6 +203,55 @@ const NULLABLE_DOM_ATTR_SLOTS: ReadonlySet<string> = new Set([
   'aria-activedescendant',
   'aria-invalid',
 ]);
+
+/**
+ * EB-1 (quick 261019-9g1) — the plain-string ARIA attributes whose
+ * `@vue/runtime-dom` 3.5 `AriaAttributes` slot is `string | undefined` (never
+ * `| null`). A nullable-shaped binding (`string | null` prop) bound RAW to one of
+ * these on an HTML element is a vue-tsc TS2322 for a strict consumer compiling
+ * the emitted `.vue` source, so it is dropped as `(expr) ?? undefined` — the same
+ * wrap `NULLABLE_DOM_ATTR_SLOTS` applies (`aria-activedescendant`, the numeric and
+ * boolean-enumerated ARIA names live there).
+ *
+ * Phase 67 rejected adding `aria-label` for fear of a TS2869 storm. That
+ * objection no longer holds: TS2869 is purely syntactic, and
+ * `isProvablyNonNullishAttr` already keeps the only TS2869-prone operand shapes
+ * (binary, both-branches-non-null ternary) RAW; `isAlreadyUndefinedDropped` keeps
+ * an author-written `|| undefined` / `?? undefined` RAW.
+ *
+ * Applies on HTML hosts only (see `EmitAttrCtx.elementTagKind`). Deliberate
+ * exclusions: the enumerated-string ARIA names (aria-autocomplete, aria-current,
+ * aria-dropeffect, aria-haspopup, aria-live, aria-orientation, aria-relevant,
+ * aria-sort) — a `string | null` operand fails their literal-union slot whether
+ * or not it is wrapped — and the Numberish names outside the numeric list.
+ */
+const NULLABLE_DOM_STRING_ARIA_SLOTS: ReadonlySet<string> = new Set([
+  'aria-controls',
+  'aria-describedby',
+  'aria-details',
+  'aria-errormessage',
+  'aria-flowto',
+  'aria-keyshortcuts',
+  'aria-label',
+  'aria-labelledby',
+  'aria-owns',
+  'aria-placeholder',
+  'aria-roledescription',
+  'aria-valuetext',
+]);
+
+/**
+ * EB-1 — true for `a || undefined` / `a ?? undefined`: the author already
+ * dropped the nullish case, so the result is null-free and appending another
+ * `?? undefined` would be a redundant (and TS2869-prone) wrap.
+ */
+function isAlreadyUndefinedDropped(expr: t.Expression): boolean {
+  return (
+    t.isLogicalExpression(expr) &&
+    (expr.operator === '||' || expr.operator === '??') &&
+    t.isIdentifier(expr.right, { name: 'undefined' })
+  );
+}
 
 /**
  * Member-property names that TypeScript proves `number` (never nullish) — a
@@ -661,7 +722,13 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     // wrap calls/general-members/identifiers). Wrap as `(expr) ?? undefined`
     // unless the shape is provably-non-nullish (TS2869 guard). Parenthesize so a
     // top-level `||`/`&&` adjacent to `??` stays well-formed.
-    if (NULLABLE_DOM_ATTR_SLOTS.has(name.toLowerCase()) && !isProvablyNonNullishAttr(normalized)) {
+    const lname = name.toLowerCase();
+    const wrapsSlot =
+      NULLABLE_DOM_ATTR_SLOTS.has(lname) ||
+      (NULLABLE_DOM_STRING_ARIA_SLOTS.has(lname) &&
+        ctx.elementTagKind !== 'component' &&
+        ctx.elementTagKind !== 'self');
+    if (wrapsSlot && !isProvablyNonNullishAttr(normalized) && !isAlreadyUndefinedDropped(normalized)) {
       return `:${name}="(${expr}) ?? undefined"`;
     }
     return `:${name}="${expr}"`;

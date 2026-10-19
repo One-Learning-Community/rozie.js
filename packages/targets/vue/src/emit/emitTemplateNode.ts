@@ -394,6 +394,9 @@ function emitElementWithExtraDirectiveInner(
     // unsupported host (<select>/<textarea>) and warn instead of silently
     // emitting wrong output.
     elementTagName: node.tagName,
+    // EB-1 (quick 261019-9g1) — the host kind gates the plain-string ARIA drop
+    // to HTML hosts (a component host's slot is the child's prop type).
+    elementTagKind: node.tagKind,
     diagnostics: ctx.diagnostics,
     // Phase 15 — script-injection sink shared with the listener-spread
     // emit below. `normalizeListeners` runtime imports flow through the

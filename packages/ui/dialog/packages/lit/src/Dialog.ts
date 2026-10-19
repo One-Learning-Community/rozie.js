@@ -186,8 +186,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-
-<dialog class="rozie-dialog" aria-label=${rozieAttr(this.ariaLabel ?? undefined)} aria-labelledby=${rozieAttr(this.ariaLabelledby ?? undefined)} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @close=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onNativeClose(); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onPointerDown($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
+<dialog class="rozie-dialog" aria-label=${rozieAttr(this.ariaLabel)} aria-labelledby=${rozieAttr(this.ariaLabelledby)} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @close=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onNativeClose(); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onPointerDown($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
   
   <div class="rozie-dialog-panel" data-rozie-ref="panelEl" data-rozie-s-2a679072>
     <slot></slot>

@@ -362,15 +362,10 @@ $expose({ show, hide }, { show: '() => void', hide: '() => void' })
 </script>
 
 <template>
-<!-- `?? undefined` on the two nullable string ARIA props: `null` and `undefined` both
-     drop the attribute on every target, but only `undefined` satisfies the DOM slot
-     type (`string | undefined`) of a strict consumer that compiles the Vue/React
-     source (emitter-hardening backlog: the Vue emitter's nullable-attr wrap list
-     does not yet cover `aria-label` / `aria-labelledby`). -->
 <dialog
   class="rozie-dialog"
-  :aria-label="$props.ariaLabel ?? undefined"
-  :aria-labelledby="$props.ariaLabelledby ?? undefined"
+  :aria-label="$props.ariaLabel"
+  :aria-labelledby="$props.ariaLabelledby"
   @cancel="onCancel($event)"
   @close="onNativeClose()"
   @pointerdown="onPointerDown($event)"

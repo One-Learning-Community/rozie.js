@@ -24,8 +24,7 @@ interface DefaultCtx {}
   imports: [NgTemplateOutlet],
   template: `
 
-
-    <dialog class="rozie-dialog" [attr.aria-label]="rozieAttr(ariaLabel() ?? undefined)" [attr.aria-labelledby]="rozieAttr(ariaLabelledby() ?? undefined)" #rozieSpread_0 (cancel)="onCancel($event)" (close)="onNativeClose()" (pointerdown)="onPointerDown($event)" (click)="onClick($event)" #rozieListenersTarget_1>
+    <dialog class="rozie-dialog" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-labelledby]="rozieAttr(ariaLabelledby())" #rozieSpread_0 (cancel)="onCancel($event)" (close)="onNativeClose()" (pointerdown)="onPointerDown($event)" (click)="onClick($event)" #rozieListenersTarget_1>
       
       <div class="rozie-dialog-panel" #panelEl>
         <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />

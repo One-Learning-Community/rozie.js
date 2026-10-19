@@ -290,8 +290,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
 
   return (
     <>
-
-    <dialog aria-label={rozieAttr(props.ariaLabel ?? undefined)} aria-labelledby={rozieAttr(props.ariaLabelledby ?? undefined)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClose: ($event) => { onNativeClose(); }, onPointerDown: ($event) => { onPointerDown($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
+    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClose: ($event) => { onNativeClose(); }, onPointerDown: ($event) => { onPointerDown($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
       
       <div className={"rozie-dialog-panel"} ref={panelEl} data-rozie-s-2a679072="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}

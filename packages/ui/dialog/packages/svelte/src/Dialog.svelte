@@ -7,7 +7,7 @@ export interface DialogClosePayload {
 }
 </script>
 <script lang="ts">
-import { applyListeners, rozieAttr } from '@rozie/runtime-svelte';
+import { applyListeners } from '@rozie/runtime-svelte';
 
 import type { Snippet } from 'svelte';
 import { onDestroy, onMount, untrack } from 'svelte';
@@ -262,7 +262,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<dialog aria-label={rozieAttr(ariaLabel ?? undefined)} aria-labelledby={rozieAttr(ariaLabelledby ?? undefined)} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclose={($event) => { onNativeClose(); }} onpointerdown={($event) => { onPointerDown($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
+<dialog aria-label={ariaLabel} aria-labelledby={ariaLabelledby} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclose={($event) => { onNativeClose(); }} onpointerdown={($event) => { onPointerDown($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
 
 <style>
 :global {

@@ -1,7 +1,6 @@
 <template>
 
-
-<dialog class="rozie-dialog" :aria-label="props.ariaLabel ?? undefined" :aria-labelledby="props.ariaLabelledby ?? undefined" v-bind="$attrs" @cancel="onCancel($event)" @close="onNativeClose()" @pointerdown="onPointerDown($event)" @click="onClick($event)">
+<dialog class="rozie-dialog" :aria-label="(props.ariaLabel) ?? undefined" :aria-labelledby="(props.ariaLabelledby) ?? undefined" v-bind="$attrs" @cancel="onCancel($event)" @close="onNativeClose()" @pointerdown="onPointerDown($event)" @click="onClick($event)">
   
   <div class="rozie-dialog-panel" ref="panelElRef">
     <slot></slot>
