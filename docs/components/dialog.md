@@ -74,7 +74,7 @@ Two-way bind `open` to a boolean and put your content in the default slot. A cli
 
 | Event | Description |
 | --- | --- |
-| `close` | Fired whenever the dialog dismisses — backdrop click, Escape, or a programmatic `hide()`. Payload `{ reason }` where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'`. The two-way `open` model is set to `false` on the same tick, so use this only to learn *why* it closed. |
+| `close` | Fired whenever the dialog dismisses — backdrop click, Escape, a programmatic `hide()`, or a native close that did not go through the component (such as a `<form method="dialog">` submit). Payload `{ reason }` (a `DialogClosePayload`) where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'` — the last covers `hide()` and any native close. The two-way `open` model is set to `false` on the same tick, so use this only to learn *why* it closed. |
 
 ### Imperative handle
 
@@ -83,7 +83,7 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | Method | Description |
 | --- | --- |
 | `show` | Open the dialog imperatively (sets `open = true`; the native `showModal()` runs on the next reconcile). |
-| `hide` | Close the dialog imperatively (sets `open = false` and emits `close` with `{ reason: 'programmatic' }`). |
+| `hide` | Close the dialog imperatively (sets `open = false` and emits `close` with `{ reason: 'programmatic' }`). A no-op when the dialog is not open — nothing is dismissed, so no `close` is emitted. |
 
 The verbs are `show` / `hide`, not `open` / `close`, on purpose: an `open` verb would collide with the `open` model prop, and a `close` verb would collide with the `@close` event (a compile error). `show` / `hide` are clear and collision-free, and unlike `focus` they are not inherited `HTMLElement` members, so there is no override warning on the Lit custom element.
 
@@ -114,9 +114,10 @@ The complete token table and the design-system bridges live on the [dedicated th
 ## Accessibility
 
 - `showModal()` renders the dialog in the browser's **top layer** with `role="dialog"` and `aria-modal="true"` applied by the UA, a **native focus trap** (Tab cycles within the dialog), and **focus restoration** to the previously-focused element on close — none of which the component has to implement. The component adds the one case the platform misses: a Dialog unmounted while open (removed by an `r-if` / `<Show>` with `open` still `true`) releases its scroll lock and returns focus to the element focused before it opened.
-- Provide an accessible name with either `ariaLabelledby` (point at a visible heading — preferred) or `ariaLabel` (when there is no visible title).
+- Provide an accessible name with either `ariaLabelledby` (point at a visible heading — preferred) or `ariaLabel` (when there is no visible title). On the **Lit** element the `<dialog>` lives in a shadow root while your heading is slotted light DOM, and an `aria-labelledby` id never crosses a shadow boundary; Dialog therefore hands the browser the heading element directly (`ariaLabelledByElements`, Chrome/Edge 135+ and Safari 16.4+). Where that is unsupported, give the Lit element an `ariaLabel` instead.
 - Escape fires the native `cancel` event; the component `preventDefault()`s it and drives the close through the `open` model so the binding never desyncs. Set `disableEscapeClose` to opt out (e.g. a required confirmation).
-- The scrim is the native `::backdrop` pseudo-element. A click on the `<dialog>` element itself (outside the `.rozie-dialog-panel`) is treated as a backdrop click; set `disableBackdropClose` to require an explicit action.
+- The scrim is the native `::backdrop` pseudo-element. A click on the `<dialog>` element itself (outside the `.rozie-dialog-panel`) is treated as a backdrop click; set `disableBackdropClose` to require an explicit action. A press that *starts* inside the panel (selecting text, a drag) and is released over the scrim is not a backdrop click and does not close the dialog.
+- A native close that does not go through the component — a `<form method="dialog">` submit inside the panel, or a stray `dialog.close()` — is folded into the same close path: `open` goes back to `false` and `close` fires with `reason: 'programmatic'`, so the binding never stays `true` over a closed dialog. (On the Lit element a slotted `<form method="dialog">` has no ancestor `<dialog>` in its own tree and cannot close it; use a button that sets `open = false` or calls `hide()`.)
 - A `prefers-reduced-motion: no-preference` enter/leave transition (via `@starting-style` + `allow-discrete`) is applied where supported and is a no-op elsewhere — the dialog simply appears.
 
 ## Browser support

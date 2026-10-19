@@ -15,7 +15,7 @@ The complete prop / event / slot / imperative-handle surface of `@rozie-ui/pagin
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `change` | `{ page }` | Fired whenever the current page changes (a page button, prev/next, or a programmatic `goto`/`next`/`prev`/`first`/`last`). `page` is the new clamped 1-based page. Not fired when the target equals the current page. |
+| `change` | `PaginationChangePayload` — `{ page: number }` | Fired whenever the current page changes (a page button, prev/next, or a programmatic `goto`/`next`/`prev`/`first`/`last`). `page` is the new clamped 1-based page. Not fired when the target equals the current page. |
 
 The two-way model also fires the framework-native update event (`onModelValueChange` / `update:modelValue` / `bind:modelValue` / `(modelValueChange)` / `model-value-change`) carrying the new page directly.
 
@@ -25,10 +25,10 @@ All slots are optional — omit them to get the default token-themed buttons.
 
 | Slot | Scope params | Description |
 | --- | --- | --- |
-| `item` | `{ page, selected, goto }` | Render a single page button. `page` is the 1-based number, `selected` is `true` for the current page, `goto` navigates to it. |
-| `ellipsis` | `{ index }` | Render the collapsed-gap marker (defaults to `…`). |
-| `prevControl` | `{ disabled, goto, page }` | Render the "previous page" control. `disabled` is `true` at the first page, `goto` steps back, `page` is the target. |
-| `nextControl` | `{ disabled, goto, page }` | Render the "next page" control. `disabled` is `true` at the last page, `goto` steps forward, `page` is the target. |
+| `item` | `{ page: number, selected: boolean, goto: () => void }` | Render a single page button. `page` is the 1-based number, `selected` is `true` for the current page, `goto` navigates to it. |
+| `ellipsis` | `{ index: number }` | Render the collapsed-gap marker (defaults to `…`). |
+| `prevControl` | `{ disabled: boolean, goto: () => void, page: number }` | Render the "previous page" control. `disabled` is `true` at the first page, `goto` steps back, `page` is the target. |
+| `nextControl` | `{ disabled: boolean, goto: () => void, page: number }` | Render the "next page" control. `disabled` is `true` at the last page, `goto` steps forward, `page` is the target. |
 
 > On React the scoped slots are render-prop callbacks (e.g. an `item` render-prop) — the one documented cross-framework slot divergence.
 
@@ -38,7 +38,7 @@ Grab a handle via the framework-native ref mechanism (`useRef` → `PaginationHa
 
 | Method | Description |
 | --- | --- |
-| `goto(page)` | Go to a specific 1-based page (clamped into `[1, totalPages]`). |
+| `goto(page: number)` | Go to a specific 1-based page (clamped into `[1, totalPages]`). |
 | `next()` | Advance one page (no-op at the last page). |
 | `prev()` | Go back one page (no-op at the first page). |
 | `first()` | Jump to page 1. |

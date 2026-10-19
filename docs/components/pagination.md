@@ -78,6 +78,19 @@ the bounds, the keyboard nav, and the ARIA wiring:
 </Pagination>
 ```
 
+## Keyboard
+
+The pager is one roving group. The active page and the prev/next controls are tab stops; the other page numbers are `tabindex="-1"` and reached with the keys:
+
+| Key | Moves focus to |
+| --- | --- |
+| `ArrowRight` / `ArrowDown` | the next control |
+| `ArrowLeft` / `ArrowUp` | the previous control |
+| `Home` / `End` | the first / last control (prev / next) |
+| `Enter` / `Space` | activates the focused control — focus stays on the page you just chose, even as the window slides |
+
+Everything is inert while `disabled` is set.
+
 See the full prop / event / slot / handle surface on the [API reference](/components/pagination-api),
 the [live demo](/components/pagination-demo), and how it compares to existing libraries on the
 [comparison page](/components/pagination-comparison).

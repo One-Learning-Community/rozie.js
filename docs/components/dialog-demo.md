@@ -27,7 +27,6 @@ This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePr
   <div class="dialog-live__head">
     <button @click="open = true">Open dialog</button>
     <button @click="dialogBox?.show()">show()</button>
-    <button @click="dialogBox?.hide()">hide()</button>
     <label class="dialog-live__opt">
       <input type="checkbox" v-model="noBackdrop" /> disableBackdropClose
     </label>
@@ -49,6 +48,7 @@ This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePr
     <p class="dialog-live__body">This action cannot be undone. The file will be permanently removed.</p>
     <div class="dialog-live__actions">
       <button @click="open = false">Cancel</button>
+      <button @click="dialogBox?.hide()">hide()</button>
       <button class="dialog-live__danger" @click="open = false">Delete</button>
     </div>
   </Dialog>
@@ -56,7 +56,7 @@ This is the **real `@rozie-ui/dialog-vue` package** running on this page (VitePr
 </div>
 </ClientOnly>
 
-`open` is two-way bound with `v-model:open` — the readout updates the instant the dialog shows or dismisses, and a consumer write flows back in. The dialog renders in the **top layer** above this content with no portal; click the dimmed backdrop (unless you tick `disableBackdropClose`), press `Escape`, or use Cancel / Delete to close it, and watch `@close` report `'backdrop'`, `'escape'`, or — via the `show()` / `hide()` handle buttons — `'programmatic'`. See the [full API](/components/dialog) for every prop, event, and handle verb, plus theming and accessibility reference.
+`open` is two-way bound with `v-model:open` — the readout updates the instant the dialog shows or dismisses, and a consumer write flows back in. The dialog renders in the **top layer** above this content with no portal; click the dimmed backdrop (unless you tick `disableBackdropClose`), press `Escape`, or use Cancel / Delete to close it, and watch `@close` report `'backdrop'`, `'escape'`, or — via the `hide()` handle button inside the dialog — `'programmatic'`. The `show()` button opens it through the handle; the page behind a modal is inert, so `hide()` lives inside the dialog, and calling it on a closed dialog does nothing. See the [full API](/components/dialog) for every prop, event, and handle verb, plus theming and accessibility reference.
 
 ## What ships for each framework
 
