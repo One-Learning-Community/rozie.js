@@ -368,15 +368,27 @@ name: Release (early subset)
 #   - The three "dialog, listbox, maplibre, …" lists below and in the debut-Solid step comments
 #     are the historical 2026-09-26 record and keep the name that shipped.
 #
+# 2026-10 dialog + pagination ALL-SIX DEBUT (quick 261018-vdu):
+#   - The five held targets of `dialog` and of `pagination` (react, vue, svelte, lit, angular)
+#     debut next to the Solid leaves that have been on npm since the 2026-09-26 wave. Both
+#     families align on their Solid sibling's version: the five held leaves are preset one patch
+#     below it and every changeset line that names them is a patch, so one version number means
+#     one component revision on all six targets (RELEASING.md §6 item 20).
+#   - Each family gets its own all-six "Build <family> leaves" / "Publish <family> leaves
+#     (@rozie-ui/*)" step pair (the runtime-carrying shape, RELEASING.md §6 item 6: the Vue leaf
+#     depends on @rozie/runtime-vue). The two Solid leaves therefore leave the debut-Solid step
+#     pair. Neither family has a @rozie-ui workspace peer, so the only ordering is "after the
+#     toolchain build".
+#   - The "dialog, … pagination, …" lists in the 2026-09-26 and 2026-08 notes above are the
+#     historical record and keep what was true when they were written.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
-# above is not release-verified. As of the 2026-09-26 wave, that includes the 40 remaining
-# targets (React/Vue/Svelte/Lit/Angular) of the 8 families whose SOLID leaf debuted above
-# (dialog, listbox, maplibre, number-field, pagination, resizable, slider, switch), PLUS all
-# 6 targets of `lexical` (its Solid leaf does NOT debut this wave — no content read/write API
-# yet, so it is fully held back alongside its siblings) — 46 packages total — held back until
-# they get their own dogfooding pass, exactly like uppy and every other not-yet-verified
-# family. Do NOT widen the --filter lists below to other targets or families without updating
-# the release runbook.
+# above is not release-verified. What is still held back is exactly what `.changeset/config.json`
+# lists under `ignore` (the lexical family, plus the React/Vue/Svelte/Lit/Angular targets of
+# maplibre, number-field, resizable, slider and switch, whose Solid leaves debuted in the
+# 2026-09-26 wave) — held back until they get their own dogfooding pass, exactly like uppy and
+# every other not-yet-verified family. Do NOT widen the --filter lists below to other targets or
+# families without updating the release runbook.
 #
 # Prerequisites:
 #   - Repo is PUBLIC (npm provenance requires a public source repo) — verified.
@@ -830,27 +842,57 @@ jobs:
           --filter=@rozie-ui/wavesurfer-angular
           build
 
-      # Build the 8 DEBUT Solid-only leaves (2026-09-26 wave). Each carries @rozie/runtime-solid
+      # Build the DEBUT Solid-only leaves (2026-09-26 wave). Each carries @rozie/runtime-solid
       # as a workspace dep (tsdown, rewritten to the concrete published version at publish time),
       # so this sits AFTER the toolchain build, same rationale as every other non-vue leaf step
       # above. None carries an @rozie-ui workspace peer, so there is NO ordering coupling to any
       # other leaf family — this step can run anywhere after the toolchain build. The OTHER five
-      # targets of these same 8 families (dialog, listbox, maplibre, number-field,
-      # pagination, resizable, slider, switch) remain out of scope and are NOT built here — see
-      # the dated header note above. `lexical` is NOT in this step at all (fully held back, all
-      # six targets — no content read/write API yet). `listbox-solid` is no longer in this step:
-      # the family was renamed to `select` (2026-10) and all six select leaves build together in
-      # "Build select leaves" below.
+      # targets of these families (maplibre, number-field, resizable, slider, switch) remain out
+      # of scope and are NOT built here — see the dated header note above. `lexical` is NOT in
+      # this step at all (fully held back, all six targets — no content read/write API yet).
+      # `listbox-solid` is no longer in this step: the family was renamed to `select` (2026-10)
+      # and all six select leaves build together in "Build select leaves" below. The dialog and
+      # pagination Solid leaves are no longer in this step either: since the 2026-10 all-six debut
+      # they build with their siblings in "Build dialog leaves" / "Build pagination leaves" below.
       - name: Build debut Solid leaves
         run: >
           pnpm
-          --filter=@rozie-ui/dialog-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
-          --filter=@rozie-ui/pagination-solid
           --filter=@rozie-ui/resizable-solid
           --filter=@rozie-ui/slider-solid
           --filter=@rozie-ui/switch-solid
+          build
+
+      # Build all six dialog leaves into their compiled dist/ drop-in (2026-10 all-six debut; the
+      # Solid leaf has been on npm since 2026-09-26). Mixed per-target toolchain (react/solid/lit
+      # tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package, angular ng-packagr APF). Each
+      # leaf carries @rozie/runtime-<fw> as a workspace dep (the Vue leaf makes this a
+      # runtime-carrying family, RELEASING.md §6 item 6), so this sits AFTER the toolchain build.
+      # No @rozie-ui workspace peer, so there is no ordering coupling to any other leaf family.
+      - name: Build dialog leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/dialog-react
+          --filter=@rozie-ui/dialog-vue
+          --filter=@rozie-ui/dialog-solid
+          --filter=@rozie-ui/dialog-lit
+          --filter=@rozie-ui/dialog-svelte
+          --filter=@rozie-ui/dialog-angular
+          build
+
+      # Build all six pagination leaves into their compiled dist/ drop-in (2026-10 all-six debut;
+      # the Solid leaf has been on npm since 2026-09-26). Same toolchain mix and ordering as the
+      # dialog step above: AFTER the toolchain build, no @rozie-ui workspace peer.
+      - name: Build pagination leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/pagination-react
+          --filter=@rozie-ui/pagination-vue
+          --filter=@rozie-ui/pagination-solid
+          --filter=@rozie-ui/pagination-lit
+          --filter=@rozie-ui/pagination-svelte
+          --filter=@rozie-ui/pagination-angular
           build
 
       # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
@@ -1102,10 +1144,20 @@ jobs:
           --filter @rozie-ui/wavesurfer-lit
           --filter @rozie-ui/wavesurfer-svelte
           --filter @rozie-ui/wavesurfer-angular
+          --filter @rozie-ui/dialog-react
+          --filter @rozie-ui/dialog-vue
           --filter @rozie-ui/dialog-solid
+          --filter @rozie-ui/dialog-lit
+          --filter @rozie-ui/dialog-svelte
+          --filter @rozie-ui/dialog-angular
           --filter @rozie-ui/maplibre-solid
           --filter @rozie-ui/number-field-solid
+          --filter @rozie-ui/pagination-react
+          --filter @rozie-ui/pagination-vue
           --filter @rozie-ui/pagination-solid
+          --filter @rozie-ui/pagination-lit
+          --filter @rozie-ui/pagination-svelte
+          --filter @rozie-ui/pagination-angular
           --filter @rozie-ui/resizable-solid
           --filter @rozie-ui/slider-solid
           --filter @rozie-ui/switch-solid
@@ -1619,15 +1671,18 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # The 8 DEBUT Solid-only leaves (2026-09-26 wave — dialog, listbox, maplibre,
+      # The DEBUT Solid-only leaves (2026-09-26 wave — dialog, listbox, maplibre,
       # number-field, pagination, resizable, slider, switch; verified 0/8 on npm via a direct
       # registry GET, since `npm view` lags on first-ever names). pnpm rewrites each leaf's
       # `@rozie/runtime-solid` workspace dep to the concrete published version in the tarball —
       # already live on npm from this same run's earlier "Publish toolchain" step. solid-js ^1.8
-      # is a required peer on all eight, alongside no @rozie-ui workspace peer on any of them, so
-      # there is no ordering coupling to any other leaf family. The OTHER five targets of these
-      # SAME 8 families (40 packages) are NOT published — they stay in `.changeset/config.json`'s
-      # `ignore` list until their own dogfooding pass; do NOT widen this filter list to them.
+      # is a required peer on all of them, alongside no @rozie-ui workspace peer on any of them, so
+      # there is no ordering coupling to any other leaf family. The OTHER five targets of the
+      # families still listed here (maplibre, number-field, resizable, slider, switch) are NOT
+      # published — they stay in `.changeset/config.json`'s `ignore` list until their own
+      # dogfooding pass; do NOT widen this filter list to them. The dialog and pagination Solid
+      # leaves left this step with the 2026-10 all-six debut: they publish with their siblings in
+      # "Publish dialog leaves" / "Publish pagination leaves" below.
       # `lexical` is NOT in this step at all — fully held back this wave (all six targets,
       # including Solid; no content read/write API yet), still fully in `.changeset/config.json`'s
       # `ignore` list.
@@ -1638,13 +1693,48 @@ jobs:
       - name: Publish debut Solid leaves (@rozie-ui/*)
         run: >
           pnpm
-          --filter=@rozie-ui/dialog-solid
           --filter=@rozie-ui/maplibre-solid
           --filter=@rozie-ui/number-field-solid
-          --filter=@rozie-ui/pagination-solid
           --filter=@rozie-ui/resizable-solid
           --filter=@rozie-ui/slider-solid
           --filter=@rozie-ui/switch-solid
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six dialog leaves (2026-10 DEBUT of the five held targets; the Solid leaf has been on
+      # npm since 2026-09-26 — see the dated header note). Aligned on the Solid leaf's version, so
+      # a re-publish of an already-live version is skipped (no --force), not an error. pnpm
+      # rewrites each leaf's `workspace:` @rozie/runtime-<fw> dep to the concrete version in the
+      # tarball, live on npm from this run's "Publish toolchain" step. No @rozie-ui workspace
+      # peer, so there is no ordering coupling to any other leaf family. Inherits dry_run
+      # (default TRUE) via steps.flags.outputs.extra.
+      - name: Publish dialog leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/dialog-react
+          --filter=@rozie-ui/dialog-vue
+          --filter=@rozie-ui/dialog-solid
+          --filter=@rozie-ui/dialog-lit
+          --filter=@rozie-ui/dialog-svelte
+          --filter=@rozie-ui/dialog-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six pagination leaves (2026-10 DEBUT of the five held targets; the Solid leaf has been
+      # on npm since 2026-09-26). Same shape and rationale as the dialog step above.
+      - name: Publish pagination leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/pagination-react
+          --filter=@rozie-ui/pagination-vue
+          --filter=@rozie-ui/pagination-solid
+          --filter=@rozie-ui/pagination-lit
+          --filter=@rozie-ui/pagination-svelte
+          --filter=@rozie-ui/pagination-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
