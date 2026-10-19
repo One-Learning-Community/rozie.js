@@ -1,0 +1,108 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/dialog-vue",
+  "version": "0.1.1",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "Dialog",
+          "source": {
+            "module": "@rozie-ui/dialog-vue",
+            "symbol": "Dialog"
+          },
+          "description": "Headless, accessible modal dialog on the native `<dialog>` element + `showModal()` — top-layer rendering, a native `::backdrop` scrim, a real focus trap, Escape-to-dismiss, and a two-way `open` binding with a typed `close` event.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "open",
+              "description": "Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disable-backdrop-close",
+              "description": "Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: 'backdrop'`; set this to require an explicit action.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disable-escape-close",
+              "description": "Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: 'escape'`; the component `preventDefault()`s it so the close always flows through the `open` model. Set this to keep the dialog open on Escape (e.g. a required confirmation).",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disable-scroll-lock",
+              "description": "Opt **out** of locking `<html>` scroll while the dialog is open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown; set this to leave background scrolling enabled.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "initial-focus",
+              "description": "What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus=\"input[name=title]\"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string",
+                "element"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "aria-labelledby",
+              "description": "The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "close",
+                "description": "Fired whenever the dialog dismisses — through a backdrop click, the Escape key, a programmatic `hide()`, or a native close that did not go through the component (such as a `<form method=\"dialog\">` submit). Payload `{ reason }` where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'` (the last covers `hide()` and any native close). The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel).",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:open",
+                "description": "Emitted with the updated `open` value; powers `v-model:open`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "default",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

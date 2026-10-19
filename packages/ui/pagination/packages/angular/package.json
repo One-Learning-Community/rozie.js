@@ -41,7 +41,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "module": "./dist/fesm2022/rozie-ui-pagination-angular.mjs",
   "types": "./dist/index.d.ts",

@@ -1,0 +1,264 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Headless, WAI-ARIA accessible pagination control — a windowed page-item model (numbers + ellipses), prev/next bounds, roving keyboard navigation, scoped slots, and a two-way `modelValue` page binding.",
+          "name": "Pagination",
+          "tagName": "rozie-pagination",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "modelValue",
+              "description": "The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "model-value",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "totalPages",
+              "description": "Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "total-pages",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "total",
+              "description": "Total item count. Combined with `pageSize` to derive the page count (`ceil(total / pageSize)`) when `totalPages` is not given.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "total",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "pageSize",
+              "description": "Items per page. Combined with `total` to derive the page count when `totalPages` is not given.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "page-size",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "siblingCount",
+              "description": "Number of page buttons shown on each side of the current page (the sibling window). Larger values show more context around the current page.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "sibling-count",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "boundaryCount",
+              "description": "Number of page buttons always shown at each boundary (the first and last `boundaryCount` pages), regardless of the current page.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "boundary-count",
+              "default": "1"
+            },
+            {
+              "kind": "field",
+              "name": "disabled",
+              "description": "Disable the entire control — every page button and the prev/next controls become non-interactive and are marked `aria-disabled`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disabled",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `\"Pagination\"`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "aria-label",
+              "default": "\"Pagination\""
+            },
+            {
+              "kind": "method",
+              "name": "goto",
+              "description": "Go to a specific 1-based page; the argument is clamped into `[1, totalPages]`. Emits `change` unless the target equals the current page."
+            },
+            {
+              "kind": "method",
+              "name": "next",
+              "description": "Advance to the next page (no-op at the last page). Emits `change` on success."
+            },
+            {
+              "kind": "method",
+              "name": "prev",
+              "description": "Go back to the previous page (no-op at the first page). Emits `change` on success."
+            },
+            {
+              "kind": "method",
+              "name": "first",
+              "description": "Jump to the first page (page 1). Emits `change` unless already there."
+            },
+            {
+              "kind": "method",
+              "name": "last",
+              "description": "Jump to the last page (the effective `totalPages`). Emits `change` unless already there."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "model-value",
+              "description": "The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "modelValue",
+              "default": "1"
+            },
+            {
+              "name": "total-pages",
+              "description": "Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "totalPages",
+              "default": "null"
+            },
+            {
+              "name": "total",
+              "description": "Total item count. Combined with `pageSize` to derive the page count (`ceil(total / pageSize)`) when `totalPages` is not given.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "total",
+              "default": "null"
+            },
+            {
+              "name": "page-size",
+              "description": "Items per page. Combined with `total` to derive the page count when `totalPages` is not given.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "pageSize",
+              "default": "null"
+            },
+            {
+              "name": "sibling-count",
+              "description": "Number of page buttons shown on each side of the current page (the sibling window). Larger values show more context around the current page.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "siblingCount",
+              "default": "1"
+            },
+            {
+              "name": "boundary-count",
+              "description": "Number of page buttons always shown at each boundary (the first and last `boundaryCount` pages), regardless of the current page.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "boundaryCount",
+              "default": "1"
+            },
+            {
+              "name": "disabled",
+              "description": "Disable the entire control — every page button and the prev/next controls become non-interactive and are marked `aria-disabled`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disabled",
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `\"Pagination\"`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "\"Pagination\""
+            }
+          ],
+          "events": [
+            {
+              "name": "change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired whenever the current page changes (a page button, prev/next, or a programmatic `goto`/`next`/`prev`/`first`/`last`). Payload `{ page }` — the new clamped 1-based page. Not fired when the target page equals the current page."
+            },
+            {
+              "name": "model-value-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `modelValue` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": "prevControl",
+              "description": "Scoped slot — props: disabled, goto, page."
+            },
+            {
+              "name": "ellipsis",
+              "description": "Scoped slot — props: index."
+            },
+            {
+              "name": "item",
+              "description": "Scoped slot — props: page, selected, goto."
+            },
+            {
+              "name": "nextControl",
+              "description": "Scoped slot — props: disabled, goto, page."
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Pagination",
+          "declaration": {
+            "name": "Pagination",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Pagination",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-pagination",
+          "declaration": {
+            "name": "Pagination",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

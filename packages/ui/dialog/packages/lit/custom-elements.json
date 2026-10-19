@@ -1,0 +1,217 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Headless, accessible modal dialog on the native `<dialog>` element + `showModal()` — top-layer rendering, a native `::backdrop` scrim, a real focus trap, Escape-to-dismiss, and a two-way `open` binding with a typed `close` event.",
+          "name": "Dialog",
+          "tagName": "rozie-dialog",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "open",
+              "description": "Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "open",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disableBackdropClose",
+              "description": "Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: 'backdrop'`; set this to require an explicit action.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disable-backdrop-close",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disableEscapeClose",
+              "description": "Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: 'escape'`; the component `preventDefault()`s it so the close always flows through the `open` model. Set this to keep the dialog open on Escape (e.g. a required confirmation).",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disable-escape-close",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disableScrollLock",
+              "description": "Opt **out** of locking `<html>` scroll while the dialog is open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown; set this to leave background scrolling enabled.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disable-scroll-lock",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "initialFocus",
+              "description": "What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus=\"input[name=title]\"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.",
+              "type": {
+                "text": "string | Element"
+              },
+              "attribute": "initial-focus",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "aria-label",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabelledby",
+              "description": "The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "aria-labelledby",
+              "default": "null"
+            },
+            {
+              "kind": "method",
+              "name": "show",
+              "description": "Open the dialog imperatively (sets the two-way `open` model to `true`). Equivalent to a consumer write of `open = true`; the native `<dialog>.showModal()` runs on the next reconcile."
+            },
+            {
+              "kind": "method",
+              "name": "hide",
+              "description": "Close the dialog imperatively. Sets `open` to `false` and emits `close` with `{ reason: 'programmatic' }`. A no-op when the dialog is not open (nothing is dismissed, so no `close` is emitted)."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "open",
+              "description": "Whether the dialog is shown (two-way `r-model`). The sole `model: true` prop — two-way bind it (`r-model:open` / `v-model:open` / `bind:open` / `[(open)]`) and Dialog reconciles the native `<dialog>` to it via `showModal()` / `close()`. Every close path (backdrop, Escape, programmatic `hide()`) writes `open = false` and emits `close`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "open",
+              "default": "false"
+            },
+            {
+              "name": "disable-backdrop-close",
+              "description": "Opt **out** of backdrop-click-to-dismiss. By default a click on the scrim (the `<dialog>` element itself, outside the content panel) closes the dialog with `reason: 'backdrop'`; set this to require an explicit action.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disableBackdropClose",
+              "default": "false"
+            },
+            {
+              "name": "disable-escape-close",
+              "description": "Opt **out** of Escape-to-dismiss. By default the native `cancel` event (Esc) closes with `reason: 'escape'`; the component `preventDefault()`s it so the close always flows through the `open` model. Set this to keep the dialog open on Escape (e.g. a required confirmation).",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disableEscapeClose",
+              "default": "false"
+            },
+            {
+              "name": "disable-scroll-lock",
+              "description": "Opt **out** of locking `<html>` scroll while the dialog is open. By default `document.documentElement` `overflow` is set to `hidden` for the duration the dialog is shown; set this to leave background scrolling enabled.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disableScrollLock",
+              "default": "false"
+            },
+            {
+              "name": "initial-focus",
+              "description": "What to focus when the dialog opens: a CSS selector matched inside the dialog content, or an Element. By default the native `showModal()` choice applies: the first element with `autofocus`, otherwise the first focusable element. Use it to start on a specific field (e.g. `initialFocus=\"input[name=title]\"`) without waiting for the dialog to mount. A selector that matches nothing, or an element that is not focusable, leaves the native choice in place.",
+              "type": {
+                "text": "string | Element"
+              },
+              "fieldName": "initialFocus",
+              "default": "null"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the dialog (`aria-label`) when there is no visible title to point at. Prefer `ariaLabelledby` when a visible heading exists.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "null"
+            },
+            {
+              "name": "aria-labelledby",
+              "description": "The `id` of the element that titles the dialog (`aria-labelledby`) — preferred over `ariaLabel` when a visible heading exists inside the dialog. On the Lit element the dialog lives in a shadow root while the heading is slotted light DOM, so the attribute alone cannot reach it; Dialog hands the browser the element directly (`ariaLabelledByElements`) where that is supported (Chrome/Edge 135+, Safari 16.4+) — elsewhere, use `ariaLabel` on Lit.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabelledby",
+              "default": "null"
+            }
+          ],
+          "events": [
+            {
+              "name": "close",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired whenever the dialog dismisses — through a backdrop click, the Escape key, a programmatic `hide()`, or a native close that did not go through the component (such as a `<form method=\"dialog\">` submit). Payload `{ reason }` where `reason` is `'backdrop'`, `'escape'`, or `'programmatic'` (the last covers `hide()` and any native close). The two-way `open` model is set to `false` on the same tick, so you usually only need this to learn *why* it closed (e.g. to skip a confirmation on an explicit Cancel)."
+            },
+            {
+              "name": "open-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `open` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": ""
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "Dialog",
+          "declaration": {
+            "name": "Dialog",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "Dialog",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-dialog",
+          "declaration": {
+            "name": "Dialog",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

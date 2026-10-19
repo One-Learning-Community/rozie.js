@@ -42,7 +42,9 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md",
+    "custom-elements.json"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:^"
@@ -69,5 +71,6 @@
   },
   "publishConfig": {
     "access": "public"
-  }
+  },
+  "customElements": "custom-elements.json"
 }

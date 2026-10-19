@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/pagination-vue",
+  "version": "0.1.1",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "Pagination",
+          "source": {
+            "module": "@rozie-ui/pagination-vue",
+            "symbol": "Pagination"
+          },
+          "description": "Headless, WAI-ARIA accessible pagination control — a windowed page-item model (numbers + ellipses), prev/next bounds, roving keyboard navigation, scoped slots, and a two-way `modelValue` page binding.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "model-value",
+              "description": "The 1-based current page (two-way model). Clamped into `[1, totalPages]`. Bind it with `r-model:modelValue` / `v-model:modelValue` / `modelValue` + `onModelValueChange`; it is also the Angular ControlValueAccessor control value.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "total-pages",
+              "description": "Explicit total page count. When provided (> 0) it takes precedence over `total` + `pageSize`. Use it when the backend already reports the page count.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "total",
+              "description": "Total item count. Combined with `pageSize` to derive the page count (`ceil(total / pageSize)`) when `totalPages` is not given.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "page-size",
+              "description": "Items per page. Combined with `total` to derive the page count when `totalPages` is not given.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "sibling-count",
+              "description": "Number of page buttons shown on each side of the current page (the sibling window). Larger values show more context around the current page.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "boundary-count",
+              "description": "Number of page buttons always shown at each boundary (the first and last `boundaryCount` pages), regardless of the current page.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "1"
+            },
+            {
+              "name": "disabled",
+              "description": "Disable the entire control — every page button and the prev/next controls become non-interactive and are marked `aria-disabled`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the surrounding `<nav>` landmark (its `aria-label`). Defaults to `\"Pagination\"`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"Pagination\""
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "change",
+                "description": "Fired whenever the current page changes (a page button, prev/next, or a programmatic `goto`/`next`/`prev`/`first`/`last`). Payload `{ page }` — the new clamped 1-based page. Not fired when the target page equals the current page.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:modelValue",
+                "description": "Emitted with the updated `modelValue` value; powers `v-model:modelValue`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "prevControl",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ disabled: any; goto: any; page: any }"
+            },
+            {
+              "name": "ellipsis",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ index: any }"
+            },
+            {
+              "name": "item",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ page: any; selected: any; goto: any }"
+            },
+            {
+              "name": "nextControl",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": "{ disabled: any; goto: any; page: any }"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
