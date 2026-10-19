@@ -1,6 +1,6 @@
 <template>
 
-<nav :class="['rozie-pagination', { 'rozie-pagination--disabled': props.disabled }]" ref="navRef" :aria-label="props.ariaLabel" v-bind="$attrs" @keydown="onControlKeydown($event)">
+<nav :class="['rozie-pagination', { 'rozie-pagination--disabled': props.disabled }]" ref="navRef" :aria-label="(props.ariaLabel) ?? undefined" v-bind="$attrs" @keydown="onControlKeydown($event)">
   
   <slot name="prevControl" :disabled="!canPrev() || props.disabled" :goto="goPrev" :page="currentPage() - 1">
     <button type="button" class="rozie-pagination-control rozie-pagination-prev" data-page-control="" :tabindex="(tabIndexFor(true)) ?? undefined" :disabled="!canPrev() || props.disabled" :aria-disabled="!!(!canPrev() || props.disabled)" aria-label="Previous page" @click="goPrev">‹</button>
@@ -11,7 +11,7 @@
     <span v-if="item === 'ellipsis'" class="rozie-pagination-ellipsis" aria-hidden="true">
       <slot name="ellipsis" :index="index">…</slot>
     </span><span v-if="item !== 'ellipsis'" class="rozie-pagination-item">
-      <slot name="item" :page="asPage(item)" :selected="isActive(item)" :goto="() => goToPage(item)">
+      <slot name="item" :page="item" :selected="isActive(item)" :goto="() => goToPage(item)">
         <button type="button" :class="['rozie-pagination-page', { 'is-active': isActive(item) }]" data-page-control="" :tabindex="(tabIndexFor(isActive(item))) ?? undefined" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-current="isActive(item) ? 'page' : undefined" :aria-label="'Go to page ' + item" @click="goToPage(item)">{{ item }}</button>
       </slot>
     </span></template>
@@ -129,10 +129,6 @@ const model = () => paginationItems({
 // rather than an inline ternary: the emitters repeat the key on each r-if branch,
 // where `item` is already narrowed, and TS then rejects the comparison.
 const itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
-// A loop item that is not the ellipsis marker is a page number. The `r-if` that
-// guards the `item` slot narrows it for the compiler on some targets only (Solid's
-// <Show> is not a type guard), so state it once here instead of per target.
-const asPage = (item: any): number => item as number;
 // The resolved effective total page count (read in the template + handlers).
 // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
 // the `totalPages` PROP, which on Lit becomes a class field of type `number`

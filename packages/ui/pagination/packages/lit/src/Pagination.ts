@@ -265,7 +265,7 @@ export default class Pagination extends SignalWatcher(LitElement) {
     ${item === 'ellipsis' ? html`<span class="rozie-pagination-ellipsis" aria-hidden="true" data-rozie-s-de247ae2>
       ${this.ellipsis !== undefined ? this.ellipsis({index: index}) : html`<slot name="ellipsis" data-rozie-params=${(() => { try { return JSON.stringify({index: index}); } catch { return '{}'; } })()}>…</slot>`}
     </span>` : nothing}${item !== 'ellipsis' ? html`<span class="rozie-pagination-item" data-rozie-s-de247ae2>
-      ${this.item !== undefined ? this.item({page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item)}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({page: this.asPage(item), selected: this.isActive(item)}); } catch { return '{}'; } })()} @rozie-item-goto=${($event: CustomEvent) => ((() => this.goToPage(item)) as (...args: any[]) => any)($event.detail)}>
+      ${this.item !== undefined ? this.item({page: item, selected: this.isActive(item), goto: () => this.goToPage(item)}) : html`<slot name="item" data-rozie-params=${(() => { try { return JSON.stringify({page: item, selected: this.isActive(item)}); } catch { return '{}'; } })()} @rozie-item-goto=${($event: CustomEvent) => ((() => this.goToPage(item)) as (...args: any[]) => any)($event.detail)}>
         <button class="${Object.entries({ "rozie-pagination-page": true, 'is-active': this.isActive(item) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" type="button" data-page-control="" tabindex=${rozieAttr(this.tabIndexFor(this.isActive(item)))} ?disabled=${!!this.disabled} aria-disabled=${!!this.disabled} aria-current=${rozieAttr(this.isActive(item) ? 'page' : null)} aria-label=${rozieAttr('Go to page ' + item)} @click=${($event: MouseEvent & { currentTarget: HTMLButtonElement; target: HTMLButtonElement }) => { this.goToPage(item); }} data-rozie-s-de247ae2>${rozieDisplay(item)}</button>
       </slot>`}
     </span>` : nothing}`)}
@@ -293,11 +293,6 @@ export default class Pagination extends SignalWatcher(LitElement) {
   // rather than an inline ternary: the emitters repeat the key on each r-if branch,
   // where `item` is already narrowed, and TS then rejects the comparison.
   itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
-
-  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
-  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
-  // <Show> is not a type guard), so state it once here instead of per target.
-  asPage = (item: any): number => item as number;
 
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow

@@ -126,13 +126,6 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
     return item === 'ellipsis' ? 'ellipsis-' + index : item;
   }
 
-  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
-  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
-  // <Show> is not a type guard), so state it once here instead of per target.
-  function asPage(item: any): number {
-    return item as number;
-  }
-
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -283,7 +276,7 @@ const Pagination = forwardRef<PaginationHandle, PaginationProps>(function Pagina
         {!!(item === 'ellipsis') && <span key={itemKey(item, index)} className={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(props.renderEllipsis ?? props.slots?.['ellipsis']) ? ((props.renderEllipsis ?? props.slots?.['ellipsis']) as Function)({ index }) : "…"}
         </span>}{!!(item !== 'ellipsis') && <span key={itemKey(item, index)} className={"rozie-pagination-item"} data-rozie-s-de247ae2="">
-          {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: asPage(item), selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={tabIndexFor(isActive(item))} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
+          {(props.renderItem ?? props.slots?.['item']) ? ((props.renderItem ?? props.slots?.['item']) as Function)({ page: item, selected: isActive(item), goto: () => goToPage(item) }) : <button type="button" className={clsx("rozie-pagination-page", { "is-active": isActive(item) })} data-page-control="" tabIndex={tabIndexFor(isActive(item))} disabled={!!props.disabled} aria-disabled={!!props.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : undefined)} aria-label={rozieAttr('Go to page ' + item)} onClick={($event) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
         </span>}</Fragment>)}
 
       

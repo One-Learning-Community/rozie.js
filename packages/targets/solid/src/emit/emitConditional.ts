@@ -8,6 +8,26 @@
  *   - Single r-if (no else): `<Show when={cond}>{body}</Show>`
  *   - r-if + r-else: `<Show when={cond} fallback={elseBody}>{body}</Show>`
  *   - r-if + r-else-if + ...: nested `<Show>` elements in fallback
+ *   - EB-2 (quick 261019-9g1) — a chain inside a keyless `<For>` whose test reads
+ *     the RAW loop item alias lowers to a fragment-wrapped JSX conditional,
+ *     `<>{(t1) ? A : (t2) ? B : C}</>`, instead of `<Show>`.
+ *
+ * Why not `<Show>` there: `<Show when={...}>` is not a type guard, so inside
+ * `<Show when={item !== 'gap'}>` a union alias (`number | 'gap'`) is NOT narrowed
+ * and a slot param typed `number` fails strict tsc (TS2322) on Solid alone —
+ * React's `&&`, Lit's ternary, Vue's v-if and Svelte's {#if} all narrow. A JSX
+ * ternary narrows.
+ *
+ * Why a FRAGMENT and not a bare ternary: the `<For>` render callback runs
+ * untracked, so a bare `(item) => test ? a : b` is evaluated once — a test or
+ * branch that reads a signal would stop updating. Inside a fragment,
+ * babel-preset-solid compiles the dynamic child to
+ * `_$memo(() => _$memo(() => !!(test))() ? a : null)`, the same truthiness-gated
+ * memo `<Show>` uses. A row-constant test (only the alias and literals) compiles
+ * to a static ternary, equivalent because a keyless `<For>` row's item never
+ * changes. `ctx.loopValueBindings` holds ONLY raw keyless-For item aliases, so
+ * keyed `<Key>` loops (accessor item) and non-loop conditionals never qualify and
+ * keep their byte-identical `<Show>` output.
  *
  * @experimental — shape may change before v1.0
  */
@@ -15,6 +35,61 @@ import type { TemplateConditionalIR, IRTemplateNode as TemplateNode } from '@roz
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 import { stripBalancedMustache } from './unwrapMustache.js';
+
+/** AST keys that carry positions / comments, never sub-expressions. */
+const SKIP_AST_KEYS: ReadonlySet<string> = new Set([
+  'loc',
+  'start',
+  'end',
+  'extra',
+  'leadingComments',
+  'trailingComments',
+  'innerComments',
+]);
+
+/**
+ * EB-2 — true when `test` contains a free read of one of `names`. An Identifier
+ * counts UNLESS it is the non-computed `property` of a (Optional)MemberExpression
+ * or the non-computed `key` of an ObjectProperty / ObjectMethod (`$props.item`
+ * and `{ item: 1 }` do not read a loop variable named `item`). Deliberately NOT
+ * emitTemplateNode's `expressionReferencesIdentifier`, which also matches member
+ * property keys.
+ */
+function testReadsLoopValue(test: unknown, names: ReadonlySet<string>): boolean {
+  const walk = (value: unknown, parent: Record<string, unknown> | null, key: string | null): boolean => {
+    if (Array.isArray(value)) return value.some((v) => walk(v, parent, key));
+    if (value === null || typeof value !== 'object') return false;
+    const obj = value as Record<string, unknown>;
+    if (obj['type'] === 'Identifier' && typeof obj['name'] === 'string' && names.has(obj['name'])) {
+      const ptype = parent?.['type'];
+      const isMemberProp =
+        (ptype === 'MemberExpression' || ptype === 'OptionalMemberExpression') &&
+        key === 'property' &&
+        parent?.['computed'] !== true;
+      const isObjectKey =
+        (ptype === 'ObjectProperty' || ptype === 'ObjectMethod') &&
+        key === 'key' &&
+        parent?.['computed'] !== true;
+      return !(isMemberProp || isObjectKey);
+    }
+    return Object.entries(obj).some(([k, v]) => !SKIP_AST_KEYS.has(k) && walk(v, obj, k));
+  };
+  return walk(test, null, null);
+}
+
+/**
+ * EB-2 — render a branch body as a ternary OPERAND. A balanced `{…}` mustache
+ * (a `<slot>` invocation) becomes `(inner)`; an element / fragment (starts with
+ * `<`) and `null` are used as-is; anything else (static text) is wrapped in a
+ * fragment.
+ */
+function toTernaryOperand(bodyJsx: string): string {
+  const body = bodyJsx.trim();
+  const inner = stripBalancedMustache(body);
+  if (inner !== null) return `(${inner})`;
+  if (body.startsWith('<') || body === 'null') return body;
+  return `<>${body}</>`;
+}
 
 /**
  * Render a branch's body as a single JSX expression. Multiple children
@@ -68,9 +143,37 @@ export function emitConditional(
   emitNodeFn: (n: TemplateNode, ctx: EmitNodeCtx) => string,
 ): string {
   const { solid: solidImports } = ctx.collectors;
-  solidImports.add('Show');
 
   const branches = node.branches;
+
+  // EB-2 — narrowing lowering for a chain that reads a raw keyless-For item alias.
+  const loopNames = ctx.loopValueBindings;
+  if (
+    loopNames !== undefined &&
+    loopNames.size > 0 &&
+    branches.some((b) => b.test !== null && testReadsLoopValue(b.test, loopNames))
+  ) {
+    // Build right to left: `rest` starts as `null` (no r-else) and every branch
+    // wraps it as `(test) ? operand : rest`. An r-else supplies its body as `rest`.
+    let rest = 'null';
+    for (let i = branches.length - 1; i >= 0; i--) {
+      const branch = branches[i]!;
+      const operand = toTernaryOperand(renderBranchBody(branch.body, ctx, emitNodeFn));
+      if (branch.test === null) {
+        rest = operand;
+        continue;
+      }
+      const testCode = rewriteTemplateExpression(branch.test, ctx.ir, {
+        invokeAccessors: ctx.invokeAccessors,
+        loopValueBindings: ctx.loopValueBindings,
+        scopeAccessorParams: ctx.scopeAccessorParams,
+      });
+      rest = `(${testCode}) ? ${operand} : ${rest}`;
+    }
+    return `<>{${rest}}</>`;
+  }
+
+  solidImports.add('Show');
   if (branches.length === 0) return '{null}';
 
   // Build from right to left. The last branch is either:

@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { For, Show, mergeProps, onMount, splitProps } from 'solid-js';
+import { For, mergeProps, onMount, splitProps } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, mergeListeners, pickListeners, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { paginationItems } from './internal/paginationItems';
 
@@ -170,13 +170,6 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
     return item === 'ellipsis' ? 'ellipsis-' + index : item;
   }
 
-  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
-  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
-  // <Show> is not a type guard), so state it once here instead of per target.
-  function asPage(item: any): number {
-    return item as number;
-  }
-
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -320,11 +313,11 @@ export default function Pagination(_props: PaginationProps): JSX.Element {
 
       
       <For each={model().pages}>{(item, index) => <>
-        {<Show when={item === 'ellipsis'}><span class={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
+        <>{(item === 'ellipsis') ? <span class={"rozie-pagination-ellipsis"} aria-hidden="true" data-rozie-s-de247ae2="">
           {(_props.ellipsisSlot ?? _props.slots?.['ellipsis'])?.({ get index() { return index(); } }) ?? "…"}
-        </span></Show>}{<Show when={item !== 'ellipsis'}><span class={"rozie-pagination-item"} data-rozie-s-de247ae2="">
-          {(_props.itemSlot ?? _props.slots?.['item'])?.({ get page() { return asPage(item); }, get selected() { return isActive(item); }, goto: () => goToPage(item) }) ?? <button type="button" data-page-control="" aria-disabled={!!local.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} class={"rozie-pagination-page" + " " + rozieClass({ 'is-active': isActive(item) })} tabIndex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!local.disabled} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
-        </span></Show>}</>}</For>
+        </span> : null}</><>{(item !== 'ellipsis') ? <span class={"rozie-pagination-item"} data-rozie-s-de247ae2="">
+          {(_props.itemSlot ?? _props.slots?.['item'])?.({ get page() { return item; }, get selected() { return isActive(item); }, goto: () => goToPage(item) }) ?? <button type="button" data-page-control="" aria-disabled={!!local.disabled} aria-current={rozieAttr(isActive(item) ? 'page' : null)} aria-label={rozieAttr('Go to page ' + item)} class={"rozie-pagination-page" + " " + rozieClass({ 'is-active': isActive(item) })} tabIndex={rozieAttr(tabIndexFor(isActive(item)))} disabled={!!local.disabled} onClick={($event: MouseEvent & { currentTarget: HTMLButtonElement; target: Element }) => { goToPage(item); }} data-rozie-s-de247ae2="">{rozieDisplay(item)}</button>}
+        </span> : null}</></>}</For>
 
       
       {(_props.nextControlSlot ?? _props.slots?.['nextControl'])?.({ get disabled() { return !canNext() || local.disabled; }, get goto() { return goNext; }, get page() { return currentPage() + 1; } }) ?? <button type="button" data-page-control="" aria-disabled={!!(!canNext() || local.disabled)} aria-label="Next page" class={"rozie-pagination-control rozie-pagination-next"} tabIndex={rozieAttr(tabIndexFor(true))} disabled={!canNext() || local.disabled} onClick={goNext} data-rozie-s-de247ae2="">›</button>}

@@ -235,10 +235,6 @@ export class Pagination {
   // rather than an inline ternary: the emitters repeat the key on each r-if branch,
   // where `item` is already narrowed, and TS then rejects the comparison.
   itemKey = (item: any, index: any) => item === 'ellipsis' ? 'ellipsis-' + index : item;
-  // A loop item that is not the ellipsis marker is a page number. The `r-if` that
-  // guards the `item` slot narrows it for the compiler on some targets only (Solid's
-  // <Show> is not a type guard), so state it once here instead of per target.
-  asPage = (item: any): number => item as number;
   // The resolved effective total page count (read in the template + handlers).
   // NAMED `effectivePages`, NOT `totalPages` — a `totalPages` helper would shadow
   // the `totalPages` PROP, which on Lit becomes a class field of type `number`
@@ -414,7 +410,7 @@ export class Pagination {
     }
   });
 
-  private _item_ctx_2 = (item: any, index: any) => ({ $implicit: { page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item) }, page: this.asPage(item), selected: this.isActive(item), goto: () => this.goToPage(item) });
+  private _item_ctx_2 = (item: any, index: any) => ({ $implicit: { page: item, selected: this.isActive(item), goto: () => this.goToPage(item) }, page: item, selected: this.isActive(item), goto: () => this.goToPage(item) });
 
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 
