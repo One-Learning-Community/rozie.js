@@ -1,6 +1,4 @@
 ---
-"@rozie-ui/dialog-react": patch
-"@rozie-ui/dialog-svelte": minor
 "@rozie-ui/lexical-react": patch
 "@rozie-ui/lexical-solid": patch
 "@rozie-ui/lexical-svelte": minor
@@ -8,8 +6,6 @@
 "@rozie-ui/maplibre-svelte": minor
 "@rozie-ui/number-field-react": patch
 "@rozie-ui/number-field-svelte": minor
-"@rozie-ui/pagination-react": patch
-"@rozie-ui/pagination-svelte": minor
 "@rozie-ui/resizable-react": patch
 "@rozie-ui/resizable-svelte": minor
 "@rozie-ui/slider-react": patch

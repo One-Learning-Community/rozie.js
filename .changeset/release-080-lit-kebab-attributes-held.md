@@ -1,9 +1,7 @@
 ---
-"@rozie-ui/dialog-lit": patch
 "@rozie-ui/lexical-lit": patch
 "@rozie-ui/maplibre-lit": patch
 "@rozie-ui/number-field-lit": patch
-"@rozie-ui/pagination-lit": patch
 "@rozie-ui/resizable-lit": patch
 "@rozie-ui/slider-lit": patch
 "@rozie-ui/switch-lit": patch

@@ -1,6 +1,4 @@
 ---
-"@rozie-ui/dialog-react": patch
-"@rozie-ui/pagination-react": patch
 "@rozie-ui/switch-react": patch
 ---
 

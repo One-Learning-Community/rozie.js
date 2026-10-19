@@ -1,8 +1,4 @@
 ---
-"@rozie-ui/dialog-angular": patch
-"@rozie-ui/dialog-react": patch
-"@rozie-ui/dialog-svelte": patch
-"@rozie-ui/dialog-vue": patch
 "@rozie-ui/lexical-lit": patch
 "@rozie-ui/maplibre-angular": patch
 "@rozie-ui/maplibre-lit": patch
@@ -12,9 +8,6 @@
 "@rozie-ui/number-field-angular": patch
 "@rozie-ui/number-field-react": patch
 "@rozie-ui/number-field-vue": patch
-"@rozie-ui/pagination-angular": patch
-"@rozie-ui/pagination-react": patch
-"@rozie-ui/pagination-vue": patch
 "@rozie-ui/resizable-angular": patch
 "@rozie-ui/resizable-react": patch
 "@rozie-ui/resizable-vue": patch
