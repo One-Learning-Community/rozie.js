@@ -182,6 +182,12 @@ const NUMERIC_HTML_ATTRS: ReadonlySet<string> = new Set([
   'aria-rowcount',
   'aria-colcount',
   'aria-level',
+  // quick 261019-9g1 (add-on C) — the remaining numeric ARIA names React types
+  // `number | undefined`: grid span, and the listbox/tree position set.
+  'aria-colspan',
+  'aria-rowspan',
+  'aria-posinset',
+  'aria-setsize',
   // LB6 SEAM 2 — the slider/resizable `aria-valuenow`/`aria-valuemin`/`aria-valuemax`
   // re-emit (sibling of the `aria-rowindex` class above). React types these
   // `number | undefined`; a number-typed call/member/logical expr now emits RAW

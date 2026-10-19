@@ -177,6 +177,11 @@ const NULLABLE_DOM_ATTR_SLOTS: ReadonlySet<string> = new Set([
   'aria-rowcount',
   'aria-colcount',
   'aria-level',
+  // quick 261019-9g1 (add-on C) — the remaining Numberish ARIA names.
+  'aria-colspan',
+  'aria-rowspan',
+  'aria-posinset',
+  'aria-setsize',
   'aria-valuenow',
   'aria-valuemin',
   'aria-valuemax',
@@ -328,6 +333,36 @@ function isProvablyNonNullishAttr(expr: t.Expression): boolean {
     return isProvablyNonNullishAttr(expr.right);
   }
   return false;
+}
+
+/**
+ * Wrap a rewritten binding expression as `(expr) ?? undefined` when `name` is a
+ * DOM-attr slot that types `X | undefined` (never `| null`) — the shared decision
+ * for BOTH the `:attr="x"` binding path and the single-segment interpolated
+ * `attr="{{ x }}"` path (add-on B, quick 261019-9g1).
+ *
+ * `shapeExpr` is the (normalized) source expression the shape predicates inspect;
+ * `code` is its rewritten text. Wraps when the slot is in NULLABLE_DOM_ATTR_SLOTS,
+ * or in NULLABLE_DOM_STRING_ARIA_SLOTS on an HTML host, unless the operand is
+ * provably non-nullish (TS2869 guard) or already `|| undefined` / `?? undefined`.
+ * Parenthesized so a top-level `||`/`&&` adjacent to `??` stays well-formed.
+ */
+function wrapNullableSlot(
+  name: string,
+  shapeExpr: t.Expression,
+  code: string,
+  ctx: EmitAttrCtx,
+): string {
+  const lname = name.toLowerCase();
+  const wrapsSlot =
+    NULLABLE_DOM_ATTR_SLOTS.has(lname) ||
+    (NULLABLE_DOM_STRING_ARIA_SLOTS.has(lname) &&
+      ctx.elementTagKind !== 'component' &&
+      ctx.elementTagKind !== 'self');
+  if (wrapsSlot && !isProvablyNonNullishAttr(shapeExpr) && !isAlreadyUndefinedDropped(shapeExpr)) {
+    return `(${code}) ?? undefined`;
+  }
+  return code;
 }
 
 /**
@@ -722,22 +757,15 @@ function emitSingleAttr(attr: AttributeBinding, ctx: EmitAttrCtx): string {
     // wrap calls/general-members/identifiers). Wrap as `(expr) ?? undefined`
     // unless the shape is provably-non-nullish (TS2869 guard). Parenthesize so a
     // top-level `||`/`&&` adjacent to `??` stays well-formed.
-    const lname = name.toLowerCase();
-    const wrapsSlot =
-      NULLABLE_DOM_ATTR_SLOTS.has(lname) ||
-      (NULLABLE_DOM_STRING_ARIA_SLOTS.has(lname) &&
-        ctx.elementTagKind !== 'component' &&
-        ctx.elementTagKind !== 'self');
-    if (wrapsSlot && !isProvablyNonNullishAttr(normalized) && !isAlreadyUndefinedDropped(normalized)) {
-      return `:${name}="(${expr}) ?? undefined"`;
-    }
-    return `:${name}="${expr}"`;
+    return `:${name}="${wrapNullableSlot(name, normalized, expr, ctx)}"`;
   }
 
   // interpolated: if exactly one binding segment, simplify to `:name="<expr>"`.
   if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
     const seg = attr.segments[0]! as { kind: 'binding'; expression: t.Expression; deps: unknown };
-    return `:${name}="${rewriteTemplateExpression(seg.expression, ir)}"`;
+    // quick 261019-9g1 (add-on B) — `attr="{{ x }}"` is the same binding as
+    // `:attr="x"`, so it takes the same nullable-slot drop (EB-1 / Phase 67).
+    return `:${name}="${wrapNullableSlot(name, seg.expression, rewriteTemplateExpression(seg.expression, ir), ctx)}"`;
   }
 
   // Multi-segment or single-static — render as template literal.

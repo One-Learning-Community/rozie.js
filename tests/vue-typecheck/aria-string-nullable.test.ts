@@ -5,6 +5,10 @@
  * source. `@vue/runtime-dom` types these slots `string | undefined` (never
  * `| null`), so the emitter drops them with `(expr) ?? undefined`.
  *
+ * Also covers the single-binding interpolated form (`aria-label="{{ x }}"`) and the
+ * Numberish names aria-colspan / aria-rowspan / aria-posinset / aria-setsize
+ * (add-ons B and C).
+ *
  * Controls (binary / both-literal ternary / already `|| undefined`) must stay RAW:
  * wrapping any of them would be TS2869 "right operand of ?? is unreachable".
  */
@@ -38,11 +42,17 @@ const SRC = `<rozie name="AriaStringNullable">
 {
   label: { type: String, default: null },
   on: { type: Boolean, default: false },
+  n: { type: Number, default: null },
 }
 </props>
 <template>
 <div>
 ${NAMES.map((n) => `  <div :${n}="$props.label"></div>`).join('\n')}
+  <div aria-label="{{ $props.label }}"></div>
+  <div :aria-colspan="$props.n"></div>
+  <div :aria-rowspan="$props.n"></div>
+  <div :aria-posinset="$props.n"></div>
+  <div :aria-setsize="$props.n"></div>
   <div :aria-label="'Item ' + $props.label"></div>
   <div :aria-describedby="$props.on ? 'a' : 'b'"></div>
   <div :aria-labelledby="$props.label || undefined"></div>

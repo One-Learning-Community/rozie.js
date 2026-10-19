@@ -130,3 +130,50 @@ ${PROPS}
     expect(template).toContain(':aria-current="props.cur"');
   });
 });
+
+describe('emitTemplateAttribute (Vue) — single-binding interpolated path takes the same drop (add-on B)', () => {
+  it('aria-label="{{ $props.label }}" on a <div> wraps as (expr) ?? undefined', () => {
+    const template = emitInterpolated('aria-label', '{{ $props.label }}');
+    expect(template).toContain(':aria-label="(props.label) ?? undefined"');
+  });
+
+  it('a plain-string name on a component host stays RAW in the interpolated form', () => {
+    const ir = lowerInline(`<rozie name="Test">
+<components>{ Child: "./Child.rozie" }</components>
+${PROPS}
+<template>
+  <Child aria-label="{{ $props.label }}" />
+</template>
+</rozie>`);
+    const { template } = emitTemplate(ir, REGISTRY);
+    expect(template).toContain(':aria-label="props.label"');
+    expect(template).not.toContain('?? undefined');
+  });
+
+  it('a numeric name (tabindex) in the interpolated form wraps too', () => {
+    const template = emitInterpolated('tabindex', '{{ $props.n }}');
+    expect(template).toContain(':tabindex="(props.n) ?? undefined"');
+  });
+
+  it('NO-REGRESS: an unlisted name stays RAW in the interpolated form', () => {
+    const template = emitInterpolated('title', '{{ $props.label }}');
+    expect(template).toContain(':title="props.label"');
+  });
+
+  it('NO-REGRESS: a multi-segment interpolation stays a template literal (no wrap)', () => {
+    const template = emitInterpolated('aria-label', 'Item {{ $props.label }}');
+    expect(template).toContain(':aria-label="`Item ${props.label}`"');
+  });
+});
+
+function emitInterpolated(attr: string, value: string): string {
+  const ir = lowerInline(`<rozie name="Test">
+${PROPS}
+<template>
+  <div ${attr}="${value}"></div>
+</template>
+</rozie>`);
+  const { template, diagnostics } = emitTemplate(ir, REGISTRY);
+  expect(diagnostics).toEqual([]);
+  return template;
+}
