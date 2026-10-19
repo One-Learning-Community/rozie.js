@@ -3,7 +3,7 @@
 <div class="rozie-popover" v-bind="$attrs">
 
   
-  <div class="rozie-popover-anchor" ref="anchorElRef" :aria-haspopup="anchorHaspopup()" :aria-expanded="(props.trigger === 'click' ? !!open : undefined) ?? undefined" :aria-controls="props.trigger === 'click' && open ? panelId() : undefined" :aria-describedby="isTooltip() && open ? panelId() : undefined" @click="props.trigger === 'click' && onAnchorClick()" @pointerenter="props.trigger === 'hover' && onAnchorPointerEnter()" @pointerleave="props.trigger === 'hover' && onAnchorPointerLeave()" @focusin="props.trigger === 'focus' && onAnchorFocus()" @focusout="props.trigger === 'focus' && onAnchorBlur()">
+  <div class="rozie-popover-anchor" ref="anchorElRef" :aria-haspopup="anchorHaspopup()" :aria-expanded="(props.trigger === 'click' ? !!open : undefined) ?? undefined" :aria-controls="(props.trigger === 'click' && open ? panelId() : undefined) ?? undefined" :aria-describedby="(isTooltip() && open ? panelId() : undefined) ?? undefined" @click="props.trigger === 'click' && onAnchorClick()" @pointerenter="props.trigger === 'hover' && onAnchorPointerEnter()" @pointerleave="props.trigger === 'hover' && onAnchorPointerLeave()" @focusin="props.trigger === 'focus' && onAnchorFocus()" @focusout="props.trigger === 'focus' && onAnchorBlur()">
     <slot name="anchor" :open="open" :toggle="toggle" :show="show" :hide="hide" :panelId="panelId()" :popupRole="anchorPopupRole()"></slot>
   </div>
 

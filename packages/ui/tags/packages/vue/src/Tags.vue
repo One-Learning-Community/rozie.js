@@ -1,15 +1,15 @@
 <template>
 
-<div :class="['rozie-tags', { 'rozie-tags--disabled': props.disabled, 'rozie-tags--readonly': props.readonly }]" ref="rootRef" role="group" :aria-label="props.ariaLabel" v-bind="$attrs">
+<div :class="['rozie-tags', { 'rozie-tags--disabled': props.disabled, 'rozie-tags--readonly': props.readonly }]" ref="rootRef" role="group" :aria-label="(props.ariaLabel) ?? undefined" v-bind="$attrs">
   <ul class="rozie-tags-list">
     <li v-for="t in tokens()" :key="t + ':' + tokens().indexOf(t)" class="rozie-tags-chip">
       <slot name="tag" :tag="t" :index="tokens().indexOf(t)" :remove="() => removeAt(tokens().indexOf(t))">
         <span class="rozie-tags-chip__label">{{ t }}</span>
-        <button v-if="!props.readonly" type="button" class="rozie-tags-chip__remove" :disabled="!!props.disabled" :aria-label="removeLabel(t)" @click="removeAt(tokens().indexOf(t))">×</button></slot>
+        <button v-if="!props.readonly" type="button" class="rozie-tags-chip__remove" :disabled="!!props.disabled" :aria-label="(removeLabel(t)) ?? undefined" @click="removeAt(tokens().indexOf(t))">×</button></slot>
     </li>
   </ul>
 
-  <input v-if="!props.readonly" class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" :value="draft" :placeholder="props.placeholder" :disabled="!!props.disabled || !!atMax()" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @input="onInput($event)" @keydown="onKeydown($event)" @paste="onPaste($event)" @blur="onBlur($event)" /><span class="rozie-tags-count" aria-live="polite">{{ countLabel() }}</span>
+  <input v-if="!props.readonly" class="rozie-tags-input" type="text" autocomplete="off" autocapitalize="off" :value="draft" :placeholder="props.placeholder" :disabled="!!props.disabled || !!atMax()" :aria-label="(props.ariaLabel) ?? undefined" :aria-disabled="!!props.disabled" @input="onInput($event)" @keydown="onKeydown($event)" @paste="onPaste($event)" @blur="onBlur($event)" /><span class="rozie-tags-count" aria-live="polite">{{ countLabel() }}</span>
 </div>
 
 </template>

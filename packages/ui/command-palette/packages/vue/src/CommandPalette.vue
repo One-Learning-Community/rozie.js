@@ -3,7 +3,7 @@
 <Teleport :to="__roziePortalTo0" :disabled="!__roziePortalTo0"><div v-if="open" class="rozie-command-palette" @click="onBackdropClick($event)">
   
   <div ref="frameRef" tabindex="-1" class="rozie-command-palette-frame" data-testid="command-palette-frame" @keydown="onPanelKeydown($event)">
-  <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="props.ariaLabel">
+  <div ref="panelRef" class="rozie-command-palette-panel" role="dialog" aria-modal="true" :aria-label="(props.ariaLabel) ?? undefined">
     
     <div v-if="atDepth()" class="rozie-command-palette-header">
       <slot name="breadcrumb" :stack="breadcrumbStack()" :back="goBack">
@@ -46,7 +46,7 @@
       <span class="rozie-command-palette-args-chip rozie-command-palette-breadcrumb-segment--current" data-testid="command-palette-args-chip" aria-hidden="true">{{ argsState ? labelText(argsState.item) : '' }}</span>
       <span v-for="(arg, argIdx) in argsState ? argsState.argList : []" :key="arg.id" class="rozie-command-palette-args-field">
         <slot name="argsField" :item="argsState ? argsState.item : null" :arg="arg" :value="argsState ? argsState.values[arg.id] : ''" :setValue="setArgValueFor(arg.id)">
-          <input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" :value="argsState ? argsState.values[arg.id] : ''" :placeholder="arg.placeholder || arg.id" :aria-label="arg.placeholder || arg.id" @input="onArgFieldInput(arg.id, $event)" />
+          <input type="text" class="rozie-command-palette-args-input" data-testid="command-palette-args-input" :value="argsState ? argsState.values[arg.id] : ''" :placeholder="arg.placeholder || arg.id" :aria-label="(arg.placeholder || arg.id) ?? undefined" @input="onArgFieldInput(arg.id, $event)" />
         </slot>
       </span>
     </div><div v-if="currentStatus() === 'loading'" class="rozie-command-palette-loading">
@@ -58,7 +58,7 @@
     </div></div>
 
   
-  <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="actionAnchor ? labelText(actionAnchor.item) : undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
+  <div v-if="atActions()" data-command-palette-menu="" data-testid="command-palette-actions-menu" class="rozie-command-palette-actions-menu" role="menu" :aria-label="(actionAnchor ? labelText(actionAnchor.item) : undefined) ?? undefined" :style="'top:' + actionMenuTop + 'px'" @keydown="onActionMenuKeydown($event)">
     <div v-for="(action, ai) in actionAnchor ? actionAnchor.actions : []" :key="action.id" :class="['rozie-command-palette-actions-menu-item', { 'rozie-command-palette-actions-menu-item--active': ai === actionIndex, 'rozie-command-palette-actions-menu-item--disabled': !!action.disabled }]" role="menuitem" data-testid="command-palette-action-item" :aria-disabled="!!action.disabled" tabindex="-1" @mouseenter="actionIndex = Number(ai)" @mousedown.prevent="selectAction(action)">
       <slot name="actionItem" :action="action" :item="actionAnchor ? actionAnchor.item : null" :active="ai === actionIndex" :disabled="!!action.disabled">
         <span v-if="actionIcon(action)" class="rozie-command-palette-actions-menu-item-icon">{{ actionIcon(action) }}</span><span class="rozie-command-palette-actions-menu-item-label">{{ actionLabel(action) }}</span>

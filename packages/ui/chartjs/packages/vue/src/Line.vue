@@ -2,7 +2,7 @@
 
 <div class="rozie-chart" :style="{ height: props.height + 'px', width: props.width ? props.width + 'px' : undefined }">
   
-  <canvas ref="canvasElRef" role="img" :aria-label="props.ariaLabel"><slot name="fallback"></slot></canvas>
+  <canvas ref="canvasElRef" role="img" :aria-label="(props.ariaLabel) ?? undefined"><slot name="fallback"></slot></canvas>
 </div>
 
 

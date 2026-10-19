@@ -1,6 +1,6 @@
 <template>
 
-<input class="rdt-col-filter" part="col-filter" type="text" :aria-label="a11yLabel()" :value="draftValue()" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input class="rdt-col-filter" part="col-filter" type="text" :aria-label="(a11yLabel()) ?? undefined" :value="draftValue()" @input="onInput($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 

@@ -8,14 +8,14 @@
         <template v-if="props.multiple"><span v-for="(row, idx) in chipRows()" :key="row.key" class="rozie-select-chip">
           <slot name="chip" :option="row.option" :remove="() => onChipRemove(row)" :index="idx">
             <span class="rozie-select-chip__label">{{ row.label }}</span>
-            <button type="button" class="rozie-select-chip__remove" tabindex="-1" :disabled="!!props.disabled" :aria-label="chipRemoveLabel(row)" @mousedown.prevent="noop()" @click="onChipRemove(row)">×</button>
+            <button type="button" class="rozie-select-chip__remove" tabindex="-1" :disabled="!!props.disabled" :aria-label="(chipRemoveLabel(row)) ?? undefined" @mousedown.prevent="noop()" @click="onChipRemove(row)">×</button>
           </slot>
-        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-hidden="(nativeActive() ? true : undefined) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="props.ariaLabel" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
+        </span></template><div ref="triggerElRef" class="rozie-select-trigger" role="combobox" aria-haspopup="listbox" :tabindex="(triggerTabindex()) ?? undefined" :aria-hidden="(nativeActive() ? true : undefined) ?? undefined" :aria-expanded="!!popupVisible()" :aria-controls="idRoot() + '-list'" :aria-activedescendant="(popupVisible() && activeIndex < visibleOptions().length ? activeDescendant : undefined) ?? undefined" :aria-label="(props.ariaLabel) ?? undefined" :aria-disabled="!!props.disabled" @keydown="onTriggerKeyDown($event)">
           <template v-if="!props.multiple"><slot name="selected" :selected="selectedLabel()" :value="value">
             <span v-if="selectedLabel()" class="rozie-select-selected">{{ selectedLabel() }}</span><span v-else class="rozie-select-placeholder">{{ props.placeholder }}</span></slot></template><span v-if="props.multiple && selectedValues().length === 0" class="rozie-select-placeholder">{{ props.placeholder }}</span></div>
-        <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="props.clearLabel" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
+        <button v-if="props.clearable && hasValue() && !props.disabled" type="button" class="rozie-select-clear" tabindex="-1" :aria-label="(props.clearLabel) ?? undefined" @mousedown.prevent="noop()" @click="onClearClick()">×</button><span class="rozie-select-arrow" aria-hidden="true">▾</span>
         
-        <select v-if="nativeActive()" class="rozie-select-native" :disabled="!!props.disabled" :aria-label="props.ariaLabel ? props.ariaLabel : undefined" @change="onNativeChange($event)">
+        <select v-if="nativeActive()" class="rozie-select-native" :disabled="!!props.disabled" :aria-label="(props.ariaLabel ? props.ariaLabel : undefined) ?? undefined" @change="onNativeChange($event)">
           <option value="" :disabled="!!nativePlaceholderDisabled()">{{ props.placeholder }}</option>
           <option v-for="row in nativeRows().loose" :key="'n-' + row.index" :value="row.index" :disabled="!!disabledOf(row.opt)">{{ labelOf(row.opt) }}</option>
           <optgroup v-for="blk in nativeRows().grouped" :key="'ng-' + blk.group.id" :label="blk.group.label">
@@ -24,7 +24,7 @@
         </select></div>
     </template>
       
-      <div v-if="popupVisible() && !props.virtual && !isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
+      <div v-if="popupVisible() && !props.virtual && !isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="(props.ariaLabel) ?? undefined" :aria-multiselectable="(props.multiple) ?? undefined" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
         <div v-for="row in flatRows()" :key="optionId(row.index)" :id="optionId(row.index)" :class="['rozie-select-option', { 'is-active': activeIndex === row.index, 'is-selected': row.selected, 'is-disabled': disabledOf(row.opt) }]" role="option" :aria-selected="!!row.selected" :aria-disabled="!!disabledOf(row.opt)" @click="select(row.opt)" @mousemove="onOptionPointerMove(row.index)">
           <slot name="option" :option="row.opt" :index="row.index" :active="activeIndex === row.index" :selected="row.selected" :disabled="disabledOf(row.opt)">
             {{ labelOf(row.opt) }}
@@ -33,8 +33,8 @@
 
         <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
           <slot name="empty" :query="query">No options</slot>
-        </div></div><div v-if="popupVisible() && !props.virtual && isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
-        <div v-for="blk in groupedRows()" :key="blk.key" class="rozie-select-group" role="group" :aria-label="blk.group ? blk.group.label : undefined">
+        </div></div><div v-if="popupVisible() && !props.virtual && isGrouped()" ref="listElRef" class="rozie-select-list" role="listbox" :id="idRoot() + '-list'" :aria-label="(props.ariaLabel) ?? undefined" :aria-multiselectable="(props.multiple) ?? undefined" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
+        <div v-for="blk in groupedRows()" :key="blk.key" class="rozie-select-group" role="group" :aria-label="(blk.group ? blk.group.label : undefined) ?? undefined">
           <div v-if="blk.group" class="rozie-select-group-heading" role="presentation">
             <slot name="groupHeading" :group="blk.group">{{ blk.group.label }}</slot>
           </div><div v-for="row in blk.items" :key="optionId(row.index)" :id="optionId(row.index)" :class="['rozie-select-option', { 'is-active': activeIndex === row.index, 'is-selected': row.selected, 'is-disabled': disabledOf(row.opt) }]" role="option" :aria-selected="!!row.selected" :aria-disabled="!!disabledOf(row.opt)" @click="select(row.opt)" @mousemove="onOptionPointerMove(row.index)">
@@ -45,7 +45,7 @@
         </div>
         <div v-if="visibleOptions().length === 0" class="rozie-select-empty" role="presentation">
           <slot name="empty" :query="query">No options</slot>
-        </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="props.ariaLabel" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + props.maxHeight : 'overflow-y:auto')" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
+        </div></div><div v-if="props.virtual" ref="listElRef" class="rozie-select-list rozie-select-list--virtual" role="listbox" :id="idRoot() + '-list'" :aria-label="(props.ariaLabel) ?? undefined" :aria-multiselectable="(props.multiple) ?? undefined" :style="(popupVisible() ? '' : 'display:none;') + (props.maxHeight ? 'height:' + props.maxHeight + ';max-height:' + props.maxHeight + ';overflow-y:auto;--rozie-select-list-max-height:' + props.maxHeight : 'overflow-y:auto')" @mousedown="onListMouseDown($event)" @wheel="cancelReveal()" @touchmove="cancelReveal()">
         <div class="rozie-select-spacer" aria-hidden="true" :style="'height:' + padTop() + 'px'"></div>
 
         <div v-for="wr in windowedRows()" :key="wr.row.id" :id="optionId(wr.vi.index)" :data-index="wr.vi.index" :class="['rozie-select-option', { 'is-active': activeIndex === wr.vi.index, 'is-selected': isSelected(rowOption(wr)), 'is-disabled': disabledOf(rowOption(wr)) }]" role="option" :aria-selected="!!isSelected(rowOption(wr))" :aria-disabled="!!disabledOf(rowOption(wr))" @click="select(rowOption(wr))" @mousemove="onOptionPointerMove(wr.vi.index)">

@@ -1,6 +1,6 @@
 <template>
 
-<input ref="inputElRef" class="rdt-cell-editor" type="date" data-editing-cell="" :aria-label="a11yLabel()" :value="draftValue()" @input="onInput($event)" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
+<input ref="inputElRef" class="rdt-cell-editor" type="date" data-editing-cell="" :aria-label="(a11yLabel()) ?? undefined" :value="draftValue()" @input="onInput($event)" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()" />
 
 </template>
 

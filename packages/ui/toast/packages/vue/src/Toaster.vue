@@ -1,6 +1,6 @@
 <template>
 
-<div :class="['rozie-toaster', 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')]" role="region" :aria-label="regionLabel()" v-bind="$attrs" @mouseenter="onMouseEnter()" @mouseleave="onMouseLeave()" @focusin="onFocusIn()" @focusout="onFocusOut($event)">
+<div :class="['rozie-toaster', 'rozie-toaster--' + props.position + (props.stacked ? ' rozie-toaster--stacked' : '')]" role="region" :aria-label="(regionLabel()) ?? undefined" v-bind="$attrs" @mouseenter="onMouseEnter()" @mouseleave="onMouseLeave()" @focusin="onFocusIn()" @focusout="onFocusOut($event)">
   
   <div v-if="!props.disableAnnounce" class="rozie-toaster-live">
     <div role="status" aria-live="polite" aria-atomic="false">

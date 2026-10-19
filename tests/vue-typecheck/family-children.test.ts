@@ -141,40 +141,15 @@ const FAMILIES: FamilySpec[] = [
   {
     name: 'select',
     leaf: 'packages/ui/select/packages/vue',
-    baseline: {
-      'Select.vue': {
-        // Phase 67 (SC-2) cleared the `:aria-activedescendant="activeDescendant"`
-        // TS2322 (4 → 3): a `string|null` bound to the `string|undefined` slot, now
-        // emitted as `(activeDescendant) ?? undefined` by the shape heuristic.
-        //
-        // The residual 3 are all `:aria-label="props.ariaLabel"` (`string|null` →
-        // `string|undefined` slot) at L7/L15/L24. These are NOT shape-fixable, and
-        // this is the empirical revision of 67-RESEARCH's optimistic "select → 0":
-        // `aria-label` is overwhelmingly bound to provably-NON-null expressions across
-        // the family set — `props.columnId` (string), string-literal concats
-        // (`'Pin ' + …`), non-null ternaries (`rowIsExpanded(row) ? 'Collapse' :
-        // 'Expand'`, INCLUDING 4 in the gated DataTable.vue), and loop-var identifiers
-        // (`gk`, `day.iso`). The Vue emitter does NO type inference and decides by
-        // SHAPE, so it cannot distinguish nullable `props.ariaLabel` from non-null
-        // `props.columnId` — both are `props.<id>` members. Adding `aria-label` to
-        // NULLABLE_DOM_ATTR_SLOTS would wrap the non-null cases as `(expr) ?? undefined`
-        // and produce a TS2869 "unreachable right operand" storm — REGRESSING the gate
-        // (DataTable.vue would gain 4 new TS2869). React avoids this by routing
-        // nullable aria-label through its `rozieAttr` RUNTIME drop (no type-level
-        // `?? undefined`); Vue has no such path. Clearing these 3 therefore needs a
-        // Vue `rozieAttr`-equivalent runtime capability — an architectural addition
-        // OUT OF SCOPE for Phase 67 (which is a shape-heuristic emitter phase, no
-        // `as any`/annotations — the Phase-65 SC-3 discipline). Baselined as an
-        // inherent residual, exactly like Phase 65's "no leaf fully clean" finding.
-        // (The earlier TS2339 ×8 Class-3 windowing `never` narrowing was already
-        // cleared by Phase 65 Plan 04.)
-        //
-        // 3 → 4 (select option groups): the new grouped listbox branch carries the
-        // same `:aria-label="props.ariaLabel"` binding as the flat and windowed
-        // branches — one more site of the residual described above, not a new class.
-        TS2322: 4,
-      },
-    },
+    // Enforced clean. Phase 67 (SC-2) cleared `:aria-activedescendant` and left a
+    // residual of 3 → 4 `:aria-label="props.ariaLabel"` TS2322 (`string|null` bound to
+    // the `string|undefined` slot) on the theory that wrapping `aria-label` would
+    // wrap provably-non-null operands and raise TS2869. Cleared by EB-1 (quick
+    // 261019-9g1): TS2869 is syntactic, and the shape predicate
+    // (`isProvablyNonNullishAttr`) keeps binary operands (`'Pin ' + …`) and
+    // both-non-null ternaries RAW, so wrapping member/identifier operands
+    // (`props.columnId`, `gk`, `day.iso`) is safe — DataTable.vue gains no TS2869.
+    baseline: {},
   },
   {
     // Engine-wrapper family — currently CLEAN under strict. Enforced clean: any

@@ -2,7 +2,7 @@
 
 <div class="rozie-lexical" v-bind="$attrs">
   
-  <div ref="rootElRef" class="rozie-lexical-content" :contenteditable="true" :aria-label="props.ariaLabel"></div>
+  <div ref="rootElRef" class="rozie-lexical-content" :contenteditable="true" :aria-label="(props.ariaLabel) ?? undefined"></div>
   
   <slot></slot>
 </div>

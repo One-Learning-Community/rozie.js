@@ -1,6 +1,6 @@
 <template>
 
-<select ref="selectElRef" class="rdt-cell-editor" data-editing-cell="" :aria-label="a11yLabel()" :value="draftValue()" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
+<select ref="selectElRef" class="rdt-cell-editor" data-editing-cell="" :aria-label="(a11yLabel()) ?? undefined" :value="draftValue()" @change="onChange($event)" @keydown="onKeydown($event)" @blur="onBlur()">
   <option v-for="opt in props.options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
 </select>
 

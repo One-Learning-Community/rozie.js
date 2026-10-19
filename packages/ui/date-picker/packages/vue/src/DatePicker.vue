@@ -1,25 +1,25 @@
 <template>
 
-<div :class="['rozie-datepicker', { 'rozie-datepicker--disabled': props.disabled, 'rozie-datepicker--multi': props.numberOfMonths > 1 }]" ref="rootRef" role="group" :aria-label="labelFor('root')" :aria-disabled="!!props.disabled" v-bind="$attrs">
+<div :class="['rozie-datepicker', { 'rozie-datepicker--disabled': props.disabled, 'rozie-datepicker--multi': props.numberOfMonths > 1 }]" ref="rootRef" role="group" :aria-label="(labelFor('root')) ?? undefined" :aria-disabled="!!props.disabled" v-bind="$attrs">
   
   <slot name="header" :label="monthHeading()" :prev="goPrevMonth" :next="goNextMonth" :disabled="!!props.disabled" :openMonths="enterMonthsView" :openYears="enterYearsView" :closeDrill="exitToDaysView" :viewMode="viewMode">
     <div class="rozie-datepicker-header">
-      <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('previousMonth')" @click="goPrevMonth">‹</button>
-      <button v-if="props.monthYearNav" type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('changeMonthYear')" aria-live="polite" @click="enterMonthsView">{{ monthHeading() }}</button><span v-else class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span><button type="button" class="rozie-datepicker-nav rozie-datepicker-next" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('nextMonth')" @click="goNextMonth">›</button>
+      <button type="button" class="rozie-datepicker-nav rozie-datepicker-prev" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="(labelFor('previousMonth')) ?? undefined" @click="goPrevMonth">‹</button>
+      <button v-if="props.monthYearNav" type="button" class="rozie-datepicker-heading rozie-datepicker-heading-button" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="(labelFor('changeMonthYear')) ?? undefined" aria-live="polite" @click="enterMonthsView">{{ monthHeading() }}</button><span v-else class="rozie-datepicker-heading" aria-live="polite">{{ monthHeading() }}</span><button type="button" class="rozie-datepicker-nav rozie-datepicker-next" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="(labelFor('nextMonth')) ?? undefined" @click="goNextMonth">›</button>
     </div>
   </slot>
 
   
   <div class="rozie-datepicker-grids" ref="__rozieKeynavRootRef">
-    <div v-for="(g, gi) in daysGrids()" :key="g.year + '-' + g.month" class="rozie-datepicker-grid" role="grid" :aria-label="panelHeading(gi)" @mouseleave="hoverIso = ''">
+    <div v-for="(g, gi) in daysGrids()" :key="g.year + '-' + g.month" class="rozie-datepicker-grid" role="grid" :aria-label="(panelHeading(gi)) ?? undefined" @mouseleave="hoverIso = ''">
       <div class="rozie-datepicker-weekdays" role="row">
-        <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="weekdaysLong()[wi]">{{ wd }}</span>
+        <span v-for="(wd, wi) in weekdays()" :key="wi" class="rozie-datepicker-weekday" role="columnheader" :aria-label="(weekdaysLong()[wi]) ?? undefined">{{ wd }}</span>
       </div>
 
       <div v-for="(week, wk) in g.weeks" :key="week[0].iso" class="rozie-datepicker-week" role="row">
         
         <span v-for="(day, dc) in week" :key="day.iso" class="rozie-datepicker-cell" role="gridcell" :aria-selected="!!(day.selected || day.rangeStart || day.rangeEnd)">
-          <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="dayAria(day.iso)" :aria-current="day.today ? 'date' : undefined" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayCellKeydown(day.iso, $event)" :id="`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`" :data-rozie-keynav-item="gi * 42 + wk * 7 + dc" :data-rozie-keynav-active="activeDay === gi * 42 + wk * 7 + dc ? '' : undefined" :tabindex="activeDay === gi * 42 + wk * 7 + dc ? 0 : -1">{{ day.day }}</button>
+          <button type="button" :class="['rozie-datepicker-day', { 'is-selected': day.selected, 'is-today': day.today, 'is-outside': !day.inMonth, 'is-in-range': day.inRange, 'is-range-start': day.rangeStart, 'is-range-end': day.rangeEnd, 'is-in-preview': day.inPreview }]" :data-day="day.iso" :disabled="!!props.disabled" :aria-disabled="!!day.disabled" :aria-label="(dayAria(day.iso)) ?? undefined" :aria-current="day.today ? 'date' : undefined" @mouseenter="onDayHover(day.iso)" @focus="onDayHover(day.iso)" @keydown="onDayCellKeydown(day.iso, $event)" :id="`${__rozieKeynavGroupId}-item-${gi * 42 + wk * 7 + dc}`" :data-rozie-keynav-item="gi * 42 + wk * 7 + dc" :data-rozie-keynav-active="activeDay === gi * 42 + wk * 7 + dc ? '' : undefined" :tabindex="activeDay === gi * 42 + wk * 7 + dc ? 0 : -1">{{ day.day }}</button>
         </span>
       </div>
     </div>
@@ -28,16 +28,16 @@
   
   <div v-if="showsMonthsView()" class="rozie-datepicker-months">
     <div class="rozie-datepicker-drill-header">
-      <button type="button" class="rozie-datepicker-drill-label" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="labelFor('changeYear')" @click="enterYearsView">{{ monthList().year }}</button>
+      <button type="button" class="rozie-datepicker-drill-label" :disabled="!!props.disabled" :aria-disabled="!!props.disabled" :aria-label="(labelFor('changeYear')) ?? undefined" @click="enterYearsView">{{ monthList().year }}</button>
     </div>
-    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="labelFor('chooseMonth')" ref="__rozieKeynavRootRef1">
+    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="(labelFor('chooseMonth')) ?? undefined" ref="__rozieKeynavRootRef1">
       <button v-for="(cell, __rozieKeynavIndex) in monthList().months" :key="cell.iso" type="button" :class="['rozie-datepicker-month', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-month="cell.iso" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectMonth(cell.iso)" @keydown="onMonthCellKeydown(cell.iso, $event)" :id="`${__rozieKeynavGroupId1}-item-${__rozieKeynavIndex}`" :data-rozie-keynav-item="__rozieKeynavIndex" :data-rozie-keynav-active="activeMonth === __rozieKeynavIndex ? '' : undefined" :tabindex="activeMonth === __rozieKeynavIndex ? 0 : -1">{{ cell.label }}</button>
     </div>
   </div><div v-if="showsYearsView()" class="rozie-datepicker-years">
     <div class="rozie-datepicker-drill-header">
       <span class="rozie-datepicker-drill-label" aria-live="polite">{{ yearRangeLabel() }}</span>
     </div>
-    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="labelFor('chooseYear')" ref="__rozieKeynavRootRef2">
+    <div class="rozie-datepicker-drill-grid" role="grid" :aria-label="(labelFor('chooseYear')) ?? undefined" ref="__rozieKeynavRootRef2">
       <button v-for="(cell, __rozieKeynavIndex) in yearGrid().years" :key="cell.iso" type="button" :class="['rozie-datepicker-year', { 'is-selected': cell.selected, 'is-current': cell.current }]" role="gridcell" :data-year="cell.iso" :aria-disabled="!!cell.disabled" :aria-selected="!!cell.selected" @click="selectYear(cell.iso)" @keydown="onYearCellKeydown(cell.iso, $event)" :id="`${__rozieKeynavGroupId2}-item-${__rozieKeynavIndex}`" :data-rozie-keynav-item="__rozieKeynavIndex" :data-rozie-keynav-active="activeYear === __rozieKeynavIndex ? '' : undefined" :tabindex="activeYear === __rozieKeynavIndex ? 0 : -1">{{ cell.year }}</button>
     </div>
   </div><slot name="footer" :today="selectToday" :clear="clear" :todayIso="todayIso()">
@@ -48,7 +48,7 @@
 
   
   <slot name="presets" :presets="resolvedPresets()" :apply="applyPreset">
-    <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" :aria-label="labelFor('presets')">
+    <div v-if="hasPresets()" class="rozie-datepicker-presets" role="group" :aria-label="(labelFor('presets')) ?? undefined">
       <button v-for="p in resolvedPresets()" :key="p.label" type="button" :class="['rozie-datepicker-preset', { 'is-active': isPresetActive(p.range) }]" :aria-pressed="!!isPresetActive(p.range)" :disabled="!!props.disabled" @click="applyPreset(p.range)">{{ p.label }}</button>
     </div></slot>
 </div>

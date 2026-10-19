@@ -1,6 +1,6 @@
 <template>
 
-<input ref="inputElRef" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :aria-label="a11yLabel()" :checked="!!props.value" @change="onChange($event)" @keydown="onKeydown($event)" />
+<input ref="inputElRef" class="rdt-cell-editor" type="checkbox" data-editing-cell="" :aria-label="(a11yLabel()) ?? undefined" :checked="!!props.value" @change="onChange($event)" @keydown="onKeydown($event)" />
 
 </template>
 
