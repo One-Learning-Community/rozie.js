@@ -103,6 +103,19 @@ describe('emitConditional (Solid) — raw r-for alias narrowing (EB-2)', () => {
     expect(code).toContain('{(x) => <>{(x) ? (_props.slots?.[x]?.()) : null}</>}');
   });
 
+  it('operand rule: a static-text branch body (an unwrapped <template r-case> host) is wrapped in a fragment', () => {
+    // quick 261019-ti9 (DC-1) — REACHABLE from authored markup: core unwraps a
+    // `<template r-case>` / `<template r-default>` host into its children, so a
+    // text-only branch body reaches `toTernaryOperand` as bare static text. Without
+    // the `<>…</>` wrap the operand would be the bare identifier `alpha` (invalid).
+    const code = emit(
+      withBody(
+        `<div><template r-for="x, i in $props.items" :key="i"><template r-match="x"><template r-case="'a'">alpha</template><template r-default>other</template></template></template></div>`,
+      ),
+    );
+    expect(code).toContain(`<>{(x === 'a') ? <>alpha</> : <>other</>}</>`);
+  });
+
   it('operand rule: an element body (including a <template> wrapper) is used as-is', () => {
     const code = emit(
       withBody(
