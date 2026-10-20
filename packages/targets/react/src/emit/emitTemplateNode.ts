@@ -373,7 +373,20 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
   };
   let bodyJsx: string;
   if (node.body.length === 1) {
-    bodyJsx = emitNode(node.body[0]!, childCtx);
+    // quick 261019-ti9 (RK-1) — single-root twin of the 9g1 multi-root comment
+    // below. A conditional (r-if chain) or hostless r-match ALWAYS emits as a `{…}`
+    // mustache, which the 260711-cy1 branch below wraps in a keyed
+    // `<Fragment key>` — that Fragment is the array item. Letting the branch
+    // elements consume `pendingKey` as well repeated the key redundantly and, when
+    // the key re-tests the discriminant the branch narrows, was a strict-tsc
+    // TS2367. A host-element r-match keeps `childCtx`: its HOST is the array item
+    // and consumes the key (its ladder withholds it, see delegateMatchToConditional).
+    const only = node.body[0]!;
+    const ladderChild =
+      keyCode !== null &&
+      (only.type === 'TemplateConditional' ||
+        (only.type === 'TemplateMatch' && only.hostElement === undefined));
+    bodyJsx = emitNode(only, ladderChild ? { ...childCtx, pendingKey: null } : childCtx);
     // R11-1 fix (260711-ad5) — loop twin of R10-1's `renderBranchBody`. A
     // single-child body that emits as a bare `{...}` mustache (a `<slot>`,
     // a lone interpolation, or a nested conditional-slot) splices directly
@@ -1273,7 +1286,11 @@ function delegateMatchToConditional(node: TemplateMatchIR, ctx: EmitNodeCtx): st
     branches: node.branches,
     sourceLoc: node.sourceLoc,
   };
-  let ladder = emitConditional(synthetic, ctx, emitNode);
+  // quick 261019-ti9 (RK-1) — inside a keyed loop a host-element r-match's HOST is
+  // the array item and consumes `pendingKey` (emitElement below); the ladder is
+  // only its CHILD, so its branch elements must not repeat the key.
+  const ladderCtx = node.hostElement !== undefined ? { ...ctx, pendingKey: null } : ctx;
+  let ladder = emitConditional(synthetic, ladderCtx, emitNode);
   if (
     node.discriminantMode === 'hoist' &&
     node.tempName !== undefined &&
