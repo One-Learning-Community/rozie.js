@@ -294,7 +294,9 @@ const FAMILIES: FamilySpec[] = [
     leaf: 'packages/ui/data-table/packages/lit',
     baseline: {
       'DataTable.ts': {
-        TS2322: 1,
+        // TS2322 1 → 0 (quick 261019-ti9, add-on F): the `grouping` model prop
+        // (`default: null`) now types its controllable generic and accessor
+        // `any[] | null`, so `defaultValue: null` is assignable.
         TS2379: 1,
         // 9 → 11 (260708-ni6, grid pointer §1): the two new `isActiveCell(...)` header
         // calls mirror `cellTabindex`'s existing `level = null` inherent strict-null shape.
