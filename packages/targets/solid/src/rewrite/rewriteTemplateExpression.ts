@@ -29,6 +29,7 @@ import _traverse from '@babel/traverse';
 import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
+import { narrowPathOf } from '../../../../core/src/codegen/narrowGate.js';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
 
 // CJS interop normalization.
@@ -215,24 +216,6 @@ export function withoutNarrowedRoots(
   if (!reads || reads.length === 0) return reads;
   const kept = reads.filter((r) => !names.includes(r.path.split('.')[0]!));
   return kept.length === reads.length ? reads : kept;
-}
-
-/**
- * SN-1 — the dotted component-state path of `node` (`$props.label`,
- * `$data.picked.child`, `sel`, `sel.child`), or null when it is not a pure
- * non-computed member chain rooted in an Identifier.
- */
-export function narrowPathOf(node: t.Node): string | null {
-  if (t.isIdentifier(node)) return node.name;
-  if (
-    t.isMemberExpression(node) &&
-    !node.computed &&
-    t.isIdentifier(node.property)
-  ) {
-    const objPath = narrowPathOf(node.object);
-    return objPath === null ? null : `${objPath}.${node.property.name}`;
-  }
-  return null;
 }
 
 /**
