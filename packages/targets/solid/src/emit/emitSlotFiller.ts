@@ -54,7 +54,7 @@
  * @experimental — shape may change before v1.0
  */
 import type { SlotFillerDecl } from '@rozie/core';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { rewriteTemplateExpression, withoutNarrowedRoots } from '../rewrite/rewriteTemplateExpression.js';
 import type { ScopeAccessorParams, ScopeParamBinding } from '../rewrite/rewriteTemplateExpression.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
@@ -197,6 +197,19 @@ function renderFillerBody(
       bodyCtx = { ...ctx, scopeAccessorParams: params };
     }
   }
+  // SN-1 — a fill scope param shadows a `$computed`-rooted narrowed read of the
+  // same name; a PORTAL fill body may run after the enclosing Show closed (it is
+  // invoked from script), where the narrowed accessor would throw — keep live reads.
+  const fillNarrowed =
+    filler.isPortal === true
+      ? undefined
+      : withoutNarrowedRoots(
+          ctx.narrowedReads,
+          filler.params.map((p) => p.bindAs ?? p.name),
+        );
+  if (fillNarrowed !== bodyCtx.narrowedReads) {
+    bodyCtx = { ...bodyCtx, narrowedReads: fillNarrowed };
+  }
   const parts = filler.body.map((c) => emitNodeFn(c, bodyCtx));
   const inner = parts.join('');
   // Wrap in a fragment so the arrow returns a single JSX expression.
@@ -314,7 +327,7 @@ export function emitDynamicSlotsProp(
     const { jsx: bodyJsx, argList } = renderFillerBody(filler, ctx);
     if (filler.isDynamic) {
       if (!filler.dynamicNameExpr) continue; // ROZ946 was already emitted upstream
-      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams });
+      const keyExpr = rewriteTemplateExpression(filler.dynamicNameExpr, ctx.ir, { invokeAccessors: ctx.invokeAccessors, loopValueBindings: ctx.loopValueBindings, scopeAccessorParams: ctx.scopeAccessorParams, narrowedReads: ctx.narrowedReads });
       entries.push(`[${keyExpr}]: ${argList} => (${bodyJsx})`);
     } else {
       const keyLiteral = `'${escapeSingleQuotedKey(filler.name)}'`;

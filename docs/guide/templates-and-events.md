@@ -180,6 +180,23 @@ When the active branch changes and two branches happen to share a tag, Rozie inh
 
 A few malformed shapes are static compile errors with source-located code frames: an `r-match` with no value, a child of an `r-match` host that is neither `r-case` nor `r-default`, a valueless `r-case` (the diagnostic nudges you toward `r-default`), `r-case` and `r-for` on the same element, an `r-default` that isn't last, and more than one `r-default`. A literal `r-case` value that duplicates an earlier one is a warning, not an error — first occurrence wins, like a JavaScript `switch`.
 
+## Type narrowing inside `r-if` branches
+
+An `r-if` branch narrows the value its condition tests, so a nullable value can be handed straight to something that needs the non-null type (a typed slot param, a function argument, a member access, a child component prop) without a non-null assertion:
+
+```rozie
+<span r-if="$props.label">{{ format($props.label) }} / {{ $props.label.length }}</span>
+<slot r-if="$data.picked" name="item" :item="$data.picked" :param-types="{ item: 'Item' }" />
+<span r-if="$props.count != null">{{ double($props.count) }}</span>
+```
+
+The recognised conditions are bare truthiness (`x`), `!!x`, `x != null`, `x !== null` and `x !== undefined`, for `$props`, model props, `$data`, `$computed` values and `r-for` items. React, Vue, Svelte and Lit narrow natively. On Solid the compiler uses `<Show>`'s accessor form for a branch that passes the tested value on, so TypeScript sees the narrowed type there too; every other conditional is emitted exactly as before. Event handlers inside the branch always read the live value, never a snapshot.
+
+Two shapes are not narrowed, because TypeScript itself does not narrow them:
+
+- **A condition that calls a function** (`r-if="pick()"` then `pick().name`). A call is never narrowed on any target. Bind the result with a `$computed` and test that instead.
+- **On Solid, an `&&` chain that re-reads the same `$data` or `$computed` value** (`r-if="$data.picked && $data.picked.child"`). Each read of a Solid signal is a separate call. Nest the conditions instead (`r-if="$data.picked"` outside, `r-if="$data.picked.child"` inside), which narrows end to end.
+
 ## Safe non-primitive interpolation — objects render as portable JSON, never crash
 
 Interpolate a non-primitive value — an array, a plain object, a reactive `$data` graph — and the six targets used to disagree wildly. Vue pretty-printed JSON (its native `toDisplayString`), Svelte and Angular showed comma-joined `[object Object]`, Solid and Lit showed space-joined `[object Object]`, and **React threw `Objects are not valid as a React child` and crashed the component.** Same source, six renderings, one hard crash.

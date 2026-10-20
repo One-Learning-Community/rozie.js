@@ -47,8 +47,8 @@ import type {
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
-import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
-import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import type { NarrowedReads, ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
+import { rewriteTemplateExpression, withoutNarrowedRoots } from '../rewrite/rewriteTemplateExpression.js';
 import { emitConditional } from './emitConditional.js';
 // Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
 // (see emitKeynav.ts's module doc comment).
@@ -150,6 +150,23 @@ export interface EmitNodeCtx {
    */
   scopeAccessorParams?: ScopeAccessorParams | undefined;
   /**
+   * SN-1 (quick 261019-ti9) — component-state reads narrowed by the enclosing
+   * gated `<Show when>{(_rozieWhenN) => …}</Show>` callbacks, one entry per gated
+   * Show (outermost first). Threaded into every template-BODY rewrite
+   * (interpolations, element / slot / component bindings, loop iterables and
+   * keys, r-html / r-text / r-show, nested r-if tests) so a re-read of the tested
+   * value becomes `_rozieWhenN()`. Undefined everywhere else.
+   *
+   * Deliberately NOT threaded into event handlers, their modifier wrappers or
+   * the `<listeners>`-block emitters: a handler can outlive the branch, and the
+   * narrowed accessor throws "Stale read from <Show>" when read after the
+   * condition turned falsy; debounce / throttle wrappers are also hoisted to
+   * component scope, where the accessor does not exist. Those keep the live
+   * read (runtime-equivalent, merely un-narrowed). r-keynav plans are likewise
+   * resolved at component scope and keep live reads.
+   */
+  narrowedReads?: NarrowedReads | undefined;
+  /**
    * Phase 71 (r-keynav), extended Phase 77 (multi-root) — the per-component
    * keynav emission plans (resolved ONCE by `emitTemplate.ts` via
    * `resolveKeynavPlans`), one entry per `r-keynav` root in document order.
@@ -230,6 +247,7 @@ function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): str
     invokeAccessors: ctx.invokeAccessors,
     loopValueBindings: ctx.loopValueBindings,
     scopeAccessorParams: ctx.scopeAccessorParams,
+    narrowedReads: ctx.narrowedReads,
   });
   // Phase 26 (D-06/D-07/A4) — the wrap sits INSIDE the JSX `{}` so Solid still
   // tracks the reactive accessor read (the accessor invocation lives in `code`).
@@ -328,6 +346,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     invokeAccessors: ctx.invokeAccessors,
     loopValueBindings: ctx.loopValueBindings,
     scopeAccessorParams: ctx.scopeAccessorParams,
+    narrowedReads: ctx.narrowedReads,
   });
 
   // Phase 71 (r-keynav) — SPEC §5: "item index comes from the r-for
@@ -380,6 +399,12 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     node.itemAlias,
     ...(indexAlias ? [indexAlias] : []),
   ]);
+  // SN-1 — a loop alias (item / index) shadows a `$computed`-rooted narrowed read
+  // of the same name for the whole loop body.
+  const bodyNarrowedReads = withoutNarrowedRoots(ctx.narrowedReads, [
+    node.itemAlias,
+    ...(indexAlias ? [indexAlias] : []),
+  ]);
   const childCtx: EmitNodeCtx =
     keyed || indexAlias
       ? {
@@ -388,12 +413,14 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
           loopValueBindings: bodyLoopValueBindings,
           keynavItemIndexAlias: indexAlias,
           scopeAccessorParams: bodyScopeAccessorParams,
+          narrowedReads: bodyNarrowedReads,
         }
       : {
           ...ctx,
           loopValueBindings: bodyLoopValueBindings,
           keynavItemIndexAlias: null,
           scopeAccessorParams: bodyScopeAccessorParams,
+          narrowedReads: bodyNarrowedReads,
         };
 
   let bodyJsx: string;
@@ -442,6 +469,9 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     // quick 260922-mkb — the key reads the enclosing slot fill's scope lazily too;
     // the current item alias shadows a scope param of the same name.
     scopeAccessorParams: withoutShadowed(ctx.scopeAccessorParams, [node.itemAlias]),
+    // SN-1 — the key reads the enclosing gated Show's accessor too; the current
+    // item alias shadows a `$computed`-rooted entry of the same name.
+    narrowedReads: withoutNarrowedRoots(ctx.narrowedReads, [node.itemAlias]),
   });
   // `<Key>`'s `each?: readonly T[]` infers `T = unknown` from a bare `any`
   // iterable (e.g. a `Record<string, any>` member access), which then poisons
@@ -944,6 +974,7 @@ function emitPortalWrap(node: TemplateElementIR, markup: string, ctx: EmitNodeCt
     invokeAccessors: ctx.invokeAccessors,
     loopValueBindings: ctx.loopValueBindings,
     scopeAccessorParams: ctx.scopeAccessorParams,
+    narrowedReads: ctx.narrowedReads,
   });
   const containerCode = `(typeof document === 'undefined' ? null : (${rawContainerCode}))`;
   ctx.collectors.solid.add('Show');
@@ -965,6 +996,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
     });
     ctx.collectors.solid.add('Show');
     return `<Show keyed when={\`k\${${keyExprCode}}\`}>${markup}</Show>`;
@@ -1039,6 +1071,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
     });
     workingAttrs = workingAttrs.filter((a) => a !== rHtmlAttr);
     const attrsResult = emitAttributes(workingAttrs, {
@@ -1047,6 +1080,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
       elementTagKind: node.tagKind,
       tagName: node.tagName,
       producerProps: node.producerProps,
@@ -1073,6 +1107,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
     });
     rTextChildren = `{${exprCode}}`;
     workingAttrs = workingAttrs.filter((a) => a !== rTextAttr);
@@ -1088,6 +1123,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
     });
     rShowStyleAttr = `style={{ display: (${exprCode}) ? '' : 'none' }}`;
     workingAttrs = workingAttrs.filter((a) => a !== rShowAttr);
@@ -1111,6 +1147,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     invokeAccessors: ctx.invokeAccessors,
     loopValueBindings: ctx.loopValueBindings,
     scopeAccessorParams: ctx.scopeAccessorParams,
+    narrowedReads: ctx.narrowedReads,
     elementTagKind: node.tagKind,
     tagName: node.tagName,
     producerProps: node.producerProps,
@@ -1260,6 +1297,7 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
       scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
     });
     const hoisted = `{(() => { const ${node.tempName} = ${discriminantCode}; return ${inner}; })()}`;
     if (node.hostElement !== undefined) {

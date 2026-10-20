@@ -42,7 +42,7 @@ import { slotFieldName } from './emitSlotDecl.js';
 import { escapeSingleQuotedKey } from '../../../../core/src/codegen/escapeSingleQuotedKey.js';
 import { isSlotNameIdentifier } from '../../../../core/src/codegen/slotNameIdentifier.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
-import type { ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
+import type { NarrowedReads, ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 // Late-import to avoid circular reference; both modules initialize independently.
 import * as _emitTemplateNodeModule from './emitTemplateNode.js';
@@ -101,6 +101,7 @@ function buildParamObj(
   invokeAccessors?: ReadonlySet<string> | undefined,
   loopValueBindings?: ReadonlySet<string> | undefined,
   scopeAccessorParams?: ScopeAccessorParams | undefined,
+  narrowedReads?: NarrowedReads | undefined,
 ): string {
   if (args.length === 0) return '{}';
   const parts = args.map((a) => {
@@ -108,6 +109,7 @@ function buildParamObj(
       invokeAccessors,
       loopValueBindings,
       scopeAccessorParams,
+      narrowedReads,
     });
     if (code === a.name) return a.name;
     // A literal cannot read a signal, so a getter would be pure noise. Neither can CREATING a
@@ -196,6 +198,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
         invokeAccessors: ctx.invokeAccessors,
         loopValueBindings: ctx.loopValueBindings,
         scopeAccessorParams: ctx.scopeAccessorParams,
+        narrowedReads: ctx.narrowedReads,
       });
       const dynFieldRef = `_props.slots?.[${dynKeyExpr}]`;
       if (node.args.length > 0) {
@@ -204,6 +207,8 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
           ctx.ir,
           ctx.invokeAccessors,
           ctx.loopValueBindings,
+          ctx.scopeAccessorParams,
+          ctx.narrowedReads,
         );
         if (hasInvocationFallback) {
           return `{${dynFieldRef}?.(${paramObj}) ?? ${invocationFallback}}`;
@@ -217,7 +222,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
     }
     const slotHasParams = slot ? slot.params.length > 0 : false;
     if (slotHasParams) {
-      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams);
+      const paramObj = buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams, ctx.narrowedReads);
       // Function-child case: invoke with scope. Non-function child case: fall
       // back to the standard `resolved()` (Solid children() accessor) path so
       // existing static-child reactivity semantics are preserved.
@@ -237,7 +242,7 @@ export function emitSlotInvocation(node: TemplateSlotInvocationIR, ctx: EmitNode
   const hasParams = slot ? slot.params.length > 0 : false;
   const paramObj =
     slot && hasParams
-      ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams)
+      ? buildParamObj(node.args, ctx.ir, ctx.invokeAccessors, ctx.loopValueBindings, ctx.scopeAccessorParams, ctx.narrowedReads)
       : null;
 
   // Phase 07.3.2 — merge static slot prop with the consumer-side dynamic

@@ -29,10 +29,50 @@
  * keyed `<Key>` loops (accessor item) and non-loop conditionals never qualify and
  * keep their byte-identical `<Show>` output.
  *
+ * SN-1 (quick 261019-ti9) — component-state narrowing. Same root cause as EB-2
+ * (`<Show when>` is not a type guard) for the OTHER class: a nullable `$props` /
+ * model / `$data` / `$computed` value tested by an r-if and re-read as a typed
+ * slot param, a typed call argument or a member access. On Solid the reads are
+ * `local.x` property reads or signal CALLS (`picked()`), which TypeScript never
+ * narrows (and a property narrowing does not survive the slot getter closure), so
+ * no ternary can fix it. The idiomatic Solid answer is Show's FUNCTION CHILD:
+ *
+ *   <Show when={local.label}>{(_rozieWhen0) => <span>{fmt(_rozieWhen0())}</span>}</Show>
+ *
+ * `_rozieWhen0()` is typed `NonNullable<…>`; the body's re-reads of the tested
+ * value E are rewritten to it (see `narrowedReads` in rewriteTemplateExpression).
+ *   - Bare `E` and `!!E`: `when={E}` (Show's condition memo compares `!a === !b`,
+ *     so the body is created exactly as often as before).
+ *   - `E != null` / `!== null` / `!== undefined` (either operand order): `when={E}`
+ *     would HIDE `0` / `''` / `false`, so `when` is a boxed value,
+ *     `((v) => (v OP N ? { value: v } : undefined))(E)`, and reads become
+ *     `_rozieWhenN().value`. The IIFE evaluates E once and TypeScript narrows the
+ *     parameter for member reads and signal calls alike.
+ *   - The callback body is an element, or a FRAGMENT `<>…</>` for anything else (a
+ *     `<slot>` mustache, text, a nested conditional): Show runs the callback
+ *     UNTRACKED, and babel-preset-solid compiles `<>{slotCall}</>` to a tracked
+ *     memo while a bare `(v) => slotCall` is evaluated once and would stop
+ *     reacting to a slot swap.
+ *   - Event handlers keep the live read (a handler can outlive the branch and the
+ *     narrowed accessor throws "Stale read from <Show>" once the condition turned
+ *     falsy; debounce / throttle wrappers are hoisted to component scope where the
+ *     accessor does not exist), and so do function-expression bodies and portal
+ *     fills.
+ *   - Accessor names are `_rozieWhen` + a nesting index, so siblings reuse
+ *     `_rozieWhen0` and a nested gated Show gets the next free index; a nested
+ *     TEST is rendered with the OUTER ctx and so reads the outer accessor.
+ * The lowering is GATED (narrowGate.ts): only a branch whose body re-reads E in a
+ * position that needs the narrowing takes it; every other Show is byte-identical.
+ * Not narrowable (documented, no diagnostic): a condition that calls an author
+ * function (TypeScript never narrows a call, on any target) and a Solid `&&` chain
+ * that re-reads a signal (`picked() && picked().child` — two calls).
+ *
  * @experimental — shape may change before v1.0
  */
 import type { TemplateConditionalIR, IRTemplateNode as TemplateNode } from '@rozie/core';
+import type { NarrowedRead } from '../rewrite/rewriteTemplateExpression.js';
 import { rewriteTemplateExpression } from '../rewrite/rewriteTemplateExpression.js';
+import { planNarrowGate } from './narrowGate.js';
 import type { EmitNodeCtx } from './emitTemplateNode.js';
 import { stripBalancedMustache } from './unwrapMustache.js';
 
@@ -109,6 +149,50 @@ function renderBranchBody(
 }
 
 /**
+ * SN-1 — render one test branch: its `when` code and its callback-or-plain body.
+ *
+ * Ungated (the overwhelming majority): exactly the pre-SN-1 pair, the rewritten
+ * test and `renderBranchBody`. Gated: the Show function-child form described in
+ * the file docblock. The test is ALWAYS rewritten with the OUTER ctx so a nested
+ * test reads the outer accessor.
+ */
+function renderTestBranch(
+  branch: TemplateConditionalIR['branches'][number],
+  ctx: EmitNodeCtx,
+  emitNodeFn: (n: TemplateNode, ctx: EmitNodeCtx) => string,
+): { testCode: string; bodyJsx: string } {
+  const test = branch.test!;
+  const rewrite = (expr: typeof test): string =>
+    rewriteTemplateExpression(expr, ctx.ir, {
+      invokeAccessors: ctx.invokeAccessors,
+      loopValueBindings: ctx.loopValueBindings,
+      scopeAccessorParams: ctx.scopeAccessorParams,
+      narrowedReads: ctx.narrowedReads,
+    });
+  const gate = planNarrowGate(test, branch.body, ctx.ir, ctx);
+  if (gate === null) {
+    return { testCode: rewrite(test), bodyJsx: renderBranchBody(branch.body, ctx, emitNodeFn) };
+  }
+
+  const valueCode = rewrite(gate.value);
+  const testCode = gate.boxed
+    ? `((v) => (v ${gate.operator} ${gate.nullish} ? { value: v } : undefined))(${valueCode})`
+    : valueCode;
+
+  // Next free accessor index: one past the highest in scope (siblings reuse an
+  // index; a nested gated Show gets the next one; a dropped shadowed entry can
+  // never make a kept accessor collide).
+  const used = (ctx.narrowedReads ?? []).map((r) => Number(r.accessor.slice('_rozieWhen'.length)));
+  const accessor = `_rozieWhen${used.length === 0 ? 0 : Math.max(...used) + 1}`;
+  const entry: NarrowedRead = { path: gate.path, accessor, boxed: gate.boxed };
+  const childCtx: EmitNodeCtx = { ...ctx, narrowedReads: [...(ctx.narrowedReads ?? []), entry] };
+
+  const rendered = renderBranchBody(branch.body, childCtx, emitNodeFn).trim();
+  const callbackBody = rendered.startsWith('<') ? rendered : `<>${rendered}</>`;
+  return { testCode, bodyJsx: `{(${accessor}) => ${callbackBody}}` };
+}
+
+/**
  * Build a <Show> element for a single branch. The `fallback` prop is
  * optional — omit when no else branch.
  *
@@ -167,6 +251,7 @@ export function emitConditional(
         invokeAccessors: ctx.invokeAccessors,
         loopValueBindings: ctx.loopValueBindings,
         scopeAccessorParams: ctx.scopeAccessorParams,
+        narrowedReads: ctx.narrowedReads,
       });
       rest = `(${testCode}) ? ${operand} : ${rest}`;
     }
@@ -192,12 +277,7 @@ export function emitConditional(
     currentFallback = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
   } else {
     // No trailing r-else — last branch becomes a Show with no fallback
-    const testCode = rewriteTemplateExpression(lastBranch.test, ctx.ir, {
-      invokeAccessors: ctx.invokeAccessors,
-      loopValueBindings: ctx.loopValueBindings,
-      scopeAccessorParams: ctx.scopeAccessorParams,
-    });
-    const bodyJsx = renderBranchBody(lastBranch.body, ctx, emitNodeFn);
+    const { testCode, bodyJsx } = renderTestBranch(lastBranch, ctx, emitNodeFn);
     currentFallback = null;
     // Build from second-to-last going left
     const startIdx = branches.length - 1;
@@ -214,12 +294,7 @@ export function emitConditional(
         currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
         continue;
       }
-      const bTestCode = rewriteTemplateExpression(branch.test, ctx.ir, {
-        invokeAccessors: ctx.invokeAccessors,
-        loopValueBindings: ctx.loopValueBindings,
-        scopeAccessorParams: ctx.scopeAccessorParams,
-      });
-      const bBodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
+      const { testCode: bTestCode, bodyJsx: bBodyJsx } = renderTestBranch(branch, ctx, emitNodeFn);
       // The "show" we built for the next branch becomes the fallback here
       const innerShow = buildShow(
         bTestCode,
@@ -243,12 +318,7 @@ export function emitConditional(
       currentFallback = renderBranchBody(branch.body, ctx, emitNodeFn);
       continue;
     }
-    const testCode = rewriteTemplateExpression(branch.test, ctx.ir, {
-      invokeAccessors: ctx.invokeAccessors,
-      loopValueBindings: ctx.loopValueBindings,
-      scopeAccessorParams: ctx.scopeAccessorParams,
-    });
-    const bodyJsx = renderBranchBody(branch.body, ctx, emitNodeFn);
+    const { testCode, bodyJsx } = renderTestBranch(branch, ctx, emitNodeFn);
     result = buildShow(testCode, bodyJsx, currentFallback);
     currentFallback = result;
   }

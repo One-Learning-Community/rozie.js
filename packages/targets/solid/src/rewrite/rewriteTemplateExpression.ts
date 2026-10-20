@@ -26,6 +26,7 @@
 import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
 import { lowerClassSelectorCall } from './lowerClassSelectorCall.js';
@@ -126,6 +127,25 @@ export interface ScopeParamBinding {
 /** Local param name → its binding. Nested fills merge their own over the outer map. */
 export type ScopeAccessorParams = ReadonlyMap<string, ScopeParamBinding>;
 
+/**
+ * SN-1 (quick 261019-ti9) — one component-state read that an enclosing gated
+ * `<Show when={…}>{(accessor) => …}</Show>` has narrowed.
+ *
+ * `path` is the dotted component-state path with a `$model` root normalized to
+ * `$props` (`$props.label`, `$data.picked.child`) or a `$computed` identifier
+ * path (`sel`, `sel.child`). `accessor` is the Show callback parameter
+ * (`_rozieWhen0`). `boxed` marks a null-comparison gate whose `when` value is a
+ * `{ value }` box, so the read becomes `accessor().value`.
+ */
+export interface NarrowedRead {
+  path: string;
+  accessor: string;
+  boxed: boolean;
+}
+
+/** One entry per enclosing gated Show, outermost first. */
+export type NarrowedReads = ReadonlyArray<NarrowedRead>;
+
 export interface RewriteTemplateOpts {
   /**
    * Identifiers that resolve to a Solid `Accessor<T>` (a `() => T` getter) at
@@ -167,6 +187,52 @@ export interface RewriteTemplateOpts {
    * accessor and is threaded via `invokeAccessors` instead (so it DOES get `()`).
    */
   loopValueBindings?: ReadonlySet<string> | undefined;
+  /**
+   * SN-1 (quick 261019-ti9) — component-state reads narrowed by enclosing gated
+   * `<Show>` callbacks. A read whose dotted path equals an entry is rewritten to
+   * the entry's Show accessor (`_rozieWhen0()`, or `_rozieWhen0().value` for a
+   * boxed null-comparison gate) BEFORE the `$props` / `$data` / `$computed`
+   * rewrite, so TypeScript sees the `NonNullable` accessor type.
+   *
+   * Only template-BODY callers pass it (never event handlers or their modifier
+   * wrappers: the accessor throws once the condition turned falsy and is out of
+   * scope in hoisted wrappers). Assignment / update / `delete` targets are never
+   * substituted. Undefined / empty is the byte-identical back-compat path.
+   */
+  narrowedReads?: NarrowedReads | undefined;
+}
+
+/**
+ * SN-1 — drop narrowed-read entries whose ROOT identifier is re-bound by a loop
+ * alias or a slot-fill scope param (only a `$computed`-rooted entry can collide;
+ * `$props` / `$data` roots never do). Returns the SAME array when nothing is
+ * shadowed so ctx identity is unchanged outside the rare collision.
+ */
+export function withoutNarrowedRoots(
+  reads: NarrowedReads | undefined,
+  names: readonly string[],
+): NarrowedReads | undefined {
+  if (!reads || reads.length === 0) return reads;
+  const kept = reads.filter((r) => !names.includes(r.path.split('.')[0]!));
+  return kept.length === reads.length ? reads : kept;
+}
+
+/**
+ * SN-1 — the dotted component-state path of `node` (`$props.label`,
+ * `$data.picked.child`, `sel`, `sel.child`), or null when it is not a pure
+ * non-computed member chain rooted in an Identifier.
+ */
+export function narrowPathOf(node: t.Node): string | null {
+  if (t.isIdentifier(node)) return node.name;
+  if (
+    t.isMemberExpression(node) &&
+    !node.computed &&
+    t.isIdentifier(node.property)
+  ) {
+    const objPath = narrowPathOf(node.object);
+    return objPath === null ? null : `${objPath}.${node.property.name}`;
+  }
+  return null;
 }
 
 /**
@@ -208,6 +274,85 @@ export function rewriteTemplateExpression(
       if (t.isIdentifier(obj) && obj.name === '$model') obj.name = '$props';
     },
   });
+
+  // SN-1 — substitute narrowed component-state reads with their Show accessor.
+  // Top-down: an outer node is checked before its object, so the LONGEST matching
+  // path wins (`$data.picked.child.name` with entries for `$data.picked` and
+  // `$data.picked.child` becomes `<inner accessor>().name`).
+  const narrowed = opts.narrowedReads;
+  if (narrowed !== undefined && narrowed.length > 0) {
+    const entries = new Map<string, NarrowedRead>();
+    for (const e of narrowed) entries.set(e.path, e);
+    const rootOf = (n: t.Node): string => {
+      let cur: t.Node = n;
+      while (t.isMemberExpression(cur)) cur = cur.object;
+      return t.isIdentifier(cur) ? cur.name : '';
+    };
+    const accessorRead = (e: NarrowedRead): t.Expression => {
+      const call = t.callExpression(t.identifier(e.accessor), []);
+      return e.boxed ? t.memberExpression(call, t.identifier('value')) : call;
+    };
+    const trySubstitute = (path: NodePath<t.MemberExpression | t.Identifier>): void => {
+      const node = path.node;
+      const p = narrowPathOf(node);
+      if (p === null) return;
+      const entry = entries.get(p);
+      if (entry === undefined) return;
+      const parent = path.parent;
+      // A write / update / delete target is never a read.
+      if (t.isAssignmentExpression(parent) && parent.left === node) return;
+      if (t.isUpdateExpression(parent) && parent.argument === node) return;
+      if (t.isUnaryExpression(parent) && parent.operator === 'delete' && parent.argument === node) return;
+      // Already a call callee (`sel()` lowered upstream) — never re-wrap.
+      if (t.isCallExpression(parent) && parent.callee === node && t.isIdentifier(node)) return;
+      // A binding introduced inside this expression (arrow param, catch clause…)
+      // shadows a `$computed` root.
+      const root = rootOf(node);
+      if (root !== '' && path.scope.hasBinding(root, true)) return;
+      if (t.isIdentifier(node)) {
+        // Property of a member access / object key: a name, not a read.
+        if (
+          (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+          parent.property === node &&
+          !parent.computed
+        ) {
+          return;
+        }
+        if (t.isObjectProperty(parent) && parent.key === node && !parent.computed) {
+          if (
+            parent.shorthand &&
+            t.isIdentifier(parent.value) &&
+            parent.value.name === node.name &&
+            path.parentPath
+          ) {
+            path.parentPath.replaceWith(
+              t.objectProperty(t.identifier(node.name), accessorRead(entry), false, false),
+            );
+            path.parentPath.skip();
+          }
+          return;
+        }
+        // The value half of a shorthand property was already expanded via the key.
+        if (t.isObjectProperty(parent) && parent.shorthand && parent.value === node) return;
+      }
+      path.replaceWith(accessorRead(entry));
+      path.skip();
+    };
+    traverse(wrapper, {
+      // A function expression's body runs LATER (a callback prop, an event-ish
+      // closure) and may outlive the branch — there the narrowed accessor would
+      // throw "Stale read from <Show>". Keep the live read inside it.
+      Function(path) {
+        path.skip();
+      },
+      MemberExpression(path) {
+        trySubstitute(path);
+      },
+      Identifier(path) {
+        trySubstitute(path);
+      },
+    });
+  }
 
   traverse(wrapper, {
     AssignmentExpression(path) {
