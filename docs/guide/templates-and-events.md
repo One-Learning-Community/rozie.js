@@ -190,12 +190,12 @@ An `r-if` branch narrows the value its condition tests, so a nullable value can 
 <span r-if="$props.count != null">{{ double($props.count) }}</span>
 ```
 
-The recognised conditions are bare truthiness (`x`), `!!x`, `x != null`, `x !== null` and `x !== undefined`, for `$props`, model props, `$data`, `$computed` values and `r-for` items. React, Vue, Svelte and Lit narrow natively. On Solid the compiler uses `<Show>`'s accessor form for a branch that passes the tested value on, so TypeScript sees the narrowed type there too; every other conditional is emitted exactly as before. Event handlers inside the branch always read the live value, never a snapshot.
+The recognised conditions are bare truthiness (`x`), `!!x`, `x != null`, `x !== null` and `x !== undefined`, for `$props`, model props, `$data`, `$computed` values and `r-for` items. React, Vue, Svelte and Lit narrow natively. Solid and Angular read state through signal calls, which TypeScript never narrows, so the compiler helps there: on Solid a branch that passes the tested value on uses `<Show>`'s accessor form, and on Angular the read is emitted with a type-only non-null assertion (`picked()!.name`), so a `strictTemplates` build sees the narrowed type. Every other conditional is emitted exactly as before. On Solid, event handlers inside the branch always read the live value, never a snapshot.
 
 Two shapes are not narrowed, because TypeScript itself does not narrow them:
 
-- **A condition that calls a function** (`r-if="pick()"` then `pick().name`). A call is never narrowed on any target. Bind the result with a `$computed` and test that instead.
-- **On Solid, an `&&` chain that re-reads the same `$data` or `$computed` value** (`r-if="$data.picked && $data.picked.child"`). Each read of a Solid signal is a separate call. Nest the conditions instead (`r-if="$data.picked"` outside, `r-if="$data.picked.child"` inside), which narrows end to end.
+- **A condition that calls a function** (`r-if="pick()"` then `pick().name`). A call is never narrowed on any target (React, Lit and Angular report the same error). Bind the result with a `$computed` and test that instead.
+- **On Solid and Angular, an `&&` chain that re-reads the same `$data` or `$computed` value** (`r-if="$data.picked && $data.picked.child"`). Each read of a signal is a separate call. Nest the conditions instead (`r-if="$data.picked"` outside, `r-if="$data.picked.child"` inside), which narrows end to end.
 
 ## Safe non-primitive interpolation — objects render as portable JSON, never crash
 
