@@ -753,7 +753,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    * `GroupingState` — an ordered `string[]` of column ids (multi-column → nested groups, e.g. `['region','category']`). An empty/unbound list is ungrouped (byte-identical-off). Group-header rows are collapsible (they ride the expand model). Surfaces through `group-change`; uncontrolled fallback (`$data.groupingDefault`, default `[]`) when unbound — the default is `null` (mirroring `expanded`) so the uncontrolled fallback is reachable and the grouping auto-expand default can activate when a consumer applies grouping without binding the two-way `grouping` model (a non-null `[]` default would short-circuit it). All reads are null-guarded, so table-core still receives an array.
    */
   @property({ type: Array, attribute: 'grouping' }) _grouping_attr: any[] | null = null;
-  private _groupingControllable = createLitControllableProperty<any[]>({ host: this, eventName: 'grouping-change', defaultValue: null, initialControlledValue: undefined });
+  private _groupingControllable = createLitControllableProperty<any[] | null>({ host: this, eventName: 'grouping-change', defaultValue: null, initialControlledValue: undefined });
   /**
    * `RowSelectionState` — `{ [rowId]: true }`. Checkbox-only toggle (the row body does not select). Driven by the `selectionMode` chrome. Two-way: fires `selection-change` regardless of binding.
    */
@@ -1640,7 +1640,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     if (name === 'column-filters') this._columnFiltersControllable.notifyAttributeChange(value as unknown as any[]);
     if (name === 'pagination') this._paginationControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'expanded') this._expandedControllable.notifyAttributeChange(value as unknown as any | boolean);
-    if (name === 'grouping') this._groupingControllable.notifyAttributeChange(value as unknown as any[]);
+    if (name === 'grouping') this._groupingControllable.notifyAttributeChange(value as unknown as any[] | null);
     if (name === 'row-selection') this._rowSelectionControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'column-visibility') this._columnVisibilityControllable.notifyAttributeChange(value as unknown as any);
     if (name === 'column-sizing') this._columnSizingControllable.notifyAttributeChange(value as unknown as any);
@@ -9471,8 +9471,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   set pagination(v: any) { this._paginationControllable.notifyPropertyWrite(v); }
   get expanded(): any | boolean { return this._expandedControllable.read(); }
   set expanded(v: any | boolean) { this._expandedControllable.notifyPropertyWrite(v); }
-  get grouping(): any[] { return this._groupingControllable.read(); }
-  set grouping(v: any[]) { this._groupingControllable.notifyPropertyWrite(v); }
+  get grouping(): any[] | null { return this._groupingControllable.read(); }
+  set grouping(v: any[] | null) { this._groupingControllable.notifyPropertyWrite(v); }
   get rowSelection(): any { return this._rowSelectionControllable.read(); }
   set rowSelection(v: any) { this._rowSelectionControllable.notifyPropertyWrite(v); }
   get columnVisibility(): any { return this._columnVisibilityControllable.read(); }

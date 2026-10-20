@@ -68,7 +68,7 @@ export default class NumberField extends SignalWatcher(LitElement) {
    * <rozie-number-field .modelValue=${qty} @model-value-change=${…} .min=${0} .max=${10}></rozie-number-field>
    */
   @property({ type: Number, attribute: 'model-value' }) _modelValue_attr: number | null = null;
-  private _modelValueControllable = createLitControllableProperty<number>({ host: this, eventName: 'model-value-change', defaultValue: null, initialControlledValue: undefined });
+  private _modelValueControllable = createLitControllableProperty<number | null>({ host: this, eventName: 'model-value-change', defaultValue: null, initialControlledValue: undefined });
   /**
    * Inclusive lower bound. Every commit clamps the value to `>= min`, and the **Home** key jumps to `min`. `null` (the default) means no lower bound. Also emitted as `aria-valuemin`.
    */
@@ -406,8 +406,8 @@ export default class NumberField extends SignalWatcher(LitElement) {
   this._text.value = '';
 };
 
-  get modelValue(): number { return this._modelValueControllable.read(); }
-  set modelValue(v: number) { this._modelValueControllable.notifyPropertyWrite(v); }
+  get modelValue(): number | null { return this._modelValueControllable.read(); }
+  set modelValue(v: number | null) { this._modelValueControllable.notifyPropertyWrite(v); }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the
