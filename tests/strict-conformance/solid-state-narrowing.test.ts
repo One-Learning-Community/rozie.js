@@ -61,7 +61,11 @@ const dbl = (n: number): number => n * 2
 </template>
 </rozie>`;
 
-/** A NULLABLE model prop (default: null) re-read as a typed call argument. */
+/**
+ * A NULLABLE model prop (default: null) re-read as a typed call argument. Lit also
+ * covers the add-on F typing fix: `createLitControllableProperty<string | null>`
+ * (it was `<string>` with `defaultValue: null`, TS2322).
+ */
 const MODEL = `<rozie name="ModelNarrow">
 <props>
 {
@@ -87,7 +91,7 @@ const TARGETS = [
 
 const SOURCES = [
   { name: 'StateNarrow', src: WITNESS, targets: ['solid', 'react', 'lit'] },
-  { name: 'ModelNarrow', src: MODEL, targets: ['solid', 'react'] },
+  { name: 'ModelNarrow', src: MODEL, targets: ['solid', 'react', 'lit'] },
 ];
 
 describe('SOLID-STATE-NARROWING — a narrowed nullable component value feeds typed positions', () => {

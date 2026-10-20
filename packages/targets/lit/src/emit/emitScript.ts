@@ -331,6 +331,37 @@ const ARIA_MIXIN_FIELDS = new Set([
   'role',
 ]);
 
+/**
+ * Whether the rendered TS type already admits `null` under strictNullChecks: it has
+ * a `null` union alternative (top level, or paren-grouped within a pure union), or
+ * a bare `any` / `unknown` union member. The `\bnull\b` token check is safe
+ * because every `null` in an emitted Lit field type is a pure-union alternative.
+ */
+function tsTypeAdmitsNull(tsType: string): boolean {
+  return /\bnull\b/.test(tsType) || /(^|\|)\s*(any|unknown)\s*(\||$)/.test(tsType);
+}
+
+/**
+ * The prop's TS type widened to admit its `default: null`. A `null` default on a
+ * null-failing type (`string` / `number` / an object shape) is a type/init
+ * mismatch (TS2322) in the field declaration AND in a model prop's
+ * `createLitControllableProperty<T>({ defaultValue: null })` + accessor pair;
+ * every other target types such a prop `T | null`. Types that already admit
+ * `null`, and every non-null default, stay byte-identical.
+ */
+function nullWidenedTsType(prop: PropDecl): string {
+  const tsType = renderTsType(prop.typeAnnotation);
+  if (
+    prop.defaultValue != null &&
+    !isUndefinedDefault(prop.defaultValue) &&
+    t.isNullLiteral(prop.defaultValue) &&
+    !tsTypeAdmitsNull(tsType)
+  ) {
+    return `${tsType} | null`;
+  }
+  return tsType;
+}
+
 function renderFieldSuffix(prop: PropDecl): string {
   const tsType = renderTsType(prop.typeAnnotation);
   if (prop.defaultValue != null && !isUndefinedDefault(prop.defaultValue)) {
@@ -351,12 +382,7 @@ function renderFieldSuffix(prop: PropDecl): string {
     // shape) gets the `| null` suffix. The `\bnull\b` token check is safe here
     // because every `null` appearing in an emitted Lit field type is a pure-union
     // alternative that bubbles to the top (no `Array<T | null>`-style nesting).
-    let fieldType = tsType;
-    const admitsNull =
-      /\bnull\b/.test(fieldType) || /(^|\|)\s*(any|unknown)\s*(\||$)/.test(fieldType);
-    if (t.isNullLiteral(prop.defaultValue) && !admitsNull) {
-      fieldType = `${fieldType} | null`;
-    }
+    const fieldType = nullWidenedTsType(prop);
     return `: ${fieldType} = ${renderDefault(prop.defaultValue, prop.typeAnnotation)}`;
   }
   // 260712-ig6 Task A — an ARIAMixin-named prop falls through to here for the
@@ -581,7 +607,9 @@ interface ModelPropEmit {
 
 function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
   const litType = renderType(prop.typeAnnotation);
-  const tsType = renderTsType(prop.typeAnnotation);
+  // Add-on F (quick 261019-ti9): a `default: null` model prop types `T | null`, like
+  // every other target (the controllable generic, the coerce cast and the accessor).
+  const tsType = nullWidenedTsType(prop);
   // Model props must NOT reflect — Lit echoes property→attribute which fires
   // attributeChangedCallback→notifyAttributeChange, spuriously flipping
   // wasControlled=false→true on init and breaking uncontrolled write().
@@ -642,7 +670,7 @@ function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
 }
 
 function emitModelGetterSetter(prop: PropDecl): string {
-  const tsType = renderTsType(prop.typeAnnotation);
+  const tsType = nullWidenedTsType(prop);
   // The public PROPERTY setter is the entry point for an EXTERNAL parent
   // reassigning the model via a Lit `.${prop.name}=${…}` property binding.
   // A property binding bypasses `attributeChangedCallback` entirely, so it
