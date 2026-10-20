@@ -1,5 +1,6 @@
 ---
 "@rozie/core": patch
+"@rozie/runtime-angular": patch
 ---
 
 Emitter fixes for strict TypeScript consumers of the generated source:
