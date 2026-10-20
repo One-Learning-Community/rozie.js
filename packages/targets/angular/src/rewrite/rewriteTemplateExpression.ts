@@ -30,8 +30,10 @@
 import type { GeneratorOptions } from '@babel/generator';
 import _generate from '@babel/generator';
 import _traverse from '@babel/traverse';
+import type { NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import type { IRComponent } from '@rozie/core';
+import { narrowPathOf } from '../../../../core/src/codegen/narrowGate.js';
 import { hasKeyedFillIntake } from '../emit/refineSlotTypes.js';
 import { buildSlotsMerge } from './buildSlotsMerge.js';
 import { collectComponentRefTypes } from './componentRefs.js';
@@ -156,6 +158,26 @@ export interface RewriteTemplateOpts {
    * CVA-receiving AND declares a `disabled` prop.
    */
   cvaMergeDisabled?: boolean | undefined;
+  /**
+   * SN-1 parity (quick 261019-ti9, add-on G) — dotted component-state paths
+   * (`$props.label`, `$data.picked.child`, `sel`; `$model` normalized to
+   * `$props`) that an enclosing `@if` branch has tested non-nullish. Angular
+   * signal reads lower to calls (`picked()`), which TypeScript never narrows, so
+   * `@if (picked()) { picked().name }` is TS2531 under `strictTemplates`. A read
+   * of an entry path in a position that NEEDS the narrowing (the object of a
+   * member access, a call callee / argument, or — with `nonNullTop` — the whole
+   * expression) is wrapped in a non-null assertion, `picked()!.name`. The `!` is
+   * type-only (the template compiler erases it), so runtime is unchanged. The
+   * template parser accepts it (ngc strictTemplates verified). Undefined / empty
+   * is the byte-identical back-compat path.
+   */
+  nonNullReads?: ReadonlySet<string> | undefined;
+  /**
+   * With `nonNullReads`: also treat the WHOLE expression as a needs-narrowing
+   * position. Set for a `[prop]` binding on a composed child component, whose
+   * declared input type is checked against the bound value under strictTemplates.
+   */
+  nonNullTop?: boolean | undefined;
 }
 
 /**
@@ -302,6 +324,72 @@ export function rewriteTemplateExpression(
       path.replaceWith(path.node.expression);
     },
   });
+
+  // SN-1 parity (add-on G) — assert the tested component-state value non-null at
+  // the positions that need it. Runs AFTER the pre-pass above (whose
+  // TSNonNullExpression visitor drops AUTHORED `!`), so the synthesized
+  // assertions survive; the main lowering below then rewrites the wrapped
+  // `$data.picked` to `picked()` inside the assertion.
+  const nonNullReads = opts.nonNullReads;
+  if (!scriptContext && nonNullReads !== undefined && nonNullReads.size > 0) {
+    const needsNarrowing = (path: NodePath<t.MemberExpression | t.Identifier>): boolean => {
+      const parent = path.parent;
+      const node = path.node;
+      if (t.isExpressionStatement(parent)) return opts.nonNullTop === true;
+      if (t.isMemberExpression(parent) && parent.object === node) return true;
+      if (t.isOptionalMemberExpression(parent) && parent.object === node && !parent.optional) {
+        return true;
+      }
+      if (
+        (t.isCallExpression(parent) || t.isOptionalCallExpression(parent)) &&
+        (parent.callee === node || (parent.arguments as t.Node[]).includes(node))
+      ) {
+        return true;
+      }
+      if (t.isNewExpression(parent) && (parent.arguments as t.Node[]).includes(node)) return true;
+      return false;
+    };
+    const trySubstitute = (path: NodePath<t.MemberExpression | t.Identifier>): void => {
+      const node = path.node;
+      const p = narrowPathOf(node);
+      if (p === null || !nonNullReads.has(p)) return;
+      const parent = path.parent;
+      // A write / update target is never a read.
+      if (t.isAssignmentExpression(parent) && parent.left === node) return;
+      if (t.isUpdateExpression(parent) && parent.argument === node) return;
+      if (t.isIdentifier(node)) {
+        // A loop binding shadows a `$computed` root; a property key is a name.
+        if (loopBindings.has(node.name)) return;
+        if (
+          (t.isMemberExpression(parent) || t.isOptionalMemberExpression(parent)) &&
+          parent.property === node &&
+          !parent.computed
+        ) {
+          return;
+        }
+        if (t.isObjectProperty(parent) && parent.key === node && !parent.computed) return;
+        if (t.isCallExpression(parent) && parent.callee === node) return;
+      } else {
+        let root: t.Node = node;
+        while (t.isMemberExpression(root)) root = root.object;
+        if (t.isIdentifier(root) && loopBindings.has(root.name)) return;
+      }
+      if (!needsNarrowing(path)) return;
+      // No `path.skip()`: the traversal re-enters the wrapped node, where its
+      // parent is now the assertion (not a needs-narrowing position, so it is not
+      // wrapped twice) and continues to the NEXT entry down the chain
+      // (`$data.picked.child.name` -> `picked()!.child!.name`).
+      path.replaceWith(t.tsNonNullExpression(node));
+    };
+    traverse(wrapper, {
+      MemberExpression(path) {
+        trySubstitute(path);
+      },
+      Identifier(path) {
+        trySubstitute(path);
+      },
+    });
+  }
 
   const COMPOUND_OP_MAP: Record<string, t.BinaryExpression['operator']> = {
     '+=': '+',

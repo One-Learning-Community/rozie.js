@@ -210,6 +210,16 @@ export interface EmitNodeCtx {
    */
   cvaMergeDisabled?: boolean | undefined;
   /**
+   * SN-1 parity (quick 261019-ti9, add-on G) — dotted component-state paths that
+   * an enclosing `@if` branch has tested non-nullish (see
+   * `RewriteTemplateOpts.nonNullReads`). Accumulated by `emitConditional` for the
+   * branch BODY only; a branch's own test and its siblings see the outer set.
+   * Threaded into every template-body AND handler rewrite: the `!` it produces is
+   * type-only, so — unlike Solid's Show accessor — a handler that outlives the
+   * branch is safe. Undefined everywhere else.
+   */
+  nonNullReads?: ReadonlySet<string> | undefined;
+  /**
    * Phase 71 (r-keynav, Angular), extended Phase 77 (multi-root) — the
    * per-component keynav emission plans (resolved ONCE by `emitAngular.ts`
    * via `resolveKeynavPlans`, threaded through both `emitTemplate.ts` and
@@ -299,6 +309,7 @@ function emitInterpolation(node: TemplateInterpolationIR, ctx: EmitNodeCtx): str
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
   // Phase 26 (SPEC-1, D-06/D-07) — gate on the IR-precomputed wrap decision.
@@ -350,6 +361,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     loopBindings: ctx.loopBindings,
     cvaModelProp: ctx.cvaModelProp,
     cvaMergeDisabled: ctx.cvaMergeDisabled,
+    nonNullReads: ctx.nonNullReads,
   });
 
   let trackExpr: string;
@@ -368,6 +380,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
       loopBindings: childBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
 
@@ -444,6 +457,7 @@ function emitEvents(
         handlerArity: ctx.handlerArity,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        nonNullReads: ctx.nonNullReads,
         elementTagKind: tagKind,
         producerEmits,
       });
@@ -475,6 +489,7 @@ function emitEvents(
         handlerArity: ctx.handlerArity,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        nonNullReads: ctx.nonNullReads,
         elementTagKind: tagKind,
         producerEmits,
       });
@@ -602,6 +617,7 @@ function emitElement(origNode: TemplateElementIR, ctx: EmitNodeCtx): string {
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
     // Single-element keyed @for: `[expr]` always renders exactly one child;
     // `track` by the key value recreates it only when the value changes.
@@ -745,6 +761,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       // OR-merges `this.__rozieCvaDisabled()`.
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     },
     node.tagName,
   );
@@ -872,6 +889,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
     partsHead.push(`[style.display]="(${expr}) ? '' : 'none'"`);
   }
@@ -893,6 +911,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
     // Phase 06.2 P2: tagKind: 'component'/'self' → rozie-kebab selector.
     const tagOut = resolveAngularTagName(node);
@@ -1130,6 +1149,7 @@ function emitMatchNode(node: TemplateMatchIR, ctx: EmitNodeCtx): string {
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
     letLine = `@let ${node.tempName} = ${rewritten};\n`;
   }

@@ -78,6 +78,12 @@ export interface EmitEventCtx {
    */
   cvaModelProp?: string | null | undefined;
   cvaMergeDisabled?: boolean | undefined;
+  /**
+   * SN-1 parity (add-on G) — component-state paths asserted non-null by an
+   * enclosing `@if`. Type-only (`x()!`), so a handler may safely outlive the
+   * branch; threaded into the handler `rewriteTemplateExpression` calls.
+   */
+  nonNullReads?: ReadonlySet<string> | undefined;
 }
 
 export interface EmitTemplateEventResult {
@@ -311,6 +317,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     loopBindings: ctx.loopBindings,
     cvaModelProp: ctx.cvaModelProp,
     cvaMergeDisabled: ctx.cvaMergeDisabled,
+    nonNullReads: ctx.nonNullReads,
   });
 
   for (const entry of listener.modifierPipeline) {
@@ -380,6 +387,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
         loopBindings: ctx.loopBindings,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        nonNullReads: ctx.nonNullReads,
         // Spike-012 R4 — this handler is spliced into a class-field IIFE (real
         // TS), NOT the template string: keep a TS `as` cast intact (Angular's
         // `$any()` template built-in is undefined in TS code).

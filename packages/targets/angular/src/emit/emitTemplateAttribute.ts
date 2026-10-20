@@ -134,6 +134,13 @@ export interface EmitAttrCtx {
   cvaModelProp?: string | null | undefined;
   cvaMergeDisabled?: boolean | undefined;
   /**
+   * SN-1 parity (add-on G) — component-state paths asserted non-null by an
+   * enclosing `@if` (see `EmitNodeCtx.nonNullReads`). Threaded into every
+   * bound-attribute `rewriteTemplateExpression` call; the hoisted double-read
+   * getter path keeps its own local narrowing and does not take it.
+   */
+  nonNullReads?: ReadonlySet<string> | undefined;
+  /**
    * command-palette-portal-overlay phase — class members from rewriteScript
    * (includes user method names). Threaded ONLY into `emitPortalDirective`'s
    * `rewriteListenerExpression` call (SCRIPT context) so a bare user-function
@@ -287,6 +294,7 @@ function renderInterpolatedTemplateLiteral(
         loopBindings: ctx.loopBindings,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        nonNullReads: ctx.nonNullReads,
       });
       // Phase 26 (SPEC-4) — a multi-segment interpolated attribute
       // (`class="card--{{ $data.x }}"`) ALWAYS renders as attribute text (it is
@@ -490,6 +498,11 @@ function lowerBoundAttrExpression(expr: t.Expression, ctx: EmitAttrCtx, attrName
     loopBindings: ctx.loopBindings,
     cvaModelProp: ctx.cvaModelProp,
     cvaMergeDisabled: ctx.cvaMergeDisabled,
+    nonNullReads: ctx.nonNullReads,
+    // A `[prop]` binding on a composed child is checked against the child's
+    // declared input type under strictTemplates — the whole value needs the
+    // narrowing (SN-1 parity). An HTML host's DOM property is not checked.
+    nonNullTop: ctx.elementTagKind === 'component' || ctx.elementTagKind === 'self',
   });
 }
 
@@ -854,6 +867,7 @@ function emitSpreadBinding(
       prefixThis: true,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
 
@@ -1048,6 +1062,7 @@ function emitListenerSpread(spread: ListenerSpreadIR, ctx: EmitAttrCtx): string 
       prefixThis: true,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
 
@@ -1410,6 +1425,7 @@ export function emitSingleAttr(
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
     return `[${bindingName}]="${expr}"`;
   }
@@ -1492,6 +1508,7 @@ export function emitSingleAttr(
         loopBindings: ctx.loopBindings,
         cvaModelProp: ctx.cvaModelProp,
         cvaMergeDisabled: ctx.cvaMergeDisabled,
+        nonNullReads: ctx.nonNullReads,
       });
       return `[(ngModel)]="${expr}" [ngModelOptions]="{standalone: true}"`;
     }
@@ -1647,6 +1664,7 @@ function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
   if (attr.kind === 'spreadBinding') {
@@ -1664,6 +1682,7 @@ function attrToArraySegment(attr: AttributeBinding, ctx: EmitAttrCtx): string {
       loopBindings: ctx.loopBindings,
       cvaModelProp: ctx.cvaModelProp,
       cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
     });
   }
   return '`' + renderInterpolatedTemplateLiteral(attr.segments, ctx) + '`';
