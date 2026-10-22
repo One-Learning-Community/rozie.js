@@ -1,5 +1,11 @@
 # @rozie-ui/chartjs-vue
 
+## 0.1.6
+
+### Patch Changes
+
+- a2053e1: Regenerated with the Vue string-ARIA fix: a nullable value bound to a string ARIA attribute (for example `aria-label`) on an HTML element is emitted with an `undefined` fallback, so a strict TypeScript consumer compiling the component's `.vue` source typechecks. Rendered markup is unchanged.
+
 ## 0.1.5
 
 ### Patch Changes

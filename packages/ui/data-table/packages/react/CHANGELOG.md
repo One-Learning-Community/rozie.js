@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-react
 
+## 0.7.4
+
+### Patch Changes
+
+- a2053e1: Regenerated with the React keyed-loop fix: the detail row no longer repeats the row key that its enclosing `Fragment` already carries, so two siblings no longer share one key. Rendered markup is unchanged.
+  - @rozie/runtime-react@0.10.1
+
 ## 0.7.3
 
 ### Patch Changes

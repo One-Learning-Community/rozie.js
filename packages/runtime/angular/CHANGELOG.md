@@ -1,5 +1,19 @@
 # @rozie/runtime-angular
 
+## 0.10.1
+
+### Patch Changes
+
+- a2053e1: Emitter fixes for strict TypeScript consumers of the generated source:
+  - Vue: a nullable value bound to a string ARIA attribute on an HTML element (`aria-controls`, `aria-describedby`, `aria-details`, `aria-errormessage`, `aria-flowto`, `aria-keyshortcuts`, `aria-label`, `aria-labelledby`, `aria-owns`, `aria-placeholder`, `aria-roledescription`, `aria-valuetext`) is emitted with an `undefined` fallback, so a strict vue-tsc consumer compiling the `.vue` source no longer reports TS2322. This now also covers the interpolated form (`aria-label="{{ x }}"`). `aria-colspan`, `aria-rowspan`, `aria-posinset` and `aria-setsize` join the numeric ARIA names that Vue and React already drop when null. Rendering is unchanged (Vue removes the attribute for `null` and `undefined` alike); a binding on a component tag is left as written.
+  - Solid: an `r-if` / `r-else-if` / `r-else` inside an `r-for` whose condition reads the loop item lowers to a JSX conditional inside a fragment instead of `Show`, so TypeScript narrows the item in the branch (a union item fed to a `number` slot param no longer fails). The other five targets already narrowed; rendering and updates are unchanged.
+  - React: a keyed `r-for` with several root nodes no longer repeats the key on the branches of an `r-if` child (the enclosing `Fragment` already carries it). The repeat was redundant and, when the key expression re-tests the discriminant the branch narrows, failed strict TypeScript (TS2367).
+  - Solid: an `r-if` / `r-else-if` whose condition tests a `$props`, `$data`, `$computed` or model value (truthiness, `!!x`, or a `!= null` / `!== null` / `!== undefined` comparison) and passes that value on (a slot param, a function argument, a member access, a child prop) now renders through `Show`'s callback form, so TypeScript narrows the value in the branch the way the other targets already did. Rendering and updates are unchanged; every other conditional is emitted exactly as before, and event handlers keep reading the live value.
+  - Angular: inside an `@if` branch that tested a `$props`, `$data`, `$computed` or model value non-null (the same guard shapes), a re-read of that value as a member access, a function argument or a child component input is emitted with a type-only non-null assertion (`picked()!.name`), so an Angular `strictTemplates` build no longer reports TS2531 / TS2345 on it. The assertion is erased by the template compiler; runtime is unchanged and every other binding is emitted exactly as before.
+  - Lit: a `model: true` prop with `default: null` types its controllable generic and its public accessor `T | null` (it was `T`, a strict TS2322 on the generated source), matching the other five targets.
+  - React: a keyed `r-for` whose only child is an `r-if` / `r-else` chain or an `r-match` no longer repeats the key on the branch elements (the row's `Fragment`, or the `r-match` host element, carries it once). The repeat failed strict TypeScript (TS2367) when the key re-tests the narrowed value.
+  - `@rozie/runtime-angular`: the published tarball no longer contains `src/__tests__/rozieModel.test.ts` (the `files` list now excludes test files like every other runtime).
+
 ## 0.10.0
 
 ## 0.9.1
