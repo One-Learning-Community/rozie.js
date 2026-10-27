@@ -36,3 +36,5 @@ export { normalizeListeners, REACT_LISTENER_KEY_MAP } from './normalizeListeners
 export { mergeListeners } from './mergeListeners.js';
 export { pickListeners } from './pickListeners.js';
 export { rozieContext } from './rozieContext.js';
+export { rozieNativeListeners } from './rozieNativeListeners.js';
+export type { RozieNativeListener, RozieForwardRef } from './rozieNativeListeners.js';

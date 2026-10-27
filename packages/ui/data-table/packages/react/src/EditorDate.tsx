@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { rozieAttr } from '@rozie/runtime-react';
+import { rozieAttr, rozieNativeListeners } from '@rozie/runtime-react';
 // C-07: the native `<input type="date">` accepts ONLY `YYYY-MM-DD` and renders BLANK for
 // anything else, silently. The seed used to be `String($props.value)`, which is not the ISO
 // coercion this component's own docs: string promises — so a `Date`, an ISO datetime string,
@@ -148,7 +148,7 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
 
   return (
     <>
-    <input ref={inputEl} className={"rdt-cell-editor"} type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} onInput={($event) => { onInput($event); }} onChange={($event) => { onChange($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} data-rozie-s-7abe1a56="" />
+    <input className={"rdt-cell-editor"} type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} ref={rozieNativeListeners<HTMLInputElement>([["change", ($event) => { onChange($event); }]], inputEl)} data-rozie-s-7abe1a56="" />
     </>
   );
 }

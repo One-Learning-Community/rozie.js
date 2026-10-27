@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, rozieNativeListeners, useControllableState } from '@rozie/runtime-react';
 import './Combobox.css';
 import Popover from '@rozie-ui/popover-react';
 // virtual-core: the framework-agnostic windowing state machine (the data-table
@@ -2093,7 +2093,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
             {chipRows().map((row, idx) => <li key={'chip-' + row.value} className={"rozie-combobox-chip"} data-rozie-s-9546115a="">
               {(props.renderChip ?? props.slots?.['chip']) ? ((props.renderChip ?? props.slots?.['chip']) as Function)({ option: row.option, remove: () => onChipRemoveActivate(row.value), index: idx }) : <><span className={"rozie-combobox-chip__label"} data-rozie-s-9546115a="">{rozieDisplay(row.label)}</span><button type="button" className={"rozie-combobox-chip__remove"} disabled={!!props.disabled} aria-label={rozieAttr(chipRemoveLabel(row))} onMouseDown={($event) => { $event.preventDefault(); onChipRemovePointerDown(); }} onClick={($event) => { $event.stopPropagation(); onChipRemoveActivate(row.value); }} data-rozie-s-9546115a="">×</button></>}
             </li>)}
-          </ul>}<input ref={inputEl} className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!popupVisible()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={inputText} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} onChange={($event) => { $event.stopPropagation(); onNativeInputChange(); }} data-rozie-s-9546115a="" />
+          </ul>}<input className={"rozie-combobox-input"} type="text" role="combobox" aria-autocomplete="list" aria-expanded={!!popupVisible()} aria-controls={rozieAttr(listId())} aria-activedescendant={rozieAttr(activeId())} aria-label={rozieAttr(props.ariaLabel)} value={inputText} placeholder={props.placeholder} disabled={!!props.disabled} autoComplete="off" onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur($event); }} onKeyDown={($event) => { onKeydown($event); }} onPaste={($event) => { onPaste($event); }} ref={rozieNativeListeners<HTMLInputElement>([["change", ($event) => { $event.stopPropagation(); onNativeInputChange(); }]], inputEl)} data-rozie-s-9546115a="" />
           </div>
         </>)} children={<>
         

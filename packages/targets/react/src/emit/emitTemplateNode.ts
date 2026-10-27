@@ -557,6 +557,27 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // Build a working set of attributes — start with element's own.
   let workingAttrs: AttributeBinding[] = [...node.attributes];
 
+  // `@change` on a text control is the DOM `change` event, which JSX
+  // `onChange` is not (React fires it per keystroke). Those listeners leave
+  // `node.events` here — before the r-model same-event merge, which would
+  // otherwise fold them into the model's per-keystroke handler — and are
+  // attached through the element's ref (`nativeListenerRefJsx` below). The
+  // author's own `ref` is forwarded through the same callback, since an
+  // element takes a single `ref`.
+  const nativeEvents = node.events.filter((ev) => isNativeChangeListener(ev, node));
+  let nativeForwardRef: string | null = null;
+  if (nativeEvents.length > 0) {
+    node = { ...node, events: node.events.filter((ev) => !nativeEvents.includes(ev)) };
+    const refNames = new Set(ctx.ir.refs.map((r) => r.name));
+    const authorRef = workingAttrs.find(
+      (a) => a.kind === 'static' && a.name === 'ref' && refNames.has(a.value),
+    );
+    if (authorRef && authorRef.kind === 'static') {
+      nativeForwardRef = authorRef.value;
+      workingAttrs = workingAttrs.filter((a) => a !== authorRef);
+    }
+  }
+
   // Keyed-remount codegen Task 2 — a component-level `:key="expr"` (NOT
   // under r-for; that path owns `key` via `pendingKey` above) lowers to
   // `remountKeyExpression` (Task 1). React natively destroys+recreates a
@@ -781,6 +802,16 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     ...keynavAttrs,
   ];
   if (mergedModelEventJsx) headParts.push(mergedModelEventJsx);
+  if (nativeEvents.length > 0) {
+    // A synthesized keynav ref is forwarded too (it is emitted only when the
+    // author wrote none, so there is at most one to forward).
+    const refAt = headParts.findIndex((part) => /^ref=\{[\w$]+\}$/.test(part));
+    if (refAt !== -1) {
+      nativeForwardRef = headParts[refAt]!.slice('ref={'.length, -1);
+      headParts.splice(refAt, 1);
+    }
+    headParts.push(nativeListenerRefJsx(node, nativeEvents, nativeForwardRef, ctx));
+  }
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
   if (remountKeyJsx) headParts.push(remountKeyJsx);
@@ -1139,6 +1170,63 @@ function emitElementListeners(
   ctx.collectors.runtime.add('mergeListeners');
   const spreadToken = `{...mergeListeners(${mergeArgs.join(', ')})}`;
   return { eventsJsx: '', extraSpreads: [spreadToken] };
+}
+
+/** Input types whose JSX `onChange` already is the DOM `change` event. */
+const ONCHANGE_IS_NATIVE_INPUT_TYPES = new Set(['checkbox', 'radio', 'file']);
+
+/**
+ * True for a `@change` listener on an `<input>` / `<textarea>` whose JSX
+ * `onChange` would fire per keystroke. A static `type` of checkbox, radio or
+ * file keeps `onChange` (React's event matches the native one there), as
+ * does `<select>`. A bound `:type` can be a text type, so it goes native.
+ */
+function isNativeChangeListener(ev: Listener, node: TemplateElementIR): boolean {
+  if (ev.event !== 'change' || node.tagKind !== 'html') return false;
+  const tag = node.tagName.toLowerCase();
+  if (tag === 'textarea') return true;
+  if (tag !== 'input') return false;
+  const type = node.attributes.find((a) => a.kind === 'static' && a.name === 'type');
+  return !(
+    type &&
+    type.kind === 'static' &&
+    ONCHANGE_IS_NATIVE_INPUT_TYPES.has(type.value.toLowerCase())
+  );
+}
+
+/**
+ * `ref={rozieNativeListeners<El>([["change", handler, capture?], …], forward)}`
+ * for the listeners `isNativeChangeListener` routed off JSX. Each handler is
+ * the same arrow `emitTemplateEvent` builds for the JSX prop, so modifiers
+ * (`.stop`, `.prevent`, key filters, debounce wraps) behave as before;
+ * `.capture` becomes the listener's capture flag.
+ */
+function nativeListenerRefJsx(
+  node: TemplateElementIR,
+  listeners: Listener[],
+  forwardRef: string | null,
+  ctx: EmitNodeCtx,
+): string {
+  const entries: string[] = [];
+  for (const ev of listeners) {
+    const result = emitTemplateEvent(ev, {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      collectors: ctx.collectors,
+      injectionCounter: ctx.injectionCounter,
+    });
+    if (result.scriptInjection !== null) ctx.scriptInjections.push(result.scriptInjection);
+    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{([\s\S]*)\}$/);
+    const jsxName = match ? match[1]! : '';
+    const body = match ? match[2]! : result.jsxAttr;
+    const capture = jsxName.endsWith('Capture') ? ', true' : '';
+    entries.push(`[${JSON.stringify(ev.event)}, ${body}${capture}]`);
+  }
+  ctx.collectors.runtime.add('rozieNativeListeners');
+  const elType = node.tagName.toLowerCase() === 'textarea' ? 'HTMLTextAreaElement' : 'HTMLInputElement';
+  const forward = forwardRef !== null ? `, ${forwardRef}` : '';
+  return `ref={rozieNativeListeners<${elType}>([${entries.join(', ')}]${forward})}`;
 }
 
 /**

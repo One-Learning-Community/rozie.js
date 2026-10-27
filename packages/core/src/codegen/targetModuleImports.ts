@@ -99,6 +99,9 @@ export const REACT_RUNTIME_IMPORTS = [
   // Typed-surface P3 review fix — filters `attrs` to listener keys for the R6
   // all-fire merge on an auto-fallthrough root with its own @events.
   'pickListeners',
+  // Native DOM listeners attached through the element's ref — `@change` on an
+  // `<input>` / `<textarea>`, where JSX `onChange` is a per-keystroke event.
+  'rozieNativeListeners',
   'isEnter',
   'isEscape',
   'isTab',
