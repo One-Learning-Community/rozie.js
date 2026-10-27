@@ -116,6 +116,8 @@ These all passed `compile()×6` clean and only bit at the per-leaf `typecheck`/`
 - **hyphenated slot name** (e.g. `page-item`) → unquoted property key in the Vue/Solid/Lit `defineSlots<{…}>` slot-type literal → hard `TS1005` parse error. Workaround: use single-word slot names (`item`). Proper fix = quote non-identifier slot keys in the vue/solid/lit slot-type emitters. (pagination) — NEW gap.
 - **`r-if`/`r-else` with a `<slot>` in the else branch** lowered to an object-literal in JSX-expression position on React. Workaround: two independent `r-if`s instead of `r-if`/`r-else`. (pagination)
 - **numeric `:attr` `?? undefined` → `TS2869`** on React (a provably-non-null tabindex like `0`/`-1` trips "right operand of ?? is unreachable"). Workaround: route tabindex through a `number | undefined`-typed helper (the data-table `cellTabindex` precedent). (pagination)
+- **`@change` on a text `<input>` / `<textarea>` means a different thing on React** — it lowers to JSX `onChange`, which React fires on every keystroke; the other five targets get the native commit-on-blur `change`. compile()×6 and every typecheck stay green. Workaround: derive the commit from `@focus` / `@blur` (text-field's `textAtFocus` + edited-since-focus flag). (text-field)
+- **two top-level helpers that call each other → `TS2448` on React** — each becomes a `useCallback` whose deps array names the other before it is declared. Only the React leaf `tsc` catches it. Workaround: break the cycle (text-field's width observer re-applies through top-level lets instead of calling `fit`). (text-field)
 
 ## Verification gates (this is purely additive — no emitter change)
 
