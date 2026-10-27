@@ -130,6 +130,7 @@ Most families wrap a battle-tested vanilla-JS engine whose framework bindings ar
 | [Slider](https://one-learning-community.github.io/rozie.js/components/slider) | slider / range | pending |
 | [Switch](https://one-learning-community.github.io/rozie.js/components/switch) | toggle / switch | pending |
 | [Tags](https://one-learning-community.github.io/rozie.js/components/tags) | token / tags input | ✅ |
+| [TextField](https://one-learning-community.github.io/rozie.js/components/text-field) | text field / textarea with label, help + error wiring | pending |
 | [Toaster](https://one-learning-community.github.io/rozie.js/components/toast) | toast / notification host | ✅ |
 
 Shared internals: [`@rozie-ui/headless-core`](packages/ui/headless-core) (workspace-internal state helpers) and [`@rozie/runtime-keynav-core`](packages/runtime/keynav-core) (published keyboard-navigation primitive). Adding a family is documented in [`packages/ui/ADDING-A-FAMILY.md`](packages/ui/ADDING-A-FAMILY.md).

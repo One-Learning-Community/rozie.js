@@ -57,6 +57,7 @@ export function propsCodegen(
       'data-table',
       'tags',
       'number-field',
+      'text-field',
       'pagination',
       'date-picker',
       'switch',

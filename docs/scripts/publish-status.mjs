@@ -44,6 +44,7 @@ export const PARTIAL_DEBUTS = {
   resizable: ['solid'],
   slider: ['solid'],
   switch: ['solid'],
+  'text-field': [],
   lexical: [],
 };
 

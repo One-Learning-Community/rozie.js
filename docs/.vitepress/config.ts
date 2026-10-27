@@ -406,6 +406,18 @@ export default defineConfig({
           ],
         },
         {
+          text: '@rozie-ui/text-field',
+          collapsed: true,
+          items: [
+            { text: 'TextField — accessible text field / textarea', link: '/components/text-field' },
+            { text: 'API reference', link: '/components/text-field-api' },
+            { text: 'Usage examples', link: '/components/text-field-usage' },
+            { text: 'Theming', link: '/components/text-field-theming' },
+            { text: 'Text field comparison', link: '/components/text-field-comparison' },
+            { text: 'TextField — live demo', link: '/components/text-field-demo' },
+          ],
+        },
+        {
           text: '@rozie-ui/pagination',
           collapsed: true,
           items: [

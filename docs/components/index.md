@@ -75,6 +75,7 @@ Authored from scratch in a single `.rozie` file — no third-party engine, fully
 | **Dialog** | *(native `<dialog>`)* headless accessible modal dialog | [/components/dialog](/components/dialog) |
 | **Tags** | *(no engine)* headless accessible token / tags input | [/components/tags](/components/tags) |
 | **NumberField** | *(no engine)* headless accessible number field / stepper | [/components/number-field](/components/number-field) |
+| **TextField** | *(no engine)* accessible text field / textarea with label, help and error wiring | [/components/text-field](/components/text-field) |
 | **Pagination** | *(no engine)* headless accessible pagination | [/components/pagination](/components/pagination) |
 | **DatePicker** | *(no engine)* headless accessible calendar (single + range modes) | [/components/date-picker](/components/date-picker) |
 | **Switch** | *(no engine)* headless accessible toggle / switch | [/components/switch](/components/switch) |

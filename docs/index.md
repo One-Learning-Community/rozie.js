@@ -49,7 +49,7 @@ Every `@rozie-ui` family is the same component with the same API in React, Vue, 
 
 **No-engine, pure Rozie** — headless, fully accessible interaction authored from scratch in a single `.rozie` file, proving Rozie carries rich behavior on its own:
 
-[Select](/components/select) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [Pagination](/components/pagination) · [DatePicker & Calendar](/components/date-picker) · [Switch & Toggle](/components/switch) · [Resizable Split Pane](/components/resizable) · [Command Palette](/components/command-palette)
+[Select](/components/select) · [Slider & Range](/components/slider) · [Otp & PIN input](/components/otp) · [Combobox & Autocomplete](/components/combobox) · [Toast & Notifications](/components/toast) · [Dialog & Modal](/components/dialog) · [Tags & Token input](/components/tags) · [NumberField & Stepper](/components/number-field) · [TextField & Textarea](/components/text-field) · [Pagination](/components/pagination) · [DatePicker & Calendar](/components/date-picker) · [Switch & Toggle](/components/switch) · [Resizable Split Pane](/components/resizable) · [Command Palette](/components/command-palette)
 
 **Hosted widgets** — a third-party SaaS widget loaded at runtime (no npm engine), unified across providers *and* frameworks:
 
