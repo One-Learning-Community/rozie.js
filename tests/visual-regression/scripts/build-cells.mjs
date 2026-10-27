@@ -271,6 +271,7 @@ const NUMBER_FIELD_SRC = resolve(
   'number-field',
   'src',
 );
+const TEXT_FIELD_SRC = resolve(REPO_ROOT, 'packages', 'ui', 'text-field', 'src');
 const PAGINATION_SRC = resolve(
   REPO_ROOT,
   'packages',
@@ -719,6 +720,7 @@ function cleanupCrossTreeAngularArtifacts() {
   for (const [src, shim] of [
     [TAGS_SRC, 'Tags.ts'],
     [NUMBER_FIELD_SRC, 'NumberField.ts'],
+    [TEXT_FIELD_SRC, 'TextField.ts'],
     [PAGINATION_SRC, 'Pagination.ts'],
     [SWITCH_SRC, 'Switch.ts'],
     [POPOVER_SRC, 'Popover.ts'],

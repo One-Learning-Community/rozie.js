@@ -38,6 +38,7 @@ const FAMILIES = [
   { family: 'switch', demo: 'SwitchBehaviorDemo' },
   { family: 'otp', demo: 'OtpBehaviorDemo' },
   { family: 'number-field', demo: 'NumberFieldBehaviorDemo' },
+  { family: 'text-field', demo: 'TextFieldBehaviorDemo' },
   { family: 'toast', demo: 'ToasterBehaviorDemo' },
   { family: 'date-picker', demo: 'DatePickerBehaviorDemo' },
   { family: 'pagination', demo: 'PaginationBehaviorDemo' },

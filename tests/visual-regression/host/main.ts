@@ -1285,6 +1285,11 @@ export const EXAMPLES = [
   // roving-keyboard coverage that PaginationBehavior's page-wide locators cannot share a page
   // with (examples/demos/PaginationSurfaceDemo.rozie; pagination-surface.spec.ts). Behavioral-only.
   'PaginationSurface',
+  // @rozie-ui/text-field — the BEHAVIORAL cell (loader →
+  // examples/demos/TextFieldBehaviorDemo.rozie): label↔control and describedby
+  // wiring, model + change/enter events, autosize and the handle. See
+  // text-field.spec.ts. Behavioral-only.
+  'TextFieldBehavior',
   // Phase 60 — the three content-STABLE SCREENSHOT cells (loaders →
   // examples/demos/{Tags,NumberField,Pagination}ScreenshotDemo.rozie). All render
   // INLINE → standard mount-clipped matrix cells (matrix.spec.ts). Each seeds a
@@ -1294,6 +1299,10 @@ export const EXAMPLES = [
   'TagsScreenshot',
   'NumberFieldScreenshot',
   'PaginationScreenshot',
+  // @rozie-ui/text-field INLINE screenshot cell (TextFieldScreenshotDemo.rozie):
+  // a labelled field with help text, an invalid field with its error, and a
+  // filled textarea with a counter — all unfocused, so the frame is stable.
+  'TextFieldScreenshot',
   // @rozie-ui/switch + popover headless families — the BEHAVIORAL cells (loaders →
   // examples/demos/{Switch,Popover}BehaviorDemo.rozie, each importing
   // packages/ui/<family>/src/<Component>.rozie). SwitchBehavior drives the
@@ -1932,6 +1941,8 @@ export const LIT_TAGS: Record<Example, string> = {
   TagsScreenshot: 'rozie-tags-screenshot',
   NumberFieldScreenshot: 'rozie-number-field-screenshot',
   PaginationScreenshot: 'rozie-pagination-screenshot',
+  TextFieldBehavior: 'rozie-text-field-behavior',
+  TextFieldScreenshot: 'rozie-text-field-screenshot',
   // @rozie-ui/switch + popover — '-demo' appended on Lit → tags
   // 'rozie-switch-behavior-demo' etc. = kebab of {Switch,Popover}{Behavior,Screenshot}Demo
   // (the wrapper components are name="<Name>Demo").
@@ -2488,6 +2499,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   TagsScreenshot: {},
   NumberFieldScreenshot: {},
   PaginationScreenshot: {},
+  TextFieldBehavior: {},
+  TextFieldScreenshot: {},
   // @rozie-ui/switch + popover — all four demos are self-contained wrappers (each
   // seeds its own state in <data> and binds the inner component via r-model). No
   // parent-supplied props; no MODEL_PROPS entry (the model is bound internally —

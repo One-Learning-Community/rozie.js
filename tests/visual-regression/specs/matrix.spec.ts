@@ -397,6 +397,9 @@ const EXAMPLES = [
   'TagsScreenshot',
   'NumberFieldScreenshot',
   'PaginationScreenshot',
+  // @rozie-ui/text-field INLINE screenshot cell — labelled / invalid / multiline
+  // fields, all unfocused (no caret, no focus ring). Same shared-baseline rule.
+  'TextFieldScreenshot',
   // @rozie-ui/switch INLINE screenshot cell — the pure-Rozie toggle renders in
   // normal flow, so it goes in this standard mount-clipped matrix.
   // SwitchScreenshot seeds three fixed states (on / off / disabled), unfocused
@@ -1049,6 +1052,13 @@ async function settleExample(
         { timeout: 5_000, intervals: [100, 200, 400, 800] },
       )
       .toBe('42');
+  }
+  // TextFieldScreenshot (@rozie-ui/text-field): wait for the three controls and the
+  // error text (the error only renders once the seeded value is bound) so the clip
+  // never catches a half-mounted field. `[class*=...]` pierces Lit's shadow.
+  if (example === 'TextFieldScreenshot') {
+    await expect(page.locator('[class*="rozie-text-field-input"]')).toHaveCount(3, { timeout: 10_000 });
+    await expect(page.locator('[class*="rozie-text-field-error"]')).toHaveCount(1, { timeout: 10_000 });
   }
   // PaginationScreenshot (@rozie-ui/pagination): page 5 of 20 → the window is
   // [1, …, 4, 5, 6, …, 20] = 5 page buttons + 2 ellipses. Wait for the 5 page

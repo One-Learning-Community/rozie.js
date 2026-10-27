@@ -131,6 +131,7 @@ const FAMILIES: Family[] = [
     },
   },
   { family: 'number-field', litTag: 'rozie-number-field', example: 'NumberFieldBehavior', root: '.rozie-number-field', derived: {} },
+  { family: 'text-field', litTag: 'rozie-text-field', example: 'TextFieldBehavior', root: '.rozie-text-field', derived: {} },
   {
     family: 'otp', litTag: 'rozie-otp',
     example: 'OtpBehavior',

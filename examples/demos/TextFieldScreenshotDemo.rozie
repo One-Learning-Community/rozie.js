@@ -1,0 +1,71 @@
+<!--
+  TextFieldScreenshotDemo.rozie — content-STABLE screenshot consumer for
+  @rozie-ui/text-field.
+
+  Where TextFieldBehaviorDemo.rozie is the BEHAVIORAL cell, THIS is the SEPARATE
+  deterministic SCREENSHOT cell — never extend it for behavior. Deterministic by:
+  fixed seeded values, NO focus (no caret, no focus ring) and NO interaction. It
+  shows the three visual states that matter: a labelled field with help text and a
+  required marker, an invalid field with its error, and a filled textarea with a
+  counter. The Linux PNG baseline is generated in pinned Linux Docker (never on
+  macOS, feedback_vr_linux_baselines). INLINE-rendering family → standard
+  mount-clipped matrix cell (specs/matrix.spec.ts).
+-->
+
+<rozie name="TextFieldScreenshotDemo">
+
+<components>
+{
+  TextField: '../../packages/ui/text-field/src/TextField.rozie',
+}
+</components>
+
+<data>
+{
+  name: 'Ada Lovelace',
+  email: 'ada@',
+  bio: 'Mathematician and writer.',
+}
+</data>
+
+<template>
+<div class="text-field-screenshot-demo">
+  <TextField
+    r-model:modelValue="$data.name"
+    label="Full name"
+    idBase="shot-name"
+    description="As it appears on your ID."
+    required
+  />
+  <TextField
+    r-model:modelValue="$data.email"
+    label="Email"
+    type="email"
+    idBase="shot-email"
+    error="Enter a valid email address."
+  />
+  <TextField
+    r-model:modelValue="$data.bio"
+    label="Bio"
+    idBase="shot-bio"
+    multiline
+    :rows="3"
+    :maxLength="160"
+    showCount
+  />
+</div>
+</template>
+
+<style>
+.text-field-screenshot-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+</style>
+
+</rozie>

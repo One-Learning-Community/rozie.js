@@ -427,6 +427,17 @@ const BUNDLE_DECLS: readonly BundleDecl[] = [
     dependencyGlobPaths: ['../../../packages/ui/number-field/src/NumberField.rozie'],
   },
   {
+    // @rozie-ui/text-field — its `./internal/autosize` helper rides as a
+    // passthrough blob sibling (the date-picker precedent).
+    key: 'bundle/TextFieldBehaviorDemo',
+    label: 'bundle/TextFieldBehaviorDemo',
+    entryGlobPath: '../../demos/TextFieldBehaviorDemo.rozie',
+    dependencyGlobPaths: [
+      '../../../packages/ui/text-field/src/TextField.rozie',
+      '../../../packages/ui/text-field/src/internal/autosize.ts',
+    ],
+  },
+  {
     key: 'bundle/ToasterBehaviorDemo',
     label: 'bundle/ToasterBehaviorDemo',
     entryGlobPath: '../../demos/ToasterBehaviorDemo.rozie',
