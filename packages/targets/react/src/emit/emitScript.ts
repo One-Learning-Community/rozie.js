@@ -440,6 +440,10 @@ function tryWrapEscapingHelperUseCallback(
   // the bare `_rozieProp_*` local still happens (the hoisted destructure binds
   // it in the enclosing scope). Empty set = the byte-identical pre-fix path.
   hoistedPropNames: ReadonlySet<string> = new Set(),
+  // Cycle forward edges (see `computeCycleForwardRefs`). `declared` is shared
+  // across the wrap loop so each `_rozieFwd_<X>` ref is declared once, ahead
+  // of the first helper that calls through it.
+  forward: CycleForwardRefs = { refs: new Map(), targets: new Set(), declared: new Set() },
 ): string | null {
   if (!t.isVariableDeclaration(stmt)) return null;
   if (stmt.declarations.length !== 1) return null;
@@ -493,7 +497,10 @@ function tryWrapEscapingHelperUseCallback(
   // the deps array, replace `props.X` with the renamed local for any X that
   // was destructured — eslint expects the deps[] entry to match the body's
   // bare-identifier reference.
-  const bodyDeps = computeHelperBodyDeps(init.body, ir, allHelperNames, helperName);
+  const forwardNames = forward.refs.get(helperName) ?? new Set<string>();
+  const bodyDeps = computeHelperBodyDeps(init.body, ir, allHelperNames, helperName).filter(
+    (ref) => !(ref.scope === 'closure' && forwardNames.has(ref.identifier)),
+  );
   const rawDepsLiteral = renderDepArrayWithIR(bodyDeps, ir);
   // Rewrite `props.onSearch` → `_rozieProp_onSearch` in the deps array
   // for each destructured name. Sort the resulting list lexically again.
@@ -516,6 +523,20 @@ function tryWrapEscapingHelperUseCallback(
     }
   }
 
+  let forwardPrefix = '';
+  if (forwardNames.size > 0) {
+    initToEmit = rewriteForwardHelperRefs(initToEmit, forwardNames);
+    for (const name of [...forwardNames].sort()) {
+      if (forward.declared.has(name)) continue;
+      forward.declared.add(name);
+      collectors.react.add('useRef');
+      forwardPrefix += `const _rozieFwd_${name} = useRef<typeof ${name}>(null!);\n`;
+    }
+  }
+  const forwardSync = forward.targets.has(helperName)
+    ? `\n_rozieFwd_${helperName}.current = ${helperName};`
+    : '';
+
   const arrowSource = genCode(initToEmit);
 
   // WR-01 ROOT CAUSE 2 — the `useCallback` wrap rebuilds the declaration as a
@@ -527,7 +548,84 @@ function tryWrapEscapingHelperUseCallback(
   // sole — and sufficient — carrier.)
   const declTypeSuffix = renderDeclaratorTypeSuffix(decl.id);
 
-  return `${destructurePrefix}const ${helperName}${declTypeSuffix} = useCallback(${arrowSource}, ${depsLiteral});`;
+  return `${forwardPrefix}${destructurePrefix}const ${helperName}${declTypeSuffix} = useCallback(${arrowSource}, ${depsLiteral});${forwardSync}`;
+}
+
+interface CycleForwardRefs {
+  /** helper name → the cycle members declared after it that it references */
+  refs: ReadonlyMap<string, ReadonlySet<string>>;
+  /** every helper some earlier cycle member reaches through a ref */
+  targets: ReadonlySet<string>;
+  /** refs already declared by an earlier helper in the wrap loop */
+  declared: Set<string>;
+}
+
+/**
+ * The forward edges of helper cycles among the `useCallback`-wrapped helpers:
+ * helper A references helper B, B is declared after A, and B reaches A again
+ * through helper references. Those are the dep-array entries no statement
+ * order can satisfy. A forward reference outside a cycle is left alone —
+ * `orderByEagerDeps` moves B above A for it.
+ */
+function computeCycleForwardRefs(
+  useCallbackHelperNames: ReadonlySet<string>,
+  helperBodyByName: ReadonlyMap<string, t.Node>,
+  ir: IRComponent,
+  allHelperNames: Set<string>,
+): Map<string, Set<string>> {
+  const order = [...helperBodyByName.keys()].filter((n) => useCallbackHelperNames.has(n));
+  const index = new Map(order.map((n, i) => [n, i]));
+  const edges = new Map<string, Set<string>>();
+  for (const name of order) {
+    const out = new Set<string>();
+    for (const ref of computeHelperBodyDeps(helperBodyByName.get(name)!, ir, allHelperNames, name)) {
+      if (ref.scope === 'closure' && index.has(ref.identifier) && ref.identifier !== name) out.add(ref.identifier);
+    }
+    edges.set(name, out);
+  }
+  const reaches = (from: string, to: string): boolean => {
+    const seen = new Set<string>();
+    const stack = [from];
+    while (stack.length > 0) {
+      const cur = stack.pop()!;
+      if (cur === to) return true;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      stack.push(...(edges.get(cur) ?? []));
+    }
+    return false;
+  };
+  const result = new Map<string, Set<string>>();
+  for (const name of order) {
+    for (const next of edges.get(name)!) {
+      if (index.get(next)! <= index.get(name)!) continue;
+      if (!reaches(next, name)) continue;
+      if (!result.has(name)) result.set(name, new Set());
+      result.get(name)!.add(next);
+    }
+  }
+  return result;
+}
+
+/**
+ * Rewrite references to the given helpers (not shadowed inside `node`) to
+ * `_rozieFwd_<name>.current`. Returns a rewritten clone.
+ */
+function rewriteForwardHelperRefs(node: t.Node, names: ReadonlySet<string>): t.Node {
+  const cloned = t.cloneNode(node, true, false);
+  const file = t.file(t.program([t.expressionStatement(cloned as t.Expression)]));
+  traverse(file, {
+    Identifier(path) {
+      if (!names.has(path.node.name)) return;
+      if (!path.isReferencedIdentifier()) return;
+      if (path.scope.hasBinding(path.node.name)) return;
+      path.replaceWith(
+        t.memberExpression(t.identifier(`_rozieFwd_${path.node.name}`), t.identifier('current')),
+      );
+      path.skip();
+    },
+  });
+  return cloned;
 }
 
 /**
@@ -2604,6 +2702,16 @@ export function emitScript(
       useCallbackHelperNames.add(name);
     }
   }
+  // Helpers that call each other in a cycle can't all list each other as
+  // `useCallback` deps: whichever is declared first would read the next one
+  // before its declaration ran (TS2448, and a TDZ ReferenceError on the first
+  // render), and no statement order fixes a cycle. For each call from a
+  // helper to a cycle member declared LATER, the dep is dropped and the call
+  // goes through `_rozieFwd_<X>`, a ref declared ahead of the helpers and kept
+  // current after `<X>`'s declaration. Empty when there is no cycle.
+  const cycleForwardRefs = computeCycleForwardRefs(useCallbackHelperNames, helperBodyByName, ir, allHelperNames);
+  const cycleForwardTargets = new Set([...cycleForwardRefs.values()].flatMap((s) => [...s]));
+  const declaredForwardRefs = new Set<string>();
   {
     // D-10 collision guard — this path, seam 2, 5b-bis and `emitPortals` all
     // mint `_<name>Ref`. Skip any helper whose ref ident could collide with a
@@ -4790,6 +4898,7 @@ export function emitScript(
       allHelperNames,
       collectors,
       hoistedPropNames,
+      { refs: cycleForwardRefs, targets: cycleForwardTargets, declared: declaredForwardRefs },
     );
     if (wrapped) {
       pushWrapped(wrapped, stmt);

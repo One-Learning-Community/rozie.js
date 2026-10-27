@@ -112,6 +112,10 @@ export function orderByEagerDeps(script: string): string {
         if (p === root) return;
         if (!runsImmediately(p)) p.skip();
       },
+      // Types are erased: `useRef<typeof later>(…)` reads nothing at runtime.
+      TSType(p: NodePath<t.TSType>) {
+        p.skip();
+      },
       Identifier: visitRef,
     };
     if (root.isFunction()) {
