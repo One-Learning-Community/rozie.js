@@ -444,7 +444,7 @@ $expose({ focus, select, clear }, { focus: '() => void', select: '() => void', c
   class="rozie-text-field"
   :class="{ 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': $props.disabled, 'rozie-text-field--multiline': $props.multiline, 'rozie-text-field--autosize': $props.multiline && $props.autosize }"
 >
-  <label r-if="$props.label" class="rozie-text-field-label" :for="inputId()">{{ $props.label }}<span r-if="$props.required" class="rozie-text-field-required" aria-hidden="true"> *</span></label>
+  <label r-if="$props.label" class="rozie-text-field-label" :for="inputId()">{{ $props.label }}<span r-if="$props.required" class="rozie-text-field-required" aria-hidden="true">*</span></label>
 
   <div class="rozie-text-field-control">
     <span r-if="$slots.prefix" class="rozie-text-field-prefix"><slot name="prefix" /></span>
@@ -526,6 +526,8 @@ $expose({ focus, select, clear }, { focus: '() => void', select: '() => void', c
 }
 
 .rozie-text-field-required {
+  /* A margin, not a leading space in the markup: targets collapse that space differently. */
+  margin-left: 0.25em;
   color: var(--rozie-text-field-error-color, var(--rtf-error-color, #dc2626));
 }
 

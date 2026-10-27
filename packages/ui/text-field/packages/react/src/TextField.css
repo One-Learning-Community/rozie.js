@@ -13,6 +13,8 @@
   color: var(--rozie-text-field-label-color, var(--rtf-label-color, inherit));
 }
 .rozie-text-field-required[data-rozie-s-346ae6aa] {
+  /* A margin, not a leading space in the markup: targets collapse that space differently. */
+  margin-left: 0.25em;
   color: var(--rozie-text-field-error-color, var(--rtf-error-color, #dc2626));
 }
 .rozie-text-field-control[data-rozie-s-346ae6aa] {

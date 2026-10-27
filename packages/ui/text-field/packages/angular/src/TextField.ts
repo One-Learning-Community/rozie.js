@@ -26,7 +26,7 @@ interface SuffixCtx {}
     <div class="rozie-text-field" [ngClass]="{ 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': (disabled() || this.__rozieCvaDisabled()), 'rozie-text-field--multiline': multiline(), 'rozie-text-field--autosize': multiline() && autosize() }" #rozieSpread_0 #rozieListenersTarget_1>
       @if (label()) {
     <label class="rozie-text-field-label" [attr.for]="rozieAttr(inputId())">{{ label() }}@if (required()) {
-    <span class="rozie-text-field-required" aria-hidden="true"> *</span>
+    <span class="rozie-text-field-required" aria-hidden="true">*</span>
     }</label>
     }<div class="rozie-text-field-control">
         @if ((prefixTpl ?? __rozieFillMap()['prefix'] ?? templates()?.['prefix'])) {
@@ -69,6 +69,8 @@ interface SuffixCtx {}
       color: var(--rozie-text-field-label-color, var(--rtf-label-color, inherit));
     }
     .rozie-text-field-required {
+      /* A margin, not a leading space in the markup: targets collapse that space differently. */
+      margin-left: 0.25em;
       color: var(--rozie-text-field-error-color, var(--rtf-error-color, #dc2626));
     }
     .rozie-text-field-control {

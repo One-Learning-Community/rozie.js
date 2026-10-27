@@ -1,7 +1,7 @@
 <template>
 
 <div :class="['rozie-text-field', { 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': props.disabled, 'rozie-text-field--multiline': props.multiline, 'rozie-text-field--autosize': props.multiline && props.autosize }]" v-bind="$attrs">
-  <label v-if="props.label" class="rozie-text-field-label" :for="inputId()">{{ props.label }}<span v-if="props.required" class="rozie-text-field-required" aria-hidden="true"> *</span></label><div class="rozie-text-field-control">
+  <label v-if="props.label" class="rozie-text-field-label" :for="inputId()">{{ props.label }}<span v-if="props.required" class="rozie-text-field-required" aria-hidden="true">*</span></label><div class="rozie-text-field-control">
     <span v-if="$slots.prefix" class="rozie-text-field-prefix"><slot name="prefix"></slot></span><textarea v-if="props.multiline" ref="textareaElRef" class="rozie-text-field-input" :id="inputId()" :value="currentText()" :rows="(props.rows) ?? undefined" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur($event)"></textarea><input v-if="!props.multiline" ref="inputElRef" class="rozie-text-field-input" :id="inputId()" :type="inputType()" :value="currentText()" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur($event)" @keydown="onKeydown($event)" /><span v-if="$slots.suffix" class="rozie-text-field-suffix"><slot name="suffix"></slot></span></div>
 
   <p v-if="props.description" class="rozie-text-field-description" :id="descriptionId()">{{ props.description }}</p><p v-if="hasError()" class="rozie-text-field-error" :id="errorId()">{{ props.error }}</p><p v-if="props.showCount" class="rozie-text-field-count" :id="countId()">{{ countText() }}</p></div>
@@ -333,6 +333,8 @@ defineExpose({ focus, select, clear } as TextFieldHandle);
   color: var(--rozie-text-field-label-color, var(--rtf-label-color, inherit));
 }
 .rozie-text-field-required {
+  /* A margin, not a leading space in the markup: targets collapse that space differently. */
+  margin-left: 0.25em;
   color: var(--rozie-text-field-error-color, var(--rtf-error-color, #dc2626));
 }
 .rozie-text-field-control {
