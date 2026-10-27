@@ -2,7 +2,7 @@
 
 <div :class="['rozie-text-field', { 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': props.disabled, 'rozie-text-field--multiline': props.multiline, 'rozie-text-field--autosize': props.multiline && props.autosize }]" v-bind="$attrs">
   <label v-if="props.label" class="rozie-text-field-label" :for="inputId()">{{ props.label }}<span v-if="props.required" class="rozie-text-field-required" aria-hidden="true">*</span></label><div class="rozie-text-field-control">
-    <span v-if="$slots.prefix" class="rozie-text-field-prefix"><slot name="prefix"></slot></span><textarea v-if="props.multiline" ref="textareaElRef" class="rozie-text-field-input" :id="inputId()" :value="currentText()" :rows="(props.rows) ?? undefined" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur($event)"></textarea><input v-if="!props.multiline" ref="inputElRef" class="rozie-text-field-input" :id="inputId()" :type="inputType()" :value="currentText()" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @focus="onFocus($event)" @blur="onBlur($event)" @keydown="onKeydown($event)" /><span v-if="$slots.suffix" class="rozie-text-field-suffix"><slot name="suffix"></slot></span></div>
+    <span v-if="$slots.prefix" class="rozie-text-field-prefix"><slot name="prefix"></slot></span><textarea v-if="props.multiline" ref="textareaElRef" class="rozie-text-field-input" :id="inputId()" :value="currentText()" :rows="(props.rows) ?? undefined" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @change.stop="onChange($event)"></textarea><input v-if="!props.multiline" ref="inputElRef" class="rozie-text-field-input" :id="inputId()" :type="inputType()" :value="currentText()" :name="optionalAttr(props.name)" :placeholder="optionalAttr(props.placeholder)" :autocomplete="optionalAttr(props.autocomplete)" :maxlength="(props.maxLength) ?? undefined" :required="!!props.required" :disabled="!!props.disabled" :readonly="!!props.readonly" :aria-label="(props.ariaLabel) ?? undefined" :aria-invalid="(isInvalid() ? 'true' : undefined) ?? undefined" :aria-describedby="(describedBy()) ?? undefined" @input="onInput($event)" @change.stop="onChange($event)" @keydown="onKeydown($event)" /><span v-if="$slots.suffix" class="rozie-text-field-suffix"><slot name="suffix"></slot></span></div>
 
   <p v-if="props.description" class="rozie-text-field-description" :id="descriptionId()">{{ props.description }}</p><p v-if="hasError()" class="rozie-text-field-error" :id="errorId()">{{ props.error }}</p><p v-if="props.showCount" class="rozie-text-field-count" :id="countId()">{{ countText() }}</p></div>
 
@@ -154,16 +154,6 @@ let lastWidth = -1;
 // Whether fit() has written an inline height, so turning `autosize` off can
 // remove it (and never touches a height the user set with the resize grip).
 let autosized = false;
-// The rows the last fit() used, read by the width observer. The observer
-// re-applies through these instead of calling fit(): two helpers calling each
-// other are a use-before-declaration error in React's useCallback dep arrays.
-let fitRows: any = null;
-let fitMaxRows: any = null;
-// The text when the control gained focus, and whether the user has typed since.
-// `change` fires on blur only for a user edit that changed the text, so a
-// programmatic write (clear(), a consumer reformatting the value) never does.
-let textAtFocus = '';
-let editedSinceFocus = false;
 // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
 const nextAutoId = () => {
   const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
@@ -217,7 +207,7 @@ const observeWidth = (el: any) => {
     const w = entries[0] ? entries[0].contentRect.width : -1;
     if (w === lastWidth) return;
     lastWidth = w;
-    applyAutosize(observedEl, fitRows, fitMaxRows);
+    fit();
   });
   widthObserver.observe(el);
 };
@@ -232,10 +222,8 @@ const fit = () => {
     autosized = false;
     return;
   }
-  fitRows = props.rows;
-  fitMaxRows = props.maxRows;
   observeWidth(el);
-  applyAutosize(el, fitRows, fitMaxRows);
+  applyAutosize(el, props.rows, props.maxRows);
   autosized = true;
 };
 // Re-measure once every target has rendered the change: a macrotask, because
@@ -249,25 +237,17 @@ const commitText = (text: any) => {
   modelValue.value = text;
 };
 const onInput = (e: any) => {
-  editedSinceFocus = true;
   commitText(e && e.target ? e.target.value : '');
   fit();
 };
-// `change` = a committed edit: on blur, when the text differs from what it was
-// at focus. Driven from focus/blur rather than the native `change` event because
-// React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-// so the native event would not mean the same thing on all six targets.
-const onFocus = (e: any) => {
-  textAtFocus = e && e.target ? e.target.value : currentText();
-  editedSinceFocus = false;
-};
-const onBlur = (e: any) => {
-  const text = e && e.target ? e.target.value : currentText();
-  const changed = editedSinceFocus && text !== textAtFocus;
-  editedSinceFocus = false;
-  textAtFocus = text;
-  if (changed) emit('change', {
-    value: text
+// `change` = the DOM `change` event: the user committed an edit (blurred after
+// changing the text, or pressed Enter where the browser commits on it). A
+// programmatic write never fires it. The template stops the native event so it
+// can't bubble out alongside this component's own `change` (Angular has no
+// shadow boundary to contain it).
+const onChange = (e: any) => {
+  emit('change', {
+    value: e && e.target ? e.target.value : currentText()
   });
 };
 const onKeydown = (e: any) => {

@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { clsx, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
+import { clsx, rozieAttr, rozieDisplay, rozieNativeListeners, useControllableState } from '@rozie/runtime-react';
 import './TextField.css';
 import { applyAutosize } from './internal/autosize';
 
@@ -144,13 +144,9 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     return rest;
   })();
   const autosized = useRef(false);
-  const fitRows = useRef<any>(null);
-  const fitMaxRows = useRef<any>(null);
   const observedEl = useRef<any>(null);
   const widthObserver = useRef<any>(null);
   const lastWidth = useRef(-1);
-  const editedSinceFocus = useRef(false);
-  const textAtFocus = useRef('');
   const [modelValue, setModelValue] = useControllableState({
     value: props.modelValue,
     defaultValue: props.defaultModelValue ?? '',
@@ -167,12 +163,6 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
 
-  // The text when the control gained focus, and whether the user has typed since.
-  // `change` fires on blur only for a user edit that changed the text, so a
-  // programmatic write (clear(), a consumer reformatting the value) never does.
-  // The rows the last fit() used, read by the width observer. The observer
-  // re-applies through these instead of calling fit(): two helpers calling each
-  // other are a use-before-declaration error in React's useCallback dep arrays.
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   // Top-level so React hoists it to a ref and the Solid onMount/onCleanup split
@@ -243,6 +233,7 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
   // A width change re-wraps the text, so an autosized textarea is observed and
   // re-measured. Only a WIDTH change counts: our own height write must not loop
   // the observer. Re-targets when the textarea is (re)mounted by `multiline`.
+  const _rozieFwd_fit = useRef<typeof fit>(null!);
   const observeWidth = useCallback((el: any) => {
     if (el === observedEl.current) return;
     if (widthObserver.current) widthObserver.current.disconnect();
@@ -254,7 +245,7 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === lastWidth.current) return;
       lastWidth.current = w;
-      applyAutosize(observedEl.current, fitRows.current, fitMaxRows.current);
+      _rozieFwd_fit.current();
     });
     widthObserver.current.observe(el);
   }, []);
@@ -269,12 +260,11 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
       autosized.current = false;
       return;
     }
-    fitRows.current = props.rows;
-    fitMaxRows.current = props.maxRows;
     observeWidth(el);
-    applyAutosize(el, fitRows.current, fitMaxRows.current);
+    applyAutosize(el, props.rows, props.maxRows);
     autosized.current = true;
   }, [observeWidth, props.autosize, props.maxRows, props.multiline, props.rows]);
+  _rozieFwd_fit.current = fit;
   // Re-measure once every target has rendered the change: a macrotask, because
   // Lit applies its update in a microtask of its own.
   function fitLater() {
@@ -287,26 +277,18 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     setModelValue(text);
   }
   const onInput = useCallback((e: any) => {
-    editedSinceFocus.current = true;
     commitText(e && e.target ? e.target.value : '');
     fit();
   }, [commitText, fit]);
-  // `change` = a committed edit: on blur, when the text differs from what it was
-  // at focus. Driven from focus/blur rather than the native `change` event because
-  // React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-  // so the native event would not mean the same thing on all six targets.
-  const onFocus = useCallback((e: any) => {
-    textAtFocus.current = e && e.target ? e.target.value : currentText();
-    editedSinceFocus.current = false;
-  }, [currentText]);
+  // `change` = the DOM `change` event: the user committed an edit (blurred after
+  // changing the text, or pressed Enter where the browser commits on it). A
+  // programmatic write never fires it. The template stops the native event so it
+  // can't bubble out alongside this component's own `change` (Angular has no
+  // shadow boundary to contain it).
   const { onChange: _rozieProp_onChange } = props;
-    const onBlur = useCallback((e: any) => {
-    const text = e && e.target ? e.target.value : currentText();
-    const changed = editedSinceFocus.current && text !== textAtFocus.current;
-    editedSinceFocus.current = false;
-    textAtFocus.current = text;
-    if (changed) _rozieProp_onChange && _rozieProp_onChange({
-      value: text
+    const onChange = useCallback((e: any) => {
+    _rozieProp_onChange && _rozieProp_onChange({
+      value: e && e.target ? e.target.value : currentText()
     });
   }, [_rozieProp_onChange, currentText]);
   const { onEnter: _rozieProp_onEnter } = props;
@@ -344,11 +326,13 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
 
   const _fitRef = useRef(fit);
   _fitRef.current = fit;
+  const _observeWidthRef = useRef(observeWidth);
+  _observeWidthRef.current = observeWidth;
   useEffect(() => {
     if (!_idBaseRef.current) setAutoId('rozie-text-field-' + nextAutoId());
     _fitRef.current();
     return () => {
-      observeWidth(null);
+      _observeWidthRef.current(null);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -380,7 +364,7 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     <>
     <div {...attrs} className={clsx(clsx("rozie-text-field", { "rozie-text-field--invalid": isInvalid(), "rozie-text-field--disabled": props.disabled, "rozie-text-field--multiline": props.multiline, "rozie-text-field--autosize": props.multiline && props.autosize }), (attrs.className as string | undefined))} data-rozie-s-346ae6aa="">
       {!!(props.label) && <label className={"rozie-text-field-label"} htmlFor={rozieAttr(inputId())} data-rozie-s-346ae6aa="">{props.label}{!!(props.required) && <span className={"rozie-text-field-required"} aria-hidden="true" data-rozie-s-346ae6aa="">*</span>}</label>}<div className={"rozie-text-field-control"} data-rozie-s-346ae6aa="">
-        {!!((props.renderPrefix ?? props.slots?.['prefix'])) && <span className={"rozie-text-field-prefix"} data-rozie-s-346ae6aa="">{(props.renderPrefix ?? props.slots?.['prefix'])?.()}</span>}{!!(props.multiline) && <textarea ref={textareaEl} className={"rozie-text-field-input"} id={rozieAttr(inputId())} value={currentText()} rows={props.rows} name={rozieAttr(optionalAttr(props.name))} placeholder={rozieAttr(optionalAttr(props.placeholder))} autoComplete={rozieAttr(optionalAttr(props.autocomplete))} maxLength={(props.maxLength) ?? undefined} required={!!props.required} disabled={!!props.disabled} readOnly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : undefined)} aria-describedby={rozieAttr(describedBy())} onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur($event); }} data-rozie-s-346ae6aa="" />}{!!(!props.multiline) && <input ref={inputEl} className={"rozie-text-field-input"} id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={currentText()} name={rozieAttr(optionalAttr(props.name))} placeholder={rozieAttr(optionalAttr(props.placeholder))} autoComplete={rozieAttr(optionalAttr(props.autocomplete))} maxLength={(props.maxLength) ?? undefined} required={!!props.required} disabled={!!props.disabled} readOnly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : undefined)} aria-describedby={rozieAttr(describedBy())} onInput={($event) => { onInput($event); }} onFocus={($event) => { onFocus($event); }} onBlur={($event) => { onBlur($event); }} onKeyDown={($event) => { onKeydown($event); }} data-rozie-s-346ae6aa="" />}{!!((props.renderSuffix ?? props.slots?.['suffix'])) && <span className={"rozie-text-field-suffix"} data-rozie-s-346ae6aa="">{(props.renderSuffix ?? props.slots?.['suffix'])?.()}</span>}</div>
+        {!!((props.renderPrefix ?? props.slots?.['prefix'])) && <span className={"rozie-text-field-prefix"} data-rozie-s-346ae6aa="">{(props.renderPrefix ?? props.slots?.['prefix'])?.()}</span>}{!!(props.multiline) && <textarea className={"rozie-text-field-input"} id={rozieAttr(inputId())} value={currentText()} rows={props.rows} name={rozieAttr(optionalAttr(props.name))} placeholder={rozieAttr(optionalAttr(props.placeholder))} autoComplete={rozieAttr(optionalAttr(props.autocomplete))} maxLength={(props.maxLength) ?? undefined} required={!!props.required} disabled={!!props.disabled} readOnly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : undefined)} aria-describedby={rozieAttr(describedBy())} onInput={($event) => { onInput($event); }} ref={rozieNativeListeners<HTMLTextAreaElement>([["change", ($event) => { $event.stopPropagation(); onChange($event); }]], textareaEl)} data-rozie-s-346ae6aa="" />}{!!(!props.multiline) && <input className={"rozie-text-field-input"} id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={currentText()} name={rozieAttr(optionalAttr(props.name))} placeholder={rozieAttr(optionalAttr(props.placeholder))} autoComplete={rozieAttr(optionalAttr(props.autocomplete))} maxLength={(props.maxLength) ?? undefined} required={!!props.required} disabled={!!props.disabled} readOnly={!!props.readonly} aria-label={rozieAttr(props.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : undefined)} aria-describedby={rozieAttr(describedBy())} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} ref={rozieNativeListeners<HTMLInputElement>([["change", ($event) => { $event.stopPropagation(); onChange($event); }]], inputEl)} data-rozie-s-346ae6aa="" />}{!!((props.renderSuffix ?? props.slots?.['suffix'])) && <span className={"rozie-text-field-suffix"} data-rozie-s-346ae6aa="">{(props.renderSuffix ?? props.slots?.['suffix'])?.()}</span>}</div>
 
       {!!(props.description) && <p className={"rozie-text-field-description"} id={rozieAttr(descriptionId())} data-rozie-s-346ae6aa="">{props.description}</p>}{!!(hasError()) && <p className={"rozie-text-field-error"} id={rozieAttr(errorId())} data-rozie-s-346ae6aa="">{props.error}</p>}{!!(props.showCount) && <p className={"rozie-text-field-count"} id={rozieAttr(countId())} data-rozie-s-346ae6aa="">{rozieDisplay(countText())}</p>}</div>
     </>

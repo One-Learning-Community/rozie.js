@@ -150,16 +150,6 @@ let lastWidth = -1;
 // Whether fit() has written an inline height, so turning `autosize` off can
 // remove it (and never touches a height the user set with the resize grip).
 let autosized = false;
-// The rows the last fit() used, read by the width observer. The observer
-// re-applies through these instead of calling fit(): two helpers calling each
-// other are a use-before-declaration error in React's useCallback dep arrays.
-let fitRows: any = null;
-let fitMaxRows: any = null;
-// The text when the control gained focus, and whether the user has typed since.
-// `change` fires on blur only for a user edit that changed the text, so a
-// programmatic write (clear(), a consumer reformatting the value) never does.
-let textAtFocus = '';
-let editedSinceFocus = false;
 // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
 const nextAutoId = () => {
   const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
@@ -213,7 +203,7 @@ const observeWidth = (el: any) => {
     const w = entries[0] ? entries[0].contentRect.width : -1;
     if (w === lastWidth) return;
     lastWidth = w;
-    applyAutosize(observedEl, fitRows, fitMaxRows);
+    fit();
   });
   widthObserver.observe(el);
 };
@@ -228,10 +218,8 @@ const fit = () => {
     autosized = false;
     return;
   }
-  fitRows = rows;
-  fitMaxRows = maxRows;
   observeWidth(el);
-  applyAutosize(el, fitRows, fitMaxRows);
+  applyAutosize(el, rows, maxRows);
   autosized = true;
 };
 // Re-measure once every target has rendered the change: a macrotask, because
@@ -245,25 +233,17 @@ const commitText = (text: any) => {
   modelValue = text;
 };
 const onInput = (e: any) => {
-  editedSinceFocus = true;
   commitText(e && e.target ? e.target.value : '');
   fit();
 };
-// `change` = a committed edit: on blur, when the text differs from what it was
-// at focus. Driven from focus/blur rather than the native `change` event because
-// React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-// so the native event would not mean the same thing on all six targets.
-const onFocus = (e: any) => {
-  textAtFocus = e && e.target ? e.target.value : currentText();
-  editedSinceFocus = false;
-};
-const onBlur = (e: any) => {
-  const text = e && e.target ? e.target.value : currentText();
-  const changed = editedSinceFocus && text !== textAtFocus;
-  editedSinceFocus = false;
-  textAtFocus = text;
-  if (changed) onchange?.({
-    value: text
+// `change` = the DOM `change` event: the user committed an edit (blurred after
+// changing the text, or pressed Enter where the browser commits on it). A
+// programmatic write never fires it. The template stops the native event so it
+// can't bubble out alongside this component's own `change` (Angular has no
+// shadow boundary to contain it).
+const onChange = (e: any) => {
+  onchange?.({
+    value: e && e.target ? e.target.value : currentText()
   });
 };
 const onKeydown = (e: any) => {
@@ -314,7 +294,7 @@ onMount(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-text-field", { 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': disabled, 'rozie-text-field--multiline': multiline, 'rozie-text-field--autosize': multiline && autosize }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-346ae6aa>{#if label}<label class="rozie-text-field-label" for={rozieAttr(inputId())} data-rozie-s-346ae6aa>{label}{#if required}<span class="rozie-text-field-required" aria-hidden="true" data-rozie-s-346ae6aa>*</span>{/if}</label>{/if}<div class="rozie-text-field-control" data-rozie-s-346ae6aa>{#if prefix}<span class="rozie-text-field-prefix" data-rozie-s-346ae6aa>{#if prefix}{@render prefix()}{/if}</span>{/if}{#if multiline}<textarea bind:this={textareaEl} class="rozie-text-field-input" id={rozieAttr(inputId())} value={rozieAttr(currentText())} rows={rows} name={rozieAttr(optionalAttr(name))} placeholder={rozieAttr(optionalAttr(placeholder))} autocomplete={rozieAttr(optionalAttr(autocomplete))} maxlength={maxLength} required={!!required} disabled={!!disabled} readonly={!!readonly} aria-label={ariaLabel} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} oninput={($event) => { onInput($event); }} onfocus={($event) => { onFocus($event); }} onblur={($event) => { onBlur($event); }} data-rozie-s-346ae6aa></textarea>{/if}{#if !multiline}<input bind:this={inputEl} class="rozie-text-field-input" id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={rozieAttr(currentText())} name={rozieAttr(optionalAttr(name))} placeholder={rozieAttr(optionalAttr(placeholder))} autocomplete={rozieAttr(optionalAttr(autocomplete))} maxlength={maxLength} required={!!required} disabled={!!disabled} readonly={!!readonly} aria-label={ariaLabel} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} oninput={($event) => { onInput($event); }} onfocus={($event) => { onFocus($event); }} onblur={($event) => { onBlur($event); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-346ae6aa />{/if}{#if suffix}<span class="rozie-text-field-suffix" data-rozie-s-346ae6aa>{#if suffix}{@render suffix()}{/if}</span>{/if}</div>{#if description}<p class="rozie-text-field-description" id={rozieAttr(descriptionId())} data-rozie-s-346ae6aa>{description}</p>{/if}{#if hasError()}<p class="rozie-text-field-error" id={rozieAttr(errorId())} data-rozie-s-346ae6aa>{error}</p>{/if}{#if showCount}<p class="rozie-text-field-count" id={rozieAttr(countId())} data-rozie-s-346ae6aa>{rozieDisplay(countText())}</p>{/if}</div>
+<div {...__rozieAttrs} class={["rozie-text-field", { 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': disabled, 'rozie-text-field--multiline': multiline, 'rozie-text-field--autosize': multiline && autosize }, (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-346ae6aa>{#if label}<label class="rozie-text-field-label" for={rozieAttr(inputId())} data-rozie-s-346ae6aa>{label}{#if required}<span class="rozie-text-field-required" aria-hidden="true" data-rozie-s-346ae6aa>*</span>{/if}</label>{/if}<div class="rozie-text-field-control" data-rozie-s-346ae6aa>{#if prefix}<span class="rozie-text-field-prefix" data-rozie-s-346ae6aa>{#if prefix}{@render prefix()}{/if}</span>{/if}{#if multiline}<textarea bind:this={textareaEl} class="rozie-text-field-input" id={rozieAttr(inputId())} value={rozieAttr(currentText())} rows={rows} name={rozieAttr(optionalAttr(name))} placeholder={rozieAttr(optionalAttr(placeholder))} autocomplete={rozieAttr(optionalAttr(autocomplete))} maxlength={maxLength} required={!!required} disabled={!!disabled} readonly={!!readonly} aria-label={ariaLabel} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} oninput={($event) => { onInput($event); }} onchange={($event) => { $event.stopPropagation(); onChange($event); }} data-rozie-s-346ae6aa></textarea>{/if}{#if !multiline}<input bind:this={inputEl} class="rozie-text-field-input" id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={rozieAttr(currentText())} name={rozieAttr(optionalAttr(name))} placeholder={rozieAttr(optionalAttr(placeholder))} autocomplete={rozieAttr(optionalAttr(autocomplete))} maxlength={maxLength} required={!!required} disabled={!!disabled} readonly={!!readonly} aria-label={ariaLabel} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} oninput={($event) => { onInput($event); }} onchange={($event) => { $event.stopPropagation(); onChange($event); }} onkeydown={($event) => { onKeydown($event); }} data-rozie-s-346ae6aa />{/if}{#if suffix}<span class="rozie-text-field-suffix" data-rozie-s-346ae6aa>{#if suffix}{@render suffix()}{/if}</span>{/if}</div>{#if description}<p class="rozie-text-field-description" id={rozieAttr(descriptionId())} data-rozie-s-346ae6aa>{description}</p>{/if}{#if hasError()}<p class="rozie-text-field-error" id={rozieAttr(errorId())} data-rozie-s-346ae6aa>{error}</p>{/if}{#if showCount}<p class="rozie-text-field-count" id={rozieAttr(countId())} data-rozie-s-346ae6aa>{rozieDisplay(countText())}</p>{/if}</div>
 
 <style>
 :global {

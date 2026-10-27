@@ -138,49 +138,33 @@ describe('TextField value, events and counter', () => {
     expect(control(m.host).value).toBe('Grace');
   });
 
-  it('emits change on blur after a user edit', async () => {
+  it('emits change on the DOM change event, not while typing', async () => {
     const m = await mount();
     const input = control(m.host);
-    input.dispatchEvent(new FocusEvent('focus'));
     input.value = 'x';
     input.dispatchEvent(new Event('input'));
+    input.value = 'xy';
+    input.dispatchEvent(new Event('input'));
     expect(m.events).toEqual([]);
-    input.dispatchEvent(new FocusEvent('blur'));
-    expect(m.events).toEqual([{ name: 'change', payload: { value: 'x' } }]);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(m.events).toEqual([{ name: 'change', payload: { value: 'xy' } }]);
   });
 
-  it('does not emit change on blur without an edit, or for an edit that restores the text', async () => {
+  it('a programmatic write does not emit change', async () => {
     const m = await mount();
-    m.model.value = 'same';
-    await nextTick();
-    const input = control(m.host);
-    input.dispatchEvent(new FocusEvent('focus'));
-    input.dispatchEvent(new FocusEvent('blur'));
-    input.dispatchEvent(new FocusEvent('focus'));
-    input.value = 'samex';
-    input.dispatchEvent(new Event('input'));
-    input.value = 'same';
-    input.dispatchEvent(new Event('input'));
-    input.dispatchEvent(new FocusEvent('blur'));
-    expect(m.events).toEqual([]);
-  });
-
-  it('a programmatic write while focused does not emit change', async () => {
-    const m = await mount();
-    const input = control(m.host);
-    input.dispatchEvent(new FocusEvent('focus'));
     m.model.value = 'from the app';
     await nextTick();
-    input.dispatchEvent(new FocusEvent('blur'));
+    expect(control(m.host).value).toBe('from the app');
     expect(m.events).toEqual([]);
   });
 
-  it('ignores the native change event (React fires onChange per keystroke)', async () => {
+  it('stops the native change event at the control', async () => {
     const m = await mount();
-    const input = control(m.host);
-    input.value = 'x';
-    input.dispatchEvent(new Event('change'));
-    expect(m.events).toEqual([]);
+    let bubbled = 0;
+    m.host.addEventListener('change', () => bubbled++);
+    control(m.host).dispatchEvent(new Event('change', { bubbles: true }));
+    expect(m.events).toHaveLength(1);
+    expect(bubbled).toBe(0);
   });
 
   it('emits enter on Enter, but not during IME composition', async () => {

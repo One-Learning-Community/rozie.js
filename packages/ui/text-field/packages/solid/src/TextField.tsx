@@ -248,16 +248,6 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   let autosized = false;
-  // The rows the last fit() used, read by the width observer. The observer
-  // re-applies through these instead of calling fit(): two helpers calling each
-  // other are a use-before-declaration error in React's useCallback dep arrays.
-  let fitRows: any = null;
-  let fitMaxRows: any = null;
-  // The text when the control gained focus, and whether the user has typed since.
-  // `change` fires on blur only for a user edit that changed the text, so a
-  // programmatic write (clear(), a consumer reformatting the value) never does.
-  let textAtFocus = '';
-  let editedSinceFocus = false;
 
   // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
   function nextAutoId() {
@@ -337,7 +327,7 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === lastWidth) return;
       lastWidth = w;
-      applyAutosize(observedEl, fitRows, fitMaxRows);
+      fit();
     });
     widthObserver.observe(el);
   }
@@ -352,10 +342,8 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
       autosized = false;
       return;
     }
-    fitRows = local.rows;
-    fitMaxRows = local.maxRows;
     observeWidth(el);
-    applyAutosize(el, fitRows, fitMaxRows);
+    applyAutosize(el, local.rows, local.maxRows);
     autosized = true;
   }
 
@@ -371,26 +359,18 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
     setModelValue(text);
   }
   function onInput(e: any) {
-    editedSinceFocus = true;
     commitText(e && e.target ? e.target.value : '');
     fit();
   }
 
-  // `change` = a committed edit: on blur, when the text differs from what it was
-  // at focus. Driven from focus/blur rather than the native `change` event because
-  // React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-  // so the native event would not mean the same thing on all six targets.
-  function onFocus(e: any) {
-    textAtFocus = e && e.target ? e.target.value : currentText();
-    editedSinceFocus = false;
-  }
-  function onBlur(e: any) {
-    const text = e && e.target ? e.target.value : currentText();
-    const changed = editedSinceFocus && text !== textAtFocus;
-    editedSinceFocus = false;
-    textAtFocus = text;
-    if (changed) _props.onChange?.({
-      value: text
+  // `change` = the DOM `change` event: the user committed an edit (blurred after
+  // changing the text, or pressed Enter where the browser commits on it). A
+  // programmatic write never fires it. The template stops the native event so it
+  // can't bubble out alongside this component's own `change` (Angular has no
+  // shadow boundary to contain it).
+  function onChange(e: any) {
+    _props.onChange?.({
+      value: e && e.target ? e.target.value : currentText()
     });
   }
   function onKeydown(e: any) {
@@ -431,7 +411,7 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
     <>
     <div {...attrs} class={"rozie-text-field" + " " + rozieClass({ 'rozie-text-field--invalid': isInvalid(), 'rozie-text-field--disabled': local.disabled, 'rozie-text-field--multiline': local.multiline, 'rozie-text-field--autosize': local.multiline && local.autosize }) + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-346ae6aa="">
       {<Show when={local.label}><label class={"rozie-text-field-label"} for={rozieAttr(inputId())} data-rozie-s-346ae6aa="">{local.label}{<Show when={local.required}><span class={"rozie-text-field-required"} aria-hidden="true" data-rozie-s-346ae6aa="">*</span></Show>}</label></Show>}<div class={"rozie-text-field-control"} data-rozie-s-346ae6aa="">
-        {<Show when={(_props.prefixSlot ?? _props.slots?.['prefix'])}><span class={"rozie-text-field-prefix"} data-rozie-s-346ae6aa="">{(_props.prefixSlot ?? _props.slots?.['prefix']?.({}))}</span></Show>}{<Show when={local.multiline}><textarea aria-label={rozieAttr(local.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} ref={(el) => { textareaElRef = el as HTMLElement; }} class={"rozie-text-field-input"} id={rozieAttr(inputId())} value={currentText()} rows={local.rows} name={rozieAttr(optionalAttr(local.name))} placeholder={rozieAttr(optionalAttr(local.placeholder))} autocomplete={rozieAttr(optionalAttr(local.autocomplete))} maxLength={(local.maxLength) ?? undefined} required={!!local.required} disabled={!!local.disabled} readOnly={!!local.readonly} onInput={($event: InputEvent & { currentTarget: HTMLTextAreaElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLTextAreaElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLTextAreaElement; target: Element }) => { onBlur($event); }} data-rozie-s-346ae6aa="" /></Show>}{<Show when={!local.multiline}><input aria-label={rozieAttr(local.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-text-field-input"} id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={currentText()} name={rozieAttr(optionalAttr(local.name))} placeholder={rozieAttr(optionalAttr(local.placeholder))} autocomplete={rozieAttr(optionalAttr(local.autocomplete))} maxLength={(local.maxLength) ?? undefined} required={!!local.required} disabled={!!local.disabled} readOnly={!!local.readonly} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onFocus={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onFocus($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onBlur($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-346ae6aa="" /></Show>}{<Show when={(_props.suffixSlot ?? _props.slots?.['suffix'])}><span class={"rozie-text-field-suffix"} data-rozie-s-346ae6aa="">{(_props.suffixSlot ?? _props.slots?.['suffix']?.({}))}</span></Show>}</div>
+        {<Show when={(_props.prefixSlot ?? _props.slots?.['prefix'])}><span class={"rozie-text-field-prefix"} data-rozie-s-346ae6aa="">{(_props.prefixSlot ?? _props.slots?.['prefix']?.({}))}</span></Show>}{<Show when={local.multiline}><textarea aria-label={rozieAttr(local.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} ref={(el) => { textareaElRef = el as HTMLElement; }} class={"rozie-text-field-input"} id={rozieAttr(inputId())} value={currentText()} rows={local.rows} name={rozieAttr(optionalAttr(local.name))} placeholder={rozieAttr(optionalAttr(local.placeholder))} autocomplete={rozieAttr(optionalAttr(local.autocomplete))} maxLength={(local.maxLength) ?? undefined} required={!!local.required} disabled={!!local.disabled} readOnly={!!local.readonly} onInput={($event: InputEvent & { currentTarget: HTMLTextAreaElement; target: Element }) => { onInput($event); }} onChange={($event: Event & { currentTarget: HTMLTextAreaElement; target: Element }) => { $event.stopPropagation(); onChange($event); }} data-rozie-s-346ae6aa="" /></Show>}{<Show when={!local.multiline}><input aria-label={rozieAttr(local.ariaLabel)} aria-invalid={rozieAttr(isInvalid() ? 'true' : null)} aria-describedby={rozieAttr(describedBy())} ref={(el) => { inputElRef = el as HTMLElement; }} class={"rozie-text-field-input"} id={rozieAttr(inputId())} type={rozieAttr(inputType())} value={currentText()} name={rozieAttr(optionalAttr(local.name))} placeholder={rozieAttr(optionalAttr(local.placeholder))} autocomplete={rozieAttr(optionalAttr(local.autocomplete))} maxLength={(local.maxLength) ?? undefined} required={!!local.required} disabled={!!local.disabled} readOnly={!!local.readonly} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onInput($event); }} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { $event.stopPropagation(); onChange($event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onKeydown($event); }} data-rozie-s-346ae6aa="" /></Show>}{<Show when={(_props.suffixSlot ?? _props.slots?.['suffix'])}><span class={"rozie-text-field-suffix"} data-rozie-s-346ae6aa="">{(_props.suffixSlot ?? _props.slots?.['suffix']?.({}))}</span></Show>}</div>
 
       {<Show when={local.description}><p class={"rozie-text-field-description"} id={rozieAttr(descriptionId())} data-rozie-s-346ae6aa="">{local.description}</p></Show>}{<Show when={hasError()}><p class={"rozie-text-field-error"} id={rozieAttr(errorId())} data-rozie-s-346ae6aa="">{local.error}</p></Show>}{<Show when={local.showCount}><p class={"rozie-text-field-count"} id={rozieAttr(countId())} data-rozie-s-346ae6aa="">{rozieDisplay(countText())}</p></Show>}</div>
     </>

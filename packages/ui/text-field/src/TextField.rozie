@@ -239,7 +239,7 @@ export interface TextFieldValuePayload { value: string }
 
 <emits>
 {
-  change: { payload: 'TextFieldValuePayload', docs: { description: 'Fired when the user commits an edit: on blur, when the text differs from what it was when the field gained focus. The payload is `{ value }`. Use `modelValue` for every keystroke.' } },
+  change: { payload: 'TextFieldValuePayload', docs: { description: 'Fired when the user commits an edit — the DOM `change` event: on blur after changing the text (and on Enter where the browser commits there). Programmatic writes never fire it. The payload is `{ value }`. Use `modelValue` for every keystroke.' } },
   enter: { payload: 'TextFieldValuePayload', docs: { description: 'Fired when the user presses Enter in a single-line field (not while an IME composition is open). The payload is `{ value }`. The key is not prevented, so an enclosing form still submits.' } },
 }
 </emits>
@@ -262,16 +262,6 @@ let lastWidth = -1
 // Whether fit() has written an inline height, so turning `autosize` off can
 // remove it (and never touches a height the user set with the resize grip).
 let autosized = false
-// The rows the last fit() used, read by the width observer. The observer
-// re-applies through these instead of calling fit(): two helpers calling each
-// other are a use-before-declaration error in React's useCallback dep arrays.
-let fitRows: any = null
-let fitMaxRows: any = null
-// The text when the control gained focus, and whether the user has typed since.
-// `change` fires on blur only for a user edit that changed the text, so a
-// programmatic write (clear(), a consumer reformatting the value) never does.
-let textAtFocus = ''
-let editedSinceFocus = false
 
 // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
 const nextAutoId = () => {
@@ -333,7 +323,7 @@ const observeWidth = (el) => {
     const w = entries[0] ? entries[0].contentRect.width : -1
     if (w === lastWidth) return
     lastWidth = w
-    applyAutosize(observedEl, fitRows, fitMaxRows)
+    fit()
   })
   widthObserver.observe(el)
 }
@@ -349,10 +339,8 @@ const fit = () => {
     autosized = false
     return
   }
-  fitRows = $props.rows
-  fitMaxRows = $props.maxRows
   observeWidth(el)
-  applyAutosize(el, fitRows, fitMaxRows)
+  applyAutosize(el, $props.rows, $props.maxRows)
   autosized = true
 }
 
@@ -369,26 +357,17 @@ const commitText = (text) => {
 }
 
 const onInput = (e) => {
-  editedSinceFocus = true
   commitText(e && e.target ? e.target.value : '')
   fit()
 }
 
-// `change` = a committed edit: on blur, when the text differs from what it was
-// at focus. Driven from focus/blur rather than the native `change` event because
-// React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-// so the native event would not mean the same thing on all six targets.
-const onFocus = (e) => {
-  textAtFocus = e && e.target ? e.target.value : currentText()
-  editedSinceFocus = false
-}
-
-const onBlur = (e) => {
-  const text = e && e.target ? e.target.value : currentText()
-  const changed = editedSinceFocus && text !== textAtFocus
-  editedSinceFocus = false
-  textAtFocus = text
-  if (changed) $emit('change', { value: text })
+// `change` = the DOM `change` event: the user committed an edit (blurred after
+// changing the text, or pressed Enter where the browser commits on it). A
+// programmatic write never fires it. The template stops the native event so it
+// can't bubble out alongside this component's own `change` (Angular has no
+// shadow boundary to contain it).
+const onChange = (e) => {
+  $emit('change', { value: e && e.target ? e.target.value : currentText() })
 }
 
 const onKeydown = (e) => {
@@ -467,8 +446,7 @@ $expose({ focus, select, clear }, { focus: '() => void', select: '() => void', c
       :aria-invalid="isInvalid() ? 'true' : null"
       :aria-describedby="describedBy()"
       @input="onInput($event)"
-      @focus="onFocus($event)"
-      @blur="onBlur($event)"
+      @change.stop="onChange($event)"
     ></textarea>
 
     <input
@@ -489,8 +467,7 @@ $expose({ focus, select, clear }, { focus: '() => void', select: '() => void', c
       :aria-invalid="isInvalid() ? 'true' : null"
       :aria-describedby="describedBy()"
       @input="onInput($event)"
-      @focus="onFocus($event)"
-      @blur="onBlur($event)"
+      @change.stop="onChange($event)"
       @keydown="onKeydown($event)"
     />
 

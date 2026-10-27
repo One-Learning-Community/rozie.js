@@ -19,7 +19,7 @@ The full prop surface. The single `model: true` prop (`modelValue`, the **Two-wa
 
 | Event | Payload | Description |
 | --- | --- | --- |
-| `change` | `TextFieldValuePayload` (`{ value: string }`) | The user committed an edit: on blur, when they changed the text since the field gained focus. Programmatic writes never fire it. Implemented on focus/blur rather than the native `change` event, which React fires on every keystroke, so it means the same on all six targets. |
+| `change` | `TextFieldValuePayload` (`{ value: string }`) | The user committed an edit: the DOM `change` event, on blur after changing the text (and on Enter where the browser commits there). Programmatic writes never fire it. The native event is stopped at the control, so a listener on the host sees only this one. On React this is the native event too, not JSX `onChange` (which fires per keystroke). |
 | `enter` | `TextFieldValuePayload` (`{ value: string }`) | The user pressed **Enter** in a single-line field, except while an IME composition is open. The key is not prevented, so an enclosing `<form>` still submits. |
 
 On Lit, events are dispatched as `CustomEvent`s with the payload on `detail`; the two-way model arrives as `model-value-change`.

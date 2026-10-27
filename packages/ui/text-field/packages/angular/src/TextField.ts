@@ -34,9 +34,9 @@ interface SuffixCtx {}
     <ng-container *ngTemplateOutlet="(prefixTpl ?? __rozieFillMap()['prefix'] ?? templates()?.['prefix'])" />
     }</span>
     }@if (multiline()) {
-    <textarea #textareaEl class="rozie-text-field-input" [attr.id]="rozieAttr(inputId())" [value]="currentText()" [rows]="rows()" [attr.name]="rozieAttr(optionalAttr(name()))" [attr.placeholder]="rozieAttr(optionalAttr(placeholder()))" [attr.autocomplete]="rozieAttr(optionalAttr(autocomplete()))" [attr.maxlength]="rozieAttr(maxLength())" [required]="!!required()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [readOnly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-invalid]="rozieAttr(isInvalid() ? 'true' : null)" [attr.aria-describedby]="rozieAttr(describedBy())" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur($event)"></textarea>
+    <textarea #textareaEl class="rozie-text-field-input" [attr.id]="rozieAttr(inputId())" [value]="currentText()" [rows]="rows()" [attr.name]="rozieAttr(optionalAttr(name()))" [attr.placeholder]="rozieAttr(optionalAttr(placeholder()))" [attr.autocomplete]="rozieAttr(optionalAttr(autocomplete()))" [attr.maxlength]="rozieAttr(maxLength())" [required]="!!required()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [readOnly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-invalid]="rozieAttr(isInvalid() ? 'true' : null)" [attr.aria-describedby]="rozieAttr(describedBy())" (input)="onInput($event)" (change)="$event.stopPropagation(); onChange($event)"></textarea>
     }@if (!multiline()) {
-    <input #inputEl class="rozie-text-field-input" [attr.id]="rozieAttr(inputId())" [attr.type]="rozieAttr(inputType())" [value]="currentText()" [attr.name]="rozieAttr(optionalAttr(name()))" [attr.placeholder]="rozieAttr(optionalAttr(placeholder()))" [attr.autocomplete]="rozieAttr(optionalAttr(autocomplete()))" [attr.maxlength]="rozieAttr(maxLength())" [required]="!!required()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [readOnly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-invalid]="rozieAttr(isInvalid() ? 'true' : null)" [attr.aria-describedby]="rozieAttr(describedBy())" (input)="onInput($event)" (focus)="onFocus($event)" (blur)="onBlur($event)" (keydown)="onKeydown($event)" />
+    <input #inputEl class="rozie-text-field-input" [attr.id]="rozieAttr(inputId())" [attr.type]="rozieAttr(inputType())" [value]="currentText()" [attr.name]="rozieAttr(optionalAttr(name()))" [attr.placeholder]="rozieAttr(optionalAttr(placeholder()))" [attr.autocomplete]="rozieAttr(optionalAttr(autocomplete()))" [attr.maxlength]="rozieAttr(maxLength())" [required]="!!required()" [disabled]="!!(disabled() || this.__rozieCvaDisabled())" [readOnly]="!!readonly()" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-invalid]="rozieAttr(isInvalid() ? 'true' : null)" [attr.aria-describedby]="rozieAttr(describedBy())" (input)="onInput($event)" (change)="$event.stopPropagation(); onChange($event)" (keydown)="onKeydown($event)" />
     }@if ((suffixTpl ?? __rozieFillMap()['suffix'] ?? templates()?.['suffix'])) {
     <span class="rozie-text-field-suffix">@if ((suffixTpl ?? __rozieFillMap()['suffix'] ?? templates()?.['suffix'])) {
     <ng-container *ngTemplateOutlet="(suffixTpl ?? __rozieFillMap()['suffix'] ?? templates()?.['suffix'])" />
@@ -302,16 +302,6 @@ export class TextField {
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   autosized = false;
-  // The rows the last fit() used, read by the width observer. The observer
-  // re-applies through these instead of calling fit(): two helpers calling each
-  // other are a use-before-declaration error in React's useCallback dep arrays.
-  fitRows: any = null;
-  fitMaxRows: any = null;
-  // The text when the control gained focus, and whether the user has typed since.
-  // `change` fires on blur only for a user edit that changed the text, so a
-  // programmatic write (clear(), a consumer reformatting the value) never does.
-  textAtFocus = '';
-  editedSinceFocus = false;
   // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
   nextAutoId = () => {
     const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
@@ -365,7 +355,7 @@ export class TextField {
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === this.lastWidth) return;
       this.lastWidth = w;
-      applyAutosize(this.observedEl, this.fitRows, this.fitMaxRows);
+      this.fit();
     });
     this.widthObserver.observe(el);
   };
@@ -380,10 +370,8 @@ export class TextField {
       this.autosized = false;
       return;
     }
-    this.fitRows = this.rows();
-    this.fitMaxRows = this.maxRows();
     this.observeWidth(el);
-    applyAutosize(el, this.fitRows, this.fitMaxRows);
+    applyAutosize(el, this.rows(), this.maxRows());
     this.autosized = true;
   };
   // Re-measure once every target has rendered the change: a macrotask, because
@@ -397,25 +385,17 @@ export class TextField {
     this.modelValue.set(text), this.__rozieCvaOnChange(text);
   };
   onInput = (e: any) => {
-    this.editedSinceFocus = true;
     this.commitText(e && e.target ? e.target.value : '');
     this.fit();
   };
-  // `change` = a committed edit: on blur, when the text differs from what it was
-  // at focus. Driven from focus/blur rather than the native `change` event because
-  // React's `onChange` (what `@change` lowers to there) fires on every keystroke,
-  // so the native event would not mean the same thing on all six targets.
-  onFocus = (e: any) => {
-    this.textAtFocus = e && e.target ? e.target.value : this.currentText();
-    this.editedSinceFocus = false;
-  };
-  onBlur = (e: any) => {
-    const text = e && e.target ? e.target.value : this.currentText();
-    const changed = this.editedSinceFocus && text !== this.textAtFocus;
-    this.editedSinceFocus = false;
-    this.textAtFocus = text;
-    if (changed) this.change.emit({
-      value: text
+  // `change` = the DOM `change` event: the user committed an edit (blurred after
+  // changing the text, or pressed Enter where the browser commits on it). A
+  // programmatic write never fires it. The template stops the native event so it
+  // can't bubble out alongside this component's own `change` (Angular has no
+  // shadow boundary to contain it).
+  onChange = (e: any) => {
+    this.change.emit({
+      value: e && e.target ? e.target.value : this.currentText()
     });
   };
   onKeydown = (e: any) => {
