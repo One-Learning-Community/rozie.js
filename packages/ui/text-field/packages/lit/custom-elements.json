@@ -1,0 +1,479 @@
+{
+  "schemaVersion": "2.1.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "dist/index.mjs",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "Accessible text field and textarea: label, description and error wired through `for` / `aria-describedby` / `aria-invalid`, a two-way `modelValue` binding (Angular ControlValueAccessor), a character counter and opt-in autosize.",
+          "name": "TextField",
+          "tagName": "rozie-text-field",
+          "customElement": true,
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "members": [
+            {
+              "kind": "field",
+              "name": "modelValue",
+              "description": "The text in the field (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so `[(ngModel)]` and `[formControl]` bind directly. Written on every keystroke.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "model-value",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "label",
+              "description": "Visible label text, rendered as a `<label>` whose `for` points at the control. Leave it empty and set `ariaLabel` when the field has no visible label.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "label",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "description",
+              "description": "Help text shown under the control and linked to it through `aria-describedby`, so screen readers announce it after the label.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "description",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "error",
+              "description": "Error message. A non-empty value renders it under the control, links it through `aria-describedby`, and marks the control `aria-invalid=\"true\"`. Clear it (empty string) once the value is valid again.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "error",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "invalid",
+              "description": "Mark the field invalid (`aria-invalid=\"true\"` and the invalid styling) without showing a message, for example when the message is rendered elsewhere. A non-empty `error` implies this.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "invalid",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "type",
+              "description": "The native input `type`: `'text'`, `'email'`, `'password'`, `'search'`, `'tel'` or `'url'`. Ignored when `multiline` is set.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "type",
+              "default": "\"text\""
+            },
+            {
+              "kind": "field",
+              "name": "placeholder",
+              "description": "Placeholder text shown while the field is empty. It is not a substitute for `label`: it disappears on input and many screen readers do not announce it.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "name",
+              "description": "The native `name` attribute, used when the field sits in a plain HTML `<form>`. On Lit the control is in a shadow root, so it does not join the outer form; bind `modelValue` there.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "name",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "autocomplete",
+              "description": "The native `autocomplete` hint (e.g. `'email'`, `'current-password'`, `'off'`). Empty leaves the browser default.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "autocomplete",
+              "default": "\"\""
+            },
+            {
+              "kind": "field",
+              "name": "required",
+              "description": "Mark the field required: sets the native `required` attribute (announced by screen readers) and shows a `*` after the label. The marker is `aria-hidden` so it is not read twice.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "required",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "disabled",
+              "description": "Disable the control. Also sets the Angular `ControlValueAccessor` disabled state.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "disabled",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "readonly",
+              "description": "Make the control read-only: the text is shown, focusable and selectable but cannot be edited.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "readonly",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "maxLength",
+              "description": "Maximum number of characters, forwarded as the native `maxlength`. `null` (the default) means no limit. With `showCount`, the counter reads `n / maxLength`.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "max-length",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "showCount",
+              "description": "Show a character counter under the control (`n / maxLength`, or just `n` without a limit). The counter is linked through `aria-describedby`; it is not a live region, so it does not interrupt typing.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "show-count",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "multiline",
+              "description": "Render a `<textarea>` instead of an `<input>`.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "multiline",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "rows",
+              "description": "Visible rows of a `multiline` field (the native `rows`). With `autosize` it is the minimum height.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "rows",
+              "default": "3"
+            },
+            {
+              "kind": "field",
+              "name": "autosize",
+              "description": "Grow a `multiline` field to fit its content, from `rows` up to `maxRows`. It re-measures on input, on programmatic `modelValue` changes and when the field width changes.",
+              "type": {
+                "text": "boolean"
+              },
+              "attribute": "autosize",
+              "default": "false"
+            },
+            {
+              "kind": "field",
+              "name": "maxRows",
+              "description": "The tallest an `autosize` field grows, in rows; past it the textarea scrolls. `null` (the default) means no cap.",
+              "type": {
+                "text": "number"
+              },
+              "attribute": "max-rows",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "ariaLabel",
+              "description": "Accessible name for the control (`aria-label`) when there is no visible `label`.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "aria-label",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "idBase",
+              "description": "Id base for the control and its text: the control is `idBase + '-input'`, and the description, error and counter are `-description`, `-error` and `-count`. Leave it empty (the default) and each instance generates a unique base after mount (`rozie-text-field-<n>`); set it when you need stable ids, for example to point an external element at the control. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.",
+              "type": {
+                "text": "string"
+              },
+              "attribute": "id-base",
+              "default": "\"\""
+            },
+            {
+              "kind": "method",
+              "name": "focus",
+              "description": "Move focus to the control (the `<input>`, or the `<textarea>` when `multiline`)."
+            },
+            {
+              "kind": "method",
+              "name": "select",
+              "description": "Focus the control and select all of its text."
+            },
+            {
+              "kind": "method",
+              "name": "clear",
+              "description": "Empty the field: writes `modelValue = ''` (and re-measures an `autosize` field). Does not emit `change`."
+            }
+          ],
+          "attributes": [
+            {
+              "name": "model-value",
+              "description": "The text in the field (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so `[(ngModel)]` and `[formControl]` bind directly. Written on every keystroke.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "modelValue",
+              "default": "\"\""
+            },
+            {
+              "name": "label",
+              "description": "Visible label text, rendered as a `<label>` whose `for` points at the control. Leave it empty and set `ariaLabel` when the field has no visible label.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "label",
+              "default": "\"\""
+            },
+            {
+              "name": "description",
+              "description": "Help text shown under the control and linked to it through `aria-describedby`, so screen readers announce it after the label.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "description",
+              "default": "\"\""
+            },
+            {
+              "name": "error",
+              "description": "Error message. A non-empty value renders it under the control, links it through `aria-describedby`, and marks the control `aria-invalid=\"true\"`. Clear it (empty string) once the value is valid again.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "error",
+              "default": "\"\""
+            },
+            {
+              "name": "invalid",
+              "description": "Mark the field invalid (`aria-invalid=\"true\"` and the invalid styling) without showing a message, for example when the message is rendered elsewhere. A non-empty `error` implies this.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "invalid",
+              "default": "false"
+            },
+            {
+              "name": "type",
+              "description": "The native input `type`: `'text'`, `'email'`, `'password'`, `'search'`, `'tel'` or `'url'`. Ignored when `multiline` is set.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "type",
+              "default": "\"text\""
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text shown while the field is empty. It is not a substitute for `label`: it disappears on input and many screen readers do not announce it.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "placeholder",
+              "default": "\"\""
+            },
+            {
+              "name": "name",
+              "description": "The native `name` attribute, used when the field sits in a plain HTML `<form>`. On Lit the control is in a shadow root, so it does not join the outer form; bind `modelValue` there.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "name",
+              "default": "\"\""
+            },
+            {
+              "name": "autocomplete",
+              "description": "The native `autocomplete` hint (e.g. `'email'`, `'current-password'`, `'off'`). Empty leaves the browser default.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "autocomplete",
+              "default": "\"\""
+            },
+            {
+              "name": "required",
+              "description": "Mark the field required: sets the native `required` attribute (announced by screen readers) and shows a `*` after the label. The marker is `aria-hidden` so it is not read twice.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "required",
+              "default": "false"
+            },
+            {
+              "name": "disabled",
+              "description": "Disable the control. Also sets the Angular `ControlValueAccessor` disabled state.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "disabled",
+              "default": "false"
+            },
+            {
+              "name": "readonly",
+              "description": "Make the control read-only: the text is shown, focusable and selectable but cannot be edited.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "readonly",
+              "default": "false"
+            },
+            {
+              "name": "max-length",
+              "description": "Maximum number of characters, forwarded as the native `maxlength`. `null` (the default) means no limit. With `showCount`, the counter reads `n / maxLength`.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxLength",
+              "default": "null"
+            },
+            {
+              "name": "show-count",
+              "description": "Show a character counter under the control (`n / maxLength`, or just `n` without a limit). The counter is linked through `aria-describedby`; it is not a live region, so it does not interrupt typing.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "showCount",
+              "default": "false"
+            },
+            {
+              "name": "multiline",
+              "description": "Render a `<textarea>` instead of an `<input>`.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "multiline",
+              "default": "false"
+            },
+            {
+              "name": "rows",
+              "description": "Visible rows of a `multiline` field (the native `rows`). With `autosize` it is the minimum height.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "rows",
+              "default": "3"
+            },
+            {
+              "name": "autosize",
+              "description": "Grow a `multiline` field to fit its content, from `rows` up to `maxRows`. It re-measures on input, on programmatic `modelValue` changes and when the field width changes.",
+              "type": {
+                "text": "boolean"
+              },
+              "fieldName": "autosize",
+              "default": "false"
+            },
+            {
+              "name": "max-rows",
+              "description": "The tallest an `autosize` field grows, in rows; past it the textarea scrolls. `null` (the default) means no cap.",
+              "type": {
+                "text": "number"
+              },
+              "fieldName": "maxRows",
+              "default": "null"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the control (`aria-label`) when there is no visible `label`.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "ariaLabel",
+              "default": "null"
+            },
+            {
+              "name": "id-base",
+              "description": "Id base for the control and its text: the control is `idBase + '-input'`, and the description, error and counter are `-description`, `-error` and `-count`. Leave it empty (the default) and each instance generates a unique base after mount (`rozie-text-field-<n>`); set it when you need stable ids, for example to point an external element at the control. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.",
+              "type": {
+                "text": "string"
+              },
+              "fieldName": "idBase",
+              "default": "\"\""
+            }
+          ],
+          "events": [
+            {
+              "name": "change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired when the user commits an edit: on blur, when the text differs from what it was when the field gained focus. Payload `{ value }`. The same on all six targets (it is not the native `change` event, which React fires on every keystroke). For every keystroke, bind `modelValue` instead."
+            },
+            {
+              "name": "enter",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired when the user presses **Enter** in a single-line field, except while an IME composition is open. Payload `{ value }`. The key is not prevented, so an enclosing `<form>` still submits."
+            },
+            {
+              "name": "model-value-change",
+              "type": {
+                "text": "CustomEvent"
+              },
+              "description": "Fired with the updated `modelValue` (`event.detail`) when it changes."
+            }
+          ],
+          "slots": [
+            {
+              "name": "prefix"
+            },
+            {
+              "name": "suffix"
+            }
+          ]
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "TextField",
+          "declaration": {
+            "name": "TextField",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "default",
+          "declaration": {
+            "name": "TextField",
+            "module": "dist/index.mjs"
+          }
+        },
+        {
+          "kind": "custom-element-definition",
+          "name": "rozie-text-field",
+          "declaration": {
+            "name": "TextField",
+            "module": "dist/index.mjs"
+          }
+        }
+      ]
+    }
+  ]
+}

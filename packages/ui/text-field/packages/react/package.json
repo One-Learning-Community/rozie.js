@@ -1,0 +1,74 @@
+{
+  "name": "@rozie-ui/text-field-react",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic React accessible text field and textarea: label, description and error wired through for / aria-describedby / aria-invalid, two-way binding, a character counter and opt-in autosize — one Rozie source compiled to React.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "text-field",
+    "input",
+    "textarea",
+    "form",
+    "autosize",
+    "accessibility",
+    "aria",
+    "component",
+    "react"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/text-field/packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/TextField.tsx",
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "@rozie/runtime-react": "workspace:^"
+  },
+  "peerDependencies": {
+    "react": "^18.2 || ^19",
+    "react-dom": "^18.2 || ^19"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "@types/react-dom": "^18"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

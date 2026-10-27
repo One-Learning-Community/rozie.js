@@ -1,0 +1,233 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JetBrains/web-types/master/schema/web-types.json",
+  "name": "@rozie-ui/text-field-vue",
+  "version": "0.1.0",
+  "description-markup": "markdown",
+  "framework": "vue",
+  "contributions": {
+    "html": {
+      "vue-components": [
+        {
+          "name": "TextField",
+          "source": {
+            "module": "@rozie-ui/text-field-vue",
+            "symbol": "TextField"
+          },
+          "description": "Accessible text field and textarea: label, description and error wired through `for` / `aria-describedby` / `aria-invalid`, a two-way `modelValue` binding (Angular ControlValueAccessor), a character counter and opt-in autosize.",
+          "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+          "props": [
+            {
+              "name": "model-value",
+              "description": "The text in the field (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so `[(ngModel)]` and `[formControl]` bind directly. Written on every keystroke.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "label",
+              "description": "Visible label text, rendered as a `<label>` whose `for` points at the control. Leave it empty and set `ariaLabel` when the field has no visible label.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "description",
+              "description": "Help text shown under the control and linked to it through `aria-describedby`, so screen readers announce it after the label.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "error",
+              "description": "Error message. A non-empty value renders it under the control, links it through `aria-describedby`, and marks the control `aria-invalid=\"true\"`. Clear it (empty string) once the value is valid again.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "invalid",
+              "description": "Mark the field invalid (`aria-invalid=\"true\"` and the invalid styling) without showing a message, for example when the message is rendered elsewhere. A non-empty `error` implies this.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "type",
+              "description": "The native input `type`: `'text'`, `'email'`, `'password'`, `'search'`, `'tel'` or `'url'`. Ignored when `multiline` is set.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"text\""
+            },
+            {
+              "name": "placeholder",
+              "description": "Placeholder text shown while the field is empty. It is not a substitute for `label`: it disappears on input and many screen readers do not announce it.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "name",
+              "description": "The native `name` attribute, used when the field sits in a plain HTML `<form>`. On Lit the control is in a shadow root, so it does not join the outer form; bind `modelValue` there.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "autocomplete",
+              "description": "The native `autocomplete` hint (e.g. `'email'`, `'current-password'`, `'off'`). Empty leaves the browser default.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            },
+            {
+              "name": "required",
+              "description": "Mark the field required: sets the native `required` attribute (announced by screen readers) and shows a `*` after the label. The marker is `aria-hidden` so it is not read twice.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "disabled",
+              "description": "Disable the control. Also sets the Angular `ControlValueAccessor` disabled state.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "readonly",
+              "description": "Make the control read-only: the text is shown, focusable and selectable but cannot be edited.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "max-length",
+              "description": "Maximum number of characters, forwarded as the native `maxlength`. `null` (the default) means no limit. With `showCount`, the counter reads `n / maxLength`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "show-count",
+              "description": "Show a character counter under the control (`n / maxLength`, or just `n` without a limit). The counter is linked through `aria-describedby`; it is not a live region, so it does not interrupt typing.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "multiline",
+              "description": "Render a `<textarea>` instead of an `<input>`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "rows",
+              "description": "Visible rows of a `multiline` field (the native `rows`). With `autosize` it is the minimum height.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "3"
+            },
+            {
+              "name": "autosize",
+              "description": "Grow a `multiline` field to fit its content, from `rows` up to `maxRows`. It re-measures on input, on programmatic `modelValue` changes and when the field width changes.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "boolean"
+              ],
+              "default": "false"
+            },
+            {
+              "name": "max-rows",
+              "description": "The tallest an `autosize` field grows, in rows; past it the textarea scrolls. `null` (the default) means no cap.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "aria-label",
+              "description": "Accessible name for the control (`aria-label`) when there is no visible `label`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "id-base",
+              "description": "Id base for the control and its text: the control is `idBase + '-input'`, and the description, error and counter are `-description`, `-error` and `-count`. Leave it empty (the default) and each instance generates a unique base after mount (`rozie-text-field-<n>`); set it when you need stable ids, for example to point an external element at the control. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"\""
+            }
+          ],
+          "js": {
+            "events": [
+              {
+                "name": "change",
+                "description": "Fired when the user commits an edit: on blur, when the text differs from what it was when the field gained focus. Payload `{ value }`. The same on all six targets (it is not the native `change` event, which React fires on every keystroke). For every keystroke, bind `modelValue` instead.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "enter",
+                "description": "Fired when the user presses **Enter** in a single-line field, except while an IME composition is open. Payload `{ value }`. The key is not prevented, so an enclosing `<form>` still submits.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              },
+              {
+                "name": "update:modelValue",
+                "description": "Emitted with the updated `modelValue` value; powers `v-model:modelValue`.",
+                "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+              }
+            ]
+          },
+          "slots": [
+            {
+              "name": "prefix",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            },
+            {
+              "name": "suffix",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

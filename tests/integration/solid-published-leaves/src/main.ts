@@ -25,8 +25,9 @@ import * as L22 from '@rozie-ui/slider-solid';
 import * as L23 from '@rozie-ui/sortable-list-solid';
 import * as L24 from '@rozie-ui/switch-solid';
 import * as L25 from '@rozie-ui/tags-solid';
-import * as L26 from '@rozie-ui/tiptap-solid';
-import * as L27 from '@rozie-ui/toast-solid';
-import * as L28 from '@rozie-ui/wavesurfer-solid';
+import * as L26 from '@rozie-ui/text-field-solid';
+import * as L27 from '@rozie-ui/tiptap-solid';
+import * as L28 from '@rozie-ui/toast-solid';
+import * as L29 from '@rozie-ui/wavesurfer-solid';
 
-export const leaves = [L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15, L16, L17, L18, L19, L20, L21, L22, L23, L24, L25, L26, L27, L28];
+export const leaves = [L0, L1, L2, L3, L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15, L16, L17, L18, L19, L20, L21, L22, L23, L24, L25, L26, L27, L28, L29];

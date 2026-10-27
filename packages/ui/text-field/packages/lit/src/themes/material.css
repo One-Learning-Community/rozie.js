@@ -1,0 +1,50 @@
+/*
+ * @rozie-ui/text-field — Material Design 3 bridge.
+ *
+ * Maps the text-field tokens onto the MD3 system color roles (`--md-sys-color-*`)
+ * emitted by material-web / @material/material-color-utilities theme builders.
+ * Falls back to the baseline M3 light palette when those vars are absent, so it
+ * renders correctly even without a generated theme.
+ *
+ *   import '@rozie-ui/text-field-lit/themes/material.css';
+ *
+ * Mirrors the M3 outlined text field: a 4dp radius, an `outline` border, and
+ * focus shown as a primary outline rather than a soft halo. The floating label
+ * is not reproduced; the label sits above the control.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rtf-x: var(--rozie-text-field-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-text-field-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-text-field`
+ *    and the Lit host `rozie-text-field`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
+ */
+:root,
+.rozie-text-field,
+rozie-text-field {
+  /* Material 3 outlined text field */
+  --rtf-bg: var(--rozie-text-field-bg, transparent);
+  --rtf-border-color: var(--rozie-text-field-border-color, var(--md-sys-color-outline, #79747e));
+  --rtf-radius: var(--rozie-text-field-radius, 0.25rem);
+  --rtf-padding-x: var(--rozie-text-field-padding-x, 1rem);
+  --rtf-padding-y: var(--rozie-text-field-padding-y, 1rem);
+  --rtf-placeholder-color: var(--rozie-text-field-placeholder-color, var(--md-sys-color-on-surface-variant, #49454f));
+  --rtf-adornment-color: var(--rozie-text-field-adornment-color, var(--md-sys-color-on-surface-variant, #49454f));
+  --rtf-description-color: var(--rozie-text-field-description-color, var(--md-sys-color-on-surface-variant, #49454f));
+  --rtf-label-size: var(--rozie-text-field-label-size, 0.75rem);
+
+  /* M3 focus is a thicker primary outline, not a soft halo */
+  --rtf-focus-color: var(--rozie-text-field-focus-color, var(--md-sys-color-primary, #6750a4));
+  --rtf-focus-ring: var(--rozie-text-field-focus-ring, var(--md-sys-color-primary, #6750a4));
+  --rtf-focus-ring-width: var(--rozie-text-field-focus-ring-width, 1px);
+  --rtf-error-color: var(--rozie-text-field-error-color, var(--md-sys-color-error, #b3261e));
+  --rtf-error-ring: var(--rozie-text-field-error-ring, var(--md-sys-color-error, #b3261e));
+  --rtf-disabled-bg: var(--rozie-text-field-disabled-bg, transparent);
+  --rtf-disabled-opacity: var(--rozie-text-field-disabled-opacity, 0.38);
+}

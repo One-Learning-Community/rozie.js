@@ -32,6 +32,7 @@
     "@rozie-ui/sortable-list-solid": "workspace:*",
     "@rozie-ui/switch-solid": "workspace:*",
     "@rozie-ui/tags-solid": "workspace:*",
+    "@rozie-ui/text-field-solid": "workspace:*",
     "@rozie-ui/tiptap-solid": "workspace:*",
     "@rozie-ui/toast-solid": "workspace:*",
     "@rozie-ui/wavesurfer-solid": "workspace:*",

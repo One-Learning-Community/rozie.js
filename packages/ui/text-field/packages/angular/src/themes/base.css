@@ -1,0 +1,61 @@
+/*
+ * @rozie-ui/text-field — base token reference.
+ *
+ * Every COSMETIC value the text field renders (label, control box, focus ring,
+ * helper text, error state) is a `--rozie-text-field-*` custom property. The
+ * component ships with inline `var(token, fallback)` defaults, so importing this
+ * file is OPTIONAL — it simply makes the full token surface explicit in one
+ * place so you can copy/override exactly what you need.
+ *
+ * Layout (the label / control / helper-text column, the adornment row) and the
+ * native control behaviour are structural and NOT tokenized.
+ *
+ * Override any token at any ancestor scope (`:root`, `.dark`, a wrapper, or the
+ * `.rozie-text-field` element). See themes/shadcn.css, themes/material.css and
+ * themes/bootstrap.css for design-system bridges.
+ *
+ * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root) {
+  /* field column */
+  --rtf-width: var(--rozie-text-field-width, 100%);
+  --rtf-gap: var(--rozie-text-field-gap, 0.375rem);
+  --rozie-text-field-font: inherit;
+  --rozie-text-field-color: inherit;
+
+  /* label */
+  --rtf-label-size: var(--rozie-text-field-label-size, 0.875rem);
+  --rtf-label-weight: var(--rozie-text-field-label-weight, 500);
+  --rozie-text-field-label-color: inherit;
+
+  /* control box */
+  --rtf-bg: var(--rozie-text-field-bg, #fff);
+  --rtf-border-width: var(--rozie-text-field-border-width, 1px);
+  --rtf-border-color: var(--rozie-text-field-border-color, rgba(0, 0, 0, 0.25));
+  --rtf-radius: var(--rozie-text-field-radius, 0.5rem);
+  --rtf-padding-x: var(--rozie-text-field-padding-x, 0.75rem);
+  --rtf-padding-y: var(--rozie-text-field-padding-y, 0.5rem);
+  --rtf-line-height: var(--rozie-text-field-line-height, 1.5);
+  --rtf-placeholder-color: var(--rozie-text-field-placeholder-color, rgba(0, 0, 0, 0.45));
+  --rtf-resize: var(--rozie-text-field-resize, vertical);
+
+  /* prefix / suffix adornments */
+  --rtf-adornment-gap: var(--rozie-text-field-adornment-gap, 0.5rem);
+  --rtf-adornment-color: var(--rozie-text-field-adornment-color, rgba(0, 0, 0, 0.55));
+
+  /* focus */
+  --rtf-focus-color: var(--rozie-text-field-focus-color, #2563eb);
+  --rtf-focus-ring: var(--rozie-text-field-focus-ring, rgba(37, 99, 235, 0.25));
+  --rtf-focus-ring-width: var(--rozie-text-field-focus-ring-width, 3px);
+
+  /* invalid */
+  --rtf-error-color: var(--rozie-text-field-error-color, #dc2626);
+  --rtf-error-ring: var(--rozie-text-field-error-ring, rgba(220, 38, 38, 0.25));
+
+  /* disabled */
+  --rtf-disabled-bg: var(--rozie-text-field-disabled-bg, rgba(0, 0, 0, 0.04));
+  --rtf-disabled-opacity: var(--rozie-text-field-disabled-opacity, 0.6);
+
+  /* description, error and counter text */
+  --rtf-help-size: var(--rozie-text-field-help-size, 0.8125rem);
+  --rtf-description-color: var(--rozie-text-field-description-color, rgba(0, 0, 0, 0.6));
+}

@@ -1,0 +1,76 @@
+{
+  "name": "@rozie-ui/text-field-lit",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Lit accessible text field and textarea: label, description and error wired through for / aria-describedby / aria-invalid, two-way binding, a character counter and opt-in autosize — one Rozie source compiled to a Lit custom element.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "text-field",
+    "input",
+    "textarea",
+    "form",
+    "autosize",
+    "accessibility",
+    "aria",
+    "component",
+    "lit"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/text-field/packages/lit"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    },
+    "./source": "./src/TextField.ts",
+    "./themes/*": "./src/themes/*"
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md",
+    "custom-elements.json"
+  ],
+  "dependencies": {
+    "@rozie/runtime-lit": "workspace:^"
+  },
+  "peerDependencies": {
+    "lit": "^3.2",
+    "@lit-labs/preact-signals": "^1.0.0",
+    "@preact/signals-core": "^1.3.0"
+  },
+  "peerDependenciesMeta": {
+    "lit": {
+      "optional": false
+    },
+    "@lit-labs/preact-signals": {
+      "optional": false
+    },
+    "@preact/signals-core": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "customElements": "custom-elements.json"
+}

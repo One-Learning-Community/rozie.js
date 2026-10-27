@@ -1,0 +1,34 @@
+// Vitest config for @rozie-ui/popover.
+//
+// Three test surfaces:
+//   • tests/surface.test.ts — the TextField.rozie compile()/lowerToIR surface gate
+//     (the same contract scripts/compile-popover-check.mjs checks), so a drift in
+//     the surface or a new compile() error fails the test gate under
+//     `turbo run test`, not just the standalone script.
+//   • src/internal/*.test.ts — unit tests for the branchy middleware builder.
+//   • scripts/manifest-snapshot.test.mjs — the published-primitive manifest
+//     round-trip anti-drift guard: re-derives buildManifest(lowerToIR(TextField.rozie))
+//     and asserts it deep-equals the committed __fixtures__/rozie-manifest.expected.json.
+//
+// testTimeout: 30000 — compile()×6 is a heavy module graph; under
+// `turbo run test` parallel CPU starvation can exceed vitest's 5s default and
+// flake only in full batteries (the captcha/cropper analog).
+import { defineConfig } from 'vitest/config';
+import vue from '@vitejs/plugin-vue';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+export default defineConfig({
+  // vue() so tests/*.behavior.test.ts can import + mount the emitted
+  // packages/vue/src/TextField.vue leaf.
+  plugins: [vue()],
+  test: {
+    globals: false,
+    environment: 'node',
+    include: ['tests/**/*.test.ts', 'src/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    root: __dirname,
+    testTimeout: 30000,
+  },
+});

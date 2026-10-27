@@ -1,0 +1,73 @@
+{
+  "name": "@rozie-ui/text-field-svelte",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Svelte accessible text field and textarea: label, description and error wired through for / aria-describedby / aria-invalid, two-way binding, a character counter and opt-in autosize — one Rozie source compiled to Svelte.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "text-field",
+    "input",
+    "textarea",
+    "form",
+    "autosize",
+    "accessibility",
+    "aria",
+    "component",
+    "svelte"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/text-field/packages/svelte"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "svelte": "./dist/TextField.svelte",
+      "types": "./dist/TextField.svelte.d.ts",
+      "default": "./dist/TextField.svelte"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "svelte": "./src/TextField.svelte",
+      "default": "./src/TextField.svelte"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "@rozie/runtime-svelte": "workspace:^"
+  },
+  "peerDependencies": {
+    "svelte": "^5"
+  },
+  "peerDependenciesMeta": {
+    "svelte": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "svelte-package --input src --output dist",
+    "typecheck": "echo 'source+dist; svelte-check at repo level'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@sveltejs/package": "^2",
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "svelte2tsx": "^0.7",
+    "typescript": "~5.6.0"
+  }
+}

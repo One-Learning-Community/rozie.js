@@ -1,0 +1,85 @@
+{
+  "name": "@rozie-ui/text-field-angular",
+  "version": "0.1.0",
+  "type": "module",
+  "private": false,
+  "license": "MIT",
+  "description": "Idiomatic Angular accessible text field and textarea: label, description and error wired through for / aria-describedby / aria-invalid, two-way binding, a character counter and opt-in autosize — one Rozie source compiled to Angular.",
+  "keywords": [
+    "rozie",
+    "rozie-ui",
+    "text-field",
+    "input",
+    "textarea",
+    "form",
+    "autosize",
+    "accessibility",
+    "aria",
+    "component",
+    "angular"
+  ],
+  "author": "One Learning Community (https://github.com/One-Learning-Community)",
+  "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/One-Learning-Community/rozie.js.git",
+    "directory": "packages/ui/text-field/packages/angular"
+  },
+  "bugs": {
+    "url": "https://github.com/One-Learning-Community/rozie.js/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/fesm2022/rozie-ui-text-field-angular.mjs"
+    },
+    "./themes/*": "./src/themes/*",
+    "./source": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "CHANGELOG.md"
+  ],
+  "module": "./dist/fesm2022/rozie-ui-text-field-angular.mjs",
+  "types": "./dist/index.d.ts",
+  "peerDependencies": {
+    "@angular/core": "^19",
+    "@angular/common": "^19",
+    "@angular/forms": "^19"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": false
+    },
+    "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
+      "optional": false
+    }
+  },
+  "scripts": {
+    "build": "ng-packagr -p ng-package.json -c tsconfig.lib.json",
+    "typecheck": "echo 'source+dist; ng-packagr declaration emit at build'"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@rozie/runtime-angular": "workspace:^",
+    "tslib": "^2"
+  },
+  "devDependencies": {
+    "@angular/common": "^19",
+    "@angular/compiler": "^19",
+    "@angular/compiler-cli": "^19",
+    "@angular/core": "^19",
+    "@angular/forms": "^19",
+    "ng-packagr": "^19",
+    "typescript": "~5.6.0"
+  }
+}

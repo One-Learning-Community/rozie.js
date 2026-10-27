@@ -1,0 +1,52 @@
+/*
+ * @rozie-ui/text-field — Bootstrap 5 bridge.
+ *
+ * Maps the text-field tokens onto Bootstrap's `--bs-*` CSS variables (Bootstrap
+ * 5.2+). Reading them live means the field follows `data-bs-theme="dark"` and
+ * any custom build automatically. Falls back to Bootstrap's default light
+ * palette when the vars are absent.
+ *
+ *   import '@rozie-ui/text-field-lit/themes/bootstrap.css';
+ *
+ * Mirrors `.form-control`: a 1px `--bs-border-color` border, the Bootstrap
+ * border radius, a 0.25rem primary-tinted focus ring, and the `.is-invalid`
+ * danger color for errors.
+ *
+ * HOW IT MAPS. This bridge declares no public token: it re-declares the private wiring of
+ * each token it maps, with the design system's variable as the fallback
+ * (`--rtf-x: var(--rozie-text-field-x, <design-system variable>)`). The component reads every token
+ * public-first, so on all six targets:
+ *  - a public `--rozie-text-field-*` token set on any ancestor (or on the component) wins;
+ *  - otherwise the design system's variable applies, resolved AT the component (`.rozie-text-field`
+ *    and the Lit host `rozie-text-field`), so a `.dark` / `data-bs-theme` wrapper narrower than
+ *    <html> is followed;
+ *  - a Lit component nested in another shadow root, which no document selector reaches,
+ *    inherits the `:root` copy instead: there the design system's variables are read at
+ *    the document root.
+ * This rule outranks base.css's `:where(:root)` wiring, so import order does not matter.
+ */
+:root,
+.rozie-text-field,
+rozie-text-field {
+  /* .form-control */
+  --rtf-bg: var(--rozie-text-field-bg, var(--bs-body-bg, #fff));
+  --rtf-border-color: var(--rozie-text-field-border-color, var(--bs-border-color, #dee2e6));
+  --rtf-radius: var(--rozie-text-field-radius, var(--bs-border-radius, 0.375rem));
+  --rtf-padding-x: var(--rozie-text-field-padding-x, 0.75rem);
+  --rtf-padding-y: var(--rozie-text-field-padding-y, 0.375rem);
+  --rtf-placeholder-color: var(--rozie-text-field-placeholder-color, var(--bs-secondary-color, rgba(33, 37, 41, 0.75)));
+  --rtf-adornment-color: var(--rozie-text-field-adornment-color, var(--bs-secondary-color, rgba(33, 37, 41, 0.75)));
+  --rtf-description-color: var(--rozie-text-field-description-color, var(--bs-secondary-color, rgba(33, 37, 41, 0.75)));
+  --rtf-label-weight: var(--rozie-text-field-label-weight, 400);
+
+  /* .form-control:focus — a 0.25rem primary-tinted ring */
+  --rtf-focus-color: var(--rozie-text-field-focus-color, #86b7fe);
+  --rtf-focus-ring: var(--rozie-text-field-focus-ring, rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25));
+  --rtf-focus-ring-width: var(--rozie-text-field-focus-ring-width, 0.25rem);
+
+  /* .is-invalid / .invalid-feedback */
+  --rtf-error-color: var(--rozie-text-field-error-color, var(--bs-form-invalid-color, #dc3545));
+  --rtf-error-ring: var(--rozie-text-field-error-ring, rgba(var(--bs-danger-rgb, 220, 53, 69), 0.25));
+  --rtf-disabled-bg: var(--rozie-text-field-disabled-bg, var(--bs-secondary-bg, #e9ecef));
+  --rtf-disabled-opacity: var(--rozie-text-field-disabled-opacity, 1);
+}
