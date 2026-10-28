@@ -443,7 +443,7 @@ function tryWrapEscapingHelperUseCallback(
   // Cycle forward edges (see `computeCycleForwardRefs`). `declared` is shared
   // across the wrap loop so each `_rozieFwd_<X>` ref is declared once, ahead
   // of the first helper that calls through it.
-  forward: CycleForwardRefs = { refs: new Map(), targets: new Set(), declared: new Set() },
+  forward: CycleForwardRefs = { refs: new Map(), deps: new Map(), targets: new Set(), declared: new Set() },
 ): string | null {
   if (!t.isVariableDeclaration(stmt)) return null;
   if (stmt.declarations.length !== 1) return null;
@@ -498,9 +498,15 @@ function tryWrapEscapingHelperUseCallback(
   // was destructured — eslint expects the deps[] entry to match the body's
   // bare-identifier reference.
   const forwardNames = forward.refs.get(helperName) ?? new Set<string>();
-  const bodyDeps = computeHelperBodyDeps(init.body, ir, allHelperNames, helperName).filter(
-    (ref) => !(ref.scope === 'closure' && forwardNames.has(ref.identifier)),
-  );
+  // The dropped forward deps are replaced by what those helpers read, so this
+  // helper's identity still changes when the state behind the call does (a
+  // `$watch` or `useMemo` calling it would otherwise never re-run).
+  const bodyDeps = [
+    ...computeHelperBodyDeps(init.body, ir, allHelperNames, helperName).filter(
+      (ref) => !(ref.scope === 'closure' && forwardNames.has(ref.identifier)),
+    ),
+    ...(forward.deps.get(helperName) ?? []),
+  ];
   const rawDepsLiteral = renderDepArrayWithIR(bodyDeps, ir);
   // Rewrite `props.onSearch` → `_rozieProp_onSearch` in the deps array
   // for each destructured name. Sort the resulting list lexically again.
@@ -554,6 +560,8 @@ function tryWrapEscapingHelperUseCallback(
 interface CycleForwardRefs {
   /** helper name → the cycle members declared after it that it references */
   refs: ReadonlyMap<string, ReadonlySet<string>>;
+  /** helper name → what its forward targets read, standing in for the dropped deps */
+  deps: ReadonlyMap<string, readonly SignalRef[]>;
   /** every helper some earlier cycle member reaches through a ref */
   targets: ReadonlySet<string>;
   /** refs already declared by an earlier helper in the wrap loop */
@@ -603,6 +611,47 @@ function computeCycleForwardRefs(
       if (!result.has(name)) result.set(name, new Set());
       result.get(name)!.add(next);
     }
+  }
+  return result;
+}
+
+/**
+ * For each helper with forward refs, the deps of the helpers it reaches through
+ * them: everything those bodies read, following further calls into helpers
+ * declared at or after it (which it can't list) and keeping references to
+ * helpers declared before it.
+ */
+function computeForwardTargetDeps(
+  forwardRefs: ReadonlyMap<string, ReadonlySet<string>>,
+  useCallbackHelperNames: ReadonlySet<string>,
+  helperBodyByName: ReadonlyMap<string, t.Node>,
+  ir: IRComponent,
+  allHelperNames: Set<string>,
+): Map<string, SignalRef[]> {
+  const order = [...helperBodyByName.keys()].filter((n) => useCallbackHelperNames.has(n));
+  const index = new Map(order.map((n, i) => [n, i]));
+  const result = new Map<string, SignalRef[]>();
+  for (const [name, targets] of forwardRefs) {
+    const own = index.get(name)!;
+    const out: SignalRef[] = [];
+    const seen = new Set<string>([name]);
+    const stack = [...targets];
+    while (stack.length > 0) {
+      const cur = stack.pop()!;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const ref of computeHelperBodyDeps(helperBodyByName.get(cur)!, ir, allHelperNames, cur)) {
+        if (ref.scope === 'closure') {
+          const at = index.get(ref.identifier);
+          if (at !== undefined && at >= own) {
+            stack.push(ref.identifier);
+            continue;
+          }
+        }
+        out.push(ref);
+      }
+    }
+    result.set(name, out);
   }
   return result;
 }
@@ -2710,6 +2759,13 @@ export function emitScript(
   // goes through `_rozieFwd_<X>`, a ref declared ahead of the helpers and kept
   // current after `<X>`'s declaration. Empty when there is no cycle.
   const cycleForwardRefs = computeCycleForwardRefs(useCallbackHelperNames, helperBodyByName, ir, allHelperNames);
+  const cycleForwardDeps = computeForwardTargetDeps(
+    cycleForwardRefs,
+    useCallbackHelperNames,
+    helperBodyByName,
+    ir,
+    allHelperNames,
+  );
   const cycleForwardTargets = new Set([...cycleForwardRefs.values()].flatMap((s) => [...s]));
   const declaredForwardRefs = new Set<string>();
   {
@@ -4898,7 +4954,7 @@ export function emitScript(
       allHelperNames,
       collectors,
       hoistedPropNames,
-      { refs: cycleForwardRefs, targets: cycleForwardTargets, declared: declaredForwardRefs },
+      { refs: cycleForwardRefs, deps: cycleForwardDeps, targets: cycleForwardTargets, declared: declaredForwardRefs },
     );
     if (wrapped) {
       pushWrapped(wrapped, stmt);

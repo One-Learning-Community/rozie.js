@@ -20,16 +20,20 @@ import { emitReact } from '../emitReact.js';
 
 const SRC = `<rozie name="Parity">
 <props>{ n: { type: Number, default: 3 } }</props>
-<data>{ floor: 0, mounted: '' }</data>
+<data>{ floor: 0, mounted: '', log: '' }</data>
 <script lang="ts">
 const ping = (k: number): string => (k <= 0 ? 'E' : pong(k - 1))
 const pong = (k: number): string => (k <= $data.floor ? 'F' + $data.floor : ping(k - 1))
+const viaMemo = $computed(() => ping($props.n))
+$watch(() => ping($props.n), (v) => { $data.log = $data.log + '|' + v })
 $onMount(() => { $data.mounted = ping(4) + '/' + pong(4) })
 </script>
 <template>
 <div>
 <span class="mounted">{{ $data.mounted }}</span>
 <span class="ping">{{ ping($props.n) }}</span>
+<span class="memo">{{ viaMemo }}</span>
+<span class="log">{{ $data.log }}</span>
 <button @click="$data.floor = 1">floor</button>
 </div>
 </template>
@@ -68,12 +72,16 @@ describe('React mutually-recursive useCallback helpers', () => {
     const { container } = render(<Parity n={3} />);
     expect(container.querySelector('.mounted')?.textContent).toBe('E/F0');
     expect(container.querySelector('.ping')?.textContent).toBe('F0');
+    // A $computed calls ping while rendering, so the ref must be set by then.
+    expect(container.querySelector('.memo')?.textContent).toBe('F0');
 
-    // ping reads nothing reactive itself, so its identity can stay put; it
-    // must still reach the CURRENT pong, which reads floor.
+    // ping reaches pong, which reads floor: the memo and the watch, which
+    // depend on ping's identity, have to re-run when floor changes.
     act(() => {
       fireEvent.click(container.querySelector('button')!);
     });
     expect(container.querySelector('.ping')?.textContent).toBe('F1');
+    expect(container.querySelector('.memo')?.textContent).toBe('F1');
+    expect(container.querySelector('.log')?.textContent).toBe('|F1');
   });
 });

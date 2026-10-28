@@ -69,7 +69,23 @@ export function orderByEagerDeps(script: string): string {
   // body's own functions.
   const tdzOwner = new Map<string, number>();
   const callables = new Map<string, NodePath<t.Function>>();
+  // `_rozieFwd_<X>.current = X;` (emitScript's helper-cycle forward refs): a
+  // statement that calls through the ref while rendering has to come after the
+  // write, or `.current` is still null on the first render.
+  const forwardWriter = new Map<string, number>();
   stmts.forEach((s, i) => {
+    if (s.isExpressionStatement()) {
+      const e = s.node.expression;
+      if (
+        t.isAssignmentExpression(e) &&
+        t.isMemberExpression(e.left) &&
+        t.isIdentifier(e.left.object) &&
+        e.left.object.name.startsWith('_rozieFwd_') &&
+        t.isIdentifier(e.left.property, { name: 'current' })
+      ) {
+        forwardWriter.set(e.left.object.name, i);
+      }
+    }
     if (s.isVariableDeclaration()) {
       for (const d of s.get('declarations')) {
         for (const name of Object.keys(t.getBindingIdentifiers(d.node.id))) tdzOwner.set(name, i);
@@ -153,6 +169,8 @@ export function orderByEagerDeps(script: string): string {
     for (const name of all) {
       const owner = tdzOwner.get(name);
       if (owner !== undefined && owner !== i) out.add(owner);
+      const writer = forwardWriter.get(name);
+      if (writer !== undefined && writer !== i) out.add(writer);
     }
     return out;
   });
