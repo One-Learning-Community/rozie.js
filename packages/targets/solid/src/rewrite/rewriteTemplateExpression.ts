@@ -338,6 +338,20 @@ export function rewriteTemplateExpression(
   }
 
   traverse(wrapper, {
+    // `$data.x++` / `$data.x--` (and a model prop's) as a handler statement:
+    // rewritten to `$data.x += 1` / `-= 1`, which the AssignmentExpression
+    // visitor then lowers through the setter (a bare `x()++` is not valid).
+    UpdateExpression(path) {
+      const arg = path.node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      if (!t.isIdentifier(arg.object) || !t.isIdentifier(arg.property)) return;
+      if (arg.object.name !== '$data' && arg.object.name !== '$props') return;
+      if (!path.parentPath?.isExpressionStatement()) return;
+      path.replaceWith(
+        t.assignmentExpression(path.node.operator === '++' ? '+=' : '-=', arg, t.numericLiteral(1)),
+      );
+    },
+
     AssignmentExpression(path) {
       const node = path.node;
       const left = node.left;

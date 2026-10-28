@@ -198,6 +198,25 @@ export function rewriteTemplateExpression(expr: t.Expression, ir: IRComponent): 
       }
     },
 
+    // `@click="$data.n++"`: the state is `const [n, setN] = useState(…)`, so a
+    // bare `n++` assigns to a const. As in the script rewrite, `++` / `--`
+    // become `+= 1` / `-= 1` through the setter, only where the expression's
+    // value is discarded (the handler's own statement).
+    UpdateExpression(path) {
+      const arg = path.node.argument;
+      if (!t.isMemberExpression(arg) || arg.computed) return;
+      const obj = arg.object;
+      const prop = arg.property;
+      if (!t.isIdentifier(obj) || !t.isIdentifier(prop)) return;
+      const known =
+        (obj.name === '$data' && dataNames.has(prop.name)) ||
+        (obj.name === '$props' && modelProps.has(prop.name));
+      if (!known) return;
+      if (!path.parentPath?.isExpressionStatement()) return;
+      const op = path.node.operator === '++' ? '+=' : '-=';
+      path.replaceWith(buildSetterCall(prop.name, op, t.numericLiteral(1)));
+    },
+
     MemberExpression(path) {
       const obj = path.node.object;
       if (!t.isIdentifier(obj)) return;
