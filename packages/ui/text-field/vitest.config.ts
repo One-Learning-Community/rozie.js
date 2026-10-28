@@ -1,14 +1,13 @@
-// Vitest config for @rozie-ui/popover.
+// Vitest config for @rozie-ui/text-field.
 //
-// Three test surfaces:
-//   • tests/surface.test.ts — the TextField.rozie compile()/lowerToIR surface gate
-//     (the same contract scripts/compile-popover-check.mjs checks), so a drift in
-//     the surface or a new compile() error fails the test gate under
-//     `turbo run test`, not just the standalone script.
-//   • src/internal/*.test.ts — unit tests for the branchy middleware builder.
-//   • scripts/manifest-snapshot.test.mjs — the published-primitive manifest
-//     round-trip anti-drift guard: re-derives buildManifest(lowerToIR(TextField.rozie))
-//     and asserts it deep-equals the committed __fixtures__/rozie-manifest.expected.json.
+// Test surfaces:
+//   • tests/surface.test.ts — the TextField.rozie compile()/lowerToIR surface gate,
+//     so a drift in the surface or a new compile() error fails `turbo run test`.
+//   • tests/wiring.behavior.test.ts — the a11y wiring, model, events and autosize
+//     behaviour, rendered on the leaves.
+//   • tests/typed-events.test.ts and tests/sidecars.test.ts — the typed event
+//     payloads, and the Vue web-types / Lit CEM sidecars.
+//   • src/internal/*.test.ts — unit tests for the autosize measurement.
 //
 // testTimeout: 30000 — compile()×6 is a heavy module graph; under
 // `turbo run test` parallel CPU starvation can exceed vitest's 5s default and

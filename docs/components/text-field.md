@@ -98,7 +98,7 @@ A generic `<Field>` that wraps *your* `<input>` would be the more flexible shape
 
 | Event | Description |
 | --- | --- |
-| `change` | The user committed an edit: on blur, when they changed the text since focus. Payload `{ value }`. Programmatic writes never fire it. |
+| `change` | The user committed an edit: the DOM `change` event, on blur after changing the text, or on Enter in a single-line field. Payload `{ value }`. Programmatic writes never fire it. |
 | `enter` | The user pressed **Enter** in a single-line field, outside an IME composition. Payload `{ value }`. Not prevented, so a form still submits. |
 
 ### Imperative handle

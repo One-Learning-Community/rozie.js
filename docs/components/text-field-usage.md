@@ -106,11 +106,11 @@ import { TextField } from '@rozie-ui/text-field-angular';
   imports: [TextField, ReactiveFormsModule],
   template: `
     <!-- TextField is a ControlValueAccessor: bind it like any form control. -->
-    <TextField [formControl]="email" label="Email" type="email" description="We never share it."
+    <rozie-text-field [formControl]="email" label="Email" type="email" description="We never share it."
                [error]="email.touched && email.invalid ? 'Enter a valid email address.' : ''" [required]="true" />
 
     <!-- Or two-way bind the model directly. -->
-    <TextField [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
+    <rozie-text-field [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
   `,
 })
 export class DemoComponent {

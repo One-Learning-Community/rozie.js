@@ -20,6 +20,8 @@ The values listed below are exposed as `--rozie-text-field-*` custom properties,
 
 ## Tokens
 
+### field column
+
 | Token | Default |
 | --- | --- |
 | `--rozie-text-field-width` | `100%` |

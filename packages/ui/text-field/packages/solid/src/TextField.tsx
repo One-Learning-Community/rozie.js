@@ -229,12 +229,21 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
   createEffect(on(() => (() => local.maxRows)(), (v) => untrack(() => (() => fitLater())()), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
-    if (!local.idBase) setAutoId('rozie-text-field-' + nextAutoId());
+    unmounted = false;
+    // Generated even when idBase is set, so clearing idBase later still leaves
+    // this instance its own ids.
+    setAutoId('rozie-text-field-' + nextAutoId());
     fit();
+    const el: any = control();
+    resetForm = el && el.form ? el.form : null;
+    if (resetForm) resetForm.addEventListener('reset', onFormReset);
   })() as unknown;
     if (_cleanup) onCleanup(_cleanup as () => void);
     onCleanup(() => {
+    unmounted = true;
     observeWidth(null);
+    if (resetForm) resetForm.removeEventListener('reset', onFormReset);
+    resetForm = null;
   });
   });
   let textareaElRef: HTMLElement | null = null;
@@ -248,6 +257,10 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   let autosized = false;
+  // Set by the unmount cleanup, so a re-fit still pending then does nothing (on
+  // Lit, Angular and Solid the element refs outlive the unmount).
+  let unmounted = false;
+  let resetForm: any = null;
 
   // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
   function nextAutoId() {
@@ -316,6 +329,9 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
   // A width change re-wraps the text, so an autosized textarea is observed and
   // re-measured. Only a WIDTH change counts: our own height write must not loop
   // the observer. Re-targets when the textarea is (re)mounted by `multiline`.
+  // The re-fit waits for the next frame: changing the observed element's height
+  // inside the callback is the "ResizeObserver loop completed with undelivered
+  // notifications" error.
   function observeWidth(el: any) {
     if (el === observedEl) return;
     if (widthObserver) widthObserver.disconnect();
@@ -327,11 +343,12 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === lastWidth) return;
       lastWidth = w;
-      fit();
+      requestAnimationFrame(() => fit());
     });
     widthObserver.observe(el);
   }
   function fit() {
+    if (unmounted) return;
     const el = local.multiline ? textareaElRef : null;
     if (!el || !local.autosize) {
       observeWidth(null);
@@ -354,6 +371,10 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
   }
 
   // ---- handlers --------------------------------------------------------------
+  function control() {
+    return local.multiline ? textareaElRef : inputElRef;
+  }
+
   // Named commitText, NOT writeValue (the generated Angular CVA method).
   function commitText(text: any) {
     setModelValue(text);
@@ -373,19 +394,34 @@ export default function TextField(_props: TextFieldProps): JSX.Element {
       value: e && e.target ? e.target.value : currentText()
     });
   }
+
+  // Enter that confirms an IME composition is not a commit. React's synthetic
+  // event has no `isComposing`, so read the native event; Safari reports the
+  // confirming Enter with keyCode 229 and `isComposing` false.
   function onKeydown(e: any) {
-    if (!e || e.key !== 'Enter' || e.isComposing) return;
+    if (!e || e.key !== 'Enter' || e.repeat) return;
+    const ne = e.nativeEvent ?? e;
+    if (ne.isComposing || ne.keyCode === 229) return;
     _props.onEnter?.({
       value: e.target ? e.target.value : currentText()
     });
   }
 
   // ---- lifecycle -------------------------------------------------------------
-
-  // ---- imperative handle -----------------------------------------------------
-  function control() {
-    return local.multiline ? textareaElRef : inputElRef;
+  // A form reset puts the control back to its default value without an input
+  // event. Vue, Svelte, Angular and Solid set the value as a property only, so
+  // the control empties while modelValue (and the counter, the autosize height,
+  // an Angular FormControl) keep the old text. The reset event fires before the
+  // reset, so the control is read a task later.
+  function onFormReset() {
+    setTimeout(() => {
+      if (unmounted) return;
+      const el: any = control();
+      if (el && el.value !== currentText()) commitText(el.value);
+      fit();
+    }, 0);
   }
+  // ---- imperative handle -----------------------------------------------------
 
   // focus() deliberately overrides HTMLElement.focus on Lit (ROZ137, accepted).
   function focus() {

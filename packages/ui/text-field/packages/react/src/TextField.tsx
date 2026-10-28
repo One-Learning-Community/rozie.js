@@ -143,6 +143,8 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     void modelValue; void label; void description; void error; void invalid; void type; void placeholder; void name; void autocomplete; void required; void disabled; void readonly; void maxLength; void showCount; void multiline; void rows; void autosize; void maxRows; void ariaLabel; void idBase; void defaultValue; void onModelValueChange; void defaultModelValue; void onChange; void onEnter; void renderPrefix; void renderSuffix; void slots;
     return rest;
   })();
+  const unmounted = useRef(false);
+  const resetForm = useRef<any>(null);
   const autosized = useRef(false);
   const observedEl = useRef<any>(null);
   const widthObserver = useRef<any>(null);
@@ -152,8 +154,6 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     defaultValue: props.defaultModelValue ?? '',
     onValueChange: props.onModelValueChange,
   });
-  const _idBaseRef = useRef(props.idBase);
-  _idBaseRef.current = props.idBase;
   const [autoId, setAutoId] = useState('');
   const textareaEl = useRef<HTMLTextAreaElement | null>(null);
   const inputEl = useRef<HTMLInputElement | null>(null);
@@ -163,6 +163,8 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
   const _watch3First = useRef(true);
   const _watch4First = useRef(true);
 
+  // Set by the unmount cleanup, so a re-fit still pending then does nothing (on
+  // Lit, Angular and Solid the element refs outlive the unmount).
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   // Top-level so React hoists it to a ref and the Solid onMount/onCleanup split
@@ -233,6 +235,9 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
   // A width change re-wraps the text, so an autosized textarea is observed and
   // re-measured. Only a WIDTH change counts: our own height write must not loop
   // the observer. Re-targets when the textarea is (re)mounted by `multiline`.
+  // The re-fit waits for the next frame: changing the observed element's height
+  // inside the callback is the "ResizeObserver loop completed with undelivered
+  // notifications" error.
   const _rozieFwd_fit = useRef<typeof fit>(null!);
   const observeWidth = useCallback((el: any) => {
     if (el === observedEl.current) return;
@@ -245,11 +250,12 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === lastWidth.current) return;
       lastWidth.current = w;
-      _rozieFwd_fit.current();
+      requestAnimationFrame(() => _rozieFwd_fit.current());
     });
     widthObserver.current.observe(el);
-  }, []);
+  }, [props.autosize, props.maxRows, props.multiline, props.rows]);
   const fit = useCallback(() => {
+    if (unmounted.current) return;
     const el = props.multiline ? textareaEl.current : null;
     if (!el || !props.autosize) {
       observeWidth(null);
@@ -272,6 +278,7 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
   }
 
   // ---- handlers --------------------------------------------------------------
+  const control = useCallback(() => props.multiline ? textareaEl.current : inputEl.current, [props.multiline]);
   // Named commitText, NOT writeValue (the generated Angular CVA method).
   function commitText(text: any) {
     setModelValue(text);
@@ -291,18 +298,33 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
       value: e && e.target ? e.target.value : currentText()
     });
   }, [_rozieProp_onChange, currentText]);
+  // Enter that confirms an IME composition is not a commit. React's synthetic
+  // event has no `isComposing`, so read the native event; Safari reports the
+  // confirming Enter with keyCode 229 and `isComposing` false.
   const { onEnter: _rozieProp_onEnter } = props;
     const onKeydown = useCallback((e: any) => {
-    if (!e || e.key !== 'Enter' || e.isComposing) return;
+    if (!e || e.key !== 'Enter' || e.repeat) return;
+    const ne = e.nativeEvent ?? e;
+    if (ne.isComposing || ne.keyCode === 229) return;
     _rozieProp_onEnter && _rozieProp_onEnter({
       value: e.target ? e.target.value : currentText()
     });
   }, [_rozieProp_onEnter, currentText]);
   // ---- lifecycle -------------------------------------------------------------
+  // A form reset puts the control back to its default value without an input
+  // event. Vue, Svelte, Angular and Solid set the value as a property only, so
+  // the control empties while modelValue (and the counter, the autosize height,
+  // an Angular FormControl) keep the old text. The reset event fires before the
+  // reset, so the control is read a task later.
+  const onFormReset = useCallback(() => {
+    setTimeout(() => {
+      if (unmounted.current) return;
+      const el: any = control();
+      if (el && el.value !== currentText()) commitText(el.value);
+      fit();
+    }, 0);
+  }, [commitText, control, currentText, fit]);
   // ---- imperative handle -----------------------------------------------------
-  function control() {
-    return props.multiline ? textareaEl.current : inputEl.current;
-  }
 
   // focus() deliberately overrides HTMLElement.focus on Lit (ROZ137, accepted).
   function focus() {
@@ -324,15 +346,29 @@ const TextField = forwardRef<TextFieldHandle, TextFieldProps>(function TextField
     fit();
   }
 
+  const _controlRef = useRef(control);
+  _controlRef.current = control;
   const _fitRef = useRef(fit);
   _fitRef.current = fit;
   const _observeWidthRef = useRef(observeWidth);
   _observeWidthRef.current = observeWidth;
+  const _onFormResetRef = useRef(onFormReset);
+  _onFormResetRef.current = onFormReset;
   useEffect(() => {
-    if (!_idBaseRef.current) setAutoId('rozie-text-field-' + nextAutoId());
+    const _onFormResetStable: typeof _onFormResetRef.current = (...args) => _onFormResetRef.current(...args);
+    unmounted.current = false;
+    // Generated even when idBase is set, so clearing idBase later still leaves
+    // this instance its own ids.
+    setAutoId('rozie-text-field-' + nextAutoId());
     _fitRef.current();
+    const el: any = _controlRef.current();
+    resetForm.current = el && el.form ? el.form : null;
+    if (resetForm.current) resetForm.current.addEventListener('reset', _onFormResetStable);
     return () => {
+      unmounted.current = true;
       _observeWidthRef.current(null);
+      if (resetForm.current) resetForm.current.removeEventListener('reset', _onFormResetStable);
+      resetForm.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

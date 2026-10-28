@@ -9,6 +9,7 @@
  * Pure glue over the `@rozie/core` public IR — NO compiler/emitter surface.
  */
 
+import { renderPropDescription } from '@rozie/core';
 import { litEventName, litEventNamesDiverge, LIT_EVENT_NOTE } from '../../lit-event-name.mjs';
 import { runtimeDepNote } from '../../runtime-dep-note.mjs';
 
@@ -162,11 +163,11 @@ import { TextField } from '@rozie-ui/text-field-angular';
   imports: [TextField, ReactiveFormsModule],
   template: \`
     <!-- TextField is a ControlValueAccessor: bind it like any form control. -->
-    <TextField [formControl]="email" label="Email" type="email" description="We never share it."
+    <rozie-text-field [formControl]="email" label="Email" type="email" description="We never share it."
                [error]="email.touched && email.invalid ? 'Enter a valid email address.' : ''" [required]="true" />
 
     <!-- Or two-way bind the model directly. -->
-    <TextField [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
+    <rozie-text-field [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
   \`,
 })
 export class DemoComponent {
@@ -347,18 +348,20 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push('```');
   lines.push('');
 
-  // Props
+  // Props — the Description cell is sourced from the single-source-of-truth
+  // `docs.description` via the shared `renderPropDescription` helper.
   lines.push('## Props');
   lines.push('');
-  lines.push('| Name | Type | Default | Two-way (model) | Required |');
-  lines.push('| --- | --- | --- | :---: | :---: |');
+  lines.push('| Name | Type | Default | Two-way (model) | Required | Description |');
+  lines.push('| --- | --- | --- | :---: | :---: | --- |');
   for (const p of ir.props) {
     // A union renders as `A | B`; a bare pipe would split the table row, so escape it.
     const type = renderPropType(p.typeAnnotation).replace(/\|/g, '\\|');
     const def = renderPropDefault(p.defaultValue);
     const model = p.isModel ? '✓' : '';
     const required = p.required ? '✓' : '';
-    lines.push(`| \`${p.name}\` | \`${type}\` | \`${def}\` | ${model} | ${required} |`);
+    const desc = renderPropDescription(p);
+    lines.push(`| \`${p.name}\` | \`${type}\` | \`${def}\` | ${model} | ${required} | ${desc} |`);
   }
   lines.push('');
 

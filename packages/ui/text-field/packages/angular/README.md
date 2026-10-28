@@ -25,11 +25,11 @@ import { TextField } from '@rozie-ui/text-field-angular';
   imports: [TextField, ReactiveFormsModule],
   template: `
     <!-- TextField is a ControlValueAccessor: bind it like any form control. -->
-    <TextField [formControl]="email" label="Email" type="email" description="We never share it."
+    <rozie-text-field [formControl]="email" label="Email" type="email" description="We never share it."
                [error]="email.touched && email.invalid ? 'Enter a valid email address.' : ''" [required]="true" />
 
     <!-- Or two-way bind the model directly. -->
-    <TextField [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
+    <rozie-text-field [(modelValue)]="notes" label="Notes" [multiline]="true" [autosize]="true" [maxRows]="8" />
   `,
 })
 export class DemoComponent {
@@ -48,28 +48,28 @@ import '@rozie-ui/text-field-angular/themes/shadcn.css';    // or material.css, 
 
 ## Props
 
-| Name | Type | Default | Two-way (model) | Required |
-| --- | --- | --- | :---: | :---: |
-| `modelValue` | `String` | `''` | ✓ |  |
-| `label` | `String` | `''` |  |  |
-| `description` | `String` | `''` |  |  |
-| `error` | `String` | `''` |  |  |
-| `invalid` | `Boolean` | `false` |  |  |
-| `type` | `String` | `"text"` |  |  |
-| `placeholder` | `String` | `''` |  |  |
-| `name` | `String` | `''` |  |  |
-| `autocomplete` | `String` | `''` |  |  |
-| `required` | `Boolean` | `false` |  |  |
-| `disabled` | `Boolean` | `false` |  |  |
-| `readonly` | `Boolean` | `false` |  |  |
-| `maxLength` | `Number` | `null` |  |  |
-| `showCount` | `Boolean` | `false` |  |  |
-| `multiline` | `Boolean` | `false` |  |  |
-| `rows` | `Number` | `3` |  |  |
-| `autosize` | `Boolean` | `false` |  |  |
-| `maxRows` | `Number` | `null` |  |  |
-| `ariaLabel` | `String` | `null` |  |  |
-| `idBase` | `String` | `''` |  |  |
+| Name | Type | Default | Two-way (model) | Required | Description |
+| --- | --- | --- | :---: | :---: | --- |
+| `modelValue` | `String` | `''` | ✓ |  | The text in the field (two-way `r-model`). As the sole `model: true` prop it drives the Angular `ControlValueAccessor`, so `[(ngModel)]` and `[formControl]` bind directly. Written on every keystroke. |
+| `label` | `String` | `''` |  |  | Visible label text, rendered as a `<label>` whose `for` points at the control. Leave it empty and set `ariaLabel` when the field has no visible label. |
+| `description` | `String` | `''` |  |  | Help text shown under the control and linked to it through `aria-describedby`, so screen readers announce it after the label. |
+| `error` | `String` | `''` |  |  | Error message. A non-empty value renders it under the control, links it through `aria-describedby`, and marks the control `aria-invalid="true"`. Clear it (empty string) once the value is valid again. |
+| `invalid` | `Boolean` | `false` |  |  | Mark the field invalid (`aria-invalid="true"` and the invalid styling) without showing a message, for example when the message is rendered elsewhere. A non-empty `error` implies this. |
+| `type` | `String` | `"text"` |  |  | The native input `type`: `'text'`, `'email'`, `'password'`, `'search'`, `'tel'` or `'url'`. Ignored when `multiline` is set. |
+| `placeholder` | `String` | `''` |  |  | Placeholder text shown while the field is empty. It is not a substitute for `label`: it disappears on input and many screen readers do not announce it. |
+| `name` | `String` | `''` |  |  | The native `name` attribute, used when the field sits in a plain HTML `<form>`. On Lit the control is in a shadow root, so it does not join the outer form; bind `modelValue` there. |
+| `autocomplete` | `String` | `''` |  |  | The native `autocomplete` hint (e.g. `'email'`, `'current-password'`, `'off'`). Empty leaves the browser default. |
+| `required` | `Boolean` | `false` |  |  | Mark the field required: sets the native `required` attribute (announced by screen readers) and shows a `*` after the label. The marker is `aria-hidden` so it is not read twice. |
+| `disabled` | `Boolean` | `false` |  |  | Disable the control. Also sets the Angular `ControlValueAccessor` disabled state. |
+| `readonly` | `Boolean` | `false` |  |  | Make the control read-only: the text is shown, focusable and selectable but cannot be edited. |
+| `maxLength` | `Number` | `null` |  |  | Maximum number of characters, forwarded as the native `maxlength`. `null` (the default) means no limit. With `showCount`, the counter reads `n / maxLength`. |
+| `showCount` | `Boolean` | `false` |  |  | Show a character counter under the control (`n / maxLength`, or just `n` without a limit). The counter is linked through `aria-describedby`; it is not a live region, so it does not interrupt typing. |
+| `multiline` | `Boolean` | `false` |  |  | Render a `<textarea>` instead of an `<input>`. |
+| `rows` | `Number` | `3` |  |  | Visible rows of a `multiline` field (the native `rows`). With `autosize` it is the minimum height. |
+| `autosize` | `Boolean` | `false` |  |  | Grow a `multiline` field to fit its content, from `rows` up to `maxRows`. It re-measures on input, on programmatic `modelValue` changes and when the field width changes. |
+| `maxRows` | `Number` | `null` |  |  | The tallest an `autosize` field grows, in rows; past it the textarea scrolls. `null` (the default) means no cap. |
+| `ariaLabel` | `String` | `null` |  |  | Accessible name for the control (`aria-label`) when there is no visible `label`. |
+| `idBase` | `String` | `''` |  |  | Id base for the control and its text: the control is `idBase + '-input'`, and the description, error and counter are `-description`, `-error` and `-count`. Leave it empty (the default) and each instance generates a unique base after mount (`rozie-text-field-<n>`); set it when you need stable ids, for example to point an external element at the control. Named `idBase` (not `id`) to avoid shadowing `HTMLElement.id` on the Lit custom element. |
 
 ## Events
 

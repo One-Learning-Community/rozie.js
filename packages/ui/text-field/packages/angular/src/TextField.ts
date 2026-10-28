@@ -289,10 +289,21 @@ export class TextField {
   }
 
   ngAfterViewInit() {
-    if (!this.idBase()) this.autoId.set('rozie-text-field-' + this.nextAutoId());
+    this.unmounted = false;
+    // Generated even when idBase is set, so clearing idBase later still leaves
+    // this instance its own ids.
+    // Generated even when idBase is set, so clearing idBase later still leaves
+    // this instance its own ids.
+    this.autoId.set('rozie-text-field-' + this.nextAutoId());
     this.fit();
+    const el: any = this.control();
+    this.resetForm = el && el.form ? el.form : null;
+    if (this.resetForm) this.resetForm.addEventListener('reset', this.onFormReset);
     this.__rozieDestroyRef.onDestroy(() => {
+      this.unmounted = true;
       this.observeWidth(null);
+      if (this.resetForm) this.resetForm.removeEventListener('reset', this.onFormReset);
+      this.resetForm = null;
     });
   }
 
@@ -302,6 +313,10 @@ export class TextField {
   // Whether fit() has written an inline height, so turning `autosize` off can
   // remove it (and never touches a height the user set with the resize grip).
   autosized = false;
+  // Set by the unmount cleanup, so a re-fit still pending then does nothing (on
+  // Lit, Angular and Solid the element refs outlive the unmount).
+  unmounted = false;
+  resetForm: any = null;
   // The page-wide id counter (the same four lines as Combobox / Listbox / Popover).
   nextAutoId = () => {
     const n = (Number(Reflect.get(globalThis, '__rozieAutoId')) || 0) + 1;
@@ -344,6 +359,9 @@ export class TextField {
   // A width change re-wraps the text, so an autosized textarea is observed and
   // re-measured. Only a WIDTH change counts: our own height write must not loop
   // the observer. Re-targets when the textarea is (re)mounted by `multiline`.
+  // The re-fit waits for the next frame: changing the observed element's height
+  // inside the callback is the "ResizeObserver loop completed with undelivered
+  // notifications" error.
   observeWidth = (el: any) => {
     if (el === this.observedEl) return;
     if (this.widthObserver) this.widthObserver.disconnect();
@@ -355,11 +373,12 @@ export class TextField {
       const w = entries[0] ? entries[0].contentRect.width : -1;
       if (w === this.lastWidth) return;
       this.lastWidth = w;
-      this.fit();
+      requestAnimationFrame(() => this.fit());
     });
     this.widthObserver.observe(el);
   };
   fit = () => {
+    if (this.unmounted) return;
     const el = this.multiline() ? this.textareaEl()?.nativeElement : null;
     if (!el || !this.autosize()) {
       this.observeWidth(null);
@@ -380,6 +399,7 @@ export class TextField {
     setTimeout(() => this.fit(), 0);
   };
   // ---- handlers --------------------------------------------------------------
+  control = () => this.multiline() ? this.textareaEl()?.nativeElement : this.inputEl()?.nativeElement;
   // Named commitText, NOT writeValue (the generated Angular CVA method).
   commitText = (text: any) => {
     this.modelValue.set(text), this.__rozieCvaOnChange(text);
@@ -398,15 +418,32 @@ export class TextField {
       value: e && e.target ? e.target.value : this.currentText()
     });
   };
+  // Enter that confirms an IME composition is not a commit. React's synthetic
+  // event has no `isComposing`, so read the native event; Safari reports the
+  // confirming Enter with keyCode 229 and `isComposing` false.
   onKeydown = (e: any) => {
-    if (!e || e.key !== 'Enter' || e.isComposing) return;
+    if (!e || e.key !== 'Enter' || e.repeat) return;
+    const ne = e.nativeEvent ?? e;
+    if (ne.isComposing || ne.keyCode === 229) return;
     this.enter.emit({
       value: e.target ? e.target.value : this.currentText()
     });
   };
   // ---- lifecycle -------------------------------------------------------------
+  // A form reset puts the control back to its default value without an input
+  // event. Vue, Svelte, Angular and Solid set the value as a property only, so
+  // the control empties while modelValue (and the counter, the autosize height,
+  // an Angular FormControl) keep the old text. The reset event fires before the
+  // reset, so the control is read a task later.
+  onFormReset = () => {
+    setTimeout(() => {
+      if (this.unmounted) return;
+      const el: any = this.control();
+      if (el && el.value !== this.currentText()) this.commitText(el.value);
+      this.fit();
+    }, 0);
+  };
   // ---- imperative handle -----------------------------------------------------
-  control = () => this.multiline() ? this.textareaEl()?.nativeElement : this.inputEl()?.nativeElement;
   // focus() deliberately overrides HTMLElement.focus on Lit (ROZ137, accepted).
   focus: () => void = () => {
     const el = this.control();

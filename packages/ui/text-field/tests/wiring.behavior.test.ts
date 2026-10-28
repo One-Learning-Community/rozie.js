@@ -22,10 +22,16 @@ interface Mounted {
   props: Ref<Record<string, unknown>>;
 }
 
-async function mount(initial: Record<string, unknown> = {}, slots: Record<string, () => unknown> = {}): Promise<Mounted> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  hosts.push(host);
+async function mount(
+  initial: Record<string, unknown> = {},
+  slots: Record<string, () => unknown> = {},
+  hostTag: 'div' | 'form' = 'div',
+): Promise<Mounted> {
+  // A form host sits in a wrapper: happy-dom's HTMLFormElement.remove() throws.
+  const wrapper = document.createElement('div');
+  const host = hostTag === 'div' ? wrapper : wrapper.appendChild(document.createElement(hostTag));
+  document.body.appendChild(wrapper);
+  hosts.push(wrapper);
   const model = ref('');
   const props = ref<Record<string, unknown>>(initial);
   const events: { name: string; payload: unknown }[] = [];
@@ -65,6 +71,16 @@ describe('TextField labelling', () => {
     const a = control((await mount({ label: 'A' })).host);
     const b = control((await mount({ label: 'B' })).host);
     expect(a.id).not.toBe(b.id);
+  });
+
+  it('keeps distinct ids when idBase is cleared after mount', async () => {
+    const a = await mount({ idBase: 'fixed' });
+    const b = await mount({ idBase: 'fixed' });
+    a.props.value = { idBase: '' };
+    b.props.value = { idBase: '' };
+    await nextTick();
+    expect(control(a.host).id).toMatch(/^rozie-text-field-\d+-input$/);
+    expect(control(a.host).id).not.toBe(control(b.host).id);
   });
 
   it('uses idBase for stable ids', async () => {
@@ -172,9 +188,28 @@ describe('TextField value, events and counter', () => {
     const input = control(m.host);
     input.value = 'go';
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true }));
+    // Safari's composition-confirming Enter: isComposing false, keyCode 229.
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 229 }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', repeat: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     expect(m.events).toEqual([{ name: 'enter', payload: { value: 'go' } }]);
+  });
+
+  it('follows a form reset: the model takes the reset value', async () => {
+    const m = await mount({ name: 'note' }, {}, 'form');
+    const input = control(m.host);
+    input.value = 'draft';
+    input.dispatchEvent(new Event('input'));
+    await nextTick();
+    expect(m.model.value).toBe('draft');
+    // What form.reset() does to a control whose value was set as a property
+    // (happy-dom's reset() does not): it empties it, with no input event.
+    m.host.dispatchEvent(new Event('reset'));
+    input.value = '';
+    await new Promise((r) => setTimeout(r, 0));
+    await nextTick();
+    expect(m.model.value).toBe('');
   });
 
   it('counts characters against maxLength and forwards maxlength', async () => {

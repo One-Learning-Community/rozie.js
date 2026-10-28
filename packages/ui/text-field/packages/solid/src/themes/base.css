@@ -15,7 +15,23 @@
  * themes/bootstrap.css for design-system bridges.
  *
  * WHERE THE DEFAULTS SIT. This file declares no public token that could shadow yours. Each
- * default is the FALLBACK of a private wiring line on the document root, under `:where(:root) {
+ * default is the FALLBACK of a private wiring line on the document root, under `:where(:root)`
+ * (zero specificity): `--rtf-x: var(--rozie-text-field-x, <default>)`. The component reads every token
+ * public-first, `var(--rozie-text-field-x, var(--rtf-x, <inline default>))`, so a value set on ANY
+ * ancestor (`:root`, `.dark`, a wrapper) or on the component itself wins by plain inheritance,
+ * in any import order, on all six targets (Lit included: custom properties inherit into its
+ * shadow root). A value an element declares for itself always beats one it would inherit,
+ * which is why nothing on the way to the component may declare a public token.
+ * The lines that say `inherit` / `initial` stay plain declarations: at the root such a value
+ * is "unset", so the component's own fallback applies, and it never shadows an ancestor.
+ * A design-system bridge (themes/shadcn.css, material.css, bootstrap.css) re-declares only the
+ * wiring of the tokens it maps, with the design system's variable as the fallback, on the
+ * component (`.rozie-text-field` and the Lit host `rozie-text-field`) — so that variable is resolved AT the
+ * component and follows the nearest theme scope — and on `:root`, the copy a Lit component
+ * nested in another shadow root (out of reach of every document selector) inherits. The
+ * `--rtf-*` names are internal: not a stable API.
+ */
+:where(:root) {
   /* field column */
   --rtf-width: var(--rozie-text-field-width, 100%);
   --rtf-gap: var(--rozie-text-field-gap, 0.375rem);
