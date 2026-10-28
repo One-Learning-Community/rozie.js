@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-lit
 
+## 0.7.4
+
+### Patch Changes
+
+- 05cb9db: Regenerated with the Lit nullable model prop typing fix: the two-way `grouping` property is now typed `any[] | null` (its default is `null`, so the narrower `any[]` was never true), which a strict TypeScript consumer reading `element.grouping` now sees. Rendered markup and runtime behaviour are unchanged.
+  - @rozie/runtime-lit@0.10.1
+
 ## 0.7.3
 
 ### Patch Changes

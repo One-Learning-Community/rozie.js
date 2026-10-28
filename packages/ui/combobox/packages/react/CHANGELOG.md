@@ -1,5 +1,13 @@
 # @rozie-ui/combobox-react
 
+## 0.8.3
+
+### Patch Changes
+
+- b52bd14: Regenerated with the React `@change` fix: the combobox text input and the data-table date editor attach the DOM `change` event through their `ref` instead of React's per-keystroke `onChange`. Both components already stopped or ignored that event, so behaviour is unchanged.
+- Updated dependencies [b52bd14]
+  - @rozie/runtime-react@0.10.1
+
 ## 0.8.2
 
 ### Patch Changes

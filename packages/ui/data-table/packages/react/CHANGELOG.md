@@ -1,5 +1,14 @@
 # @rozie-ui/data-table-react
 
+## 0.7.4
+
+### Patch Changes
+
+- b52bd14: Regenerated with the React `@change` fix: the combobox text input and the data-table date editor attach the DOM `change` event through their `ref` instead of React's per-keystroke `onChange`. Both components already stopped or ignored that event, so behaviour is unchanged.
+- 05cb9db: Regenerated with the React keyed-loop fix: the detail row no longer repeats the row key that its enclosing `Fragment` already carries, so two siblings no longer share one key. Rendered markup is unchanged.
+- Updated dependencies [b52bd14]
+  - @rozie/runtime-react@0.10.1
+
 ## 0.7.3
 
 ### Patch Changes
