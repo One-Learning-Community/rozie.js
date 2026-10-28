@@ -7,7 +7,7 @@
 "@rozie-ui/text-field-lit": patch
 ---
 
-New family: `@rozie-ui/text-field`, an accessible text field and textarea. `TextField` renders a label, the control, an optional description and an error message, and wires `for` / `id`, `aria-describedby`, `aria-invalid` and `aria-errormessage` between them on every target, including inside the Lit shadow root.
+New family: `@rozie-ui/text-field`, an accessible text field and textarea. `TextField` renders a label, the control, an optional description and an error message, and wires `for` / `id`, `aria-describedby` and `aria-invalid` between them on every target, including inside the Lit shadow root.
 
 - Two-way `modelValue` with an uncontrolled fallback; on Angular it is a `ControlValueAccessor`, so the field works with `ngModel` and reactive forms.
 - `multiline` renders a `<textarea>` with `rows`, and `autosize` grows it with its content up to `maxRows`.
