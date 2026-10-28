@@ -1,12 +1,5 @@
 # @rozie-ui/command-palette-vue
 
-## 0.5.3
-
-### Patch Changes
-
-- a2053e1: Regenerated with the Vue string-ARIA fix: a nullable value bound to a string ARIA attribute (for example `aria-label`) on an HTML element is emitted with an `undefined` fallback, so a strict TypeScript consumer compiling the component's `.vue` source typechecks. Rendered markup is unchanged.
-  - @rozie/runtime-vue@0.10.1
-
 ## 0.5.2
 
 ### Patch Changes

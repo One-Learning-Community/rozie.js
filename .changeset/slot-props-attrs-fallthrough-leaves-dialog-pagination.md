@@ -1,0 +1,6 @@
+---
+"@rozie-ui/dialog-react": patch
+"@rozie-ui/pagination-react": patch
+---
+
+React and Solid: slot props passed to the component are no longer part of the attribute pass-through spread onto its root element. On Solid a slot render function passed as `<name>Slot` (or a `slots` record) was written to the DOM as an attribute holding the function source; on React the slot members (`render<Name>`, `children`, `slots`) were left in the rest bucket. Regenerated with the compiler fix; no API change.

@@ -1,12 +1,5 @@
 # @rozie/babel-plugin
 
-## 0.10.1
-
-### Patch Changes
-
-- Updated dependencies [a2053e1]
-  - @rozie/core@0.10.1
-
 ## 0.10.0
 
 ### Patch Changes
