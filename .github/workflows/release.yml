@@ -382,6 +382,14 @@ name: Release (early subset)
 #   - The "dialog, … pagination, …" lists in the 2026-09-26 and 2026-08 notes above are the
 #     historical record and keep what was true when they were written.
 #
+# 2026-10 text-field DEBUT (all six targets, first publish):
+#   - 6 @rozie-ui text-field leaves: text-field-{react,vue,solid,lit,svelte,angular}, debut at a
+#     PATCH via `.changeset/text-field-debut.md` (0.1.0 -> 0.1.1, the select debut precedent).
+#     None is in `.changeset/config.json`'s `ignore` list. Each carries @rozie/runtime-<fw>; no
+#     @rozie-ui workspace peer, so the only ordering is "after the toolchain build". The React
+#     leaf imports `rozieNativeListeners`, new in @rozie/runtime-react 0.10.1, which the
+#     "Publish toolchain" step publishes before any leaf.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
 # above is not release-verified. What is still held back is exactly what `.changeset/config.json`
 # lists under `ignore` (the lexical family, plus the React/Vue/Svelte/Lit/Angular targets of
@@ -895,6 +903,20 @@ jobs:
           --filter=@rozie-ui/pagination-angular
           build
 
+      # Build all six text-field leaves into their compiled dist/ drop-in (2026-10 debut). Same
+      # toolchain mix and ordering as the pagination step above: AFTER the toolchain build, no
+      # @rozie-ui workspace peer.
+      - name: Build text-field leaves
+        run: >
+          pnpm
+          --filter=@rozie-ui/text-field-react
+          --filter=@rozie-ui/text-field-vue
+          --filter=@rozie-ui/text-field-solid
+          --filter=@rozie-ui/text-field-lit
+          --filter=@rozie-ui/text-field-svelte
+          --filter=@rozie-ui/text-field-angular
+          build
+
       # Build all six popover leaves into their compiled dist/ drop-in. Mixed per-target
       # toolchain (react/solid/lit tsdown, vue Vite lib + vue-tsc, svelte @sveltejs/package,
       # angular ng-packagr APF). Sits AFTER the toolchain build so the local @rozie/runtime-*
@@ -1167,6 +1189,12 @@ jobs:
           --filter @rozie-ui/select-lit
           --filter @rozie-ui/select-svelte
           --filter @rozie-ui/select-angular
+          --filter @rozie-ui/text-field-react
+          --filter @rozie-ui/text-field-vue
+          --filter @rozie-ui/text-field-solid
+          --filter @rozie-ui/text-field-lit
+          --filter @rozie-ui/text-field-svelte
+          --filter @rozie-ui/text-field-angular
 
       # Then the 11 Vue leaves. They carry zero @rozie/* deps so they don't
       # actually depend on the step above — ordering just keeps the log readable.
@@ -1735,6 +1763,22 @@ jobs:
           --filter=@rozie-ui/pagination-lit
           --filter=@rozie-ui/pagination-svelte
           --filter=@rozie-ui/pagination-angular
+          publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      # All six text-field leaves (2026-10 DEBUT). Same shape and rationale as the pagination step
+      # above.
+      - name: Publish text-field leaves (@rozie-ui/*)
+        run: >
+          pnpm
+          --filter=@rozie-ui/text-field-react
+          --filter=@rozie-ui/text-field-vue
+          --filter=@rozie-ui/text-field-solid
+          --filter=@rozie-ui/text-field-lit
+          --filter=@rozie-ui/text-field-svelte
+          --filter=@rozie-ui/text-field-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -52,13 +52,7 @@
     "@rozie-ui/switch-vue",
     "@rozie-ui/switch-svelte",
     "@rozie-ui/switch-lit",
-    "@rozie-ui/switch-angular",
-    "@rozie-ui/text-field-react",
-    "@rozie-ui/text-field-vue",
-    "@rozie-ui/text-field-svelte",
-    "@rozie-ui/text-field-lit",
-    "@rozie-ui/text-field-angular",
-    "@rozie-ui/text-field-solid"
+    "@rozie-ui/switch-angular"
   ],
   "privatePackages": { "version": false, "tag": false },
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
