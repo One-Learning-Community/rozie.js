@@ -23,10 +23,10 @@ import { NumberField } from '@rozie-ui/number-field-angular';
   standalone: true,
   imports: [NumberField],
   template: `
-    <NumberField [(modelValue)]="qty" [min]="0" [max]="10" [step]="1" ariaLabel="Quantity" (change)="onChange($event)" />
+    <rozie-number-field [(modelValue)]="qty" [min]="0" [max]="10" [step]="1" ariaLabel="Quantity" (change)="onChange($event)" />
 
     <!-- Locale-aware currency -->
-    <NumberField [(modelValue)]="qty" [min]="0" [step]="0.01" [formatOptions]="currency" ariaLabel="Price" />
+    <rozie-number-field [(modelValue)]="qty" [min]="0" [step]="0.01" [formatOptions]="currency" ariaLabel="Price" />
   `,
 })
 export class DemoComponent {
@@ -61,7 +61,7 @@ import { NumberField } from '@rozie-ui/number-field-angular';
   imports: [NumberField, ReactiveFormsModule],
   template: `
     <!-- The number field value IS the form control value -->
-    <NumberField [formControl]="qty" [min]="0" [max]="10" ariaLabel="Quantity" />
+    <rozie-number-field [formControl]="qty" [min]="0" [max]="10" ariaLabel="Quantity" />
   `,
 })
 export class NumberFormComponent {
@@ -69,7 +69,7 @@ export class NumberFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <NumberField [(ngModel)]="qty" name="qty" [min]="0" [max]="10" />
+//   <rozie-number-field [(ngModel)]="qty" name="qty" [min]="0" [max]="10" />
 ```
 
 ## Props

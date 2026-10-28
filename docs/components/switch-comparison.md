@@ -17,7 +17,7 @@ A checkbox with `role="switch"` is the usual platform starting point, but the ba
 | **React** — `@radix-ui/react-switch`, `@base-ui/switch`, `@ark-ui/react` Switch, or a hand-rolled `<button role="switch">` + state | One `<Switch>` with `modelValue` / `onModelValueChange`, a typed `SwitchHandle`, a scoped render slot, and the `--rozie-switch-*` token skin. |
 | **Vue** — `@ark-ui/vue` Switch, `@headlessui/vue` Switch, or a custom `v-model` wrapper | `<Switch v-model:modelValue="on" ariaLabel="…">` — idiomatic `v-model`, `@change`, a template-ref handle, and a `#default` scoped slot. |
 | **Svelte** — `bits-ui` / `melt-ui` Switch, or a `bind:checked` + reactive class | `<Switch bind:modelValue={on} />` with Svelte 5 runes; `onchange`; `bind:this` for the handle. |
-| **Angular** — Material `mat-slide-toggle`, a custom `ControlValueAccessor` directive, or `@ng-bootstrap` switch | `<Switch [(modelValue)]>` that **is** a `ControlValueAccessor` out of the box — `[formControl]` / `[(ngModel)]` bind directly. |
+| **Angular** — Material `mat-slide-toggle`, a custom `ControlValueAccessor` directive, or `@ng-bootstrap` switch | `<rozie-switch [(modelValue)]>` that **is** a `ControlValueAccessor` out of the box — `[formControl]` / `[(ngModel)]` bind directly. |
 | **Solid** — `@ark-ui/solid` Switch, `@kobalte/core` Switch, or a `createSignal` + `<button role="switch">` | `<Switch modelValue={on()} onModelValueChange={setOn} />` with a ref-callback handle. |
 | **Lit** — a hand-written custom element wrapping a toggle | `<rozie-switch>` with a reactive `modelValue` property and `model-value-change` / `change` events. |
 

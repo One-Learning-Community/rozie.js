@@ -104,10 +104,10 @@ import { NumberField } from '@rozie-ui/number-field-angular';
   standalone: true,
   imports: [NumberField],
   template: `
-    <NumberField [(modelValue)]="qty" [min]="0" [max]="10" [step]="1" ariaLabel="Quantity" (change)="onChange($event)" />
+    <rozie-number-field [(modelValue)]="qty" [min]="0" [max]="10" [step]="1" ariaLabel="Quantity" (change)="onChange($event)" />
 
     <!-- Locale-aware currency -->
-    <NumberField [(modelValue)]="qty" [min]="0" [step]="0.01" [formatOptions]="currency" ariaLabel="Price" />
+    <rozie-number-field [(modelValue)]="qty" [min]="0" [step]="0.01" [formatOptions]="currency" ariaLabel="Price" />
   `,
 })
 export class DemoComponent {

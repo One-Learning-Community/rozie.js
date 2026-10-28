@@ -77,7 +77,7 @@ import { Switch } from '@rozie-ui/switch-angular';
   standalone: true,
   imports: [Switch],
   template: `
-    <Switch [(modelValue)]="on" ariaLabel="Wi-Fi" (change)="onChange($event)" />
+    <rozie-switch [(modelValue)]="on" ariaLabel="Wi-Fi" (change)="onChange($event)" />
   `,
 })
 export class DemoComponent {

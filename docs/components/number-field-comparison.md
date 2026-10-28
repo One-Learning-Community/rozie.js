@@ -17,7 +17,7 @@ The platform `<input type="number">` is the usual starting point, but it is famo
 | **React** — `react-number-format`, `@base-ui/number-field`, `@ark-ui/react` NumberInput, or a hand-rolled `<input>` + clamp/format effects | One `<NumberField>` with `modelValue` / `onModelValueChange`, a typed `NumberFieldHandle`, and the `--rozie-number-field-*` token skin. |
 | **Vue** — `@ark-ui/vue` NumberInput, `@vueform/vueform` number field, or a custom `v-model` wrapper around `<input type="number">` | `<NumberField v-model:modelValue="qty" :min :max :step>` — idiomatic `v-model`, `@change`, and a template-ref handle. |
 | **Svelte** — `bits-ui` / `melt-ui` NumberField, or a `bind:value` + reactive clamp | `<NumberField bind:modelValue={qty} />` with Svelte 5 runes; `onchange`; `bind:this` for the handle. |
-| **Angular** — a custom `ControlValueAccessor` directive over `<input type="number">`, or `@ng-bootstrap` / Material `matInput type="number"` | `<NumberField [(modelValue)]>` that **is** a `ControlValueAccessor` out of the box — `[formControl]` / `[(ngModel)]` bind directly. |
+| **Angular** — a custom `ControlValueAccessor` directive over `<input type="number">`, or `@ng-bootstrap` / Material `matInput type="number"` | `<rozie-number-field [(modelValue)]>` that **is** a `ControlValueAccessor` out of the box — `[formControl]` / `[(ngModel)]` bind directly. |
 | **Solid** — `@ark-ui/solid` NumberInput, or a `createSignal` + effect-driven `<input>` | `<NumberField modelValue={qty()} onModelValueChange={setQty} />` with a ref-callback handle. |
 | **Lit** — a hand-written custom element wrapping `<input type="number">` | `<rozie-number-field>` with reactive `modelValue`/`min`/`max`/`step` properties and `model-value-change` / `change` events. |
 

@@ -23,7 +23,7 @@ import { Switch } from '@rozie-ui/switch-angular';
   standalone: true,
   imports: [Switch],
   template: `
-    <Switch [(modelValue)]="on" ariaLabel="Wi-Fi" (change)="onChange($event)" />
+    <rozie-switch [(modelValue)]="on" ariaLabel="Wi-Fi" (change)="onChange($event)" />
   `,
 })
 export class DemoComponent {
@@ -57,7 +57,7 @@ import { Switch } from '@rozie-ui/switch-angular';
   imports: [Switch, ReactiveFormsModule],
   template: `
     <!-- The switch state IS the form control value -->
-    <Switch [formControl]="enabled" ariaLabel="Notifications" />
+    <rozie-switch [formControl]="enabled" ariaLabel="Notifications" />
   `,
 })
 export class SwitchFormComponent {
@@ -65,7 +65,7 @@ export class SwitchFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Switch [(ngModel)]="enabled" name="enabled" />
+//   <rozie-switch [(ngModel)]="enabled" name="enabled" />
 ```
 
 ## Props
