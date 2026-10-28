@@ -54,3 +54,19 @@ describe('rozieNativeListeners', () => {
     expect(order).toEqual(['capture', 'target']);
   });
 });
+
+describe('rozieNativeListeners once', () => {
+  it('fires a once listener a single time, across re-renders', () => {
+    const el = document.createElement('input');
+    const handler = vi.fn();
+    const r1 = rozieNativeListeners<HTMLInputElement>([['change', handler, { once: true }]]);
+    r1(el);
+    el.dispatchEvent(new Event('change'));
+    // A re-render detaches the old callback and attaches a fresh one.
+    const r2 = rozieNativeListeners<HTMLInputElement>([['change', handler, { once: true }]]);
+    r1(null);
+    r2(el);
+    el.dispatchEvent(new Event('change'));
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+});

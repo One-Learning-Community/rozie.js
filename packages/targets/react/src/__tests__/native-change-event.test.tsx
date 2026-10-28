@@ -26,12 +26,15 @@ const log = (what, e) => {
   const entry = what + ':' + e.target.value
   $data.commits = [...$data.commits, entry]
 }
+const keepBound = (el) => { globalThis.__rozieBoundRef = el }
 $onMount(() => { $data.mountedTag = $refs.field ? $refs.field.tagName : 'none' })
 </script>
 <template>
 <div>
 <input ref="field" class="plain" type="text" @change="log('plain', $event)" />
 <input class="model" r-model="$data.text" @change="log('model', $event)" />
+<input class="bound" :ref="keepBound" @change="log('bound', $event)" />
+<input class="once" @change.once="log('once', $event)" />
 <textarea class="area" @change.stop="log('area', $event)"></textarea>
 <input class="box" type="checkbox" @change="log('box', $event)" />
 <select class="sel" @change="log('sel', $event)"><option value="a">a</option><option value="b">b</option></select>
@@ -75,6 +78,28 @@ function commit(el: Element): void {
 }
 
 describe('React @change on text controls is the native change event', () => {
+  it('emits one ref per element', () => {
+    for (const tag of code.match(/<(input|textarea)\b[^>]*>/g)!) {
+      expect(tag.match(/\bref=/g)?.length ?? 0, tag).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('forwards a bound :ref', async () => {
+    const { q } = await mount();
+    expect((globalThis as { __rozieBoundRef?: Element }).__rozieBoundRef).toBe(q('.bound'));
+  });
+
+  it('.once fires a single time, even across re-renders', async () => {
+    const { q, commits } = await mount();
+    const once = q<HTMLInputElement>('.once');
+    type(once, 'a');
+    commit(once);
+    // The commit re-rendered (commits changed), re-attaching the listener.
+    type(once, 'ab');
+    commit(once);
+    expect(commits()).toBe('once:a');
+  });
+
   it('does not lower @change on a text input or textarea to onChange', () => {
     expect(code).not.toMatch(/className=\{"plain"\}[^>]*onChange/);
     expect(code).not.toMatch(/className=\{"area"\}[^>]*onChange/);

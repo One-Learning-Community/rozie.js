@@ -576,6 +576,12 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       nativeForwardRef = authorRef.value;
       workingAttrs = workingAttrs.filter((a) => a !== authorRef);
     }
+    // A bound `:ref` (a callback or ref object) is forwarded the same way.
+    const boundRef = workingAttrs.find((a) => a.kind === 'binding' && a.name === 'ref');
+    if (nativeForwardRef === null && boundRef && boundRef.kind === 'binding') {
+      nativeForwardRef = rewriteTemplateExpression(boundRef.expression, ctx.ir);
+      workingAttrs = workingAttrs.filter((a) => a !== boundRef);
+    }
   }
 
   // Keyed-remount codegen Task 2 — a component-level `:key="expr"` (NOT
@@ -1199,7 +1205,7 @@ function isNativeChangeListener(ev: Listener, node: TemplateElementIR): boolean 
  * for the listeners `isNativeChangeListener` routed off JSX. Each handler is
  * the same arrow `emitTemplateEvent` builds for the JSX prop, so modifiers
  * (`.stop`, `.prevent`, key filters, debounce wraps) behave as before;
- * `.capture` becomes the listener's capture flag.
+ * `.capture`, `.passive` and `.once` become listener options.
  */
 function nativeListenerRefJsx(
   node: TemplateElementIR,
@@ -1214,14 +1220,21 @@ function nativeListenerRefJsx(
       registry: ctx.registry,
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
+      addEventListener: true,
     });
     if (result.scriptInjection !== null) ctx.scriptInjections.push(result.scriptInjection);
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{([\s\S]*)\}$/);
     const jsxName = match ? match[1]! : '';
     const body = match ? match[2]! : result.jsxAttr;
-    const capture = jsxName.endsWith('Capture') ? ', true' : '';
-    entries.push(`[${JSON.stringify(ev.event)}, ${body}${capture}]`);
+    const flags = [...(jsxName.endsWith('Capture') ? ['capture'] : []), ...result.listenerOptions];
+    const options =
+      flags.length === 0
+        ? ''
+        : flags.length === 1 && flags[0] === 'capture'
+          ? ', true'
+          : `, { ${flags.map((f) => `${f}: true`).join(', ')} }`;
+    entries.push(`[${JSON.stringify(ev.event)}, ${body}${options}]`);
   }
   ctx.collectors.runtime.add('rozieNativeListeners');
   const elType = node.tagName.toLowerCase() === 'textarea' ? 'HTMLTextAreaElement' : 'HTMLInputElement';

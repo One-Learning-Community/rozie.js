@@ -47,6 +47,11 @@ export interface EmitEventCtx {
   collectors: { react: ReactImportCollector; runtime: RuntimeReactImportCollector };
   /** Per-component counter for stable wrap-name suffixes. */
   injectionCounter: { next: number };
+  /**
+   * The listener is attached with `addEventListener` (`rozieNativeListeners`),
+   * so `.passive` / `.once` become listener options instead of a warning.
+   */
+  addEventListener?: boolean;
 }
 
 export interface EmitTemplateEventResult {
@@ -55,6 +60,8 @@ export interface EmitTemplateEventResult {
   /** Top-of-component-body lines (e.g., `const _rozieDebouncedSearch = ...`). */
   scriptInjection: string | null;
   diagnostics: Diagnostic[];
+  /** `.passive` / `.once` collected when `ctx.addEventListener` is set. */
+  listenerOptions: string[];
 }
 
 /**
@@ -324,6 +331,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const inlineGuards: string[] = []; // Code lines before handler invocation
   let scriptInjection: string | null = null;
   let handlerRef: string | null = null; // If a wrap is created, JSX uses this name
+  const listenerOptions: string[] = [];
 
   for (const entry of listener.modifierPipeline) {
     let modifierName: string;
@@ -363,6 +371,8 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       if (desc.token === 'capture') {
         // Append Capture suffix to JSX prop name: onClick → onClickCapture.
         jsxName = jsxName + 'Capture';
+      } else if (ctx.addEventListener) {
+        listenerOptions.push(desc.token);
       } else {
         // .passive / .once on JSX events have no native form; emit an info
         // diagnostic and skip (the JSX prop will fire normally without the
@@ -488,5 +498,6 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     jsxAttr: `${jsxName}={${handlerExpr}}`,
     scriptInjection,
     diagnostics,
+    listenerOptions,
   };
 }
