@@ -111,7 +111,7 @@ import { lineWrapping } from '@codemirror/view';
   standalone: true,
   imports: [CodeMirror],
   template: `
-    <CodeMirror
+    <rozie-code-mirror
       [(value)]="value"
       language="javascript"
       theme="dark"
@@ -289,11 +289,11 @@ Portal slots unlock the "foreign-engine cell rendering" pattern: CodeMirror owns
 **Angular** (content child `<ng-template>`):
 
 ```html
-<CodeMirror [(value)]="value">
+<rozie-code-mirror [(value)]="value">
   <ng-template #panel let-view="view">
     <span class="cm-status">Lines: {{ view.state.doc.lines }}</span>
   </ng-template>
-</CodeMirror>
+</rozie-code-mirror>
 ```
 
 **Lit** (slot bridge — pass the render callback as a property):

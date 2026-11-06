@@ -97,7 +97,7 @@ import { Captcha } from '@rozie-ui/captcha-angular';
   standalone: true,
   imports: [Captcha],
   template: `
-    <Captcha
+    <rozie-captcha
       provider="recaptcha"
       sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"
       [(token)]="token"
@@ -107,7 +107,8 @@ import { Captcha } from '@rozie-ui/captcha-angular';
 })
 export class DemoComponent {
   token = '';
-  onVerify(e: { token: string }) { console.log('verified', e.token); }
+  // The `verify` output is typed `unknown`; its payload is { token }.
+  onVerify(e: unknown) { console.log('verified', (e as { token: string }).token); }
 }
 ```
 

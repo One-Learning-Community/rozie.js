@@ -128,7 +128,7 @@ import { Chart } from '@rozie-ui/chartjs-angular';
   standalone: true,
   imports: [Chart],
   template: `
-    <Chart type="bar" [data]="data" [height]="280" (click)="onPick($event)" />
+    <rozie-chart type="bar" [data]="data" [height]="280" (click)="onPick($event)" />
   `,
 })
 export class DemoComponent {
@@ -136,7 +136,8 @@ export class DemoComponent {
     labels: ['Jan', 'Feb', 'Mar', 'Apr'],
     datasets: [{ label: 'Revenue', data: [12, 19, 8, 15] }],
   };
-  onPick(p: { elements: unknown[] }) { console.log(p.elements); }
+  // The `click` output is typed `unknown`; its payload is { elements }.
+  onPick(p: unknown) { console.log((p as { elements: unknown[] }).elements); }
 }
 ```
 
@@ -284,11 +285,11 @@ Each target fills `#tooltip` through its native imperative-render API:
 **Angular** (content child `<ng-template>`):
 
 ```html
-<Chart type="line" [data]="data">
+<rozie-chart type="line" [data]="data">
   <ng-template #tooltip let-model="model">
     <div class="my-tip"><strong>{{ model.title.join(' ') }}</strong></div>
   </ng-template>
-</Chart>
+</rozie-chart>
 ```
 
 **Solid** (render prop):

@@ -91,7 +91,7 @@ import { FullCalendar } from '@rozie-ui/fullcalendar-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [FullCalendar],
-  template: `<FullCalendar [(view)]="view" [events]="events" (eventClick)="onEventClick($event)" />`,
+  template: `<rozie-full-calendar [(view)]="view" [events]="events" (eventClick)="onEventClick($event)" />`,
 })
 export class DemoComponent {
   view = 'dayGridMonth';
@@ -281,11 +281,11 @@ Portal slots unlock the "foreign-engine cell rendering" pattern: FullCalendar ow
 **Angular** (content child `<ng-template>`):
 
 ```html
-<FullCalendar [(view)]="view" [events]="events">
+<rozie-full-calendar [(view)]="view" [events]="events">
   <ng-template #event let-arg="arg">
     <span class="fc-event-title">{{ arg.event.title }}</span>
   </ng-template>
-</FullCalendar>
+</rozie-full-calendar>
 ```
 
 **Lit** (slot bridge — pass the render callback as a property):
@@ -336,11 +336,11 @@ The **`dayCell` portal slot** (FullCalendar's `dayCellContent`) replaces a day-g
 **Angular** (content child `<ng-template>`):
 
 ```html
-<FullCalendar [(view)]="view" [events]="events">
+<rozie-full-calendar [(view)]="view" [events]="events">
   <ng-template #dayCell let-arg="arg">
     <span class="my-day">{{ arg.dayNumberText }}</span>
   </ng-template>
-</FullCalendar>
+</rozie-full-calendar>
 ```
 
 **Lit** (property bridge):

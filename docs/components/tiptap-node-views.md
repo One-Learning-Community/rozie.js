@@ -93,11 +93,11 @@ The `nodeView` slot uses the same native imperative-render API as every other po
 **Angular** (content child `<ng-template>`):
 
 ```html
-<TipTap [(html)]="html">
+<rozie-tip-tap [(html)]="html">
   <ng-template #nodeView let-node="node" let-selected="selected">
     <span [attr.data-selected]="selected">{{ node.attrs.label }}</span>
   </ng-template>
-</TipTap>
+</rozie-tip-tap>
 ```
 
 **Lit** (slot bridge — pass the render callback as a property):

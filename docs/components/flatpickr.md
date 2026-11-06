@@ -84,12 +84,14 @@ import 'flatpickr/dist/flatpickr.css';
   selector: 'app-demo',
   standalone: true,
   imports: [Flatpickr],
-  template: `<Flatpickr [(date)]="date" (change)="onChange($event)" />`,
+  template: `<rozie-flatpickr [(date)]="date" (change)="onChange($event)" />`,
 })
 export class DemoComponent {
   date = '2026-05-17';
-  onChange(e: { value: string; selectedDates: Date[] }) {
-    console.log(e.value, e.selectedDates);
+  // The `change` output is typed `unknown`; its payload is { value, selectedDates }.
+  onChange(e: unknown) {
+    const { value, selectedDates } = e as { value: string; selectedDates: Date[] };
+    console.log(value, selectedDates);
   }
 }
 ```

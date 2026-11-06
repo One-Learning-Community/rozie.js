@@ -91,7 +91,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   standalone: true,
   imports: [TipTap, FormsModule],
   template: `
-    <TipTap [(html)]="html" placeholder="Start writing…" />
+    <rozie-tip-tap [(html)]="html" placeholder="Start writing…" />
   `,
 })
 export class DemoComponent {
@@ -315,11 +315,11 @@ Each target fills `#toolbar` through its native imperative-render API:
 **Angular** (content child `<ng-template>`):
 
 ```html
-<TipTap [(html)]="html">
+<rozie-tip-tap [(html)]="html">
   <ng-template #toolbar let-editor="editor">
     <button (click)="editor.chain().focus().toggleBold().run()">Bold</button>
   </ng-template>
-</TipTap>
+</rozie-tip-tap>
 ```
 
 **Lit** (slot bridge — pass the render callback as a property):
