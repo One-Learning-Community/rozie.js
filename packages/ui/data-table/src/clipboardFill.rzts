@@ -12,6 +12,7 @@
 // Re-exported unchanged from this partial's trailing export list (DataTable.rozie imports
 // them from HERE, not from the helper module directly).
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid'
+import { rangeFillTargets } from './helpers/rangeFill'
 
 // announce(msg): write the polite aria-live PASTE-announce region (D-03 — "N of M cells
 // pasted"). SEPARATE from the validation invalidMsg region (different semantics). '' clears it.
@@ -396,4 +397,23 @@ const fillRange = (sourceBox, endCell) => {
   applyGridToRange(grid, box.r0, box.c0, 'filled')
 }
 
-export { announce, clipboardActiveAllowed, clipboardWriteAvailable, clipboardReadAvailable, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange }
+
+// ══ Range fill (Ctrl/Cmd+Enter from an editor; Space on a checkbox range) ════════════════
+// rangeSize(): how many cells a range fill would write — the range's rows in the ACTIVE
+// cell's column, or 1 with no range. Exposed to editor slots as `rangeSize` so a custom
+// editor can say "Apply to 24 cells".
+const fillTargets = () => rangeFillTargets(normalizedRange(), $data.activeRow, $data.activeColIndex)
+const rangeSize = () => ($data.activeIsHeader ? 1 : fillTargets().size)
+
+// fillActiveColumn(value): write ONE value down the active cell's column for every row of the
+// range, through the same funnel as paste and fill (skip rule, one undo step, one
+// cell-edit-commit per changed cell, "N of M cells updated"). The value is written AS IS — a
+// one-column grid of the same value, never stringified — so an array or object survives.
+const fillActiveColumn = (value) => {
+  const t = fillTargets()
+  const grid = []
+  for (let i = 0; i < t.size; i++) grid.push([value])
+  return applyGridToRange(grid, t.top, t.col, 'updated')
+}
+
+export { rangeSize, fillActiveColumn, announce, clipboardActiveAllowed, clipboardWriteAvailable, clipboardReadAvailable, fieldOfColId, normalizedRange, escapeTsvField, rangeToTsv, parseTsv, copyRange, applyGridToRange, rowOriginalAt, rowIdAt, tileGridToBox, pasteRange, cutRange, clearActiveRange, tileIndex, fillRange }

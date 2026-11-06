@@ -10,6 +10,7 @@ import { columnRuleKeys } from './helpers/columnRuleUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { resolveFollow, sameIdSequence } from './helpers/activeFollow';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
+import { rangeFillTargets } from './helpers/rangeFill';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
 // Faceted filtering (phase 50 reqs 8-9, D-03). All three are supplied UNCONDITIONALLY
@@ -8000,6 +8001,25 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     grid.push(cols);
   }
   this.applyGridToRange(grid, box.r0, box.c0, 'filled');
+};
+
+  // ══ Range fill (Ctrl/Cmd+Enter from an editor; Space on a checkbox range) ════════════════
+  // rangeSize(): how many cells a range fill would write — the range's rows in the ACTIVE
+  // cell's column, or 1 with no range. Exposed to editor slots as `rangeSize` so a custom
+  // editor can say "Apply to 24 cells".
+  fillTargets = () => rangeFillTargets(this.normalizedRange(), this._activeRow.value, this._activeColIndex.value);
+
+  rangeSize = () => this._activeIsHeader.value ? 1 : this.fillTargets().size;
+
+  // fillActiveColumn(value): write ONE value down the active cell's column for every row of the
+  // range, through the same funnel as paste and fill (skip rule, one undo step, one
+  // cell-edit-commit per changed cell, "N of M cells updated"). The value is written AS IS — a
+  // one-column grid of the same value, never stringified — so an array or object survives.
+  fillActiveColumn = (value: any) => {
+  const t = this.fillTargets();
+  const grid = [];
+  for (let i = 0; i < t.size; i++) grid.push([value]);
+  return this.applyGridToRange(grid, t.top, t.col, 'updated');
 };
 
   // onFillHandlePointerDown: begin a fill-handle drag (req-8 / D-04). The handle sits on the
