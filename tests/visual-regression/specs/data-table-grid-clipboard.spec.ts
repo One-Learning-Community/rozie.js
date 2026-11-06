@@ -16,8 +16,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   B7  — fill-drag copies each SOURCE column's OWN value down its OWN column (not a single
  *         scalar broadcast); an UP drag reads the pre-drag origin row, not the post-drag
  *         box corner. (DATA LOSS pre-fix.)
- *   B8  — a filter-to-fewer-rows clamps the range corners to the new bounds, so a copy
- *         contains only in-bounds rows (no phantom/stale trailing row).
+ *   B8  — no phantom/stale rows after a shrink: a filter-to-fewer CLEARS the range (a view
+ *         change, per the 2026-11-06 design Part 3), and a page-size shrink (navigation)
+ *         clamps the range corners to the new bounds.
  *   B9  — paste coerces each TSV cell to its column type: a numeric column commits a Number,
  *         an empty pasted cell commits null (never a raw string).
  *   B10 — a cell containing a tab + newline + double-quote round-trips through copy→paste
@@ -275,28 +276,53 @@ for (const target of TARGETS) {
   });
 
   // ════════════════════════════════════════════════════════════════════════════════
-  // B8 — a filter-to-fewer-rows CLAMPS the range corners to the new bounds, so a copy can
-  //   never include phantom/stale rows past the shrunken model. Range = qty col rows 0..2;
-  //   filter 'Oslo' keeps rows 0 + 4 (qty 10 + 14) → a 2-row model (maxRow 1). Post-fix:
-  //   clampRange clamps focus row 2 → row 1 (corners '0,1-1,1'). Pre-fix: the corners are
-  //   left untouched at '0,1-2,1' (a phantom row 2 off the shrunken model). The range is
-  //   asserted via the getSelectedRange() verb (a grid re-focus would collapse the range,
-  //   so the data change is driven from the filter input and the corners read off the
-  //   persisted $data range, never re-entering the grid).
+  // B8 — no phantom rows after a filter-to-fewer. Select qty rows 0..2, then filter 'Oslo'
+  //   (keeps rows 0 + 4 → a 2-row model). Since the 2026-11-06 data-table design, Part 3 ("the
+  //   active cell follows its record": clear the range on any re-derive that changes row
+  //   membership or order — a rectangle cannot follow rows that are no longer adjacent), a
+  //   filter is a VIEW CHANGE, so the range is CLEARED rather than clamped: getSelectedRange()
+  //   is null, and a copy afterwards yields the single active cell — no phantom rows past the
+  //   shrunken model. (The filter input does not re-enter the grid, so @focusin never collapses
+  //   the range on its own — the clear is the re-derive's.) The corner CLAMP itself is still
+  //   proven below on a navigation shrink (page size), which keeps the range and clamps it.
   // ════════════════════════════════════════════════════════════════════════════════
-  runnerFor(target)(`data-table-grid-clipboard [${target}]: B8 range corners clamp on filter-to-fewer (no phantom rows)`, async ({ page }) => {
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: B8 filter-to-fewer clears the range (no phantom rows)`, async ({ page }) => {
     const mount = await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await focusBodyCellStable(page, 0, 1);
     await extendRangeBy(page, 'Down', 2, 2, 1); // range col1 rows 0..2 (focus row 2)
 
-    // Shrink the model to 2 rows (the range persists in $data — the filter input does not
-    // re-enter the grid, so @focusin never collapses it; refreshRowModel runs clampRange).
     await mount.getByTestId('global-filter').fill('Oslo');
     await expect
       .poll(async () => mount.getByTestId('grid-table').locator('tbody [role="row"]').count(), { timeout: 10_000 })
       .toBe(2);
 
-    // The range corners clamped into the 2-row model (focus row 2 → 1) — no phantom row.
+    // The range was cleared by the view change (spec Part 3) — no out-of-bounds corners.
+    await mount.getByTestId('get-range').click();
+    await expect.poll(async () => readoutText(page, 'selrange-readout'), { timeout: 10_000 }).toBe('null');
+
+    // A copy now yields only the active cell's value (row 0 qty = 10) — never the stale
+    // 3-row rectangle or a phantom row off the 2-row model.
+    await page.evaluate(() => navigator.clipboard.writeText('__sentinel__'));
+    await focusBodyCellStable(page, 0, 1);
+    await page.keyboard.press('Control+c');
+    await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText()), { timeout: 10_000 }).toBe('10');
+  });
+
+  // B8 (clamp) — a NAVIGATION shrink keeps the range and clamps its corners into the new
+  //   bounds. Select qty rows 0..2, then setRowsPerPage(2) → a 2-row page: the corners clamp
+  //   to '0,1-1,1' (focus row 2 → 1) — no corner past the shrunken page.
+  runnerFor(target)(`data-table-grid-clipboard [${target}]: B8 range corners clamp on a page-size shrink (no phantom rows)`, async ({ page }) => {
+    const mount = await gotoGrid(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await focusBodyCellStable(page, 0, 1);
+    await extendRangeBy(page, 'Down', 2, 2, 1); // range col1 rows 0..2 (focus row 2)
+
+    await mount.getByTestId('rows-per-page-2').click();
+    await expect
+      .poll(async () => mount.getByTestId('grid-table').locator('tbody [role="row"]').count(), { timeout: 10_000 })
+      .toBe(2);
+
     await mount.getByTestId('get-range').click();
     await expect.poll(async () => readoutText(page, 'selrange-readout'), { timeout: 10_000 }).toBe('0,1-1,1');
   });

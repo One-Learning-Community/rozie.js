@@ -8,7 +8,9 @@
           drag (DATA LOSS). Each source column must copy its OWN value down its OWN
           column; an up-drag must read the pre-drag origin row, not the post-drag corner.
     B8  — range corners never clamp on sort/filter/paginate → a copy includes stale /
-          phantom rows past the shrunken model.
+          phantom rows past the shrunken model. Since the 2026-11-06 design (Part 3) a
+          sort/filter view change CLEARS the range; the clamp is proven on a page-size
+          shrink (the `rows-per-page-2` button → setRowsPerPage(2)).
     B9  — paste stores raw TSV strings (no type coercion) → mixed types in the model.
     B10 — TSV copy/paste has no tab/newline/quote escaping → a cell containing a tab,
           newline, or quote corrupts/smears into adjacent cells.
@@ -120,6 +122,14 @@ const sortByQtyAsc = (): void => {
   $data.sorting = [{ id: 'qty', desc: false }]
 }
 
+// B8 (clamp proof, moved here by the 2026-11-06 design Part 3): shrink the page to 2 rows via the
+// setRowsPerPage() $expose verb — a NAVIGATION shrink, which still clamps the range corners
+// (a sort/filter view change now clears the range instead).
+const callRowsPerPage2 = (): void => {
+  const api = $refs.dt
+  if (api && api.setRowsPerPage) api.setRowsPerPage(2)
+}
+
 // C3 (Cut) — drive the cut() $expose verb off the live $refs.dt handle (the GridNavDemo idiom).
 // cut() reads the persisted $data range/active cell, so it cuts the current selection even though
 // the button click moved DOM focus off the grid. Exercises the exposeStateVerbs Cut path; the
@@ -138,6 +148,7 @@ const callCut = (): void => {
     <button type="button" data-testid="sort-qty" @click="sortByQtyAsc">sort qty ↑</button>
     <button type="button" data-testid="get-range" @click="callGetSelectedRange">getSelectedRange()</button>
     <button type="button" data-testid="cut-btn" @click="callCut">cut()</button>
+    <button type="button" data-testid="rows-per-page-2" @click="callRowsPerPage2">setRowsPerPage(2)</button>
     <button type="button" data-testid="toggle-throw-commit" @click="toggleThrowOnCommit">toggle throwing commit listener</button>
     <span class="readout" data-testid="throw-commit-state">{{ $data.throwOnCommit ? 'on' : 'off' }}</span>
     <input
