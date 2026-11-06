@@ -62,7 +62,7 @@ import { CodeMirror } from '@rozie-ui/codemirror-angular';
   standalone: true,
   imports: [CodeMirror],
   template: `
-    <CodeMirror [(value)]="value" language="javascript" theme="dark" />
+    <rozie-code-mirror [(value)]="value" language="javascript" theme="dark" />
   `,
 })
 export class DemoComponent {

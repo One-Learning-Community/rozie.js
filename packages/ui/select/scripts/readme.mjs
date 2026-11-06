@@ -154,11 +154,11 @@ import { Select } from '@rozie-ui/select-angular';
   standalone: true,
   imports: [Select],
   template: \`
-    <Select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
+    <rozie-select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
       <ng-template #option let-option="option" let-selected="selected">
         <span [class.selected]="selected">{{ option.label }}</span>
       </ng-template>
-    </Select>
+    </rozie-select>
   \`,
 })
 export class DemoComponent {
@@ -232,7 +232,7 @@ import { Select } from '@rozie-ui/select-angular';
   imports: [Select, ReactiveFormsModule],
   template: \`
     <!-- The chosen value IS the form control value -->
-    <Select [formControl]="fruit" [options]="options" />
+    <rozie-select [formControl]="fruit" [options]="options" />
   \`,
 })
 export class PickFormComponent {
@@ -241,7 +241,7 @@ export class PickFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Select [(ngModel)]="fruit" name="fruit" [options]="options" />`,
+//   <rozie-select [(ngModel)]="fruit" name="fruit" [options]="options" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -368,7 +368,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

@@ -80,7 +80,7 @@ import { Cropper } from '@rozie-ui/cropper-angular';
   standalone: true,
   imports: [Cropper],
   template: `
-    <Cropper
+    <rozie-cropper
       src="/photo.jpg"
       [(data)]="data"
       [aspectRatio]="16 / 9"

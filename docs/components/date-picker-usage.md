@@ -195,10 +195,10 @@ import { DatePicker } from '@rozie-ui/date-picker-angular';
   standalone: true,
   imports: [DatePicker],
   template: `
-    <DatePicker [(value)]="date" min="2026-01-01" (change)="onChange($event)" />
+    <rozie-date-picker [(value)]="date" min="2026-01-01" (change)="onChange($event)" />
 
     <!-- Range selection with quick-pick presets -->
-    <DatePicker
+    <rozie-date-picker
       selectionMode="range"
       [(value)]="range"
       [presetRanges]="presetRanges"
@@ -216,11 +216,12 @@ export class DemoComponent {
       return { start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) };
     } },
   ];
-  onChange(e: { value: string }) {
-    console.log('picked:', e.value);
+  // The `change` / `rangeComplete` outputs are typed `unknown`; their payload is { value }.
+  onChange(e: unknown) {
+    console.log('picked:', (e as { value: string }).value);
   }
-  onRange(e: { value: { start: string; end: string } }) {
-    console.log('range:', e.value);
+  onRange(e: unknown) {
+    console.log('range:', (e as { value: { start: string; end: string } }).value);
   }
 }
 ```

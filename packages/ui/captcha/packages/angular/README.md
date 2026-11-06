@@ -26,11 +26,12 @@ import { Captcha } from '@rozie-ui/captcha-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [Captcha],
-  template: `<Captcha provider="recaptcha" sitekey="your-site-key" [(token)]="token" (verify)="onVerify($event)" />`,
+  template: `<rozie-captcha provider="recaptcha" sitekey="your-site-key" [(token)]="token" (verify)="onVerify($event)" />`,
 })
 export class DemoComponent {
   token = '';
-  onVerify(e: { token: string }) { console.log('verified', e.token); }
+  // The `verify` output is typed `unknown`; its payload is { token }.
+  onVerify(e: unknown) { console.log('verified', (e as { token: string }).token); }
 }
 ```
 
@@ -47,7 +48,7 @@ import { Captcha } from '@rozie-ui/captcha-angular';
   selector: 'app-form',
   standalone: true,
   imports: [Captcha, ReactiveFormsModule],
-  template: "<Captcha [formControl]=\"ctrl\" />",
+  template: "<rozie-captcha sitekey=\"your-site-key\" [formControl]=\"ctrl\" />",
 })
 export class FormComponent {
   ctrl = new FormControl('');
@@ -106,7 +107,7 @@ import { RecaptchaV3 } from '@rozie-ui/captcha-angular';
   template: `
     <form (submit)="submit($event)">
       <!-- … fields … -->
-      <RecaptchaV3 sitekey="your-site-key" action="signup" />
+      <rozie-recaptcha-v3 sitekey="your-site-key" action="signup" />
       <button type="submit">Sign up</button>
     </form>
   `,
@@ -134,7 +135,7 @@ import { Captcha } from '@rozie-ui/captcha-angular';
   selector: 'app-form',
   standalone: true,
   imports: [Captcha, ReactiveFormsModule],
-  template: "<Captcha [formControl]=\"ctrl\" />",
+  template: "<rozie-captcha sitekey=\"your-site-key\" [formControl]=\"ctrl\" />",
 })
 export class FormComponent {
   ctrl = new FormControl('');

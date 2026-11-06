@@ -261,10 +261,10 @@ import { DatePicker } from '@rozie-ui/date-picker-angular';
   standalone: true,
   imports: [DatePicker],
   template: \`
-    <DatePicker [(value)]="date" min="2026-01-01" (change)="onChange($event)" />
+    <rozie-date-picker [(value)]="date" min="2026-01-01" (change)="onChange($event)" />
 
     <!-- Range selection with quick-pick presets -->
-    <DatePicker
+    <rozie-date-picker
       selectionMode="range"
       [(value)]="range"
       [presetRanges]="presetRanges"
@@ -282,11 +282,12 @@ export class DemoComponent {
       return { start: iso(new Date(Date.now() - 6 * 864e5)), end: iso(new Date()) };
     } },
   ];
-  onChange(e: { value: string }) {
-    console.log('picked:', e.value);
+  // The \`change\` / \`rangeComplete\` outputs are typed \`unknown\`; their payload is { value }.
+  onChange(e: unknown) {
+    console.log('picked:', (e as { value: string }).value);
   }
-  onRange(e: { value: { start: string; end: string } }) {
-    console.log('range:', e.value);
+  onRange(e: unknown) {
+    console.log('range:', (e as { value: { start: string; end: string } }).value);
   }
 }`,
   },
@@ -392,7 +393,7 @@ import { DatePicker } from '@rozie-ui/date-picker-angular';
   imports: [DatePicker, ReactiveFormsModule],
   template: \`
     <!-- The selected ISO date IS the form control value -->
-    <DatePicker [formControl]="date" min="2026-01-01" />
+    <rozie-date-picker [formControl]="date" min="2026-01-01" />
   \`,
 })
 export class DateFormComponent {
@@ -400,7 +401,7 @@ export class DateFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <DatePicker [(ngModel)]="date" name="date" />`,
+//   <rozie-date-picker [(ngModel)]="date" name="date" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -523,7 +524,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'at any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

@@ -55,7 +55,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [TipTap, FormsModule],
-  template: `<TipTap [(html)]="html" placeholder="Start writing…" />`,
+  template: `<rozie-tip-tap [(html)]="html" placeholder="Start writing…" />`,
 })
 export class DemoComponent {
   html = '<p>Hello <strong>world</strong></p>';

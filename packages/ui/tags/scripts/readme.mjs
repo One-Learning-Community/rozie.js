@@ -163,7 +163,7 @@ import { Tags } from '@rozie-ui/tags-angular';
   standalone: true,
   imports: [Tags],
   template: \`
-    <Tags
+    <rozie-tags
       [(modelValue)]="skills"
       placeholder="Add a skill…"
       ariaLabel="Skills"
@@ -174,8 +174,9 @@ import { Tags } from '@rozie-ui/tags-angular';
 })
 export class DemoComponent {
   skills = ['rozie', 'angular'];
-  onAdd(e: { value: string; tokens: string[] }) {
-    console.log('added', e.value);
+  // The \`add\` output is typed \`unknown\`; its payload is { value, tokens }.
+  onAdd(e: unknown) {
+    console.log('added', (e as { value: string; tokens: string[] }).value);
   }
 }`,
   },
@@ -242,7 +243,7 @@ import { Tags } from '@rozie-ui/tags-angular';
   imports: [Tags, ReactiveFormsModule],
   template: \`
     <!-- The tokens array IS the form control value -->
-    <Tags [formControl]="skills" ariaLabel="Skills" [max]="8" />
+    <rozie-tags [formControl]="skills" ariaLabel="Skills" [max]="8" />
   \`,
 })
 export class TagsFormComponent {
@@ -250,7 +251,7 @@ export class TagsFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Tags [(ngModel)]="skills" name="skills" />`,
+//   <rozie-tags [(ngModel)]="skills" name="skills" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -372,7 +373,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

@@ -105,7 +105,7 @@ import { Pagination } from '@rozie-ui/pagination-angular';
   standalone: true,
   imports: [Pagination],
   template: `
-    <Pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
+    <rozie-pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
   `,
 })
 export class DemoComponent {

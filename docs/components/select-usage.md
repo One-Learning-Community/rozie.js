@@ -105,11 +105,11 @@ import { Select } from '@rozie-ui/select-angular';
   standalone: true,
   imports: [Select],
   template: `
-    <Select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
+    <rozie-select [(value)]="value" [options]="options" [groups]="groups" [clearable]="true" placeholder="Pick a fruit…">
       <ng-template #option let-option="option" let-selected="selected">
         <span [class.selected]="selected">{{ option.label }}</span>
       </ng-template>
-    </Select>
+    </rozie-select>
   `,
 })
 export class DemoComponent {

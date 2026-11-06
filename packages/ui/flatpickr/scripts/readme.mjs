@@ -130,13 +130,15 @@ import 'flatpickr/dist/flatpickr.css';
   standalone: true,
   imports: [Flatpickr],
   template: \`
-    <Flatpickr [(date)]="date" (change)="onChange($event)" />
+    <rozie-flatpickr [(date)]="date" (change)="onChange($event)" />
   \`,
 })
 export class DemoComponent {
   date = '2026-05-17';
-  onChange(e: { value: string; selectedDates: Date[] }) {
-    console.log(e.value, e.selectedDates);
+  // The \`change\` output is typed \`unknown\`; its payload is { value, selectedDates }.
+  onChange(e: unknown) {
+    const { value, selectedDates } = e as { value: string; selectedDates: Date[] };
+    console.log(value, selectedDates);
   }
 }`,
   },
@@ -203,7 +205,7 @@ import { Flatpickr } from '@rozie-ui/flatpickr-angular';
   imports: [Flatpickr, ReactiveFormsModule],
   template: \`
     <!-- Reactive forms — [formControl] / formControlName bind directly -->
-    <Flatpickr [formControl]="birthday" />
+    <rozie-flatpickr [formControl]="birthday" />
   \`,
 })
 export class BirthdayFormComponent {
@@ -211,7 +213,7 @@ export class BirthdayFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Flatpickr [(ngModel)]="birthday" name="birthday" />`,
+//   <rozie-flatpickr [(ngModel)]="birthday" name="birthday" />`,
 };
 
 // ---------------------------------------------------------------------------

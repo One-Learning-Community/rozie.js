@@ -34,7 +34,7 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 
 Every cosmetic value is a `--rozie-text-field-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/text-field-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 

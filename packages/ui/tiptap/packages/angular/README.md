@@ -23,7 +23,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [TipTap, FormsModule],
-  template: `<TipTap [(html)]="html" placeholder="Start writing…" />`,
+  template: `<rozie-tip-tap [(html)]="html" placeholder="Start writing…" />`,
 })
 export class DemoComponent {
   html = '<p>Hello <strong>world</strong></p>';
@@ -45,7 +45,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   imports: [TipTap, ReactiveFormsModule],
   template: `
     <!-- Reactive forms — [formControl] / formControlName bind directly -->
-    <TipTap [formControl]="body" />
+    <rozie-tip-tap [formControl]="body" />
   `,
 })
 export class EditorFormComponent {
@@ -53,7 +53,7 @@ export class EditorFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <TipTap [(ngModel)]="body" name="body" />
+//   <rozie-tip-tap [(ngModel)]="body" name="body" />
 ```
 
 The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(html)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`"<p>Start writing…</p>"`); the control is marked touched on focusout.

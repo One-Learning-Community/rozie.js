@@ -23,7 +23,7 @@ import { CodeMirror } from '@rozie-ui/codemirror-angular';
   standalone: true,
   imports: [CodeMirror],
   template: `
-    <CodeMirror [(value)]="value" language="javascript" theme="dark" />
+    <rozie-code-mirror [(value)]="value" language="javascript" theme="dark" />
   `,
 })
 export class DemoComponent {
@@ -46,7 +46,7 @@ import { CodeMirror } from '@rozie-ui/codemirror-angular';
   imports: [CodeMirror, ReactiveFormsModule],
   template: `
     <!-- Reactive forms — [formControl] / formControlName bind directly -->
-    <CodeMirror [formControl]="source" />
+    <rozie-code-mirror [formControl]="source" />
   `,
 })
 export class CodeFormComponent {
@@ -54,7 +54,7 @@ export class CodeFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <CodeMirror [(ngModel)]="source" name="source" />
+//   <rozie-code-mirror [(ngModel)]="source" name="source" />
 ```
 
 The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(value)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`""`); the control is marked touched on focusout.

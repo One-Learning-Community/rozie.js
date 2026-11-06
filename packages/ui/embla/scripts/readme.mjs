@@ -144,7 +144,7 @@ import { Carousel } from '@rozie-ui/embla-angular';
   standalone: true,
   imports: [Carousel],
   template: \`
-    <Carousel
+    <rozie-carousel
       [slides]="['A', 'B', 'C']"
       [(selectedIndex)]="index"
       [loop]="true"
@@ -154,7 +154,8 @@ import { Carousel } from '@rozie-ui/embla-angular';
 })
 export class DemoComponent {
   index = 0;
-  onSelect(i: number) { console.log('snap', i); }
+  // The \`select\` output is typed \`unknown\`; its payload is the snapped index.
+  onSelect(i: unknown) { console.log('snap', i as number); }
 }`,
   },
   solid: {

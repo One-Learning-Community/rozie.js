@@ -143,16 +143,17 @@ import { Otp } from '@rozie-ui/otp-angular';
   standalone: true,
   imports: [Otp],
   template: \`
-    <Otp [(value)]="code" [length]="6" type="numeric" ariaLabel="Verification code" (complete)="onComplete($event)" />
+    <rozie-otp [(value)]="code" [length]="6" type="numeric" ariaLabel="Verification code" (complete)="onComplete($event)" />
 
     <!-- Masked (password dots) -->
-    <Otp [(value)]="code" [length]="4" [mask]="true" ariaLabel="PIN" />
+    <rozie-otp [(value)]="code" [length]="4" [mask]="true" ariaLabel="PIN" />
   \`,
 })
 export class DemoComponent {
   code = '';
-  onComplete(e: { value: string }) {
-    console.log('code complete:', e.value);
+  // The \`complete\` output is typed \`unknown\`; its payload is { value }.
+  onComplete(e: unknown) {
+    console.log('code complete:', (e as { value: string }).value);
   }
 }`,
   },
@@ -219,7 +220,7 @@ import { Otp } from '@rozie-ui/otp-angular';
   imports: [Otp, ReactiveFormsModule],
   template: \`
     <!-- The OTP value IS the form control value -->
-    <Otp [formControl]="code" [length]="6" type="numeric" />
+    <rozie-otp [formControl]="code" [length]="6" type="numeric" />
   \`,
 })
 export class OtpFormComponent {
@@ -227,7 +228,7 @@ export class OtpFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Otp [(ngModel)]="code" name="code" [length]="6" />`,
+//   <rozie-otp [(ngModel)]="code" name="code" [length]="6" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -349,7 +350,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

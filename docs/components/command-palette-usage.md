@@ -56,7 +56,7 @@ const commands = [
   { id: 'open', label: 'Open File', group: 'File' },
   { id: 'settings', label: 'Preferences', group: 'App' },
 ];
-function onSelect(e: { item: { id: string }; path: string[] }) {
+function onSelect(e: { item: { id: string }; path: (string | null)[] }) {
   console.log('ran:', e.item.id);
 }
 </script>
@@ -111,7 +111,7 @@ export class DemoComponent {
     { id: 'open', label: 'Open File', group: 'File' },
     { id: 'settings', label: 'Preferences', group: 'App' },
   ];
-  onSelect(e: { item: { id: string }; path: string[] }) {
+  onSelect(e: { item: { id: string }; path: (string | null)[] }) {
     console.log('ran:', e.item.id);
   }
 }

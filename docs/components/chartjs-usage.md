@@ -62,7 +62,7 @@ import { Chart } from '@rozie-ui/chartjs-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [Chart],
-  template: `<Chart type="bar" [data]="data" [height]="280" />`,
+  template: `<rozie-chart type="bar" [data]="data" [height]="280" />`,
 })
 export class DemoComponent {
   data = {

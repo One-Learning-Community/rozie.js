@@ -85,16 +85,17 @@ import { Otp } from '@rozie-ui/otp-angular';
   standalone: true,
   imports: [Otp],
   template: `
-    <Otp [(value)]="code" [length]="6" type="numeric" ariaLabel="Verification code" (complete)="onComplete($event)" />
+    <rozie-otp [(value)]="code" [length]="6" type="numeric" ariaLabel="Verification code" (complete)="onComplete($event)" />
 
     <!-- Masked (password dots) -->
-    <Otp [(value)]="code" [length]="4" [mask]="true" ariaLabel="PIN" />
+    <rozie-otp [(value)]="code" [length]="4" [mask]="true" ariaLabel="PIN" />
   `,
 })
 export class DemoComponent {
   code = '';
-  onComplete(e: { value: string }) {
-    console.log('code complete:', e.value);
+  // The `complete` output is typed `unknown`; its payload is { value }.
+  onComplete(e: unknown) {
+    console.log('code complete:', (e as { value: string }).value);
   }
 }
 ```

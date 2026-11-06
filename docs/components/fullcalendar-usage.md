@@ -65,7 +65,7 @@ import { FullCalendar } from '@rozie-ui/fullcalendar-angular';
   standalone: true,
   imports: [FullCalendar],
   template: `
-    <FullCalendar [(view)]="view" [events]="events" (eventClick)="onEventClick($event)" />
+    <rozie-full-calendar [(view)]="view" [events]="events" (eventClick)="onEventClick($event)" />
   `,
 })
 export class DemoComponent {

@@ -76,7 +76,7 @@ import { Waveform } from '@rozie-ui/wavesurfer-angular';
   standalone: true,
   imports: [Waveform],
   template: `
-    <Waveform
+    <rozie-waveform
       src="/audio.mp3"
       [(currentTime)]="time"
       [timeline]="true"

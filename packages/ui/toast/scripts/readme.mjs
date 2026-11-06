@@ -173,12 +173,13 @@ import { Toaster } from '@rozie-ui/toast-angular';
     <button (click)="toaster.show({ message: 'Conversation archived', data: { threadId: 't42' }, action: { label: 'Undo', onClick: onUndo } })">Archive</button>
 
     <!-- Mount the host once (typically near the app root). -->
-    <Toaster #toaster position="bottom-right" [duration]="4000" />
+    <rozie-toaster #toaster position="bottom-right" [duration]="4000" />
   \`,
 })
 export class DemoComponent {
   @ViewChild('toaster') toaster!: Toaster;
-  onUndo(ctx: { id: string; data: { threadId: string } }) { restore(ctx.data.threadId); }
+  // An action's \`data\` is typed \`unknown\`; narrow it to the shape you passed to show().
+  onUndo(ctx: { id: string; data: unknown }) { restore((ctx.data as { threadId: string }).threadId); }
 }`,
   },
   solid: {
@@ -376,7 +377,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

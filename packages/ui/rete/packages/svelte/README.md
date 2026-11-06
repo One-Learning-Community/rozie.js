@@ -55,7 +55,7 @@ Every visual value the canvas renders is a `--rozie-flow-*` CSS custom property 
 
 **Dark mode is a zero-import, OS-driven default** — the component ships an `@media (prefers-color-scheme: dark)` block that applies when the OS requests dark. An app that explicitly opts into light at the document root (a `.light` class or `[data-theme="light"]`) keeps control: the OS-dark default stands down and the light render applies instead. On the Lit build specifically, the canvas lives inside a shadow root, where a document-root ancestor selector cannot be observed, so the light opt-out above is **not honored there** — Lit keeps following the OS scheme regardless. Lit consumers who need app-controlled theming should use the `.dark` / `[data-theme="dark"]` class strategy below instead, since custom properties inherit across the shadow boundary. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/rete-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 

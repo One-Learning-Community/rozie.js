@@ -23,11 +23,11 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   standalone: true,
   imports: [SortableList],
   template: `
-    <SortableList [items]="items" (itemsChange)="items = $event" itemKey="id">
+    <rozie-sortable-list [items]="items" (itemsChange)="items = $event" itemKey="id">
       <ng-template #default let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
-    </SortableList>
+    </rozie-sortable-list>
   `,
 })
 export class DemoComponent {
@@ -53,11 +53,11 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   imports: [SortableList, ReactiveFormsModule],
   template: `
     <!-- The user's drag-ordering IS the form value -->
-    <SortableList [formControl]="ranking" itemKey="id">
+    <rozie-sortable-list [formControl]="ranking" itemKey="id">
       <ng-template #default let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
-    </SortableList>
+    </rozie-sortable-list>
   `,
 })
 export class RankingFormComponent {
@@ -68,7 +68,7 @@ export class RankingFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <SortableList [(ngModel)]="ranking" name="ranking" itemKey="id">...</SortableList>
+//   <rozie-sortable-list [(ngModel)]="ranking" name="ranking" itemKey="id">...</rozie-sortable-list>
 ```
 
 The accessor contract: only real user interaction dirties the control — programmatic writes (form `setValue` / `reset`, or the `[(items)]` two-way binding) update the view without echoing back into the form; `writeValue(null)` resets to the prop default (`[]`); the control is marked touched on focusout; and `setDisabledState` OR-merges with the `disabled` prop, so either source disables the component.

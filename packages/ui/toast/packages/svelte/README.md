@@ -33,7 +33,7 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 
 Every visual value is a `--rozie-toast-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/toast-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 

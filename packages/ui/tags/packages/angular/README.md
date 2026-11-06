@@ -23,7 +23,7 @@ import { Tags } from '@rozie-ui/tags-angular';
   standalone: true,
   imports: [Tags],
   template: `
-    <Tags
+    <rozie-tags
       [(modelValue)]="skills"
       placeholder="Add a skill…"
       ariaLabel="Skills"
@@ -34,8 +34,9 @@ import { Tags } from '@rozie-ui/tags-angular';
 })
 export class DemoComponent {
   skills = ['rozie', 'angular'];
-  onAdd(e: { value: string; tokens: string[] }) {
-    console.log('added', e.value);
+  // The `add` output is typed `unknown`; its payload is { value, tokens }.
+  onAdd(e: unknown) {
+    console.log('added', (e as { value: string; tokens: string[] }).value);
   }
 }
 ```
@@ -63,7 +64,7 @@ import { Tags } from '@rozie-ui/tags-angular';
   imports: [Tags, ReactiveFormsModule],
   template: `
     <!-- The tokens array IS the form control value -->
-    <Tags [formControl]="skills" ariaLabel="Skills" [max]="8" />
+    <rozie-tags [formControl]="skills" ariaLabel="Skills" [max]="8" />
   `,
 })
 export class TagsFormComponent {
@@ -71,7 +72,7 @@ export class TagsFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Tags [(ngModel)]="skills" name="skills" />
+//   <rozie-tags [(ngModel)]="skills" name="skills" />
 ```
 
 ## Props

@@ -27,7 +27,7 @@ import { DataTable } from '@rozie-ui/data-table-angular';
   standalone: true,
   imports: [DataTable],
   template: `
-    <DataTable [data]="rows" [columns]="columns" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true" />
+    <rozie-data-table [data]="rows" [columns]="columns" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true" />
   `,
 })
 export class DemoComponent {
@@ -56,12 +56,12 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   standalone: true,
   imports: [DataTable, Column],
   template: `
-    <DataTable [data]="rows" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true">
-      <Column field="name" header="Name" [sortable]="true" [filterable]="true" />
-      <Column field="email" header="Email" />
-      <Column field="status" header="Status" [sortable]="true" />
+    <rozie-data-table [data]="rows" [(sorting)]="sorting" selectionMode="multiple" [stickyHeader]="true">
+      <rozie-column field="name" header="Name" [sortable]="true" [filterable]="true" />
+      <rozie-column field="email" header="Email" />
+      <rozie-column field="status" header="Status" [sortable]="true" />
 
-      <!-- One #cell template on <DataTable>, dispatched by columnId -->
+      <!-- One #cell template on <rozie-data-table>, dispatched by columnId -->
       <ng-template #cell let-columnId="columnId" let-value="value">
         @if (columnId === 'status') {
           <span class="badge">{{ value }}</span>
@@ -69,7 +69,7 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
           {{ value }}
         }
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -94,24 +94,24 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   imports: [DataTable, Column],
   template: `
     <!-- PROP form — the unbound maxHeight attribute sizes the scroll container (it's a String prop, not a two-way model). -->
-    <DataTable [data]="rows" [virtual]="true" maxHeight="400px">
-      <Column field="name" header="Name" />
-      <Column field="email" header="Email" />
-      <Column field="status" header="Status" />
-    </DataTable>
+    <rozie-data-table [data]="rows" [virtual]="true" maxHeight="400px">
+      <rozie-column field="name" header="Name" />
+      <rozie-column field="email" header="Email" />
+      <rozie-column field="status" header="Status" />
+    </rozie-data-table>
 
     <!-- TOKEN form — the same height via the CSS custom property (prop wins when
          both are set; the token is the fallback). [estimateRowHeight] tunes the seed. -->
-    <DataTable
+    <rozie-data-table
       [data]="rows"
       [virtual]="true"
       [estimateRowHeight]="48"
       style="--rozie-data-table-max-height: 400px"
     >
-      <Column field="name" header="Name" />
-      <Column field="email" header="Email" />
-      <Column field="status" header="Status" />
-    </DataTable>
+      <rozie-column field="name" header="Name" />
+      <rozie-column field="email" header="Email" />
+      <rozie-column field="status" header="Status" />
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -136,17 +136,17 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   imports: [DataTable, Column],
   template: `
     <!-- The component OWNS edit state — bind ONE model [(data)] + listen for commits. -->
-    <DataTable
+    <rozie-data-table
       interactionMode="grid"
       [(data)]="rows"
       (cell-edit-commit)="onCellCommit($event)"
       (row-edit-commit)="onRowCommit($event)"
     >
-      <Column field="name" header="Name" [editable]="true" editor="text" />
-      <Column field="qty" header="Qty" [editable]="true" editor="number" [validate]="validateQty" />
-      <Column field="status" header="Status" [editable]="true" editor="select" [editorOptions]="statusOptions" />
-      <Column field="active" header="Active" [editable]="true" editor="checkbox" />
-      <Column field="score" header="Score" [editable]="true" editor="custom" />
+      <rozie-column field="name" header="Name" [editable]="true" editor="text" />
+      <rozie-column field="qty" header="Qty" [editable]="true" editor="number" [validate]="validateQty" />
+      <rozie-column field="status" header="Status" [editable]="true" editor="select" [editorOptions]="statusOptions" />
+      <rozie-column field="active" header="Active" [editable]="true" editor="checkbox" />
+      <rozie-column field="score" header="Score" [editable]="true" editor="custom" />
 
       <!-- The #editor scoped slot is an ng-template; it replaces the built-in editor. -->
       <ng-template #editor let-columnId="columnId" let-value="value" let-commit="commit" let-cancel="cancel">
@@ -158,7 +158,7 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
           </span>
         }
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -189,15 +189,15 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   imports: [DataTable, Column],
   template: `
     <!-- expandable opts in; [(expanded)] keeps MULTIPLE rows open; getSubRows yields nested rows. -->
-    <DataTable [data]="rows" [expandable]="true" [(expanded)]="expanded" [getSubRows]="getSubRows">
-      <Column field="name" header="Name" />
-      <Column field="headcount" header="Headcount" />
+    <rozie-data-table [data]="rows" [expandable]="true" [(expanded)]="expanded" [getSubRows]="getSubRows">
+      <rozie-column field="name" header="Name" />
+      <rozie-column field="headcount" header="Headcount" />
 
       <!-- The #detail scoped slot is an ng-template receiving { row }. -->
       <ng-template #detail let-row="row">
         <aside class="detail">More about {{ row.name }}</aside>
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -225,12 +225,12 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   imports: [DataTable, Column],
   template: `
     <!-- groupable enables grouping; [(grouping)] is an ORDERED column-id list; the event
-         is `group-change`. aggregationFn rolls leaf values into the group header. -->
-    <DataTable [data]="rows" [groupable]="true" [(grouping)]="grouping" (group-change)="onGroupChange($event)">
-      <Column field="region" header="Region" />
-      <Column field="category" header="Category" />
-      <Column field="units" header="Units" aggregationFn="sum" />
-      <Column field="score" header="Score" [aggregationFn]="scoreRange" />
+         is 'group-change'. aggregationFn rolls leaf values into the group header. -->
+    <rozie-data-table [data]="rows" [groupable]="true" [(grouping)]="grouping" (group-change)="onGroupChange($event)">
+      <rozie-column field="region" header="Region" />
+      <rozie-column field="category" header="Category" />
+      <rozie-column field="units" header="Units" aggregationFn="sum" />
+      <rozie-column field="score" header="Score" [aggregationFn]="scoreRange" />
 
       <!-- #groupBar is HEADLESS — build the bar from its props (NO built-in drag UI). -->
       <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
@@ -240,7 +240,7 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
           <span>{{ grouping.join(' → ') || 'ungrouped' }} ({{ groupableColumns.length }} groupable)</span>
         </div>
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -271,11 +271,11 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
   imports: [DataTable, Column],
   template: `
     <!-- Faceting is HEADLESS + read-only (NO event, NO built-in control). The #filter slot
-         hands you `uniqueValues` (keys, cross-filtered) + numeric `minMax`. -->
-    <DataTable [data]="rows" [(columnFilters)]="columnFilters">
-      <Column field="name" header="Name" />
-      <Column field="category" header="Category" [filterable]="true" />
-      <Column field="price" header="Price" [filterable]="true" />
+         hands you uniqueValues (keys, cross-filtered) + numeric minMax. -->
+    <rozie-data-table [data]="rows" [(columnFilters)]="columnFilters">
+      <rozie-column field="name" header="Name" />
+      <rozie-column field="category" header="Category" [filterable]="true" />
+      <rozie-column field="price" header="Price" [filterable]="true" />
 
       <ng-template #filter let-columnId="columnId" let-uniqueValues="uniqueValues" let-minMax="minMax">
         @if (columnId === 'category') {
@@ -286,7 +286,7 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
           <input type="range" [min]="minMax[0]" [max]="minMax[1]" />
         }
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -318,16 +318,16 @@ import {
          default; the editors are additive named exports. Each takes the slot scope as
          inputs ([columnId] [columnLabel] [column] [row] [value] [commit] [cancel] [autofocus]); EditorSelect
          also takes [options]. Mark each column editor="custom" so the #editor slot drives it. -->
-    <DataTable
+    <rozie-data-table
       interactionMode="grid"
       [(data)]="rows"
       (cell-edit-commit)="onCellCommit($event)"
     >
-      <Column field="name" header="Name" [editable]="true" editor="custom" />
-      <Column field="qty" header="Qty" [editable]="true" editor="custom" />
-      <Column field="status" header="Status" [editable]="true" editor="custom" />
-      <Column field="active" header="Active" [editable]="true" editor="custom" />
-      <Column field="score" header="Score" [editable]="true" editor="custom" />
+      <rozie-column field="name" header="Name" [editable]="true" editor="custom" />
+      <rozie-column field="qty" header="Qty" [editable]="true" editor="custom" />
+      <rozie-column field="status" header="Status" [editable]="true" editor="custom" />
+      <rozie-column field="active" header="Active" [editable]="true" editor="custom" />
+      <rozie-column field="score" header="Score" [editable]="true" editor="custom" />
 
       <ng-template #editor let-columnId="columnId" let-columnLabel="columnLabel" let-column="column" let-row="row" let-value="value" let-commit="commit" let-cancel="cancel" let-autofocus="autofocus">
         @switch (columnId) {
@@ -348,7 +348,7 @@ import {
           }
         }
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -384,10 +384,10 @@ import {
          inputs ([columnId] [columnLabel] [value] [setFilter]); FilterSelect also takes
          [uniqueValues], FilterNumberRange also takes [minMax]. Mark each column
          filterable so the #filter slot renders. -->
-    <DataTable [(data)]="rows" [(columnFilters)]="columnFilters">
-      <Column field="name" header="Name" [filterable]="true" />
-      <Column field="category" header="Category" [filterable]="true" />
-      <Column field="price" header="Price" [filterable]="true" />
+    <rozie-data-table [(data)]="rows" [(columnFilters)]="columnFilters">
+      <rozie-column field="name" header="Name" [filterable]="true" />
+      <rozie-column field="category" header="Category" [filterable]="true" />
+      <rozie-column field="price" header="Price" [filterable]="true" />
 
       <ng-template #filter let-columnId="columnId" let-columnLabel="columnLabel" let-value="value" let-setFilter="setFilter" let-uniqueValues="uniqueValues" let-minMax="minMax">
         @switch (columnId) {
@@ -402,7 +402,7 @@ import {
           }
         }
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -433,16 +433,16 @@ import {
          headless default; both are additive named exports. GroupBar takes the group-bar
          scope as inputs ([grouping] [groupableColumns] [applyGrouping] [clearGrouping]);
          DetailPanel takes [row]. Use them as-is, or fork either as a starter. -->
-    <DataTable
+    <rozie-data-table
       [data]="rows"
       [groupable]="true"
       [expandable]="true"
       [(grouping)]="grouping"
       [(expanded)]="expanded"
     >
-      <Column field="region" header="Region" />
-      <Column field="category" header="Category" />
-      <Column field="units" header="Units" aggregationFn="sum" />
+      <rozie-column field="region" header="Region" />
+      <rozie-column field="category" header="Category" />
+      <rozie-column field="units" header="Units" aggregationFn="sum" />
 
       <ng-template #groupBar let-grouping="grouping" let-groupableColumns="groupableColumns" let-applyGrouping="applyGrouping" let-clearGrouping="clearGrouping">
         <rozie-group-bar [grouping]="grouping" [groupableColumns]="groupableColumns" [applyGrouping]="applyGrouping" [clearGrouping]="clearGrouping" />
@@ -450,7 +450,7 @@ import {
       <ng-template #detail let-row="row">
         <rozie-detail-panel [row]="row" />
       </ng-template>
-    </DataTable>
+    </rozie-data-table>
   `,
 })
 export class DemoComponent {
@@ -483,14 +483,14 @@ import { DataTable, Column } from '@rozie-ui/data-table-angular';
          built-in render. editor-<id> needs editor="custom"; filter-<id> needs
          [filterable]="true" (shown on category below); cell-<id> / colHeader-<id> have
          no gate. -->
-    <DataTable
+    <rozie-data-table
       [data]="rows"
       [templates]="{ 'cell-price': cellPriceTpl, 'colHeader-price': colHeaderPriceTpl, 'filter-category': filterCategoryTpl }"
     >
-      <Column field="name" header="Name" />
-      <Column field="category" header="Category" [filterable]="true" />
-      <Column field="price" header="Price" />
-    </DataTable>
+      <rozie-column field="name" header="Name" />
+      <rozie-column field="category" header="Category" [filterable]="true" />
+      <rozie-column field="price" header="Price" />
+    </rozie-data-table>
 
     <ng-template #cellPriceTpl let-value="value">💲 {{ value }}</ng-template>
     <ng-template #colHeaderPriceTpl let-label="label">🏷️ {{ label }}</ng-template>

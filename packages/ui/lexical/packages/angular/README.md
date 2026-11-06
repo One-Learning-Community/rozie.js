@@ -28,7 +28,7 @@ import { LexicalEditor } from '@rozie-ui/lexical-angular';
   selector: 'app-editor',
   standalone: true,
   imports: [LexicalEditor],
-  template: `<LexicalEditor ariaLabel="Post body" />`,
+  template: `<rozie-lexical-editor ariaLabel="Post body" />`,
 })
 export class EditorComponent {}
 ```

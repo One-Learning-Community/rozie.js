@@ -76,11 +76,11 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   standalone: true,
   imports: [SortableList],
   template: `
-    <SortableList [items]="items" (itemsChange)="items = $event" itemKey="id">
+    <rozie-sortable-list [items]="items" (itemsChange)="items = $event" itemKey="id">
       <ng-template #default let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
-    </SortableList>
+    </rozie-sortable-list>
   `,
 })
 export class DemoComponent {

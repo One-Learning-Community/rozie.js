@@ -71,11 +71,12 @@ import { Captcha } from '@rozie-ui/captcha-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [Captcha],
-  template: `<Captcha provider="recaptcha" sitekey="your-site-key" [(token)]="token" (verify)="onVerify($event)" />`,
+  template: `<rozie-captcha provider="recaptcha" sitekey="your-site-key" [(token)]="token" (verify)="onVerify($event)" />`,
 })
 export class DemoComponent {
   token = '';
-  onVerify(e: { token: string }) { console.log('verified', e.token); }
+  // The `verify` output is typed `unknown`; its payload is { token }.
+  onVerify(e: unknown) { console.log('verified', (e as { token: string }).token); }
 }
 ```
 

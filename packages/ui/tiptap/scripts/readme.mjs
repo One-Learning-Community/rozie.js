@@ -124,7 +124,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   selector: 'app-demo',
   standalone: true,
   imports: [TipTap, FormsModule],
-  template: \`<TipTap [(html)]="html" placeholder="Start writing…" />\`,
+  template: \`<rozie-tip-tap [(html)]="html" placeholder="Start writing…" />\`,
 })
 export class DemoComponent {
   html = '<p>Hello <strong>world</strong></p>';
@@ -166,7 +166,7 @@ import { TipTap } from '@rozie-ui/tiptap-angular';
   imports: [TipTap, ReactiveFormsModule],
   template: \`
     <!-- Reactive forms — [formControl] / formControlName bind directly -->
-    <TipTap [formControl]="body" />
+    <rozie-tip-tap [formControl]="body" />
   \`,
 })
 export class EditorFormComponent {
@@ -174,7 +174,7 @@ export class EditorFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <TipTap [(ngModel)]="body" name="body" />`,
+//   <rozie-tip-tap [(ngModel)]="body" name="body" />`,
 };
 
 const FRAMEWORK_PEER_LABEL = {

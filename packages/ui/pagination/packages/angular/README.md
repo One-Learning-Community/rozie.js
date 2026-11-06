@@ -23,7 +23,7 @@ import { Pagination } from '@rozie-ui/pagination-angular';
   standalone: true,
   imports: [Pagination],
   template: `
-    <Pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
+    <rozie-pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
   `,
 })
 export class DemoComponent {
@@ -57,7 +57,7 @@ import { Pagination } from '@rozie-ui/pagination-angular';
   imports: [Pagination, ReactiveFormsModule],
   template: `
     <!-- The current page IS the form control value -->
-    <Pagination [formControl]="page" [total]="195" [pageSize]="10" />
+    <rozie-pagination [formControl]="page" [total]="195" [pageSize]="10" />
   `,
 })
 export class PaginationFormComponent {
@@ -65,7 +65,7 @@ export class PaginationFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Pagination [(ngModel)]="page" name="page" [total]="195" [pageSize]="10" />
+//   <rozie-pagination [(ngModel)]="page" name="page" [total]="195" [pageSize]="10" />
 ```
 
 ## Props

@@ -171,7 +171,7 @@ import { Pagination } from '@rozie-ui/pagination-angular';
   standalone: true,
   imports: [Pagination],
   template: \`
-    <Pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
+    <rozie-pagination [(modelValue)]="page" [total]="195" [pageSize]="10" (change)="onChange($event)" />
   \`,
 })
 export class DemoComponent {
@@ -263,7 +263,7 @@ import { Pagination } from '@rozie-ui/pagination-angular';
   imports: [Pagination, ReactiveFormsModule],
   template: \`
     <!-- The current page IS the form control value -->
-    <Pagination [formControl]="page" [total]="195" [pageSize]="10" />
+    <rozie-pagination [formControl]="page" [total]="195" [pageSize]="10" />
   \`,
 })
 export class PaginationFormComponent {
@@ -271,7 +271,7 @@ export class PaginationFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Pagination [(ngModel)]="page" name="page" [total]="195" [pageSize]="10" />`,
+//   <rozie-pagination [(ngModel)]="page" name="page" [total]="195" [pageSize]="10" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -394,7 +394,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'at any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');

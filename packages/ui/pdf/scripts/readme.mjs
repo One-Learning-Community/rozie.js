@@ -149,7 +149,7 @@ import { PdfViewer } from '@rozie-ui/pdf-angular';
   standalone: true,
   imports: [PdfViewer],
   template: \`
-    <PdfViewer
+    <rozie-pdf-viewer
       src="/document.pdf"
       [(page)]="page"
       [scale]="1.2"
