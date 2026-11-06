@@ -1091,6 +1091,7 @@ export const EXAMPLES = [
   // + the glob-driven build-cells demos sweep already cover it, importing the data-table
   // source pkg already registered for Angular cross-tree AOT in phase 48).
   'DataTableGridUndo',
+  'DataTableHeldView',
   // Phase 63 Wave-4 (grid-mode nav-edge correctness) — the nav-edge-cluster RED-first
   // fixtures (loaders → examples/demos/DataTableGridEmptyDemo.rozie /
   // DataTableGridGroupedHeaderDemo.rozie, each importing
@@ -1881,6 +1882,8 @@ export const LIT_TAGS: Record<Example, string> = {
   // Quick 260709-8ct grid-wide undo/redo — '-demo' appended on Lit →
   // 'rozie-data-table-grid-undo-demo' = kebab of DataTableGridUndoDemo.
   DataTableGridUndo: 'rozie-data-table-grid-undo',
+  // Held-view / per-column filterFn fixture — '-demo' appended on Lit.
+  DataTableHeldView: 'rozie-data-table-held-view',
   // Phase 63 grid-mode nav-edge — '-demo' appended on Lit → tags
   // 'rozie-data-table-grid-empty-demo' / 'rozie-data-table-grid-grouped-header-demo' =
   // kebab of DataTableGridEmptyDemo / DataTableGridGroupedHeaderDemo.

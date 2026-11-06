@@ -151,6 +151,28 @@
     },
   },
 
+  // filterFn / sortingFn: the table-core per-column filter and sort rule. Either a built-in
+  // name string (e.g. 'arrIncludesSome', 'equalsString'; 'alphanumeric', 'basic', …) or a custom
+  // function — filterFn `(value, filterValue) => boolean`, sortingFn `(a, b) => number`. Null
+  // (default) → table-core's auto rule. A custom function is registered through a stable
+  // trampoline, so an inline arrow re-created each consumer render does not re-register.
+  filterFn: {
+    type: [String, Function],
+    default: null,
+    docs: {
+      description:
+        "The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.",
+    },
+  },
+  sortingFn: {
+    type: [String, Function],
+    default: null,
+    docs: {
+      description:
+        "The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.",
+    },
+  },
+
   // ── Editable-cell config (Phase 51, req-1/2/5) ────────────────────────────────
   // Whether this column's cells are editable (opt-in). Default false → the column is
   // read-only and the parent's display↔editor branch never mounts an editor for it.
@@ -223,8 +245,21 @@ let registered = false
 // the column SPEC builder — shared by the $onMount register and the late-context
 // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
 // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
+// Stable trampolines for custom filterFn/sortingFn. An inline arrow is a new identity every
+// consumer render; registering it directly would defeat the registerColumn equivalence guard
+// (a function compares by source, but table-core would hold a stale closure). The spec holds
+// ONE trampoline per column that always calls the latest function, refreshed in the re-register
+// watch below BEFORE the equivalence check. A mutable top-level `let` (a ref on React).
+let latestFilterFn: any = null
+let latestSortingFn: any = null
+const filterTrampoline = (...args: any[]) => latestFilterFn(...args)
+const sortingTrampoline = (...args: any[]) => latestSortingFn(...args)
 const colId = () => ($props.id !== '' ? $props.id : $props.field)
-const buildSpec = () => ({
+const buildSpec = () => {
+  // Seed the trampolines' targets at first registration (Lit props may not exist earlier).
+  latestFilterFn = $props.filterFn
+  latestSortingFn = $props.sortingFn
+  return {
   id: colId(),
   field: $props.field !== '' ? $props.field : colId(),
   header: $props.header,
@@ -239,13 +274,16 @@ const buildSpec = () => ({
   // custom fn) and filters groupableColumns by `groupable`.
   groupable: $props.groupable,
   aggregationFn: $props.aggregationFn,
+  filterFn: typeof $props.filterFn === 'function' ? filterTrampoline : $props.filterFn,
+  sortingFn: typeof $props.sortingFn === 'function' ? sortingTrampoline : $props.sortingFn,
   // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
   // registry (the existing per-column metadata path; NO parallel registry).
   editable: $props.editable,
   editor: $props.editor,
   editorOptions: $props.editorOptions,
   validate: $props.validate,
-})
+  }
+}
 
 $onMount(() => {
   // register this column's spec. On Lit the injected registry may still be undefined
@@ -281,8 +319,10 @@ $onUpdate(() => {
 // (possibly new) id with a fresh spec (the parent registry whole-object-replaces by
 // id, so a live edit re-projects idempotently).
 $watch(
-  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width, $props.expandable, $props.groupable, $props.aggregationFn, $props.editable, $props.editor, $props.editorOptions, $props.validate],
+  () => [$props.id, $props.field, $props.header, $props.sortable, $props.filterable, $props.pinned, $props.width, $props.expandable, $props.groupable, $props.aggregationFn, $props.filterFn, $props.sortingFn, $props.editable, $props.editor, $props.editorOptions, $props.validate],
   () => {
+    latestFilterFn = $props.filterFn
+    latestSortingFn = $props.sortingFn
     if (reg) reg.registerColumn(colId(), buildSpec())
   },
 )

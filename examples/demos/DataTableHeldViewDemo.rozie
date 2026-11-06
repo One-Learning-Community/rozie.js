@@ -1,0 +1,163 @@
+<!--
+  DataTableHeldViewDemo.rozie — data-table held-view / per-column filterFn+sortingFn fixture.
+
+  Drives data-table-held-view.spec.ts across all six targets. ONE grid-mode, `undoable`,
+  r-model:data DataTable (ref="dt", data-testid="grid-table") with CONTROLLED columnFilters
+  and sorting in $data, over 6 rows { id, title, grades[], labels[], owner, minQty }.
+
+  Columns: id (read-only, first — the spec reads visible ids from each body row's first
+  cell), title (editable text, sortable, filterable), grades (filterable, custom list rule
+  gradesRule), labels (filterable, filterFn="arrIncludesSome"), owner (editable text,
+  filterable, filterFn="equalsString"), minQty (filterable, closure filterFn reading
+  $data.threshold).
+
+  Verb buttons drive the live $refs.dt handle (never cached), each guarded so the demo still
+  compiles before a verb exists. No loop var / slot param named row/cell/header (Svelte
+  mount-throw discipline) — the #cell slot binds columnId/value only.
+-->
+
+<rozie name="DataTableHeldViewDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, title: 'Alpha',   grades: [1, 2], labels: ['a'],      owner: 'Dana', minQty: 1 },
+    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b'], owner: 'Eli',  minQty: 3 },
+    { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Fay',  minQty: 5 },
+    { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d'],      owner: 'Dana', minQty: 8 },
+    { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
+    { id: 6, title: 'Zed',     grades: [],     labels: ['e'],      owner: 'Hal',  minQty: 9 },
+  ],
+  filters: [],
+  sort: [],
+  threshold: 0,
+  canUndoText: 'false',
+}
+</data>
+
+<script lang="ts">
+const rowId = (r: { id: number }): string => String(r.id)
+
+// Custom list rule: '__empty' keeps rows whose list is empty; otherwise any overlap.
+const gradesRule = (v: any, f: any): boolean =>
+  f === '__empty' ? !v?.length : !!v?.some((x: any) => f.includes(x))
+
+// Closure rule: reads live demo state, so it only sees a new threshold on a refresh.
+const minQtyRule = (v: any): boolean => v >= $data.threshold
+
+const onHistoryChange = (payload: { canUndo: boolean; canRedo: boolean } | null): void => {
+  $data.canUndoText = String(payload ? payload.canUndo : false)
+}
+
+const setFilters = (next: any[]): void => {
+  $data.filters = next
+}
+const filterLabelsX = (): void => setFilters([{ id: 'labels', value: ['x'] }])
+const filterEmpty = (): void => setFilters([{ id: 'grades', value: '__empty' }])
+const filterOwnerDana = (): void => setFilters([{ id: 'owner', value: 'Dana' }])
+const filterThreshold = (): void => setFilters([{ id: 'minQty', value: 'on' }])
+const clearFilters = (): void => setFilters([])
+const bumpClosure = (): void => {
+  $data.threshold = 5
+}
+const callUndo = (): void => {
+  const api = $refs.dt
+  if (api && api.undo) api.undo()
+}
+</script>
+
+<template>
+<div class="dt-held-view-demo">
+  <h3>DataTable — per-column filterFn / held view</h3>
+
+  <div class="controls">
+    <button type="button" data-testid="filter-labels-x" @click="filterLabelsX">labels has x</button>
+    <button type="button" data-testid="filter-empty" @click="filterEmpty">grades empty</button>
+    <button type="button" data-testid="filter-owner-dana" @click="filterOwnerDana">owner Dana</button>
+    <button type="button" data-testid="filter-threshold" @click="filterThreshold">minQty threshold</button>
+    <button type="button" data-testid="clear-filters" @click="clearFilters">clear filters</button>
+    <button type="button" data-testid="undo-btn" @click="callUndo">undo()</button>
+    <button type="button" data-testid="bump-closure" @click="bumpClosure">threshold = 5</button>
+    <span class="label">canUndo:</span>
+    <span class="readout" data-testid="canundo-readout">{{ $data.canUndoText }}</span>
+  </div>
+
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      :undoable="true"
+      :getRowId="rowId"
+      r-model:data="$data.rows"
+      r-model:columnFilters="$data.filters"
+      r-model:sorting="$data.sort"
+      @history-change="onHistoryChange($event)"
+    >
+      <Column field="id" header="Id" />
+      <Column field="title" header="Title" :editable="true" editor="text" :sortable="true" :filterable="true" />
+      <Column field="grades" header="Grades" :filterable="true" :filterFn="gradesRule" />
+      <Column field="labels" header="Labels" :filterable="true" filterFn="arrIncludesSome" />
+      <Column field="owner" header="Owner" :editable="true" editor="text" :filterable="true" filterFn="equalsString" />
+      <Column field="minQty" header="Min qty" :filterable="true" :filterFn="minQtyRule" />
+
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ Array.isArray(value) ? value.join(',') : value }}</span>
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-held-view-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 760px;
+}
+.dt-held-view-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+}
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.controls button {
+  padding: 0.25rem 0.625rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+}
+.model {
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0 0 0.75rem;
+  color: #333;
+}
+[data-testid="grid-table"] [role="gridcell"][tabindex="0"],
+[data-testid="grid-table"] [role="columnheader"][tabindex="0"] {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.rdt-cell-editor { font: inherit; }
+</style>
+
+</rozie>

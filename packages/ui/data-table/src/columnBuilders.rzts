@@ -2,6 +2,7 @@
 // module below — pure, sigil-free, no cross-partial host-symbol calls. Re-exported unchanged
 // from this partial's trailing export list (DataTable.rozie imports them from HERE).
 import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning } from './helpers/columnDefUtils'
+import { columnRuleKeys } from './helpers/columnRuleUtils'
 // Build the table-core ColumnDef for ONE config-array entry. A LEAF entry
 // ({ id?, field, header?, … }) maps to an accessor ColumnDef; a GROUP entry
 // ({ id?, header, columns: [...] }) maps to a multi-level header GROUP column
@@ -105,6 +106,8 @@ const buildConfigDef = (c) => {
     // a custom fn defensively wrapped (T-50-04).
     groupable: c.groupable !== false,
     aggregationFn: wrapAggregationFn(c.aggregationFn),
+    // Per-column filterFn/sortingFn (built-in name or custom fn); absent when unset.
+    ...columnRuleKeys(c, id),
     pinned: c.pinned != null ? c.pinned : '',
     width: c.width != null ? c.width : '',
     // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
@@ -193,6 +196,7 @@ const columnDefs = () => {
       // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
       groupable: spec.groupable !== false,
       aggregationFn: wrapAggregationFn(spec.aggregationFn),
+      ...columnRuleKeys(spec, id),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.

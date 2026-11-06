@@ -44,6 +44,14 @@ export interface ColumnProps {
    */
   aggregationFn?: (string | ((...args: any[]) => any)) | null;
   /**
+   * The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.
+   */
+  filterFn?: (string | ((...args: any[]) => any)) | null;
+  /**
+   * The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.
+   */
+  sortingFn?: (string | ((...args: any[]) => any)) | null;
+  /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
   editable?: boolean;

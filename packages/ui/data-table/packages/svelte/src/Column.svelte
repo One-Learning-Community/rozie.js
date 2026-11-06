@@ -45,6 +45,14 @@ interface Props {
    */
   aggregationFn?: (string | ((...args: any[]) => any)) | null;
   /**
+   * The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.
+   */
+  filterFn?: (string | ((...args: any[]) => any)) | null;
+  /**
+   * The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.
+   */
+  sortingFn?: (string | ((...args: any[]) => any)) | null;
+  /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
   editable?: boolean;
@@ -75,6 +83,8 @@ let {
   expandable = false,
   groupable = true,
   aggregationFn = null,
+  filterFn = null,
+  sortingFn = null,
   editable = false,
   editor = 'text',
   editorOptions = __defaultEditorOptions,
@@ -98,32 +108,50 @@ let registered = false;
 // the column SPEC builder — shared by the $onMount register and the late-context
 // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
 // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
+// Stable trampolines for custom filterFn/sortingFn. An inline arrow is a new identity every
+// consumer render; registering it directly would defeat the registerColumn equivalence guard
+// (a function compares by source, but table-core would hold a stale closure). The spec holds
+// ONE trampoline per column that always calls the latest function, refreshed in the re-register
+// watch below BEFORE the equivalence check. A mutable top-level `let` (a ref on React).
+let latestFilterFn: any = null;
+let latestSortingFn: any = null;
+const filterTrampoline = (...args: any[]) => latestFilterFn(...args);
+const sortingTrampoline = (...args: any[]) => latestSortingFn(...args);
 const colId = () => id !== '' ? id : field;
-const buildSpec = () => ({
-  id: colId(),
-  field: field !== '' ? field : colId(),
-  header: header,
-  sortable: sortable,
-  filterable: filterable,
-  pinned: pinned,
-  width: width,
-  // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
-  expandable: expandable,
-  // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
-  // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
-  // custom fn) and filters groupableColumns by `groupable`.
-  groupable: groupable,
-  aggregationFn: aggregationFn,
-  // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
-  // registry (the existing per-column metadata path; NO parallel registry).
-  editable: editable,
-  editor: editor,
-  editorOptions: editorOptions,
-  validate: validate
-});
+const buildSpec = () => {
+  // Seed the trampolines' targets at first registration (Lit props may not exist earlier).
+  latestFilterFn = filterFn;
+  latestSortingFn = sortingFn;
+  return {
+    id: colId(),
+    field: field !== '' ? field : colId(),
+    header: header,
+    sortable: sortable,
+    filterable: filterable,
+    pinned: pinned,
+    width: width,
+    // Expandable-rows reserved metadata (phase 50, D-04) — carried via the parent registry.
+    expandable: expandable,
+    // Grouping + aggregation metadata (phase 50, reqs 4-7, D-05) — carried via the parent
+    // registry; the parent resolves aggregationFn onto the ColumnDef (defensive-wrapping a
+    // custom fn) and filters groupableColumns by `groupable`.
+    groupable: groupable,
+    aggregationFn: aggregationFn,
+    filterFn: typeof filterFn === 'function' ? filterTrampoline : filterFn,
+    sortingFn: typeof sortingFn === 'function' ? sortingTrampoline : sortingFn,
+    // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
+    // registry (the existing per-column metadata path; NO parallel registry).
+    editable: editable,
+    editor: editor,
+    editorOptions: editorOptions,
+    validate: validate
+  };
+};
 
 let __rozieWatchInitial_0 = true;
-$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, groupable, aggregationFn, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+$effect(() => { (() => [id, field, header, sortable, filterable, pinned, width, expandable, groupable, aggregationFn, filterFn, sortingFn, editable, editor, editorOptions, validate])(); untrack(() => { if (__rozieWatchInitial_0) { __rozieWatchInitial_0 = false; return; } (() => {
+  latestFilterFn = filterFn;
+  latestSortingFn = sortingFn;
   if (reg) reg.registerColumn(colId(), buildSpec());
 })(); }); });
 

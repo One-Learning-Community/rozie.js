@@ -86,7 +86,7 @@ interface Props {
    */
   data: any[];
   /**
-   * Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, pinned?, width? }`. Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `'left'` or `'right'` is applied once as the table's initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial two-way `columnPinning` model value or an interactive pin) owns the slice and this declaration is ignored.
+   * Config-array column fallback (lower precedence than `<Column>` children). Each entry: `{ id?, field, header?, sortable?, filterable?, filterFn?, sortingFn?, pinned?, width? }` (`filterFn`/`sortingFn` take a table-core built-in name or a custom function). Columns may come from this array, from `<Column>` children, or both (id-keyed last-write-wins union). A `pinned` value of `'left'` or `'right'` is applied once as the table's initial `columnPinning` state — identical to `<Column pinned>` — which also REORDERS that column, since table-core orders visible cells `[left-pinned, center, right-pinned]`. A consumer who has already expressed a pin (an initial two-way `columnPinning` model value or an interactive pin) owns the slice and this declaration is ignored.
    */
   columns?: any[];
   /**
@@ -364,6 +364,7 @@ let liveAnnounce = $state('');
 let __rozieRoot = $state<HTMLElement | undefined>(undefined);
 
 import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
+import { columnRuleKeys } from './helpers/columnRuleUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
@@ -787,6 +788,8 @@ const buildConfigDef = (c: any) => {
     // a custom fn defensively wrapped (T-50-04).
     groupable: c.groupable !== false,
     aggregationFn: wrapAggregationFn(c.aggregationFn),
+    // Per-column filterFn/sortingFn (built-in name or custom fn); absent when unset.
+    ...columnRuleKeys(c, id),
     pinned: c.pinned != null ? c.pinned : '',
     width: c.width != null ? c.width : '',
     // A-01 — `width` alone is inert; table-core sizes from `size`. Spread so an
@@ -877,6 +880,7 @@ const columnDefs = () => {
       // Grouping (phase 50 reqs 4-7) — same shape as the config branch (D-05 / T-50-04).
       groupable: spec.groupable !== false,
       aggregationFn: wrapAggregationFn(spec.aggregationFn),
+      ...columnRuleKeys(spec, id),
       pinned: spec.pinned != null ? spec.pinned : '',
       width: spec.width != null ? spec.width : '',
       // A-01 — see buildConfigDef; same mapping for the <Column> registry branch.

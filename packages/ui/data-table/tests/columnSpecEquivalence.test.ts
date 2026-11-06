@@ -52,6 +52,17 @@ describe('columnSpecsEquivalent', () => {
     expect(columnSpecsEquivalent(a, b)).toBe(true);
   });
 
+  it('treats re-created inline filterFn/sortingFn as equivalent', () => {
+    const build = () => spec({ filterFn: (v: unknown) => !!v, sortingFn: (a: number, b: number) => a - b });
+    expect(columnSpecsEquivalent(build(), build())).toBe(true);
+  });
+
+  it('does not treat a different filterFn as equivalent', () => {
+    const a = spec({ filterFn: (v: unknown) => !!v });
+    const b = spec({ filterFn: (v: unknown) => !v });
+    expect(columnSpecsEquivalent(a, b)).toBe(false);
+  });
+
   it('does NOT treat a genuinely different validator as equivalent', () => {
     const a = spec({ validate: (v: unknown) => v !== '' });
     const b = spec({ validate: (v: unknown) => v !== null });

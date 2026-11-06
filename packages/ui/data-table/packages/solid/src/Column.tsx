@@ -46,6 +46,14 @@ interface ColumnProps {
    */
   aggregationFn?: (string | ((...args: any[]) => any)) | null;
   /**
+   * The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.
+   */
+  filterFn?: (string | ((...args: any[]) => any)) | null;
+  /**
+   * The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.
+   */
+  sortingFn?: (string | ((...args: any[]) => any)) | null;
+  /**
    * Whether this column's cells are editable (opt-in). Default `false` → the column is read-only and the display↔editor branch never mounts an editor. Bind `:editable="true"` (a bare attr only coerces on Vue+Lit).
    */
   editable?: boolean;
@@ -64,11 +72,13 @@ interface ColumnProps {
 }
 
 export default function Column(_props: ColumnProps): JSX.Element {
-  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, groupable: true, aggregationFn: null, editable: false, editor: 'text', editorOptions: (() => [])() as any[], validate: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'groupable', 'aggregationFn', 'editable', 'editor', 'editorOptions', 'validate']);
+  const _merged = mergeProps({ id: '', field: '', header: '', sortable: false, filterable: false, pinned: '', width: '', expandable: false, groupable: true, aggregationFn: null, filterFn: null, sortingFn: null, editable: false, editor: 'text', editorOptions: (() => [])() as any[], validate: null }, _props);
+  const [local, attrs] = splitProps(_merged, ['id', 'field', 'header', 'sortable', 'filterable', 'pinned', 'width', 'expandable', 'groupable', 'aggregationFn', 'filterFn', 'sortingFn', 'editable', 'editor', 'editorOptions', 'validate']);
 
   const registry = useContext(rozieContext("data-table:columns"));
-  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.groupable, local.aggregationFn, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
+  createEffect(on(() => (() => [local.id, local.field, local.header, local.sortable, local.filterable, local.pinned, local.width, local.expandable, local.groupable, local.aggregationFn, local.filterFn, local.sortingFn, local.editable, local.editor, local.editorOptions, local.validate])(), (v) => untrack(() => (() => {
+    latestFilterFn = local.filterFn;
+    latestSortingFn = local.sortingFn;
     if (reg) reg.registerColumn(colId(), buildSpec());
   })()), { defer: true }));
   onMount(() => {
@@ -112,10 +122,26 @@ export default function Column(_props: ColumnProps): JSX.Element {
   // the column SPEC builder — shared by the $onMount register and the late-context
   // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
   // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
+  // Stable trampolines for custom filterFn/sortingFn. An inline arrow is a new identity every
+  // consumer render; registering it directly would defeat the registerColumn equivalence guard
+  // (a function compares by source, but table-core would hold a stale closure). The spec holds
+  // ONE trampoline per column that always calls the latest function, refreshed in the re-register
+  // watch below BEFORE the equivalence check. A mutable top-level `let` (a ref on React).
+  let latestFilterFn: any = null;
+  let latestSortingFn: any = null;
+  function filterTrampoline(...args: any[]) {
+    return latestFilterFn(...args);
+  }
+  function sortingTrampoline(...args: any[]) {
+    return latestSortingFn(...args);
+  }
   function colId() {
     return local.id !== '' ? local.id : local.field;
   }
   function buildSpec() {
+    // Seed the trampolines' targets at first registration (Lit props may not exist earlier).
+    latestFilterFn = local.filterFn;
+    latestSortingFn = local.sortingFn;
     return {
       id: colId(),
       field: local.field !== '' ? local.field : colId(),
@@ -131,6 +157,8 @@ export default function Column(_props: ColumnProps): JSX.Element {
       // custom fn) and filters groupableColumns by `groupable`.
       groupable: local.groupable,
       aggregationFn: local.aggregationFn,
+      filterFn: typeof local.filterFn === 'function' ? filterTrampoline : local.filterFn,
+      sortingFn: typeof local.sortingFn === 'function' ? sortingTrampoline : local.sortingFn,
       // Editable-cell config (Phase 51) — carried into ColumnDef.meta via the parent
       // registry (the existing per-column metadata path; NO parallel registry).
       editable: local.editable,
