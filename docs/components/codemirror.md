@@ -40,7 +40,7 @@ The two-way value is `value` — the editor's document text as a **string**. Typ
 ```tsx
 import { useState } from 'react';
 import { CodeMirror } from '@rozie-ui/codemirror-react';
-import { lineWrapping } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 export function Demo() {
   const [value, setValue] = useState('const greeting = "hello";\n');
@@ -51,7 +51,7 @@ export function Demo() {
       language="javascript"
       theme="dark"
       placeholder="Type some code…"
-      extensions={[lineWrapping]}
+      extensions={[EditorView.lineWrapping]}
     />
   );
 }
@@ -63,10 +63,10 @@ export function Demo() {
 <script setup lang="ts">
 import { ref } from 'vue';
 import CodeMirror from '@rozie-ui/codemirror-vue';
-import { lineWrapping } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 const value = ref('const greeting = "hello";\n');
-const extensions = [lineWrapping];
+const extensions = [EditorView.lineWrapping];
 </script>
 
 <template>
@@ -85,7 +85,7 @@ const extensions = [lineWrapping];
 ```svelte
 <script lang="ts">
   import CodeMirror from '@rozie-ui/codemirror-svelte';
-  import { lineWrapping } from '@codemirror/view';
+  import { EditorView } from '@codemirror/view';
 
   let value = $state('const greeting = "hello";\n');
 </script>
@@ -95,7 +95,7 @@ const extensions = [lineWrapping];
   language="javascript"
   theme="dark"
   placeholder="Type some code…"
-  extensions={[lineWrapping]}
+  extensions={[EditorView.lineWrapping]}
 />
 ```
 
@@ -104,7 +104,7 @@ const extensions = [lineWrapping];
 ```ts
 import { Component } from '@angular/core';
 import { CodeMirror } from '@rozie-ui/codemirror-angular';
-import { lineWrapping } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 @Component({
   selector: 'app-demo',
@@ -122,7 +122,7 @@ import { lineWrapping } from '@codemirror/view';
 })
 export class DemoComponent {
   value = 'const greeting = "hello";\n';
-  extensions = [lineWrapping];
+  extensions = [EditorView.lineWrapping];
 }
 ```
 
@@ -131,7 +131,7 @@ export class DemoComponent {
 ```tsx
 import { createSignal } from 'solid-js';
 import { CodeMirror } from '@rozie-ui/codemirror-solid';
-import { lineWrapping } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 export function Demo() {
   const [value, setValue] = createSignal('const greeting = "hello";\n');
@@ -142,7 +142,7 @@ export function Demo() {
       language="javascript"
       theme="dark"
       placeholder="Type some code…"
-      extensions={[lineWrapping]}
+      extensions={[EditorView.lineWrapping]}
     />
   );
 }
@@ -152,7 +152,7 @@ export function Demo() {
 
 ```ts
 import '@rozie-ui/codemirror-lit';
-import { lineWrapping } from '@codemirror/view';
+import { EditorView } from '@codemirror/view';
 
 // <rozie-code-mirror> is a custom element. Bind `value` as a property and
 // listen for the `value-change` event (the two-way change channel).
@@ -161,7 +161,7 @@ el.value = 'const greeting = "hello";\n';
 el.language = 'javascript';
 el.theme = 'dark';
 el.placeholder = 'Type some code…';
-el.extensions = [lineWrapping];
+el.extensions = [EditorView.lineWrapping];
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });
