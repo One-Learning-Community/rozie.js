@@ -311,6 +311,59 @@ async function focusedRowTitle(page: Page, scopeTestId: string): Promise<string 
 }
 
 
+/** The open editor's body row (scoped): its id cell (col 0) and title cell (col 1) text. */
+async function openEditorRow(page: Page, scopeTestId: string): Promise<{ id: string; title: string; col: string | null } | null> {
+  return page.evaluate((scopeId) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
+    if (!scope) return null;
+    const ed = findFirst(scope, '[data-editing-cell]');
+    if (!ed) return null;
+    const cell = ed.closest('[data-grid-cell]');
+    const row = cell ? cell.getAttribute('data-row') : null;
+    const grid = findFirst(scope, 'table[role="grid"]');
+    if (!grid || row == null) return null;
+    const txt = (c: number) => {
+      const el = grid.querySelector(`[data-grid-cell][data-row="${row}"][data-col-index="${c}"]`);
+      return el ? (el.textContent || '').trim() : '';
+    };
+    return { id: txt(0), title: txt(1), col: cell ? cell.getAttribute('data-col-index') : null };
+  }, scopeTestId);
+}
+
+/** Focus the scoped grid's roving tab stop (the `[tabindex="0"]` cell). */
+async function focusTabStop(page: Page, scopeTestId: string): Promise<void> {
+  await page.evaluate((scopeId) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
+    const grid = scope ? findFirst(scope, 'table[role="grid"]') : null;
+    const el = grid ? (grid.querySelector('[data-grid-cell][tabindex="0"]') as HTMLElement | null) : null;
+    if (el) el.focus();
+  }, scopeTestId);
+}
+
 interface ViewState { held: boolean; filterMismatches: number; sortMismatches: number }
 
 /** The last `view-state-change` payload (null before the first one). */
@@ -615,5 +668,74 @@ for (const target of TARGETS) {
     await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
     await expect.poll(async () => (await tabStop(page, 'grid-live'))?.title, { timeout: 10_000 }).toBe('Gamma');
     expect((await tabStop(page, 'grid-live'))?.row).toBe('4');
+  });
+  // Fix round 1 (#1): an open editor stays on the record it was opened for. Tab-commit under a
+  // sort on the edited column relocates the row; the editor Tab opens (owner, same record) must
+  // follow it, and committing it writes to that record only.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-d) Tab-advance editor follows its record across the re-sort`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'sort-title-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await enterEditAt(page, 'grid-live', 0, TITLE_COL);
+    const ed = page.locator('[data-editing-cell]').first();
+    await ed.fill('Zzz');
+    await ed.press('Tab');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live'))[0]?.title, { timeout: 10_000 }).toBe('Zzz');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['2', '4', '5', '3', '6', '1']);
+    // The editor that opened is the owner cell of the SAME record (id 1, title Zzz).
+    await expect.poll(async () => openEditorRow(page, 'grid-live'), { timeout: 10_000 }).toEqual({ id: '1', title: 'Zzz', col: String(OWNER_COL) });
+    await settleFrames(page, 4);
+    expect(await openEditorRow(page, 'grid-live')).toEqual({ id: '1', title: 'Zzz', col: String(OWNER_COL) });
+    expect(await openEditor(page, 'grid-live')).toEqual({ value: 'Dana', col: String(OWNER_COL) });
+    await commitEditorValue(page, 'Ann');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live')).map((r) => r.owner), { timeout: 10_000 })
+      .toEqual(['Ann', 'Eli', 'Fay', 'Dana', 'Gus', 'Hal']);
+    expect((await modelRows(page, 'model-readout-live')).map((r) => r.title)).toEqual(['Zzz', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zed']);
+  });
+
+  // Fix round 1 (#3a): a pure view change (no write) that excludes the active record parks.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-e) a filter change excluding the active record parks`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await focusBodyCellStable(page, 'grid-live', 1, OWNER_COL); // id 2, owner Eli
+    await clickTestId(page, 'filter-owner-dana-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '4']);
+    await expect.poll(async () => (await tabStop(page, 'grid-live'))?.role, { timeout: 10_000 }).toBe('columnheader');
+    expect((await tabStop(page, 'grid-live'))?.col).toBe(String(OWNER_COL));
+    await focusTabStop(page, 'grid-live');
+    await expect.poll(async () => (await activeCellCoords(page, 'grid-live'))?.role, { timeout: 10_000 }).toBe('columnheader');
+    const before = await readoutText(page, 'model-readout-live');
+    await page.keyboard.press('a');
+    await page.keyboard.press('Enter');
+    await settleFrames(page, 4);
+    expect(await readoutText(page, 'model-readout-live')).toBe(before);
+  });
+
+  // Fix round 1 (#3b): releasing a hold (holdView on → off) is a view change — a held,
+  // no-longer-matching active record parks on its header.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-f) a holdView release parks a held mismatch`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await holdEditedOwner(page);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    await focusBodyCellStable(page, 'grid-table', 0, OWNER_COL); // id 1, now owner Sam (held)
+    await clickTestId(page, 'hold-off');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['4']);
+    await expect.poll(async () => (await tabStop(page, 'grid-table'))?.role, { timeout: 10_000 }).toBe('columnheader');
+    expect((await tabStop(page, 'grid-table'))?.col).toBe(String(OWNER_COL));
+  });
+
+  // Fix round 1 (#2): a write on a ONE-WAY `:data` grid is never echoed, so its write flag must
+  // not survive an external swap — the swap removing the active record CLAMPS (D-05) rather
+  // than parking, on all six targets.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-g) external swap after an un-echoed write clamps`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => findGridTableWithin(page, 'grid-oneway'), { timeout: 15_000 }).toBe(true);
+    await enterEditAt(page, 'grid-oneway', 0, TITLE_COL);
+    await commitEditorValue(page, 'Q');
+    await expect.poll(async () => openEditor(page, 'grid-oneway'), { timeout: 10_000 }).toBeNull();
+    await settleFrames(page, 4);
+    await clickTestId(page, 'swap-oneway');
+    await expect.poll(async () => visibleIds(page, 'grid-oneway'), { timeout: 10_000 }).toEqual(['2', '3', '4']);
+    await settleFrames(page, 4);
+    expect(await tabStop(page, 'grid-oneway')).toMatchObject({ row: '0', role: 'gridcell' });
   });
 }

@@ -1782,6 +1782,11 @@ const maybeClearHistoryOnExternalSwap = () => {
   if (pd === lastPropsData) return   // $props.data did not change → not an external swap
   lastPropsData = pd
   if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return   // descends from our write → keep
+  // An external swap is a reset, not one of our writes: drop a write flag no echo consumed
+  // (one-way `data`). Here AND in reFeed, so it holds whichever of the two runs first on a
+  // target (Lit's $onUpdate and React's/Solid's effect order run this one before reFeed, after
+  // which reFeed's isExternalSwap() already reads false).
+  pendingWrite = false
   // A genuine external swap (runs regardless of `undoable`): it re-derives a held view (a
   // backstop — reFeed normally released it already, before its own refresh) …
   if (holdCtrl.isHolding()) {
@@ -1900,7 +1905,7 @@ import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection,
 
 import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, activeCellHasControls, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
-import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell, followActiveCell } from './gridKeydownHandlers.rzts'
+import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell, followActiveCell, rowIdInModel, modelIndexOfRowId } from './gridKeydownHandlers.rzts'
 
 // ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
 // the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to

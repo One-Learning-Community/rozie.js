@@ -22,7 +22,11 @@
   Active-cell follow (Task 5): a SECOND grid-mode DataTable (data-testid="grid-live") with
   holdView OFF over its own copy of the rows (r-model:data → rowsLive, readout
   `model-readout-live`), its own controlled sorting/columnFilters, and `sort-title-live` /
-  `filter-owner-dana-live` buttons. No loop var / slot param named row/cell/header (Svelte
+  `filter-owner-dana-live` buttons.
+
+  A THIRD grid (data-testid="grid-oneway") binds `:data` ONE-WAY (no r-model): its own writes
+  are never echoed back, and `swap-oneway` replaces the dataset with fresh rows lacking id 1 —
+  an external swap that must keep the D-05 clamp fallback on all six targets. No loop var / slot param named row/cell/header (Svelte
   mount-throw discipline) — the #cell slot binds value only.
 -->
 
@@ -52,6 +56,11 @@
     { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d', 'd2'],      owner: 'Dana', minQty: 8 },
     { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
     { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal',  minQty: 9 },
+  ],
+  rowsOneWay: [
+    { id: 1, title: 'Alpha' },
+    { id: 2, title: 'Beta' },
+    { id: 3, title: 'Gamma' },
   ],
   filtersLive: [],
   sortLive: [],
@@ -168,6 +177,13 @@ const sortTitleLive = (): void => {
 const filterOwnerDanaLive = (): void => {
   $data.filtersLive = [{ id: 'owner', value: 'Dana' }]
 }
+const swapOneWay = (): void => {
+  $data.rowsOneWay = [
+    { id: 2, title: 'Beta' },
+    { id: 3, title: 'Gamma' },
+    { id: 4, title: 'Delta' },
+  ]
+}
 const groupOwner = (): void => {
   const api = $refs.dt
   if (api && api.applyGrouping) api.applyGrouping(['owner'])
@@ -263,6 +279,17 @@ const groupOwner = (): void => {
       <template #cell="{ value }">
         <span data-testid="cell-display">{{ Array.isArray(value) ? value.join(',') : value }}</span>
       </template>
+    </DataTable>
+  </div>
+
+  <h3>One-way data grid — an external swap clamps</h3>
+  <div class="controls">
+    <button type="button" data-testid="swap-oneway" @click="swapOneWay">swap data (one-way)</button>
+  </div>
+  <div data-testid="grid-oneway">
+    <DataTable interactionMode="grid" :getRowId="rowId" :data="$data.rowsOneWay">
+      <Column field="id" header="Id" />
+      <Column field="title" header="Title" :editable="true" editor="text" />
     </DataTable>
   </div>
 </div>

@@ -114,15 +114,28 @@ const onEditorKeyDown = (e) => {
     const target = e.shiftKey
       ? prevEditableCell(fromRow, fromCol)
       : nextEditableCell(fromRow, fromCol)
+    // Part 3 (2026-11-06 design): the advance targets a RECORD, not an index. The commit below
+    // can re-sort / re-filter the rows (a write under an active sort or filter on the edited
+    // column), so capture the target row's id now — from table-core's live model, which agrees
+    // with the rendered rows before the write — and resolve its index again after the commit.
+    const targetRowId = target ? rowIdInModel(target.row) : null
     // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
     // straight into the next editable cell's editor below. Use the RETURN value (not a
     // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
     // failure returns false and keeps the editor open (the user must fix the value first).
     const committed = commitEdit(undefined, true)
-    if (committed && target) {
-      $data.activeRow = target.row
+    // Where the target record is NOW: on targets whose re-derive runs synchronously inside the
+    // write this is already the re-derived index; elsewhere the model has not re-derived yet,
+    // the index is unchanged, and the refresh that follows moves the open editor and the active
+    // cell with the record (followActiveCell). -1: the record already left the view — open
+    // nothing (the refresh parked the active cell on its header).
+    const advanceRow = targetRowId != null ? modelIndexOfRowId(targetRowId) : -1
+    if (committed && target && advanceRow >= 0) {
+      $data.activeRow = advanceRow
       $data.activeColIndex = target.col
-      beginEdit(target.row, target.col, null)
+      beginEdit(advanceRow, target.col, null)
+    } else if (committed && target) {
+      // The target record left the view: nothing to advance into.
     } else if (committed) {
       // B5: no editable cell in the Tab direction (grid start/end) — keep focus INSIDE the
       // grid by returning it to the just-committed cell instead of letting it drop to <body>.

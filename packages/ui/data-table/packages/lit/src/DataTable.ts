@@ -4577,6 +4577,11 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (pd === this.lastPropsData) return; // $props.data did not change → not an external swap
   this.lastPropsData = pd;
   if (pd != null && (pd as any)[this.DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
+  // An external swap is a reset, not one of our writes: drop a write flag no echo consumed
+  // (one-way `data`). Here AND in reFeed, so it holds whichever of the two runs first on a
+  // target (Lit's $onUpdate and React's/Solid's effect order run this one before reFeed, after
+  // which reFeed's isExternalSwap() already reads false).
+  this.pendingWrite = false;
   // A genuine external swap (runs regardless of `undoable`): it re-derives a held view (a
   // backstop — reFeed normally released it already, before its own refresh) …
   if (this.holdCtrl.isHolding()) {
@@ -6705,6 +6710,57 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
 };
 
+  // followOpenEditors: when a re-derive changed the rows under an open single-cell editor or
+  // full-row editor, re-address it to its record's new index (re-seating editor focus there),
+  // or — when the record left the view — close it WITHOUT writing (its draft belonged to a record
+  // that is no longer on screen; the active cell, on the same record, parks). Returns true when an
+  // editor is still open on a moved record (it, not the cell, owns DOM focus).
+  followOpenEditors = (prevIds: any, nextIds: any) => {
+  if (!prevIds || sameIdSequence(prevIds, nextIds)) return false;
+  let owns = false;
+  const er = this._editingRow.value;
+  if (er >= 0) {
+    const ef = resolveFollow(prevIds, er, nextIds, true);
+    if (ef.kind === 'move') {
+      this._editingRow.value = ef.index;
+      this.focusEditorWhenReady(ef.index, this._editingCol.value, false);
+      owns = true;
+    } else if (ef.kind !== 'stay') {
+      // Latch the session (an unmount blur must not commit the stale draft) and tear down.
+      this.committedThisSession = true;
+      this.editTransition = true;
+      this.endEdit();
+      this.editTransition = false;
+    }
+  }
+  const rr = this._editingRowIndex.value;
+  if (rr != null && rr >= 0) {
+    const rf = resolveFollow(prevIds, rr, nextIds, true);
+    if (rf.kind === 'move') {
+      this._editingRowIndex.value = rf.index;
+      owns = true;
+    } else if (rf.kind !== 'stay') {
+      this.editTransition = true;
+      this.endRowEdit();
+      this.editTransition = false;
+    }
+  }
+  return owns;
+};
+
+  // The row id at a visible index / the visible index of a row id, read off table-core's LIVE
+  // model (windowSource — the same index space as $data.rows), never the React-stale $data.rows.
+  rowIdInModel = (index: any) => {
+  const row = this.windowSource()[index];
+  return row ? row.id : null;
+};
+
+  modelIndexOfRowId = (id: any) => {
+  const rows = this.windowSource();
+  for (let i = 0; i < rows.length; i++) if (rows[i].id === id) return i;
+  return -1;
+};
+
   // Part 3 (design 2026-11-06): the active cell follows its RECORD across every re-derive.
   // refreshRowModel hands over the previous and next visible row ids (fresh locals — never the
   // React-stale $data.rows) and whether the rows changed because of a view change (sort /
@@ -6722,11 +6778,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // their order, so the range stays.
   followActiveCell = (prevIds: any, nextIds: any, viewChangeOrWrite: any, rowCount: any, colCount: any, editFollowPending = false) => {
   if (!this.isGrid()) return;
+  // An OPEN editor stays on the record it was opened for (its editing pair is index-addressed
+  // over the visible rows). Done first so the active-cell move below knows the editor owns focus.
+  const editorOwnsFocus = this.followOpenEditors(prevIds, nextIds);
   let follow: any = null;
   if (this.activeCellEngaged && rowCount > 0 && !this._activeIsHeader.value && !this.gridEmptyFallback) {
     follow = resolveFollow(prevIds, this._activeRow.value, nextIds, viewChangeOrWrite);
   }
-  this.clampActiveCell(rowCount, colCount, follow, editFollowPending);
+  this.clampActiveCell(rowCount, colCount, follow, editFollowPending || editorOwnsFocus);
   if (viewChangeOrWrite && !sameIdSequence(prevIds, nextIds)) this.clearRange();
 };
 
@@ -9200,15 +9259,28 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     const fromRow = this._editingRow.value;
     const fromCol = this._editingCol.value;
     const target = e.shiftKey ? this.prevEditableCell(fromRow, fromCol) : this.nextEditableCell(fromRow, fromCol);
+    // Part 3 (2026-11-06 design): the advance targets a RECORD, not an index. The commit below
+    // can re-sort / re-filter the rows (a write under an active sort or filter on the edited
+    // column), so capture the target row's id now — from table-core's live model, which agrees
+    // with the rendered rows before the write — and resolve its index again after the commit.
+    const targetRowId = target ? this.rowIdInModel(target.row) : null;
     // skipFocusReturn=true: don't bounce focus back to the committed cell — we advance
     // straight into the next editable cell's editor below. Use the RETURN value (not a
     // re-read of $data.editingRow — async-stale on React) to gate the advance: a validation
     // failure returns false and keeps the editor open (the user must fix the value first).
     const committed = this.commitEdit(undefined, true);
-    if (committed && target) {
-      this._activeRow.value = target.row;
+    // Where the target record is NOW: on targets whose re-derive runs synchronously inside the
+    // write this is already the re-derived index; elsewhere the model has not re-derived yet,
+    // the index is unchanged, and the refresh that follows moves the open editor and the active
+    // cell with the record (followActiveCell). -1: the record already left the view — open
+    // nothing (the refresh parked the active cell on its header).
+    const advanceRow = targetRowId != null ? this.modelIndexOfRowId(targetRowId) : -1;
+    if (committed && target && advanceRow >= 0) {
+      this._activeRow.value = advanceRow;
       this._activeColIndex.value = target.col;
-      this.beginEdit(target.row, target.col, null);
+      this.beginEdit(advanceRow, target.col, null);
+    } else if (committed && target) {
+      // The target record left the view: nothing to advance into.
     } else if (committed) {
       // B5: no editable cell in the Tab direction (grid start/end) — keep focus INSIDE the
       // grid by returning it to the just-committed cell instead of letting it drop to <body>.
