@@ -1,5 +1,11 @@
 # @rozie-ui/text-field-angular
 
+## 0.1.2
+
+### Patch Changes
+
+- 3c4b293: README fixes: the Svelte theming import is shown as a TypeScript snippet.
+
 ## 0.1.1
 
 ### Patch Changes

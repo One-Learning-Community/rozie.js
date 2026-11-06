@@ -1,5 +1,11 @@
 # @rozie-ui/wavesurfer-solid
 
+## 0.1.14
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-waveform>` selector (the PascalCase tag they showed fails to compile with NG8001).
+
 ## 0.1.13
 
 ### Patch Changes

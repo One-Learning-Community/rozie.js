@@ -1,5 +1,11 @@
 # @rozie-ui/toast-react
 
+## 0.3.2
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-toaster>` selector (the PascalCase tag they showed fails to compile with NG8001); the Svelte theming import is shown as a TypeScript snippet; the Angular undo action narrows its `unknown` `data`.
+
 ## 0.3.1
 
 ### Patch Changes

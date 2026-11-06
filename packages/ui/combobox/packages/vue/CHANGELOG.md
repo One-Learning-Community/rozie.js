@@ -1,5 +1,11 @@
 # @rozie-ui/combobox-vue
 
+## 0.8.3
+
+### Patch Changes
+
+- 3c4b293: README fixes: the Svelte theming import is shown as a TypeScript snippet.
+
 ## 0.8.2
 
 ### Patch Changes

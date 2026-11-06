@@ -1,5 +1,11 @@
 # @rozie-ui/pagination-vue
 
+## 0.1.9
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-pagination>` selector (the PascalCase tag they showed fails to compile with NG8001); the Svelte theming import is shown as a TypeScript snippet.
+
 ## 0.1.8
 
 ### Patch Changes

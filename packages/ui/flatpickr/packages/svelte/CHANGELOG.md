@@ -1,5 +1,11 @@
 # @rozie-ui/flatpickr-svelte
 
+## 0.2.3
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-flatpickr>` selector (the PascalCase tag they showed fails to compile with NG8001); the Angular `change` handler takes the `unknown` output payload.
+
 ## 0.2.2
 
 ### Patch Changes

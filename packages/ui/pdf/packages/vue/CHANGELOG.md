@@ -1,5 +1,11 @@
 # @rozie-ui/pdf-vue
 
+## 0.2.6
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-pdf-viewer>` selector (the PascalCase tag they showed fails to compile with NG8001).
+
 ## 0.2.5
 
 ### Patch Changes

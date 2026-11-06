@@ -1,5 +1,11 @@
 # @rozie-ui/codemirror-svelte
 
+## 0.1.9
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-code-mirror>` selector (the PascalCase tag they showed fails to compile with NG8001).
+
 ## 0.1.8
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/captcha-react
 
+## 0.1.17
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the `<rozie-captcha>` and `<rozie-recaptcha-v3>` selectors (the PascalCase tags they showed fail to compile with NG8001); the `verify` handler takes the `unknown` output payload, and the forms example sets the required `sitekey`.
+
 ## 0.1.16
 
 ### Patch Changes

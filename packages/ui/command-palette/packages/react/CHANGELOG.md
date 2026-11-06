@@ -1,5 +1,11 @@
 # @rozie-ui/command-palette-react
 
+## 0.5.4
+
+### Patch Changes
+
+- 3c4b293: README fixes: the Svelte theming import is shown as a TypeScript snippet; the Vue and Angular `select` handlers accept the payload's `(string | null)[]` path.
+
 ## 0.5.3
 
 ### Patch Changes

@@ -1,5 +1,11 @@
 # @rozie-ui/rete-react
 
+## 0.3.11
+
+### Patch Changes
+
+- 3c4b293: README fixes: the Svelte theming import is shown as a TypeScript snippet.
+
 ## 0.3.10
 
 ### Patch Changes

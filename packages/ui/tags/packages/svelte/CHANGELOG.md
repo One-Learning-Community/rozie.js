@@ -1,5 +1,11 @@
 # @rozie-ui/tags-svelte
 
+## 0.2.3
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-tags>` selector (the PascalCase tag they showed fails to compile with NG8001); the Svelte theming import is shown as a TypeScript snippet; the Angular `add` handler takes the `unknown` output payload.
+
 ## 0.2.2
 
 ### Patch Changes

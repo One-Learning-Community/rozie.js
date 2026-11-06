@@ -1,5 +1,11 @@
 # @rozie-ui/slider-solid
 
+## 0.1.8
+
+### Patch Changes
+
+- 7366768: README fixes: examples that typecheck under strict TypeScript, and known-limitation notes (no native form submission on number-field, slider and switch; no right-to-left support on slider and resizable).
+
 ## 0.1.7
 
 ### Patch Changes

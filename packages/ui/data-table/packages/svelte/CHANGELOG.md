@@ -1,5 +1,11 @@
 # @rozie-ui/data-table-svelte
 
+## 0.8.1
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the `<rozie-data-table>`, `<rozie-column>` and other child-component selectors (the PascalCase tags they showed fail to compile with NG8001), and the grouping and faceting examples no longer nest backticks inside the template string.
+
 ## 0.8.0
 
 ### Minor Changes

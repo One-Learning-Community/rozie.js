@@ -1,5 +1,11 @@
 # @rozie-ui/sortable-list-angular
 
+## 0.1.16
+
+### Patch Changes
+
+- 3c4b293: README fixes: Angular examples use the component's `<rozie-sortable-list>` selector (the PascalCase tag they showed fails to compile with NG8001).
+
 ## 0.1.15
 
 ### Patch Changes
