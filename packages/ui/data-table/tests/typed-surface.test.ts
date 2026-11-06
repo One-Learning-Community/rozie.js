@@ -43,6 +43,7 @@ const EVENTS: Array<[string, string, string, string | null]> = [
   ['selection-change', 'onSelectionChange', 'onselectionchange', 'RowSelectionState'],
   ['sort-change', 'onSortChange', 'onsortchange', 'SortingState'],
   ['visibility-change', 'onVisibilityChange', 'onvisibilitychange', 'VisibilityState'],
+  ['view-state-change', 'onViewStateChange', 'onviewstatechange', 'DataTableViewState'],
   ['visible-range-change', 'onVisibleRangeChange', 'onvisiblerangechange', 'DataTableVisibleRangeChangePayload'],
 ];
 
@@ -53,6 +54,7 @@ const VERBS = [
   'toggleColumnVisibility', 'applyColumnOrder', 'resetColumnSizing', 'pinColumn', 'focusCell',
   'getActiveCell', 'clearActiveCell', 'getScrollElement', 'getRowIndexRelativeToPage', 'editCell',
   'commitEditing', 'editRow', 'getSelectedRange', 'cut', 'undo', 'redo', 'canUndo', 'canRedo', 'clearHistory',
+  'refreshView', 'getViewState',
 ];
 
 describe('DataTable typed events (F9)', () => {

@@ -46,6 +46,8 @@ export const eventManifest = {
     'Fired when the RENDERED row window changes under row windowing (`virtual`) — the window the table actually renders, overscan included — and once after mount. Payload `{ start, end }` over the full row space (`end` exclusive; with lazy rows that space is `rowCount` long). Deduped: a scroll that does not move the window emits nothing. Pair with `manual` + `rowCount` and sparse `data` to fetch the rows the viewport needs.',
   'history-change':
     'Fired when undo/redo AVAILABILITY changes (one unified grid-wide undo/redo stack, not scoped per-cell or per-row) — EDGE-triggered (only when `canUndo`/`canRedo` actually flip, not on every recorded edit) so a toolbar can enable/disable its buttons without polling. Only meaningful when `undoable` is `true`. Payload is `{ canUndo, canRedo }` booleans. No `history` model prop exists, so there is no model-prop==emit-name duplicate-identifier collision.',
+  'view-state-change':
+    'Fired when the held-view state changes (`holdView`) — EDGE-triggered (only when `held`, `filterMismatches` or `sortMismatches` changes). Payload `{ held, filterMismatches, sortMismatches }`: `held` is whether the view is held right now (`false` when `holdView` is off or the table fell back to live behaviour under grouping, `manual` or tree data — both counts are then 0); `filterMismatches` counts rows whose membership differs from the current filters in either direction; `sortMismatches` counts rows written since the last re-derive whose held position differs from the live sort. Call `refreshView()` to re-derive.',
 };
 
 export default eventManifest;

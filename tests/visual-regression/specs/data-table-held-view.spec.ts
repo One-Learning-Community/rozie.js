@@ -248,6 +248,59 @@ async function visibleIds(page: Page): Promise<string[]> {
   });
 }
 
+
+interface ViewState { held: boolean; filterMismatches: number; sortMismatches: number }
+
+/** The last `view-state-change` payload (null before the first one). */
+async function viewState(page: Page): Promise<ViewState | null> {
+  const raw = await readoutText(page, 'view-state');
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as ViewState;
+  } catch {
+    return null;
+  }
+}
+
+/** True once a selector exists inside the scoped grid (shadow-pierced). */
+async function gridHas(page: Page, selector: string): Promise<boolean> {
+  return page.evaluate((sel) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, '[data-testid="grid-table"]');
+    if (!scope) return false;
+    const grid = findFirst(scope, 'table[role="grid"]');
+    return !!(grid && grid.querySelector(sel));
+  }, selector);
+}
+
+/** Body row count (tbody tr), shadow-pierced. */
+async function bodyRowCount(page: Page): Promise<number> {
+  return (await visibleIds(page)).length;
+}
+
+const OWNER_COL = 4;
+const TITLE_COL = 1;
+
+/** filter owner=Dana → [1,4]; edit row 0's owner to Sam → the row is held on screen. */
+async function holdEditedOwner(page: Page): Promise<void> {
+  await clickTestId(page, 'filter-owner-dana');
+  await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+  await enterEditAt(page, 'grid-table', 0, OWNER_COL);
+  await commitEditorValue(page, 'Sam');
+  await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.owner, { timeout: 10_000 }).toBe('Sam');
+}
+
 async function clickTestId(page: Page, id: string): Promise<void> {
   await page.getByTestId(id).click();
 }
@@ -311,12 +364,109 @@ for (const target of TARGETS) {
   });
 
   // Turned on by Task 4 (refreshView): closure filterFn sees the latest value after a refresh.
-  test.fixme(`data-table-held-view [${target}]: (p1-d) closure filterFn uses latest value after refreshView`, async ({ page }) => {
+  runnerFor(target)(`data-table-held-view [${target}]: (p1-d) closure filterFn uses latest value after refreshView`, async ({ page }) => {
     await gotoDemo(page, target);
     await clickTestId(page, 'filter-threshold');
     await expect.poll(async () => (await visibleIds(page)).length, { timeout: 10_000 }).toBe(6);
     await clickTestId(page, 'bump-closure');
     await clickTestId(page, 'refresh-view');
     await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['3', '4', '6']);
+  });
+
+  // ── Part 2: holding the view (Task 4) ───────────────────────────────────────────────
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-a) edited row stays, counted, refresh removes`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+    await holdEditedOwner(page);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    expect(await visibleIds(page)).toEqual(['1', '4']);
+
+    await clickTestId(page, 'refresh-view');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['4']);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-b) sort hold then flip`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'sort-title');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await enterEditAt(page, 'grid-table', 0, TITLE_COL);
+    await commitEditorValue(page, 'Zzz');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.title, { timeout: 10_000 }).toBe('Zzz');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 1 });
+    expect(await visibleIds(page)).toEqual(['1', '2', '4', '5', '3', '6']);
+
+    await clickTestId(page, 'flip-sort');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '6', '3', '5', '4', '2']);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-c) undo after refresh is counted, not shown`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await holdEditedOwner(page);
+    await clickTestId(page, 'refresh-view');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['4']);
+
+    await clickTestId(page, 'undo-btn');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.owner, { timeout: 10_000 }).toBe('Dana');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    expect(await visibleIds(page)).toEqual(['4']);
+
+    await clickTestId(page, 'refresh-view');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-d) select-all includes held mismatches`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await holdEditedOwner(page);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    await clickTestId(page, 'selection-on');
+    await expect.poll(async () => gridHas(page, 'input[type="checkbox"]'), { timeout: 10_000 }).toBe(true);
+    await clickTestId(page, 'select-all');
+    await expect.poll(async () => readoutText(page, 'selected-count'), { timeout: 10_000 }).toBe('2');
+    expect(await bodyRowCount(page)).toBe(2);
+    expect((await viewState(page))?.held).toBe(true);
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-e) paging walks held rows`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'sort-title');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await enterEditAt(page, 'grid-table', 0, TITLE_COL);
+    await commitEditorValue(page, 'Zzz');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 1 });
+    // Page 2 of the HELD order (live would be [3, 6, 1]).
+    await clickTestId(page, 'next-page');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['5', '3', '6']);
+    expect(await viewState(page)).toEqual({ held: true, filterMismatches: 0, sortMismatches: 1 });
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: hold survives r-model echo`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await holdEditedOwner(page);
+    // Let the two-way echo of the stamped array round-trip back into $props.data.
+    await page.waitForTimeout(400);
+    expect(await visibleIds(page)).toEqual(['1', '4']);
+    expect(await viewState(page)).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: external swap releases the hold`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await holdEditedOwner(page);
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    await clickTestId(page, 'swap-data');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.owner, { timeout: 10_000 }).toBe('Dana');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+    await clickTestId(page, 'canundo-btn');
+    await expect.poll(async () => readoutText(page, 'canundo-readout'), { timeout: 10_000 }).toBe('false');
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-f) grouping falls back`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => (await viewState(page))?.held, { timeout: 10_000 }).toBe(true);
+    await clickTestId(page, 'group-owner');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: false, filterMismatches: 0, sortMismatches: 0 });
   });
 }

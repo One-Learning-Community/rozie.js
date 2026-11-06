@@ -90,6 +90,7 @@ Every change event fires **regardless** of whether the matching `r-model` slice 
 | `range-change` | **Grid mode only.** Fired when the rectangular cell-range selection changes (extended via `Shift+Arrow` / `Shift+Click`). Payload: `{ anchor, focus }` — each corner a `{ rowIndex, colIndex }` index pair over the visible model, or `{ anchor: null, focus: null }` when no range is set. One-way (this event + the `getSelectedRange` verb), never a `model:true` slice. |
 | `visible-range-change` | **Requires row windowing (`virtual`).** Fired when the rendered row window changes (overscan included), and once after mount. Payload: `{ start, end }` over the full row space, `end` exclusive — with lazy rows (`manual` + `rowCount` + sparse `data`) that space is `rowCount` long. Deduped: a scroll that does not move the window emits nothing. See [lazy loading](/components/data-table-virtualization#lazy-loading). |
 | `history-change` | **Requires `undoable`.** Fired when undo/redo availability changes: always after an `undo()`/`redo()` call, and when a recorded edit flips `canUndo`/`canRedo` (edge-gated, so a streak of edits that leaves availability unchanged fires nothing). Payload: `{ canUndo: boolean, canRedo: boolean }`. Drive undo/redo toolbar-button enablement from it. |
+| `view-state-change` | **Requires `holdView`.** Fired when the held-view state changes — only when `held`, `filterMismatches` or `sortMismatches` changes. Payload: `{ held: boolean, filterMismatches: number, sortMismatches: number }`. `held` is `false` when `holdView` is off or the table fell back to live behaviour (grouping, `manual`, tree data); both counts are then 0. `filterMismatches` counts rows whose membership differs from the current filters in either direction; `sortMismatches` counts rows written since the last re-derive whose held position differs from the live sort. Drive a "Refresh" prompt from it and call `refreshView()`. |
 
 ## Imperative handle
 
@@ -133,6 +134,8 @@ Declared once in the source via `$expose`; obtained through each framework's nat
 | `canUndo` | Return whether an undo snapshot is available: `canUndo()` returns a boolean (always `false` when `undoable` is off). |
 | `canRedo` | Return whether a redo snapshot is available: `canRedo()` returns a boolean. |
 | `clearHistory` | Empty both the undo and redo stacks: `clearHistory()`. The table also clears its history automatically when the bound `data` is swapped externally (a new dataset should not inherit the old one's undo stack). |
+| `refreshView` | Re-derive the view from the current filters and sort: `refreshView()`. Releases a held view (`holdView`) and resets both mismatch counts to 0. Works with `holdView` off too: it forces custom `filterFn` / `sortingFn` rules to re-run (table-core does not re-filter or re-sort when only a column rule, or the outside state a closure rule reads, changes). |
+| `getViewState` | Return the held-view state: `getViewState()` → `{ held, filterMismatches, sortMismatches }` (the `view-state-change` payload). |
 
 ## Slots
 

@@ -30,6 +30,7 @@ getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as mak
 // guard so they never execute when off — the import token is the only static virtual-core
 // presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+import { createHoldController, viewStatesEqual, CLEAN_VIEW_STATE } from './helpers/heldView';
 
 // table-core instance — top-level `let` referenced from hooks → React hoists to
 // useRef (hoistModuleLet). NULL until $onMount: createTable lives in $onMount so its
@@ -103,6 +104,12 @@ export interface DataTableFilterChangePayload {
 export interface DataTableHistoryChangePayload {
   canUndo: boolean;
   canRedo: boolean;
+}
+/** The held-view state (`holdView`): whether the view is held right now, and how many rows the held view disagrees with. */
+export interface DataTableViewState {
+  held: boolean;
+  filterMismatches: number;
+  sortMismatches: number;
 }
 /** The `range-change` payload: the new range corners (both `null` when the range cleared). */
 export type DataTableRangeChangePayload = DataTableRange;
@@ -268,6 +275,10 @@ interface DataTableProps {
    */
   undoLimit?: number;
   /**
+   * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one dev warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
+   */
+  holdView?: boolean;
+  /**
    * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
    */
   virtual?: boolean | string;
@@ -299,6 +310,7 @@ interface DataTableProps {
   onSelectionChange?: (payload: RowSelectionState) => void;
   onSortChange?: (payload: SortingState) => void;
   onVisibilityChange?: (payload: VisibilityState) => void;
+  onViewStateChange?: (payload: DataTableViewState) => void;
   onVisibleRangeChange?: (payload: DataTableVisibleRangeChangePayload) => void;
   children?: ReactNode;
   renderGroupBar?: (ctx: GroupBarCtx) => ReactNode;
@@ -350,12 +362,14 @@ export interface DataTableHandle {
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
+  refreshView: () => void;
+  getViewState: () => DataTableViewState;
 }
 
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getRowId' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getRowId: ((...args: any[]) => any) | null; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getRowId' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'holdView' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getRowId: ((...args: any[]) => any) | null; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; holdView: boolean; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
@@ -371,15 +385,20 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     singleClickEdit: _props.singleClickEdit ?? false,
     undoable: _props.undoable ?? false,
     undoLimit: _props.undoLimit ?? 100,
+    holdView: _props.holdView ?? false,
     virtual: _props.virtual ?? false,
     estimateRowHeight: _props.estimateRowHeight ?? 40,
     autoMeasure: _props.autoMeasure ?? false,
     maxHeight: _props.maxHeight ?? '',
   };
   const table = useRef<any>(null);
+  const lastHoldSorting = useRef<unknown>(null);
+  const lastHoldColumnFilters = useRef<unknown>(null);
+  const lastHoldGlobalFilter = useRef<unknown>(null);
   const refreshRowModel = useRef<any>(null);
   const virtualizer = useRef<any>(null);
   const pendingEditFollow = useRef<any>(null);
+  const lastViewState = useRef(CLEAN_VIEW_STATE);
   const gridRoot = useRef<any>(null);
   const docPointerDown = useRef<any>(null);
   const outsidePointerDown = useRef(false);
@@ -396,6 +415,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const expandedTouched = useRef(false);
   const programmatic = useRef(0);
   const columnSizingInfoSync = useRef<any>(null);
+  const holdFallbackWarned = useRef(false);
   const measuredRowCount = useRef(0);
   const measuredRowTotal = useRef(0);
   const windowVerBumpPending = useRef(false);
@@ -426,11 +446,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const redoStack = useRef<unknown[]>([]);
   const lastRangeStart = useRef(-1);
   const lastRangeEnd = useRef(-1);
+  const pendingViewChange = useRef(false);
   const focusIntentEpoch = useRef(0);
   const committedThisSession = useRef(false);
   const rowDraftSync = useRef<Record<string, any>>({});
   const editTransition = useRef(false);
   const restoringHistory = useRef<boolean>(false);
+  const pendingWrite = useRef(false);
   const groupRowDescriptorCache = useRef<any>(null);
   const groupRowDescriptorCacheVer = useRef<any>(undefined);
   const dropinTabFlush = useRef<{
@@ -512,6 +534,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _getSubRowsRef.current = props.getSubRows;
   const _manualRef = useRef(props.manual);
   _manualRef.current = props.manual;
+  const _onViewStateChangeRef = useRef(props.onViewStateChange);
+  _onViewStateChangeRef.current = props.onViewStateChange;
   const _pageCountRef = useRef(props.pageCount);
   _pageCountRef.current = props.pageCount;
   const _rowCountRef = useRef(props.rowCount);
@@ -678,7 +702,38 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // → invisible to JSON.stringify / spread / Object.keys (the consumer's data stays clean); namespaced
   // so a consumer array never collides.
   const DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
-
+  // ── Held view (`holdView`) ─────────────────────────────────────────────────────────────
+  // ONE hold controller per instance (helpers/heldView.ts) and the two wrapped row-model
+  // factories built ONCE from it, so createTable and every reFeed setOptions pass the SAME
+  // function references (a fresh wrapper per re-feed would rebuild table-core's memoized
+  // stage). Both wrapped factories are passed ALWAYS — not only while holding — because the
+  // sort-mismatch count is only correct when wrapSorted observes the live sort. While the
+  // controller is not holding, the wrappers return the base model unchanged (same identity),
+  // so a table without `holdView` is behaviour-identical. Top-level `const`s: React lowers each
+  // to a `useMemo(..., [])` (one instance per component). NOT `let`: React hoists a `let` to
+  // `useRef(init)` and does not rewrite a sibling hoisted `let` read inside that initializer to
+  // `.current`, so `let heldX = holdCtrl.wrapX(...)` would call `wrapX` on the ref object.
+  const holdCtrl = useMemo(() => createHoldController(), []);
+  const heldFilteredRowModel = useMemo(() => holdCtrl.wrapFiltered(getFilteredRowModel()), []);
+  const heldSortedRowModel = useMemo(() => holdCtrl.wrapSorted(getSortedRowModel()), []);
+  // Set when the view was re-derived (a sort/filter change, refreshView()) and by writeData on
+  // every table write; consumed by the active-cell follow (Task 5). Plain `let`s, NOT $data —
+  // written and read inside refreshRowModel's call graph (ROZ138 / React stale reads).
+  // The last emitted view-state-change payload (refreshRowModel edge-triggers the emit).
+  // reFeed bookkeeping: the sort/filter references fed last time (a change releases the hold)
+  // and the one-shot fallback warning latch.
+  // Whether the hold applies for state `st`: holdView on, and not one of the live-behaviour
+  // fallbacks (grouping active, `manual`, tree data). Called from $onMount (before the first
+  // pull) and from every reFeed; warns once when holdView is on but cannot hold.
+  const syncHoldActive = useCallback((st: any) => {
+    const wanted = props.holdView === true;
+    const active = wanted && props.manual !== true && props.getSubRows == null && !(st.grouping || []).length;
+    holdCtrl.setActive(active);
+    if (wanted && !active && !holdFallbackWarned.current) {
+      holdFallbackWarned.current = true;
+      console.warn('[rozie-data-table] holdView falls back to live behaviour while grouping is active, in manual mode, or with tree data (getSubRows); the view is not held.');
+    }
+  }, [props.getSubRows, props.holdView, props.manual]);
   // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
   // has not bound `expanded` and has not yet toggled any group, group-header rows default to
   // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
@@ -1365,6 +1420,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       recordSnapshot(currentData());
       emitHistoryChangeIfEdged(prevU, prevR);
     }
+    // Held view (`holdView`): freeze the view as it is BEFORE this write (a no-op when the
+    // controller is inactive or already holding), then note which source rows this write
+    // replaced (the sort-mismatch count). Outside the `!restoringHistory` branch on purpose:
+    // undo/redo replays are table writes too. pendingWrite is consumed by the active-cell
+    // follow.
+    if (table.current) holdCtrl.capture(table.current);
+    holdCtrl.noteWrite(currentData() || [], Array.isArray(next) ? next : []);
+    pendingWrite.current = true;
     const fresh = Array.isArray(next) ? next.slice() : next;
     try {
       Object.defineProperty(fresh, DATA_WRITE_TOKEN_KEY, {
@@ -2863,11 +2926,27 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // TRANSIENTLY-STALE `$props.data` and wrongly wipe a just-recorded edit's history. The reset is
     // keyed on the `$props.data` REFERENCE actually changing instead — see the $onUpdate backstop
     // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
+    //
+    // Held view: decide whether the hold applies (it falls back to live behaviour under
+    // grouping, `manual`, and tree data), and re-derive on a sort/filter change. Fresh locals
+    // only — the state object is read once here and passed to setOptions below.
+    const st = currentState();
+    syncHoldActive(st);
+    if (st.sorting !== lastHoldSorting.current || st.columnFilters !== lastHoldColumnFilters.current || st.globalFilter !== lastHoldGlobalFilter.current) {
+      lastHoldSorting.current = st.sorting;
+      lastHoldColumnFilters.current = st.columnFilters;
+      lastHoldGlobalFilter.current = st.globalFilter;
+      holdCtrl.release();
+      pendingViewChange.current = true;
+    }
     table.current.setOptions((prev: any) => ({
       ...prev,
       data: feedData(),
       columns: tableColumns(),
-      state: currentState(),
+      state: st,
+      // Held view: the SAME wrapped factory references every re-feed (see holdCtrl).
+      getFilteredRowModel: heldFilteredRowModel,
+      getSortedRowModel: heldSortedRowModel,
       enableRowSelection: rowSelectionOption(),
       enableMultiRowSelection: props.selectionMode === 'multiple',
       // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
@@ -2921,7 +3000,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       onColumnSizingInfoChange: onColumnSizingInfoChangeCb
     }));
     if (refreshRowModel.current) refreshRowModel.current();
-  }, [currentState, feedData, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, rowIdOption, rowIsLazyPlaceholder, rowSelectionOption, tableColumns]);
+  }, [currentState, feedData, onColumnFiltersChangeCb, onColumnOrderChangeCb, onColumnPinningChangeCb, onColumnSizingChangeCb, onColumnSizingInfoChangeCb, onColumnVisibilityChangeCb, onExpandedChangeCb, onGlobalFilterChangeCb, onGroupingChangeCb, onPaginationChangeCb, onRowSelectionChangeCb, onSortingChangeCb, props.expandable, props.getSubRows, props.pageCount, props.rowCount, props.selectionMode, rowIdOption, rowIsLazyPlaceholder, rowSelectionOption, syncHoldActive, tableColumns]);
   // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
   // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
   // preact-signals effect, but `data` is a Lit @property (not a signal) so the effect
@@ -2948,9 +3027,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     const pd = data;
     if (pd === lastPropsData.current) return; // $props.data did not change → not an external swap
     lastPropsData.current = pd;
-    if (!props.undoable) return;
     if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
-    clearHistory();
+    // A genuine external swap (runs regardless of `undoable`): it re-derives a held view …
+    if (holdCtrl.isHolding()) {
+      holdCtrl.release();
+      if (refreshRowModel.current) refreshRowModel.current();
+    }
+    // … and clears undo history (only meaningful when `undoable`).
+    if (props.undoable) clearHistory();
   }, [clearHistory, data, props.undoable]);
   // Header click → toggle sort. Shift-click → ADD a secondary sort (multi-sort). Driven
   // through table-core's column API so the onSortingChange funnel emits the fresh state.
@@ -3687,6 +3771,31 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
   // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
   // stop for every $expose entry.
+  // Held view (`holdView`). refreshView() re-derives the view from the current filters and
+  // sort and resets both mismatch counts. It works with holdView off too: it forces custom
+  // filter/sort functions to re-run. table-core's filter and sort stages memoize on the
+  // columnFilters/sorting array REFERENCES (not on the column defs or the functions), and
+  // release() alone touches neither — so feed table-core SHALLOW COPIES of both arrays, which
+  // invalidates those memos. The next reFeed restores the original references (one harmless
+  // extra recompute). pendingViewChange is the component-scope `let` the active-cell follow
+  // consumes.
+  function refreshView() {
+    holdCtrl.release();
+    pendingViewChange.current = true;
+    if (!table.current) return;
+    table.current.setOptions((p: any) => ({
+      ...p,
+      state: {
+        ...p.state,
+        columnFilters: [...(p.state.columnFilters || [])],
+        sorting: [...(p.state.sorting || [])]
+      }
+    }));
+    if (refreshRowModel.current) refreshRowModel.current();
+  }
+  function getViewState() {
+    return holdCtrl.viewState(table.current);
+  }
   // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
   // identical to phase 48 (roles fall back to the literals, tabindex drops).
   const isGrid = useCallback(() => props.interactionMode === 'grid', [props.interactionMode]);
@@ -7953,6 +8062,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _rowsWindowedRef.current = rowsWindowed;
   const _seedColumnPinningRef = useRef(seedColumnPinning);
   _seedColumnPinningRef.current = seedColumnPinning;
+  const _syncHoldActiveRef = useRef(syncHoldActive);
+  _syncHoldActiveRef.current = syncHoldActive;
   const _syncIndeterminateRef = useRef(syncIndeterminate);
   _syncIndeterminateRef.current = syncIndeterminate;
   const _tableColumnsRef = useRef(tableColumns);
@@ -8003,8 +8114,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       columns: _tableColumnsRef.current(),
       state: _currentStateRef.current(),
       getCoreRowModel: getCoreRowModel(),
-      getSortedRowModel: getSortedRowModel(),
-      getFilteredRowModel: getFilteredRowModel(),
+      // Held view: the wrapped factories, ALWAYS (see holdCtrl's declaration).
+      getSortedRowModel: heldSortedRowModel,
+      getFilteredRowModel: heldFilteredRowModel,
       getPaginationRowModel: getPaginationRowModel(),
       // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
       // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
@@ -8089,6 +8201,14 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
       onStateChange: () => {}
     });
+    // Held view: seed the sort/filter references the table was built with, so the first reFeed
+    // (often the first write's own data re-feed) does not misread them as a view change and
+    // release a just-captured hold.
+    const st0 = _currentStateRef.current();
+    lastHoldSorting.current = st0.sorting;
+    lastHoldColumnFilters.current = st0.columnFilters;
+    lastHoldGlobalFilter.current = st0.globalFilter;
+    _syncHoldActiveRef.current(st0);
     refreshRowModel.current = () => {
       if (!table.current) return;
       // Capture fresh locals; never write a $data key then re-read it in the same fn
@@ -8170,6 +8290,13 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // across selection changes; a microtask defer covers React's post-render DOM patch.
       _syncIndeterminateRef.current();
       if (typeof queueMicrotask !== 'undefined') queueMicrotask(_syncIndeterminateStable);else Promise.resolve().then(_syncIndeterminateStable);
+      // Held view: edge-triggered view-state-change (only when held/filterMismatches/
+      // sortMismatches changed). lastViewState is a plain `let` (ROZ138-safe).
+      const vs = holdCtrl.viewState(table.current);
+      if (!viewStatesEqual(vs, lastViewState.current)) {
+        lastViewState.current = vs;
+        _onViewStateChangeRef.current && _onViewStateChangeRef.current(vs);
+      }
     };
 
     // initial pull
@@ -8387,16 +8514,16 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     seedColumnPinning();
     reFeed();
     maybeClearHistoryOnExternalSwap();
-  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [colReg, columnFilters, columnOrder, columnPinning, columnSizing, columnVisibility, data, dataDefault, expanded, globalFilter, grouping, pagination, props.columns, props.expandable, props.groupable, props.holdView, props.pageCount, props.rowCount, props.selectionMode, rowSelection, sorting]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
     const msg = buildSortFilterAnnounce();
     if (msg) setLiveAnnounce(msg);
   }, [columnFilters, columnFiltersDefault, globalFilter, globalFilterDefault, sorting, sortingDefault]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory });
-  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory };
-  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => flushSync(() => _rozieExposeRef.current.sortColumn(...args)), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => flushSync(() => _rozieExposeRef.current.clearSorting(...args)), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => flushSync(() => _rozieExposeRef.current.toggleRowExpanded(...args)), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => flushSync(() => _rozieExposeRef.current.expandAll(...args)), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => flushSync(() => _rozieExposeRef.current.collapseAll(...args)), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => flushSync(() => _rozieExposeRef.current.getExpandedRows(...args)), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => flushSync(() => _rozieExposeRef.current.applyGrouping(...args)), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => flushSync(() => _rozieExposeRef.current.clearGrouping(...args)), getFacetedUniqueValues: (...args: Parameters<typeof getFacetedUniqueValues>): ReturnType<typeof getFacetedUniqueValues> => flushSync(() => _rozieExposeRef.current.getFacetedUniqueValues(...args)), getFacetedMinMaxValues: (...args: Parameters<typeof getFacetedMinMaxValues>): ReturnType<typeof getFacetedMinMaxValues> => flushSync(() => _rozieExposeRef.current.getFacetedMinMaxValues(...args)), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => flushSync(() => _rozieExposeRef.current.getColumnDefs(...args)), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => flushSync(() => _rozieExposeRef.current.toggleAllRows(...args)), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => flushSync(() => _rozieExposeRef.current.clearSelection(...args)), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => flushSync(() => _rozieExposeRef.current.getSelectedRows(...args)), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => flushSync(() => _rozieExposeRef.current.setPage(...args)), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => flushSync(() => _rozieExposeRef.current.setRowsPerPage(...args)), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => flushSync(() => _rozieExposeRef.current.toggleColumnVisibility(...args)), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => flushSync(() => _rozieExposeRef.current.applyColumnOrder(...args)), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => flushSync(() => _rozieExposeRef.current.resetColumnSizing(...args)), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => flushSync(() => _rozieExposeRef.current.pinColumn(...args)), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => flushSync(() => _rozieExposeRef.current.focusCell(...args)), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => flushSync(() => _rozieExposeRef.current.getActiveCell(...args)), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => flushSync(() => _rozieExposeRef.current.clearActiveCell(...args)), scrollToRow: (...args: Parameters<typeof scrollToRow>): ReturnType<typeof scrollToRow> => flushSync(() => _rozieExposeRef.current.scrollToRow(...args)), getScrollElement: (...args: Parameters<typeof getScrollElement>): ReturnType<typeof getScrollElement> => flushSync(() => _rozieExposeRef.current.getScrollElement(...args)), getRowIndexRelativeToPage: (...args: Parameters<typeof getRowIndexRelativeToPage>): ReturnType<typeof getRowIndexRelativeToPage> => flushSync(() => _rozieExposeRef.current.getRowIndexRelativeToPage(...args)), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => flushSync(() => _rozieExposeRef.current.editCell(...args)), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => flushSync(() => _rozieExposeRef.current.commitEditing(...args)), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => flushSync(() => _rozieExposeRef.current.editRow(...args)), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => flushSync(() => _rozieExposeRef.current.getSelectedRange(...args)), cut: (...args: Parameters<typeof cut>): ReturnType<typeof cut> => flushSync(() => _rozieExposeRef.current.cut(...args)), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => flushSync(() => _rozieExposeRef.current.undo(...args)), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => flushSync(() => _rozieExposeRef.current.redo(...args)), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => flushSync(() => _rozieExposeRef.current.canUndo(...args)), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => flushSync(() => _rozieExposeRef.current.canRedo(...args)), clearHistory: (...args: Parameters<typeof clearHistory>): ReturnType<typeof clearHistory> => flushSync(() => _rozieExposeRef.current.clearHistory(...args)) }), []);
+  const _rozieExposeRef = useRef({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory, refreshView, getViewState });
+  _rozieExposeRef.current = { sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory, refreshView, getViewState };
+  useImperativeHandle(ref, () => ({ sortColumn: (...args: Parameters<typeof sortColumn>): ReturnType<typeof sortColumn> => flushSync(() => _rozieExposeRef.current.sortColumn(...args)), clearSorting: (...args: Parameters<typeof clearSorting>): ReturnType<typeof clearSorting> => flushSync(() => _rozieExposeRef.current.clearSorting(...args)), toggleRowExpanded: (...args: Parameters<typeof toggleRowExpanded>): ReturnType<typeof toggleRowExpanded> => flushSync(() => _rozieExposeRef.current.toggleRowExpanded(...args)), expandAll: (...args: Parameters<typeof expandAll>): ReturnType<typeof expandAll> => flushSync(() => _rozieExposeRef.current.expandAll(...args)), collapseAll: (...args: Parameters<typeof collapseAll>): ReturnType<typeof collapseAll> => flushSync(() => _rozieExposeRef.current.collapseAll(...args)), getExpandedRows: (...args: Parameters<typeof getExpandedRows>): ReturnType<typeof getExpandedRows> => flushSync(() => _rozieExposeRef.current.getExpandedRows(...args)), applyGrouping: (...args: Parameters<typeof applyGrouping>): ReturnType<typeof applyGrouping> => flushSync(() => _rozieExposeRef.current.applyGrouping(...args)), clearGrouping: (...args: Parameters<typeof clearGrouping>): ReturnType<typeof clearGrouping> => flushSync(() => _rozieExposeRef.current.clearGrouping(...args)), getFacetedUniqueValues: (...args: Parameters<typeof getFacetedUniqueValues>): ReturnType<typeof getFacetedUniqueValues> => flushSync(() => _rozieExposeRef.current.getFacetedUniqueValues(...args)), getFacetedMinMaxValues: (...args: Parameters<typeof getFacetedMinMaxValues>): ReturnType<typeof getFacetedMinMaxValues> => flushSync(() => _rozieExposeRef.current.getFacetedMinMaxValues(...args)), getColumnDefs: (...args: Parameters<typeof getColumnDefs>): ReturnType<typeof getColumnDefs> => flushSync(() => _rozieExposeRef.current.getColumnDefs(...args)), toggleAllRows: (...args: Parameters<typeof toggleAllRows>): ReturnType<typeof toggleAllRows> => flushSync(() => _rozieExposeRef.current.toggleAllRows(...args)), clearSelection: (...args: Parameters<typeof clearSelection>): ReturnType<typeof clearSelection> => flushSync(() => _rozieExposeRef.current.clearSelection(...args)), getSelectedRows: (...args: Parameters<typeof getSelectedRows>): ReturnType<typeof getSelectedRows> => flushSync(() => _rozieExposeRef.current.getSelectedRows(...args)), setPage: (...args: Parameters<typeof setPage>): ReturnType<typeof setPage> => flushSync(() => _rozieExposeRef.current.setPage(...args)), setRowsPerPage: (...args: Parameters<typeof setRowsPerPage>): ReturnType<typeof setRowsPerPage> => flushSync(() => _rozieExposeRef.current.setRowsPerPage(...args)), toggleColumnVisibility: (...args: Parameters<typeof toggleColumnVisibility>): ReturnType<typeof toggleColumnVisibility> => flushSync(() => _rozieExposeRef.current.toggleColumnVisibility(...args)), applyColumnOrder: (...args: Parameters<typeof applyColumnOrder>): ReturnType<typeof applyColumnOrder> => flushSync(() => _rozieExposeRef.current.applyColumnOrder(...args)), resetColumnSizing: (...args: Parameters<typeof resetColumnSizing>): ReturnType<typeof resetColumnSizing> => flushSync(() => _rozieExposeRef.current.resetColumnSizing(...args)), pinColumn: (...args: Parameters<typeof pinColumn>): ReturnType<typeof pinColumn> => flushSync(() => _rozieExposeRef.current.pinColumn(...args)), focusCell: (...args: Parameters<typeof focusCell>): ReturnType<typeof focusCell> => flushSync(() => _rozieExposeRef.current.focusCell(...args)), getActiveCell: (...args: Parameters<typeof getActiveCell>): ReturnType<typeof getActiveCell> => flushSync(() => _rozieExposeRef.current.getActiveCell(...args)), clearActiveCell: (...args: Parameters<typeof clearActiveCell>): ReturnType<typeof clearActiveCell> => flushSync(() => _rozieExposeRef.current.clearActiveCell(...args)), scrollToRow: (...args: Parameters<typeof scrollToRow>): ReturnType<typeof scrollToRow> => flushSync(() => _rozieExposeRef.current.scrollToRow(...args)), getScrollElement: (...args: Parameters<typeof getScrollElement>): ReturnType<typeof getScrollElement> => flushSync(() => _rozieExposeRef.current.getScrollElement(...args)), getRowIndexRelativeToPage: (...args: Parameters<typeof getRowIndexRelativeToPage>): ReturnType<typeof getRowIndexRelativeToPage> => flushSync(() => _rozieExposeRef.current.getRowIndexRelativeToPage(...args)), editCell: (...args: Parameters<typeof editCell>): ReturnType<typeof editCell> => flushSync(() => _rozieExposeRef.current.editCell(...args)), commitEditing: (...args: Parameters<typeof commitEditing>): ReturnType<typeof commitEditing> => flushSync(() => _rozieExposeRef.current.commitEditing(...args)), editRow: (...args: Parameters<typeof editRow>): ReturnType<typeof editRow> => flushSync(() => _rozieExposeRef.current.editRow(...args)), getSelectedRange: (...args: Parameters<typeof getSelectedRange>): ReturnType<typeof getSelectedRange> => flushSync(() => _rozieExposeRef.current.getSelectedRange(...args)), cut: (...args: Parameters<typeof cut>): ReturnType<typeof cut> => flushSync(() => _rozieExposeRef.current.cut(...args)), undo: (...args: Parameters<typeof undo>): ReturnType<typeof undo> => flushSync(() => _rozieExposeRef.current.undo(...args)), redo: (...args: Parameters<typeof redo>): ReturnType<typeof redo> => flushSync(() => _rozieExposeRef.current.redo(...args)), canUndo: (...args: Parameters<typeof canUndo>): ReturnType<typeof canUndo> => flushSync(() => _rozieExposeRef.current.canUndo(...args)), canRedo: (...args: Parameters<typeof canRedo>): ReturnType<typeof canRedo> => flushSync(() => _rozieExposeRef.current.canRedo(...args)), clearHistory: (...args: Parameters<typeof clearHistory>): ReturnType<typeof clearHistory> => flushSync(() => _rozieExposeRef.current.clearHistory(...args)), refreshView: (...args: Parameters<typeof refreshView>): ReturnType<typeof refreshView> => flushSync(() => _rozieExposeRef.current.refreshView(...args)), getViewState: (...args: Parameters<typeof getViewState>): ReturnType<typeof getViewState> => flushSync(() => _rozieExposeRef.current.getViewState(...args)) }), []);
 
   return (
     <__ctx_data_table_columns.Provider value={{

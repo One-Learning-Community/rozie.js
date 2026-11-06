@@ -208,6 +208,14 @@ const writeData = (next) => {
     recordSnapshot(currentData())
     emitHistoryChangeIfEdged(prevU, prevR)
   }
+  // Held view (`holdView`): freeze the view as it is BEFORE this write (a no-op when the
+  // controller is inactive or already holding), then note which source rows this write
+  // replaced (the sort-mismatch count). Outside the `!restoringHistory` branch on purpose:
+  // undo/redo replays are table writes too. pendingWrite is consumed by the active-cell
+  // follow.
+  if (table) holdCtrl.capture(table)
+  holdCtrl.noteWrite(currentData() || [], Array.isArray(next) ? next : [])
+  pendingWrite = true
   const fresh = Array.isArray(next) ? next.slice() : next
   try {
     Object.defineProperty(fresh, DATA_WRITE_TOKEN_KEY, { value: true, enumerable: false, configurable: true, writable: true })

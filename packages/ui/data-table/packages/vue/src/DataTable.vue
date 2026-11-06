@@ -300,6 +300,12 @@ export interface DataTableHistoryChangePayload {
   canUndo: boolean;
   canRedo: boolean;
 }
+/** The held-view state (`holdView`): whether the view is held right now, and how many rows the held view disagrees with. */
+export interface DataTableViewState {
+  held: boolean;
+  filterMismatches: number;
+  sortMismatches: number;
+}
 /** The `range-change` payload: the new range corners (both `null` when the range cleared). */
 export type DataTableRangeChangePayload = DataTableRange;
 /** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
@@ -351,6 +357,8 @@ export interface DataTableHandle {
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
+  refreshView: () => void;
+  getViewState: () => DataTableViewState;
 }
 </script>
 
@@ -385,6 +393,7 @@ getFacetedUniqueValues as makeFacetedUniqueValues, getFacetedMinMaxValues as mak
 // guard so they never execute when off — the import token is the only static virtual-core
 // presence. NO per-framework adapter (the codegen guard forbids @tanstack/<fw>-virtual).
 import { Virtualizer, elementScroll, observeElementRect, observeElementOffset, measureElement } from '@tanstack/virtual-core';
+import { createHoldController, viewStatesEqual, CLEAN_VIEW_STATE } from './helpers/heldView';
 // C-09's value-equality guard. Imported HERE, in DataTable.rozie's OWN script, because that
 // is where it is USED: a `.rzts` partial's import of a symbol the partial itself never
 // references is dropped as unused, and the host script then reaches a free identifier. That
@@ -453,6 +462,10 @@ const props = withDefaults(
      */
     undoLimit?: number;
     /**
+     * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one dev warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
+     */
+    holdView?: boolean;
+    /**
      * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
      */
     virtual?: boolean | string;
@@ -469,7 +482,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }
+  { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, holdView: false, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }
 );
 
 const __rozieVm = getCurrentInstance()!;
@@ -602,6 +615,7 @@ const emit = defineEmits<{
   'selection-change': [payload: RowSelectionState];
   'sort-change': [payload: SortingState];
   'visibility-change': [payload: VisibilityState];
+  'view-state-change': [payload: DataTableViewState];
   'visible-range-change': [payload: DataTableVisibleRangeChangePayload];
 }>();
 
@@ -795,6 +809,45 @@ const DATA_WRITE_TOKEN_KEY = '__rozieDataWriteToken';
 let undoStack: unknown[] = [];
 let redoStack: unknown[] = [];
 let restoringHistory: boolean = false;
+// ── Held view (`holdView`) ─────────────────────────────────────────────────────────────
+// ONE hold controller per instance (helpers/heldView.ts) and the two wrapped row-model
+// factories built ONCE from it, so createTable and every reFeed setOptions pass the SAME
+// function references (a fresh wrapper per re-feed would rebuild table-core's memoized
+// stage). Both wrapped factories are passed ALWAYS — not only while holding — because the
+// sort-mismatch count is only correct when wrapSorted observes the live sort. While the
+// controller is not holding, the wrappers return the base model unchanged (same identity),
+// so a table without `holdView` is behaviour-identical. Top-level `const`s: React lowers each
+// to a `useMemo(..., [])` (one instance per component). NOT `let`: React hoists a `let` to
+// `useRef(init)` and does not rewrite a sibling hoisted `let` read inside that initializer to
+// `.current`, so `let heldX = holdCtrl.wrapX(...)` would call `wrapX` on the ref object.
+const holdCtrl = createHoldController();
+const heldFilteredRowModel = holdCtrl.wrapFiltered(getFilteredRowModel());
+const heldSortedRowModel = holdCtrl.wrapSorted(getSortedRowModel());
+// Set when the view was re-derived (a sort/filter change, refreshView()) and by writeData on
+// every table write; consumed by the active-cell follow (Task 5). Plain `let`s, NOT $data —
+// written and read inside refreshRowModel's call graph (ROZ138 / React stale reads).
+let pendingViewChange = false;
+let pendingWrite = false;
+// The last emitted view-state-change payload (refreshRowModel edge-triggers the emit).
+let lastViewState = CLEAN_VIEW_STATE;
+// reFeed bookkeeping: the sort/filter references fed last time (a change releases the hold)
+// and the one-shot fallback warning latch.
+let lastHoldSorting: unknown = null;
+let lastHoldColumnFilters: unknown = null;
+let lastHoldGlobalFilter: unknown = null;
+let holdFallbackWarned = false;
+// Whether the hold applies for state `st`: holdView on, and not one of the live-behaviour
+// fallbacks (grouping active, `manual`, tree data). Called from $onMount (before the first
+// pull) and from every reFeed; warns once when holdView is on but cannot hold.
+const syncHoldActive = (st: any) => {
+  const wanted = props.holdView === true;
+  const active = wanted && props.manual !== true && props.getSubRows == null && !(st.grouping || []).length;
+  holdCtrl.setActive(active);
+  if (wanted && !active && !holdFallbackWarned) {
+    holdFallbackWarned = true;
+    console.warn('[rozie-data-table] holdView falls back to live behaviour while grouping is active, in manual mode, or with tree data (getSubRows); the view is not held.');
+  }
+};
 // Grouping auto-expand latch (phase 50 req-4): when grouping is ACTIVE and the consumer
 // has not bound `expanded` and has not yet toggled any group, group-header rows default to
 // EXPANDED (so the grouped subtree is visible — the standard grouped-grid affordance + the
@@ -1464,6 +1517,14 @@ const writeData = (next: any) => {
     recordSnapshot(currentData());
     emitHistoryChangeIfEdged(prevU, prevR);
   }
+  // Held view (`holdView`): freeze the view as it is BEFORE this write (a no-op when the
+  // controller is inactive or already holding), then note which source rows this write
+  // replaced (the sort-mismatch count). Outside the `!restoringHistory` branch on purpose:
+  // undo/redo replays are table writes too. pendingWrite is consumed by the active-cell
+  // follow.
+  if (table) holdCtrl.capture(table);
+  holdCtrl.noteWrite(currentData() || [], Array.isArray(next) ? next : []);
+  pendingWrite = true;
   const fresh = Array.isArray(next) ? next.slice() : next;
   try {
     Object.defineProperty(fresh, DATA_WRITE_TOKEN_KEY, {
@@ -2928,11 +2989,27 @@ const reFeed = () => {
   // TRANSIENTLY-STALE `$props.data` and wrongly wipe a just-recorded edit's history. The reset is
   // keyed on the `$props.data` REFERENCE actually changing instead — see the $onUpdate backstop
   // below (`maybeClearHistoryOnExternalSwap`), which runs on all six targets.
+  //
+  // Held view: decide whether the hold applies (it falls back to live behaviour under
+  // grouping, `manual`, and tree data), and re-derive on a sort/filter change. Fresh locals
+  // only — the state object is read once here and passed to setOptions below.
+  const st = currentState();
+  syncHoldActive(st);
+  if (st.sorting !== lastHoldSorting || st.columnFilters !== lastHoldColumnFilters || st.globalFilter !== lastHoldGlobalFilter) {
+    lastHoldSorting = st.sorting;
+    lastHoldColumnFilters = st.columnFilters;
+    lastHoldGlobalFilter = st.globalFilter;
+    holdCtrl.release();
+    pendingViewChange = true;
+  }
   table.setOptions((prev: any) => ({
     ...prev,
     data: feedData(),
     columns: tableColumns(),
-    state: currentState(),
+    state: st,
+    // Held view: the SAME wrapped factory references every re-feed (see holdCtrl).
+    getFilteredRowModel: heldFilteredRowModel,
+    getSortedRowModel: heldSortedRowModel,
     enableRowSelection: rowSelectionOption(),
     enableMultiRowSelection: props.selectionMode === 'multiple',
     // Re-pass the server-side page-count sources (#2) so a RUNTIME rowCount/pageCount change
@@ -3014,9 +3091,14 @@ const maybeClearHistoryOnExternalSwap = () => {
   const pd = data.value;
   if (pd === lastPropsData) return; // $props.data did not change → not an external swap
   lastPropsData = pd;
-  if (!props.undoable) return;
   if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
-  clearHistory();
+  // A genuine external swap (runs regardless of `undoable`): it re-derives a held view …
+  if (holdCtrl.isHolding()) {
+    holdCtrl.release();
+    if (refreshRowModel) refreshRowModel();
+  }
+  // … and clears undo history (only meaningful when `undoable`).
+  if (props.undoable) clearHistory();
 };
 let lastData: any = null;
 let lastDataLen = -1;
@@ -3698,12 +3780,36 @@ const getRowIndexRelativeToPage = (absRow: any) => {
 // moved DOM focus off the grid. Collision-safe: no `cut` event / model prop / React auto-setter /
 // inherited Lit DOM method named `cut` (ROZ121/124/137 clear) — `cut` is not on HTMLElement.
 const cut = () => cutRange();
-
+// 260709-8ct (grid-wide undo/redo): NO pass-through wrapper lands here for
+// undo/redo/canUndo/canRedo/clearHistory. Unlike `cut` above (which delegates to a
 // differently-named clipboardFill export, `cutRange`), the undoHistory.rzts exports already
 // use the exact public verb names and are already component-scope (imported directly into
 // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
 // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
 // stop for every $expose entry.
+// Held view (`holdView`). refreshView() re-derives the view from the current filters and
+// sort and resets both mismatch counts. It works with holdView off too: it forces custom
+// filter/sort functions to re-run. table-core's filter and sort stages memoize on the
+// columnFilters/sorting array REFERENCES (not on the column defs or the functions), and
+// release() alone touches neither — so feed table-core SHALLOW COPIES of both arrays, which
+// invalidates those memos. The next reFeed restores the original references (one harmless
+// extra recompute). pendingViewChange is the component-scope `let` the active-cell follow
+// consumes.
+const refreshView = () => {
+  holdCtrl.release();
+  pendingViewChange = true;
+  if (!table) return;
+  table.setOptions((p: any) => ({
+    ...p,
+    state: {
+      ...p.state,
+      columnFilters: [...(p.state.columnFilters || [])],
+      sorting: [...(p.state.sorting || [])]
+    }
+  }));
+  if (refreshRowModel) refreshRowModel();
+};
+const getViewState = () => holdCtrl.viewState(table);
 // interactionMode gate. 'grid' lights up roving nav; 'table' (default) is byte-behaviorally
 // identical to phase 48 (roles fall back to the literals, tabindex drops).
 const isGrid = () => props.interactionMode === 'grid';
@@ -7851,8 +7957,9 @@ onMounted(() => {
     columns: tableColumns(),
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
+    // Held view: the wrapped factories, ALWAYS (see holdCtrl's declaration).
+    getSortedRowModel: heldSortedRowModel,
+    getFilteredRowModel: heldFilteredRowModel,
     getPaginationRowModel: getPaginationRowModel(),
     // Expandable rows (phase 50, D-04): the expanded row model is supplied UNCONDITIONALLY
     // (mirrors the other models) — inert when `expanded` is empty + no getSubRows
@@ -7937,6 +8044,14 @@ onMounted(() => {
     // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
     onStateChange: () => {}
   });
+  // Held view: seed the sort/filter references the table was built with, so the first reFeed
+  // (often the first write's own data re-feed) does not misread them as a view change and
+  // release a just-captured hold.
+  const st0 = currentState();
+  lastHoldSorting = st0.sorting;
+  lastHoldColumnFilters = st0.columnFilters;
+  lastHoldGlobalFilter = st0.globalFilter;
+  syncHoldActive(st0);
   refreshRowModel = () => {
     if (!table) return;
     // Capture fresh locals; never write a $data key then re-read it in the same fn
@@ -8018,6 +8133,13 @@ onMounted(() => {
     // across selection changes; a microtask defer covers React's post-render DOM patch.
     syncIndeterminate();
     if (typeof queueMicrotask !== 'undefined') queueMicrotask(syncIndeterminate);else Promise.resolve().then(syncIndeterminate);
+    // Held view: edge-triggered view-state-change (only when held/filterMismatches/
+    // sortMismatches changed). lastViewState is a plain `let` (ROZ138-safe).
+    const vs = holdCtrl.viewState(table);
+    if (!viewStatesEqual(vs, lastViewState)) {
+      lastViewState = vs;
+      emit('view-state-change', vs);
+    }
   };
 
   // initial pull
@@ -8225,7 +8347,9 @@ watch(() => [sorting.value, globalFilter.value, columnFilters.value, pagination.
 // Server-side page-count sources (#2): re-feed when the consumer's rowCount/pageCount
 // changes at runtime (e.g. a server response updates the total) so getPageCount() and the
 // Next button availability track the new total.
-props.rowCount, props.pageCount, rowSelection.value, expanded.value, props.expandable, grouping.value, props.groupable, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode, (data.value || []).length,
+props.rowCount, props.pageCount, rowSelection.value, expanded.value, props.expandable, grouping.value, props.groupable, columnVisibility.value, columnSizing.value, columnOrder.value, columnPinning.value, props.selectionMode,
+// Held view: toggling holdView re-derives (reFeed → setActive).
+props.holdView, (data.value || []).length,
 // Phase 51 req-4: key on the data REFERENCE (both sinks) so a committed edit re-feeds
 // even when the fresh array is the SAME length (a single-cell edit replaces one row
 // object → new array ref, identical length → the .length key alone would miss it). The
@@ -8252,7 +8376,7 @@ watch(() => [sorting.value, columnFilters.value, globalFilter.value, sortingDefa
   if (msg) liveAnnounce.value = msg;
 }, { flush: 'post' });
 
-defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory } as DataTableHandle);
+defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseAll, getExpandedRows, applyGrouping, clearGrouping, getFacetedUniqueValues, getFacetedMinMaxValues, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, focusCell, getActiveCell, clearActiveCell, scrollToRow, getScrollElement, getRowIndexRelativeToPage, editCell, commitEditing, editRow, getSelectedRange, cut, undo, redo, canUndo, canRedo, clearHistory, refreshView, getViewState } as DataTableHandle);
 </script>
 
 <style scoped>

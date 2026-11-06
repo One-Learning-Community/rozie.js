@@ -63,4 +63,28 @@ const cut = () => cutRange()
 // DataTable.rozie) — so DataTable.rozie's $expose references them BY NAME with zero
 // indirection. This file stays the seam for verbs that need a rename/adapter, not a mandatory
 // stop for every $expose entry.
-export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut }
+// Held view (`holdView`). refreshView() re-derives the view from the current filters and
+// sort and resets both mismatch counts. It works with holdView off too: it forces custom
+// filter/sort functions to re-run. table-core's filter and sort stages memoize on the
+// columnFilters/sorting array REFERENCES (not on the column defs or the functions), and
+// release() alone touches neither — so feed table-core SHALLOW COPIES of both arrays, which
+// invalidates those memos. The next reFeed restores the original references (one harmless
+// extra recompute). pendingViewChange is the component-scope `let` the active-cell follow
+// consumes.
+const refreshView = () => {
+  holdCtrl.release()
+  pendingViewChange = true
+  if (!table) return
+  table.setOptions((p) => ({
+    ...p,
+    state: {
+      ...p.state,
+      columnFilters: [...(p.state.columnFilters || [])],
+      sorting: [...(p.state.sorting || [])],
+    },
+  }))
+  if (refreshRowModel) refreshRowModel()
+}
+const getViewState = () => holdCtrl.viewState(table)
+
+export { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection, getSelectedRows, setPage, setRowsPerPage, toggleColumnVisibility, applyColumnOrder, resetColumnSizing, pinColumn, getRowIndexRelativeToPage, cut, refreshView, getViewState }

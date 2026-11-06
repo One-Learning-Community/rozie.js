@@ -11,6 +11,11 @@
   filterable, filterFn="equalsString"), minQty (filterable, closure filterFn reading
   $data.threshold).
 
+  Held view (Task 4): `:holdView="true"`, r-model:pagination (pageSize 10 → all 6 rows; the
+  next-page button switches to pageSize 3 and advances), a `selectionMode` driven from $data
+  ('none' until selection-on, so the default layout has no checkbox column), and readouts
+  `view-state` (JSON of the last view-state-change payload) + `selected-count`.
+
   Verb buttons drive the live $refs.dt handle (never cached), each guarded so the demo still
   compiles before a verb exists. No loop var / slot param named row/cell/header (Svelte
   mount-throw discipline) — the #cell slot binds value only.
@@ -37,8 +42,12 @@
   ],
   filters: [],
   sort: [],
+  page: { pageIndex: 0, pageSize: 10 },
+  selMode: 'none',
   threshold: 0,
   canUndoText: 'false',
+  viewStateText: '',
+  selectedCount: 0,
 }
 </data>
 
@@ -85,6 +94,54 @@ const callUndo = (): void => {
   const api = $refs.dt
   if (api && api.undo) api.undo()
 }
+const callCanUndo = (): void => {
+  const api = $refs.dt
+  if (api && api.canUndo) $data.canUndoText = String(api.canUndo())
+}
+const refreshView = (): void => {
+  const api = $refs.dt
+  if (api && api.refreshView) api.refreshView()
+}
+const onViewStateChange = (payload: any): void => {
+  $data.viewStateText = JSON.stringify(payload)
+}
+const onSelectionChange = (payload: any): void => {
+  let n = 0
+  for (const k of Object.keys(payload || {})) if (payload[k]) n++
+  $data.selectedCount = n
+}
+// External swap: a brand-new array of brand-new row objects (the seed values), unstamped.
+const swapData = (): void => {
+  $data.rows = [
+    { id: 1, title: 'Alpha',   grades: [1, 2], labels: ['a'],      owner: 'Dana', minQty: 1 },
+    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b', 'y'], owner: 'Eli',  minQty: 3 },
+    { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Fay',  minQty: 5 },
+    { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d', 'd2'],      owner: 'Dana', minQty: 8 },
+    { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
+    { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal',  minQty: 9 },
+  ]
+}
+const sortTitle = (): void => {
+  $data.sort = [{ id: 'title', desc: false }]
+}
+const flipSort = (): void => {
+  $data.sort = [{ id: 'title', desc: true }]
+}
+const selectionOn = (): void => {
+  $data.selMode = 'multiple'
+}
+const selectAll = (): void => {
+  const api = $refs.dt
+  if (api && api.toggleAllRows) api.toggleAllRows(true)
+}
+// First click: pageSize 3, page 2 (rows 4-6 of the held order).
+const nextPage = (): void => {
+  $data.page = { pageIndex: $data.page.pageSize === 3 ? $data.page.pageIndex + 1 : 1, pageSize: 3 }
+}
+const groupOwner = (): void => {
+  const api = $refs.dt
+  if (api && api.applyGrouping) api.applyGrouping(['owner'])
+}
 </script>
 
 <template>
@@ -101,9 +158,22 @@ const callUndo = (): void => {
     <button type="button" data-testid="clear-filters" @click="clearFilters">clear filters</button>
     <button type="button" data-testid="undo-btn" @click="callUndo">undo()</button>
     <button type="button" data-testid="bump-closure" @click="bumpClosure">threshold = 5</button>
+    <button type="button" data-testid="refresh-view" @click="refreshView">refreshView()</button>
+    <button type="button" data-testid="swap-data" @click="swapData">swap data</button>
+    <button type="button" data-testid="sort-title" @click="sortTitle">sort title</button>
+    <button type="button" data-testid="flip-sort" @click="flipSort">flip sort</button>
+    <button type="button" data-testid="selection-on" @click="selectionOn">selection on</button>
+    <button type="button" data-testid="select-all" @click="selectAll">select all</button>
+    <button type="button" data-testid="next-page" @click="nextPage">next page (size 3)</button>
+    <button type="button" data-testid="group-owner" @click="groupOwner">group owner</button>
+    <button type="button" data-testid="canundo-btn" @click="callCanUndo">canUndo()</button>
     <span class="label">canUndo:</span>
     <span class="readout" data-testid="canundo-readout">{{ $data.canUndoText }}</span>
+    <span class="label">selected:</span>
+    <span class="readout" data-testid="selected-count">{{ $data.selectedCount }}</span>
   </div>
+
+  <pre class="model" data-testid="view-state">{{ $data.viewStateText }}</pre>
 
   <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
 
@@ -112,11 +182,16 @@ const callUndo = (): void => {
       ref="dt"
       interactionMode="grid"
       :undoable="true"
+      :holdView="true"
+      :selectionMode="$data.selMode"
       :getRowId="rowId"
       r-model:data="$data.rows"
       r-model:columnFilters="$data.filters"
       r-model:sorting="$data.sort"
+      r-model:pagination="$data.page"
       @history-change="onHistoryChange($event)"
+      @view-state-change="onViewStateChange($event)"
+      @selection-change="onSelectionChange($event)"
     >
       <Column field="id" header="Id" />
       <Column field="title" header="Title" :editable="true" editor="text" :sortable="true" :filterable="true" />

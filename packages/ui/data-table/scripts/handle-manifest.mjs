@@ -84,6 +84,10 @@ export const handleManifest = {
     'Return whether a redo step is available — `canRedo()` → `boolean`. Reflects the redo stack depth; cleared by any new edit after an undo (standard undo semantics).',
   clearHistory:
     'Discard all undo/redo history — `clearHistory()`. Empties both stacks (`canUndo()`/`canRedo()` become `false`). Also called internally on an external data-reference swap (a dataset the component itself did not write), since undoing across a dataset boundary is incoherent.',
+  refreshView:
+    'Re-derive the view from the current filters and sort — `refreshView()`. Releases a held view (`holdView`) and resets both mismatch counts to 0, so rows the held view kept on screen leave and re-sort. Works with `holdView` off too: it forces custom `filterFn`/`sortingFn` rules (for example a closure over outside state, or a rule whose logic changed) to re-run, since table-core does not re-filter or re-sort when only a column rule changes.',
+  getViewState:
+    'Return the held-view state — `getViewState()` → `{ held, filterMismatches, sortMismatches }` (the `view-state-change` payload). `held` is `false` when `holdView` is off or the table fell back to live behaviour (grouping, `manual`, tree data); a non-zero count means `refreshView()` would change what is on screen.',
 };
 
 export default handleManifest;

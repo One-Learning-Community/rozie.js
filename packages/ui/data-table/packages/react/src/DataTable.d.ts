@@ -60,6 +60,12 @@ export interface DataTableHistoryChangePayload {
   canUndo: boolean;
   canRedo: boolean;
 }
+/** The held-view state (`holdView`): whether the view is held right now, and how many rows the held view disagrees with. */
+export interface DataTableViewState {
+  held: boolean;
+  filterMismatches: number;
+  sortMismatches: number;
+}
 /** The `range-change` payload: the new range corners (both `null` when the range cleared). */
 export type DataTableRangeChangePayload = DataTableRange;
 /** The `row-activate` payload. `row` is the original data object and `index` its position in the rendered model. */
@@ -206,6 +212,10 @@ export interface DataTableProps {
    */
   undoLimit?: number;
   /**
+   * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one dev warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
+   */
+  holdView?: boolean;
+  /**
    * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
    */
   virtual?: boolean | string;
@@ -237,6 +247,7 @@ export interface DataTableProps {
   onSelectionChange?: (payload: RowSelectionState) => void;
   onSortChange?: (payload: SortingState) => void;
   onVisibilityChange?: (payload: VisibilityState) => void;
+  onViewStateChange?: (payload: DataTableViewState) => void;
   onVisibleRangeChange?: (payload: DataTableVisibleRangeChangePayload) => void;
   children?: ReactNode;
   renderGroupBar?: (params: { grouping: string[]; groupableColumns: DataTableGroupableColumn[]; applyGrouping: (cols: string[]) => void; clearGrouping: () => void }) => ReactNode;
@@ -288,6 +299,8 @@ export interface DataTableHandle {
   canUndo: () => boolean;
   canRedo: () => boolean;
   clearHistory: () => void;
+  refreshView: () => void;
+  getViewState: () => DataTableViewState;
 }
 
 declare const DataTable: React.ForwardRefExoticComponent<DataTableProps & React.RefAttributes<DataTableHandle>>;
