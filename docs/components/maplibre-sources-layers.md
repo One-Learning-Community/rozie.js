@@ -49,6 +49,14 @@ Sources and layers can also be authored as **declarative child components** — 
 
 `<Source>` takes `id` (required) plus `:spec` (the `SourceSpecification`); `<Layer>` takes `id` (required), `type`, `:paint` / `:layout`, an optional `source` (for the flat shape), and `beforeId` for draw order. This dogfoods Rozie's own [`$provide` / `$inject` cross-component context primitive](/guide/features) — the map provides the registry, each child injects it and registers on mount / updates on prop change / unregisters on unmount. The big incumbents still ship deeper component catalogs (see the [comparison page](/components/maplibre-comparison#declarative-children)) — Rozie's declarative children are a curated subset that works identically on all six targets.
 
+Every `@rozie-ui/maplibre-*` package exports `Source` and `Layer` next to `MapLibre`:
+
+| Target | Import | Tags |
+| --- | --- | --- |
+| React, Vue, Svelte, Solid | `import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-<target>'` | `<MapLibre>` / `<Source>` / `<Layer>` |
+| Angular | `import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-angular'` (add all three to `imports`) | `<rozie-map-libre>` / `<rozie-source>` / `<rozie-layer>` |
+| Lit | `import '@rozie-ui/maplibre-lit'` registers all three elements | `<rozie-map-libre>` / `<rozie-source>` / `<rozie-layer>` |
+
 ## Hit-testing layer features
 
 Set `:interactiveLayerIds` to the layer ids you want hover events on; `@mouseenter` / `@mouseleave` then fire with the hit `features` in the payload:

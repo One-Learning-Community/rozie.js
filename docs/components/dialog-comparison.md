@@ -65,11 +65,11 @@ Most modal components expose a tangle of close paths (an `onOpenChange`, an over
 
 ## Try it
 
-The [`@rozie-ui/dialog` showcase + API reference](/components/dialog) documents the `@rozie-ui/dialog-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/dialog-solid` (`npm i @rozie-ui/dialog-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the native-`<dialog>` behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/dialog-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
+The [`@rozie-ui/dialog` showcase + API reference](/components/dialog) documents the `@rozie-ui/dialog-*` packages — one pre-compiled, per-framework install each (`npm i @rozie-ui/dialog-react`, etc.). There is no engine to import and no required CSS: the native-`<dialog>` behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/dialog-demo) runs the real Vue package in the page.
 
 ## Cross-references
 
 - [Dialog — showcase & API](/components/dialog) — the full `@rozie-ui/dialog` surface, quick start, theming, and accessibility reference.
-- [Dialog — live demo](/components/dialog-demo) — the Vue leaf's workspace build running in the page (backdrop / escape / programmatic close with a `@close` reason readout), plus the one `.rozie` source and the six generated outputs.
+- [Dialog — live demo](/components/dialog-demo) — the real Vue package running in the page (backdrop / escape / programmatic close with a `@close` reason readout), plus the one `.rozie` source and the six generated outputs.
 - [`Dialog.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/dialog/src/Dialog.rozie)
 - [Otp — headless one-time-code input](/components/otp-comparison) — a sibling no-engine pure-Rozie family built on native `<input>` cells.

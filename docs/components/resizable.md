@@ -6,20 +6,18 @@ The foundation is the platform itself: native Pointer Events (with pointer captu
 
 Every visual value is a CSS custom property, so the splitter re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
-<PublishedTargetsNotice family="resizable" :published="['solid']" />
-
 ## The `@rozie-ui/resizable` packages
 
-`Resizable` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/resizable-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
+`Resizable` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/resizable-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/react/README.md) |
-| `@rozie-ui/resizable-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/vue/README.md) |
-| `@rozie-ui/resizable-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/svelte/README.md) |
-| `@rozie-ui/resizable-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/angular/README.md) |
+| `@rozie-ui/resizable-react` | `npm i @rozie-ui/resizable-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/react/README.md) |
+| `@rozie-ui/resizable-vue` | `npm i @rozie-ui/resizable-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/vue/README.md) |
+| `@rozie-ui/resizable-svelte` | `npm i @rozie-ui/resizable-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/svelte/README.md) |
+| `@rozie-ui/resizable-angular` | `npm i @rozie-ui/resizable-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/angular/README.md) |
 | `@rozie-ui/resizable-solid` | `npm i @rozie-ui/resizable-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/solid/README.md) |
-| `@rozie-ui/resizable-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/lit/README.md) |
+| `@rozie-ui/resizable-lit` | `npm i @rozie-ui/resizable-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
@@ -86,6 +84,8 @@ Every value the component renders is a `--rozie-resizable-*` CSS custom property
 }
 ```
 
+On Lit, the `.rozie-resizable` element sits inside the custom element's shadow root, where a page selector can't reach it. Set the tokens on the host element (`rozie-resizable { … }`) or on `:root` instead; custom properties inherit into the shadow root.
+
 Only cosmetic values flow through tokens; the structural rules (the flex container, the `--size`-driven first-panel basis, the remainder second panel, the vertical column variant) compile per-leaf and are not consumer-overridable.
 
 The complete token table and the design-system bridges live on the [dedicated theming page](/components/resizable-theming).
@@ -96,6 +96,10 @@ The complete token table and the design-system bridges live on the [dedicated th
 - Live `aria-valuenow` / `aria-valuemin` / `aria-valuemax` report the first panel's percent and bounds; `aria-disabled` reflects the `disabled` prop.
 - The drag uses pointer capture, so a resize started on the handle keeps tracking through the whole gesture regardless of where the pointer travels — no lost-pointer dead zones.
 - Reading the container rect happens only inside post-mount pointer handlers and the imperative handle (never eagerly), so the behavior is identical everywhere, including inside Lit's shadow root.
+
+## Known limitations
+
+- **Left-to-right only.** Under `dir="rtl"` the arrow keys and the drag math still measure from the left edge, so both run backwards.
 
 ## See also
 

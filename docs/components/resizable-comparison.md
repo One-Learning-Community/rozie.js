@@ -83,13 +83,13 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/resizable` showcase](/components/resizable) documents the `@rozie-ui/resizable-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/resizable-solid` (`npm i @rozie-ui/resizable-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the native-pointer behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/resizable-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
+The [`@rozie-ui/resizable` showcase](/components/resizable) documents the `@rozie-ui/resizable-*` packages — one pre-compiled, per-framework install each (`npm i @rozie-ui/resizable-react`, etc.). There is no engine to import and no required CSS: the native-pointer behaviour and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/resizable-demo) runs the real Vue package in the page.
 
 ## Cross-references
 
 - [Resizable — showcase](/components/resizable) — the full `@rozie-ui/resizable` surface, quick start, theming, keyboard, and accessibility reference.
 - [Resizable — API reference](/components/resizable-api) — every prop, the two-way `size` model, the `resize` event, the `applySize` / `reset` handle, and the three slots.
-- [Resizable — live demo](/components/resizable-demo) — the Vue leaf's workspace build running in the page, plus the one `.rozie` source and the six generated outputs.
+- [Resizable — live demo](/components/resizable-demo) — the real Vue package running in the page, plus the one `.rozie` source and the six generated outputs.
 - [All components](/components/) — the rest of the `@rozie-ui` family.
 - [Slider — headless slider / range](/components/slider-comparison) — a sibling no-engine pure-Rozie family built on a native `<input type="range">`.
 - [`Resizable.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/resizable/src/Resizable.rozie)

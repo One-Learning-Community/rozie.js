@@ -11,20 +11,18 @@
 
 The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
-<PublishedTargetsNotice family="text-field" :published="[]" />
-
 ## The `@rozie-ui/text-field` packages
 
-`TextField` is designed to ship as six pre-compiled, per-framework packages, but none has published to npm yet — every row below is still in dogfooding. The links go to each target's workspace README for review:
+`TextField` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/text-field-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/react/README.md) |
-| `@rozie-ui/text-field-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/vue/README.md) |
-| `@rozie-ui/text-field-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/svelte/README.md) |
-| `@rozie-ui/text-field-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/angular/README.md) |
-| `@rozie-ui/text-field-solid` | *not yet published (dogfooding)* | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/solid/README.md) |
-| `@rozie-ui/text-field-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/lit/README.md) |
+| `@rozie-ui/text-field-react` | `npm i @rozie-ui/text-field-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/react/README.md) |
+| `@rozie-ui/text-field-vue` | `npm i @rozie-ui/text-field-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/vue/README.md) |
+| `@rozie-ui/text-field-svelte` | `npm i @rozie-ui/text-field-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/svelte/README.md) |
+| `@rozie-ui/text-field-angular` | `npm i @rozie-ui/text-field-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/angular/README.md) |
+| `@rozie-ui/text-field-solid` | `npm i @rozie-ui/text-field-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/solid/README.md) |
+| `@rozie-ui/text-field-lit` | `npm i @rozie-ui/text-field-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/text-field/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 

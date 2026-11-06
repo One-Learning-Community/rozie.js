@@ -6,20 +6,18 @@ The foundation is the platform itself: a native `<input>` for text entry, browse
 
 Every visual value is a CSS custom property, so the field re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5.
 
-<PublishedTargetsNotice family="number-field" :published="['solid']" />
-
 ## The `@rozie-ui/number-field` packages
 
-`NumberField` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/number-field-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
+`NumberField` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/number-field-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/react/README.md) |
-| `@rozie-ui/number-field-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/vue/README.md) |
-| `@rozie-ui/number-field-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/svelte/README.md) |
-| `@rozie-ui/number-field-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/angular/README.md) |
+| `@rozie-ui/number-field-react` | `npm i @rozie-ui/number-field-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/react/README.md) |
+| `@rozie-ui/number-field-vue` | `npm i @rozie-ui/number-field-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/vue/README.md) |
+| `@rozie-ui/number-field-svelte` | `npm i @rozie-ui/number-field-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/svelte/README.md) |
+| `@rozie-ui/number-field-angular` | `npm i @rozie-ui/number-field-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/angular/README.md) |
 | `@rozie-ui/number-field-solid` | `npm i @rozie-ui/number-field-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/solid/README.md) |
-| `@rozie-ui/number-field-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/lit/README.md) |
+| `@rozie-ui/number-field-lit` | `npm i @rozie-ui/number-field-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/number-field/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
@@ -98,6 +96,8 @@ Every cosmetic value the component renders is a `--rozie-number-field-*` CSS cus
 }
 ```
 
+On Lit, the `.rozie-number-field` element sits inside the custom element's shadow root, where a page selector can't reach it. Set the tokens on the host element (`rozie-number-field { … }`) or on `:root` instead; custom properties inherit into the shadow root.
+
 Only cosmetic values flow through tokens; the structural rules (the inline-flex stepper row, the input box model, the +/- buttons) compile per-leaf and are not consumer-overridable.
 
 The complete token table and the design-system bridges live on the [dedicated theming page](/components/number-field-theming).
@@ -105,3 +105,7 @@ The complete token table and the design-system bridges live on the [dedicated th
 ## Accessibility
 
 The input carries `role="spinbutton"` with `aria-valuemin` / `aria-valuemax` (when `min` / `max` are set), `aria-valuenow` (the current number, omitted when empty), and `aria-valuetext` (the locale-formatted display). Set `ariaLabel` (or wire an external `<label>`) so the control is announced. The +/- buttons are `tabindex="-1"` and `aria-label`led so the keyboard story lives entirely on the focused input (Arrow / PageUp·Down / Home / End), matching the WAI-ARIA spinbutton pattern.
+
+## Known limitations
+
+- **No native form submission.** The component renders no `name`d form field, so a plain `<form>` submit doesn't include its value. Read the bound value instead. On Angular it is a `ControlValueAccessor`, so `[formControl]` and `[(ngModel)]` work.

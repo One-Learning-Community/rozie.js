@@ -70,7 +70,7 @@ The [`@rozie-ui/select` showcase + API reference](/components/select) documents 
 ## Cross-references
 
 - [Select — showcase & API](/components/select) — the full `@rozie-ui/select` surface, quick start, theming, keyboard, and accessibility reference.
-- [Select — live demo](/components/select-demo) — the Vue leaf's workspace build running in the page, plus the Rozie source and the six generated outputs.
+- [Select — live demo](/components/select-demo) — the real Vue package running in the page, plus the Rozie source and the six generated outputs.
 - [`Select.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/select/src/Select.rozie)
 - [Combobox libraries comparison](/components/combobox-comparison) — the sibling type-to-filter family.
 - [Embla libraries comparison](/components/embla-comparison) — a sibling port, contrasting the *engine-wrapper* story with this *headless-behaviour* one.

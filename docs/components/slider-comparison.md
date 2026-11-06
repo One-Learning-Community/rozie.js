@@ -28,7 +28,7 @@ On its home framework each of these is a solid pick. The case for Rozie is consi
 The deepest design choice is **what the thumb actually is**. Two camps:
 
 - **Re-implemented headless** (React Aria, Radix, Kobalte, Melt, noUiSlider): a `<div>`-based thumb with hand-authored pointer/keyboard/ARIA handling. Maximum control over drag physics, multi-thumb layouts, and exotic interactions, at the cost of re-implementing (and re-testing) drag, touch, keyboard, focus, and ARIA in JavaScript, per library.
-- **Native `<input type="range">`** (MUI internally, Shoelace, **Rozie**): the browser owns drag (mouse *and* touch), keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, disabled, and RTL. You inherit the platform's accessibility and input handling for free; the tradeoff is that styling requires the cross-browser vendor pseudo-elements (`::-webkit-slider-thumb` / `::-moz-range-thumb`) and dual-thumb range needs the two-overlapping-inputs technique.
+- **Native `<input type="range">`** (MUI internally, Shoelace, **Rozie**): the browser owns drag (mouse *and* touch), keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, and disabled. You inherit the platform's accessibility and input handling for free; the tradeoff is that styling requires the cross-browser vendor pseudo-elements (`::-webkit-slider-thumb` / `::-moz-range-thumb`) and dual-thumb range needs the two-overlapping-inputs technique.
 
 Rozie picks the native-input camp deliberately: the highest-risk surface of any slider (pointer, touch, keyboard, a11y) is delegated to the platform, while Rozie owns the author-side API, the range sort/clamp, the fill math, and the overlays. The cross-browser pseudo-element styling is shipped inside the component and gate-verified on WebKit and Firefox, so consumers never write it.
 
@@ -55,7 +55,7 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 - **First-class packages everywhere**, including Lit / web components, which have no headless slider to begin with, and Angular, whose CDK ships no slider primitive at all (only the styled `mat-slider`). Both are categories the incumbents simply don't serve.
 - **The same component surface everywhere.** Where the ecosystem offers hooks (React), components (Vue/Solid), builders (Svelte), styled widgets (Angular Material), and a vanilla engine (noUiSlider), `@rozie-ui/slider` is one `<Slider>` to learn, document, and migrate: the same props, events, two-way `value`, slots, and uniform `focus` / `increment` / `decrement` handle.
 - **A real two-way `value`.** `r-model:value` reads and writes the value with no `onChange → setState` glue. Because `value` is the sole `model: true` prop, the Angular output additionally implements `ControlValueAccessor`, so a `Slider` is a form control (`[formControl]` / `[(ngModel)]` bind directly).
-- **Built on the native `<input type="range">`.** Drag (mouse and touch), keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, disabled, and RTL come from the platform, while Rozie owns the API, the range math, the fill, and the overlays.
+- **Built on the native `<input type="range">`.** Drag (mouse and touch), keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, and disabled come from the platform, while Rozie owns the API, the range math, the fill, and the overlays.
 - **Single and range in one component.** `range` is a single boolean: off, a scalar single-thumb slider; on, a sorted `[lo, hi]` dual-thumb range. The two thumbs are two overlapping native inputs, each neighbour-clamped, so the array stays sorted however you drive it.
 - **Zero-config styling that re-skins to any design system.** Every rendered value is a `--rozie-slider-*` CSS custom property with a built-in fallback, plus ready-made token bridges for shadcn/ui, Material 3, and Bootstrap 5, and the cross-browser thumb/track pseudo-element styling that native range inputs require ships inside the component so you never hand-write it.
 
@@ -68,11 +68,11 @@ Cell legend: **✅** = documented out-of-the-box · **❌** = not supported / no
 
 ## Try it
 
-The [`@rozie-ui/slider` showcase + API reference](/components/slider) documents the `@rozie-ui/slider-*` packages — designed as one pre-compiled, per-framework install each, but today only `@rozie-ui/slider-solid` (`npm i @rozie-ui/slider-solid`) is on npm — the other five targets are still in dogfooding. There is no engine to import and no required CSS: the native-input behaviour, the cross-browser pseudo-element styling, and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/slider-demo) runs the Vue leaf's workspace build in the page (not yet the published npm package).
+The [`@rozie-ui/slider` showcase + API reference](/components/slider) documents the `@rozie-ui/slider-*` packages — one pre-compiled, per-framework install each (`npm i @rozie-ui/slider-react`, etc.). There is no engine to import and no required CSS: the native-input behaviour, the cross-browser pseudo-element styling, and a fully-tokenised skin ship inside the component, with optional one-line theme bridges for shadcn/ui, Material 3, and Bootstrap 5. The [live demo](/components/slider-demo) runs the real Vue package in the page.
 
 ## Cross-references
 
 - [Slider — showcase & API](/components/slider) — the full `@rozie-ui/slider` surface, quick start, theming, keyboard, and accessibility reference.
-- [Slider — live demo](/components/slider-demo) — the Vue leaf's workspace build running in the page (single + range + vertical), plus the one `.rozie` source and the six generated outputs.
+- [Slider — live demo](/components/slider-demo) — the real Vue package running in the page (single + range + vertical), plus the one `.rozie` source and the six generated outputs.
 - [`Slider.rozie` source on GitHub](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/src/Slider.rozie)
 - [Select — headless select / combobox](/components/select-comparison) — the sibling no-engine headless family, contrasting the *behaviour-only* story with this *native-input* one.

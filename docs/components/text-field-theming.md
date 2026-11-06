@@ -104,4 +104,4 @@ import '@rozie-ui/text-field-react/themes/shadcn.css';
 - [TextField — API reference](/components/text-field-api) — every prop, event, slot, and handle verb.
 - [TextField — usage examples](/components/text-field-usage) — idiomatic per-framework consumption code.
 - [TextField comparison](/components/text-field-comparison) — how it stacks up against the per-framework libraries.
-- [TextField — live demo](/components/text-field-demo) — the Vue leaf's workspace build running in the page (not yet the published npm package).
+- [TextField — live demo](/components/text-field-demo) — the real package running in the page.

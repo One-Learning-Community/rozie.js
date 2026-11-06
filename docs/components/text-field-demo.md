@@ -19,7 +19,7 @@ const searchBox = ref();
 
 # TextField — live demo
 
-This is the **real `@rozie-ui/text-field-vue` package** running on this page (VitePress is itself a Vue app), built from this repo's workspace rather than npm: no `@rozie-ui/text-field` target has published yet. The same `TextField` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
+This is the **real `@rozie-ui/text-field-vue` package** running on this page (VitePress is itself a Vue app). The same `TextField` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 <ClientOnly>
 <div class="tf-live">

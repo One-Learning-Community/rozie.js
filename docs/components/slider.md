@@ -1,25 +1,23 @@
 # Slider — the cross-framework headless slider / range
 
-`Slider` is a headless, fully-accessible slider and dual-thumb range with no third-party engine behind it. It covers the whole behaviour surface: drag, keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, disabled, and RTL. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
+`Slider` is a headless, fully-accessible slider and dual-thumb range with no third-party engine behind it. It covers the whole behaviour surface: drag, keyboard, focus, `role="slider"`, `aria-value*`, step/min/max, and disabled. The same component ships for React, Vue, Svelte, Angular, Solid, and Lit.
 
 The foundation is the browser's own native `<input type="range">`: drag (mouse and touch), keyboard, focus management, the slider ARIA role, and step/min/max bounds all come from the platform. Dual-thumb range mode is two overlapping transparent native inputs; vertical is a `transform: rotate(-90deg)` wrapper (so up = increase, with an explicit `aria-orientation="vertical"`); the colored fill is a positioned `<div>` underlay driven purely by `value / min / max` arithmetic, with no measured geometry. Rozie owns the author-side API: the two-way `r-model:value`, the range sort/clamp, the fill-var math, the marks + value-bubble overlays, and a thin PageUp/PageDown step augment.
 
 Every visual value is a CSS custom property, so the slider re-skins to any design system, with ready-made bridges for shadcn/ui, Material 3, and Bootstrap 5, plus the cross-browser thumb/track pseudo-element styling that native range inputs require.
 
-<PublishedTargetsNotice family="slider" :published="['solid']" />
-
 ## The `@rozie-ui/slider` packages
 
-`Slider` is designed to ship as six pre-compiled, per-framework packages, but today only `@rozie-ui/slider-solid` is on npm — the rest are still in dogfooding. Install the published one for real use; the other rows below link to their workspace README for review:
+`Slider` ships as six pre-compiled, per-framework packages. Install the one for your framework; there is no build step and no Rozie toolchain to set up:
 
 | Package | Install | README |
 | --- | --- | --- |
-| `@rozie-ui/slider-react` | *not yet published (dogfooding)* | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/react/README.md) |
-| `@rozie-ui/slider-vue` | *not yet published (dogfooding)* | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/vue/README.md) |
-| `@rozie-ui/slider-svelte` | *not yet published (dogfooding)* | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/svelte/README.md) |
-| `@rozie-ui/slider-angular` | *not yet published (dogfooding)* | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/angular/README.md) |
+| `@rozie-ui/slider-react` | `npm i @rozie-ui/slider-react` | [react/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/react/README.md) |
+| `@rozie-ui/slider-vue` | `npm i @rozie-ui/slider-vue` | [vue/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/vue/README.md) |
+| `@rozie-ui/slider-svelte` | `npm i @rozie-ui/slider-svelte` | [svelte/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/svelte/README.md) |
+| `@rozie-ui/slider-angular` | `npm i @rozie-ui/slider-angular` | [angular/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/angular/README.md) |
 | `@rozie-ui/slider-solid` | `npm i @rozie-ui/slider-solid` | [solid/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/solid/README.md) |
-| `@rozie-ui/slider-lit` | *not yet published (dogfooding)* | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/lit/README.md) |
+| `@rozie-ui/slider-lit` | `npm i @rozie-ui/slider-lit` | [lit/README](https://github.com/One-Learning-Community/rozie.js/blob/main/packages/ui/slider/packages/lit/README.md) |
 
 Each package carries only its framework peer (`react + react-dom`, `vue`, `svelte`, `@angular/core + @angular/common + @angular/forms`, `solid-js`, or `lit + @lit-labs/preact-signals + @preact/signals-core`).
 
@@ -107,6 +105,8 @@ Every value the component renders is a `--rozie-slider-*` CSS custom property wi
 }
 ```
 
+On Lit, the `.rozie-slider` element sits inside the custom element's shadow root, where a page selector can't reach it. Set the tokens on the host element (`rozie-slider { … }`) or on `:root` instead; custom properties inherit into the shadow root.
+
 Two of the tokens are special. `--rozie-slider-fill-start` and `--rozie-slider-fill-end` are **runtime-inline** custom properties the component writes from `value / min / max` (via the `fillStyle` `$computed`) — they drive the colored fill `<div>` and the bubble positions, so they are *not* theme tokens you set yourself.
 
 The structural rules (the overlapping native inputs, the filled-`<div>` underlay, the rotate-90 vertical wrapper, and the per-vendor pseudo-elements) are behavior-critical and compile per-leaf; they are not consumer-overridable. Only the cosmetic values flow through tokens.
@@ -136,3 +136,8 @@ In range mode each thumb is its own focusable native input; a thumb is clamped a
 - Supply an accessible name via a visible `<label for>` pointing at the input, or the `ariaLabel` prop (reflected onto each native input's `aria-label`). When `formatValue` is set, the formatted string is also surfaced as `aria-valuetext`.
 - Styling a native range input requires **vendor pseudo-elements** — `::-webkit-slider-thumb` / `::-webkit-slider-runnable-track` for WebKit/Blink and `::-moz-range-thumb` / `::-moz-range-track` / `::-moz-range-progress` for Firefox. Each is emitted in its **own** rule block (never comma-combined — a single invalid vendor selector drops the whole rule on both browsers), so the thumb and track render consistently across browsers.
 - In range mode, `pointer-events` is disabled on the input bodies and re-enabled only on the thumb pseudo-elements, and the focused input is raised (`z-index`), so each thumb stays independently grabbable where the two overlap.
+
+## Known limitations
+
+- **No native form submission.** The component renders no `name`d form field, so a plain `<form>` submit doesn't include its value. Read the bound value instead. On Angular it is a `ControlValueAccessor`, so `[formControl]` and `[(ngModel)]` work.
+- **Left-to-right only.** The native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they don't follow.
