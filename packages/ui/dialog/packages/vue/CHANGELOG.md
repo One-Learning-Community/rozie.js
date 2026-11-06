@@ -1,11 +1,5 @@
 # @rozie-ui/dialog-vue
 
-## 0.2.5
-
-### Patch Changes
-
-- 6cef0c1: README fixes: the Angular example now uses the component's real `<rozie-dialog>` selector (the `<Dialog>` tag it showed fails to compile), and the Svelte theming import is shown as a TypeScript snippet.
-
 ## 0.2.4
 
 ### Patch Changes
