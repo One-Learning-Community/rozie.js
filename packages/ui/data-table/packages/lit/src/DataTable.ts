@@ -1334,6 +1334,10 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this.lastHoldColumnFilters = st0.columnFilters;
     this.lastHoldGlobalFilter = st0.globalFilter;
     this.syncHoldActive(st0);
+    // Seed the external-swap baseline with the mount-time dataset, so the first re-feed after an
+    // early write (before any maybeClearHistoryOnExternalSwap ran) cannot misread the initial,
+    // unstamped `$props.data` as a swap and release a just-captured hold.
+    this.lastPropsData = this.data;
     this.refreshRowModel = () => {
       if (!this.table) return;
       // Capture fresh locals; never write a $data key then re-read it in the same fn
@@ -2093,6 +2097,19 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   lastHoldGlobalFilter: unknown = null;
 
   holdFallbackWarned = false;
+
+  // The last `$props.data` reference maybeClearHistoryOnExternalSwap examined (seeded in
+  // $onMount). Declared up here, before reFeed, so reFeed can call isExternalSwap() without a
+  // forward reference (React useCallback ordering).
+  lastPropsData: unknown = null;
+
+  // Read-only: has `$props.data` changed to a reference we did NOT write since the last
+  // maybeClearHistoryOnExternalSwap? (reFeed uses it to release a held view before its refresh.)
+  isExternalSwap = () => {
+  const pd = this.data;
+  if (pd === this.lastPropsData) return false;
+  return !(pd != null && (pd as any)[this.DATA_WRITE_TOKEN_KEY] != null);
+};
 
   // Whether the hold applies for state `st`: holdView on, and not one of the live-behaviour
   // fallbacks (grouping active, `manual`, tree data). Called from $onMount (before the first
@@ -4431,6 +4448,14 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     this.holdCtrl.release();
     this.pendingViewChange = true;
   }
+  // An external swap releases the hold BEFORE this re-feed's refresh, so the one
+  // view-state-change it emits is already the re-derived state (never a stale held count
+  // measured against the new dataset). Only the hold is touched here — the history clear and
+  // the lastPropsData bookkeeping stay in maybeClearHistoryOnExternalSwap (keyed on the
+  // `$props.data` reference; see its comment). isExternalSwap() is read-only and compares
+  // against that same lastPropsData, so a transiently-stale `$props.data` (the reference
+  // already recorded) never reads as a swap.
+  if (this.holdCtrl.isHolding() && this.isExternalSwap()) this.holdCtrl.release();
   this.table.setOptions((prev: any) => ({
     ...prev,
     data: this.feedData(),
@@ -4516,14 +4541,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // non-data tick (sort/filter/pagination) never touches `$props.data` → never clears. Called from
   // BOTH the coarse re-feed watch AND the $onUpdate backstop (Lit's @property `data` the effect-
   // tracked watch can't observe); both are ref-gated so the redundant call is an idempotent no-op.
-  lastPropsData: unknown = null;
-
   maybeClearHistoryOnExternalSwap = () => {
   const pd = this.data;
   if (pd === this.lastPropsData) return; // $props.data did not change → not an external swap
   this.lastPropsData = pd;
   if (pd != null && (pd as any)[this.DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
-  // A genuine external swap (runs regardless of `undoable`): it re-derives a held view …
+  // A genuine external swap (runs regardless of `undoable`): it re-derives a held view (a
+  // backstop — reFeed normally released it already, before its own refresh) …
   if (this.holdCtrl.isHolding()) {
     this.holdCtrl.release();
     if (this.refreshRowModel) this.refreshRowModel();

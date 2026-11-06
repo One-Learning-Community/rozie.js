@@ -11,7 +11,7 @@
   filterable, filterFn="equalsString"), minQty (filterable, closure filterFn reading
   $data.threshold).
 
-  Held view (Task 4): `:holdView="true"`, r-model:pagination (pageSize 10 → all 6 rows; the
+  Held view (Task 4): `:holdView="$data.hold"` (true until the hold-off button), r-model:pagination (pageSize 10 → all 6 rows; the
   next-page button switches to pageSize 3 and advances), a `selectionMode` driven from $data
   ('none' until selection-on, so the default layout has no checkbox column), and readouts
   `view-state` (JSON of the last view-state-change payload) + `selected-count`.
@@ -47,6 +47,8 @@
   threshold: 0,
   canUndoText: 'false',
   viewStateText: '',
+  viewStateCount: 0,
+  hold: true,
   selectedCount: 0,
 }
 </data>
@@ -104,18 +106,22 @@ const refreshView = (): void => {
 }
 const onViewStateChange = (payload: any): void => {
   $data.viewStateText = JSON.stringify(payload)
+  $data.viewStateCount = $data.viewStateCount + 1
 }
 const onSelectionChange = (payload: any): void => {
   let n = 0
   for (const k of Object.keys(payload || {})) if (payload[k]) n++
   $data.selectedCount = n
 }
-// External swap: a brand-new array of brand-new row objects (the seed values), unstamped.
+// External swap: a brand-new, unstamped array of brand-new row objects — the seed values,
+// except rows 2 and 3 are owned by 'Dana', so a released view under the owner=Dana filter
+// shows [1, 2, 3, 4] while a view still (wrongly) held would keep [1, 4] with 2 mismatches
+// (which also makes a stale intermediate emit observable: it differs from the pre-swap 1).
 const swapData = (): void => {
   $data.rows = [
     { id: 1, title: 'Alpha',   grades: [1, 2], labels: ['a'],      owner: 'Dana', minQty: 1 },
-    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b', 'y'], owner: 'Eli',  minQty: 3 },
-    { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Fay',  minQty: 5 },
+    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b', 'y'], owner: 'Dana', minQty: 3 },
+    { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Dana', minQty: 5 },
     { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d', 'd2'],      owner: 'Dana', minQty: 8 },
     { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
     { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal',  minQty: 9 },
@@ -137,6 +143,9 @@ const selectAll = (): void => {
 // First click: pageSize 3, page 2 (rows 4-6 of the held order).
 const nextPage = (): void => {
   $data.page = { pageIndex: $data.page.pageSize === 3 ? $data.page.pageIndex + 1 : 1, pageSize: 3 }
+}
+const holdOff = (): void => {
+  $data.hold = false
 }
 const groupOwner = (): void => {
   const api = $refs.dt
@@ -167,6 +176,7 @@ const groupOwner = (): void => {
     <button type="button" data-testid="next-page" @click="nextPage">next page (size 3)</button>
     <button type="button" data-testid="group-owner" @click="groupOwner">group owner</button>
     <button type="button" data-testid="canundo-btn" @click="callCanUndo">canUndo()</button>
+    <button type="button" data-testid="hold-off" @click="holdOff">holdView off</button>
     <span class="label">canUndo:</span>
     <span class="readout" data-testid="canundo-readout">{{ $data.canUndoText }}</span>
     <span class="label">selected:</span>
@@ -174,6 +184,7 @@ const groupOwner = (): void => {
   </div>
 
   <pre class="model" data-testid="view-state">{{ $data.viewStateText }}</pre>
+  <span class="readout" data-testid="view-state-count">{{ $data.viewStateCount }}</span>
 
   <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
 
@@ -182,7 +193,7 @@ const groupOwner = (): void => {
       ref="dt"
       interactionMode="grid"
       :undoable="true"
-      :holdView="true"
+      :holdView="$data.hold"
       :selectionMode="$data.selMode"
       :getRowId="rowId"
       r-model:data="$data.rows"

@@ -996,6 +996,10 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     lastHoldColumnFilters = st0.columnFilters;
     lastHoldGlobalFilter = st0.globalFilter;
     syncHoldActive(st0);
+    // Seed the external-swap baseline with the mount-time dataset, so the first re-feed after an
+    // early write (before any maybeClearHistoryOnExternalSwap ran) cannot misread the initial,
+    // unstamped `$props.data` as a swap and release a just-captured hold.
+    lastPropsData = data();
     refreshRowModel = () => {
       if (!table) return;
       // Capture fresh locals; never write a $data key then re-read it in the same fn
@@ -1438,6 +1442,17 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   let lastHoldColumnFilters: unknown = null;
   let lastHoldGlobalFilter: unknown = null;
   let holdFallbackWarned = false;
+  // The last `$props.data` reference maybeClearHistoryOnExternalSwap examined (seeded in
+  // $onMount). Declared up here, before reFeed, so reFeed can call isExternalSwap() without a
+  // forward reference (React useCallback ordering).
+  let lastPropsData: unknown = null;
+  // Read-only: has `$props.data` changed to a reference we did NOT write since the last
+  // maybeClearHistoryOnExternalSwap? (reFeed uses it to release a held view before its refresh.)
+  function isExternalSwap() {
+    const pd = data();
+    if (pd === lastPropsData) return false;
+    return !(pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null);
+  }
   // Whether the hold applies for state `st`: holdView on, and not one of the live-behaviour
   // fallbacks (grouping active, `manual`, tree data). Called from $onMount (before the first
   // pull) and from every reFeed; warns once when holdView is on but cannot hold.
@@ -3709,6 +3724,14 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       holdCtrl.release();
       pendingViewChange = true;
     }
+    // An external swap releases the hold BEFORE this re-feed's refresh, so the one
+    // view-state-change it emits is already the re-derived state (never a stale held count
+    // measured against the new dataset). Only the hold is touched here — the history clear and
+    // the lastPropsData bookkeeping stay in maybeClearHistoryOnExternalSwap (keyed on the
+    // `$props.data` reference; see its comment). isExternalSwap() is read-only and compares
+    // against that same lastPropsData, so a transiently-stale `$props.data` (the reference
+    // already recorded) never reads as a swap.
+    if (holdCtrl.isHolding() && isExternalSwap()) holdCtrl.release();
     table.setOptions((prev: any) => ({
       ...prev,
       data: feedData(),
@@ -3794,13 +3817,13 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // non-data tick (sort/filter/pagination) never touches `$props.data` → never clears. Called from
   // BOTH the coarse re-feed watch AND the $onUpdate backstop (Lit's @property `data` the effect-
   // tracked watch can't observe); both are ref-gated so the redundant call is an idempotent no-op.
-  let lastPropsData: unknown = null;
   function maybeClearHistoryOnExternalSwap() {
     const pd = data();
     if (pd === lastPropsData) return; // $props.data did not change → not an external swap
     lastPropsData = pd;
     if (pd != null && (pd as any)[DATA_WRITE_TOKEN_KEY] != null) return; // descends from our write → keep
-    // A genuine external swap (runs regardless of `undoable`): it re-derives a held view …
+    // A genuine external swap (runs regardless of `undoable`): it re-derives a held view (a
+    // backstop — reFeed normally released it already, before its own refresh) …
     if (holdCtrl.isHolding()) {
       holdCtrl.release();
       if (refreshRowModel) refreshRowModel();

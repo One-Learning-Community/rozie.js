@@ -289,6 +289,19 @@ async function bodyRowCount(page: Page): Promise<number> {
   return (await visibleIds(page)).length;
 }
 
+/** Let the page render `n` animation frames (a deterministic settle — no wall-clock wait). */
+async function settleFrames(page: Page, n = 3): Promise<void> {
+  await page.evaluate(
+    (count) =>
+      new Promise<void>((done) => {
+        let left = count;
+        const step = () => (--left <= 0 ? done() : requestAnimationFrame(step));
+        requestAnimationFrame(step);
+      }),
+    n,
+  );
+}
+
 const OWNER_COL = 4;
 const TITLE_COL = 1;
 
@@ -444,23 +457,48 @@ for (const target of TARGETS) {
 
   runnerFor(target)(`data-table-held-view [${target}]: hold survives r-model echo`, async ({ page }) => {
     await gotoDemo(page, target);
+    // holdEditedOwner waits for the model readout to show the edit — the parent has received
+    // the two-way write, so the stamped array is on its way back into $props.data.
     await holdEditedOwner(page);
-    // Let the two-way echo of the stamped array round-trip back into $props.data.
-    await page.waitForTimeout(400);
-    expect(await visibleIds(page)).toEqual(['1', '4']);
-    expect(await viewState(page)).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    // Stability: across several rendered frames after the echo, the row stays and the view stays held.
+    for (let i = 0; i < 5; i++) {
+      await settleFrames(page, 2);
+      expect(await visibleIds(page)).toEqual(['1', '4']);
+      expect(await viewState(page)).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    }
   });
 
   runnerFor(target)(`data-table-held-view [${target}]: external swap releases the hold`, async ({ page }) => {
     await gotoDemo(page, target);
     await holdEditedOwner(page);
     await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 1, sortMismatches: 0 });
+    await settleFrames(page, 4);
+    const countBefore = Number(await readoutText(page, 'view-state-count'));
+    // The swapped dataset also gives rows 2 and 3 owner 'Dana': a released view shows
+    // [1, 2, 3, 4]; a view still held would keep [1, 4] with filterMismatches 2.
     await clickTestId(page, 'swap-data');
-    await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.owner, { timeout: 10_000 }).toBe('Dana');
+    await expect.poll(async () => (await modelRows(page, 'model-readout'))[1]?.owner, { timeout: 10_000 }).toBe('Dana');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '2', '3', '4']);
     await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
-    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+    // Exactly ONE view-state-change for the swap (no stale intermediate held-count emit).
+    await settleFrames(page, 4);
+    expect(Number(await readoutText(page, 'view-state-count'))).toBe(countBefore + 1);
     await clickTestId(page, 'canundo-btn');
     await expect.poll(async () => readoutText(page, 'canundo-readout'), { timeout: 10_000 }).toBe('false');
+  });
+
+  // refreshView with holdView OFF still re-runs a closure filterFn (the shallow-copy path).
+  runnerFor(target)(`data-table-held-view [${target}]: (p1-d-off) refreshView re-runs a closure filterFn with holdView off`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'hold-off');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: false, filterMismatches: 0, sortMismatches: 0 });
+    await clickTestId(page, 'filter-threshold');
+    await expect.poll(async () => (await visibleIds(page)).length, { timeout: 10_000 }).toBe(6);
+    await clickTestId(page, 'bump-closure');
+    await clickTestId(page, 'refresh-view');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['3', '4', '6']);
+    expect((await viewState(page))?.held).toBe(false);
   });
 
   runnerFor(target)(`data-table-held-view [${target}]: (p2-f) grouping falls back`, async ({ page }) => {
