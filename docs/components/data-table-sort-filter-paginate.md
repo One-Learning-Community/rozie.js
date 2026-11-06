@@ -49,22 +49,29 @@ A filter function that throws counts as a match, so a bug in it shows rows rathe
 `filterFn` changes *how* a column matches, not *whether* it can be filtered: a column still filters only when it is `filterable`.
 
 ```rozie
+<script>
+// The cell holds a list of grade ids, e.g. [40, 41]. '__empty' keeps rows with no grades;
+// any other filter value is a list of ids to match.
+const gradesRule = (value, filter) =>
+  filter === '__empty' ? !value?.length : value?.some((id) => filter.includes(id))
+</script>
+
+<template>
 <DataTable :data="$data.rows" r-model:columnFilters="$data.columnFilters">
-  <!-- cell holds a list of grade ids, e.g. [40, 41] -->
-  <Column field="grades" header="Grades" :filterable="true"
-    :filterFn="(value, filter) => filter === '__empty'
-      ? !value?.length
-      : value?.some((id) => filter.includes(id))" />
+  <Column field="grades" header="Grades" :filterable="true" :filterFn="gradesRule" />
   <Column field="owner" header="Owner" :filterable="true" filterFn="equalsString" />
   <Column field="access" header="Public" :filterable="true" filterFn="equals" />
 </DataTable>
+</template>
 ```
+
+Define a rule function in `<script>` and bind it by name, as above. Don't write it inline in the attribute: Angular's template compiler rejects arrow functions in templates.
 
 With that column set, `columnFilters` of `[{ id: 'grades', value: '__empty' }]` shows the rows with no grades, and `[{ id: 'grades', value: [40] }]` shows the rows that include grade 40. For the plain "includes any of" case, the built-in `filterFn="arrIncludesSome"` with a filter value of `[40]` does the same without a function. Because the `data` array never changes, changing filters and sorts this way keeps [undo history](/components/data-table-grid-mode#undo-redo) intact; filtering the array yourself before passing it in counts as a new dataset and clears it.
 
 Things to know:
 
-- **The table re-filters and re-sorts only when its inputs change**: when `data`, `columnFilters`, `globalFilter` or `sorting` change. A rule that reads outside state (an owner-name lookup, a "selected owner" variable) does not re-run when that state changes, and swapping in a new rule function does not re-run it either. Call the [`refreshView()`](/components/data-table-api#imperative-handle) handle verb after the outside inputs change. It works whether or not [`holdView`](/components/data-table-grid-mode#holding-the-view-while-editing) is on. On `<Column>`, the table always calls the latest `filterFn` / `sortingFn` you passed, so a closure over a changing value picks up the new value on the next refresh.
+- **The table re-filters and re-sorts only when its inputs change**: when `data`, `columnFilters`, `globalFilter` or `sorting` change. A rule that reads outside state (an owner-name lookup, a "selected owner" variable) does not re-run when that state changes, and swapping in a new rule function does not re-run it either. Call the [`refreshView()`](/components/data-table-api#imperative-handle) handle verb after the outside inputs change. It works whether or not [`holdView`](/components/data-table-grid-mode#holding-the-view-while-editing) is on. On `<Column>`, the table always calls the latest `filterFn` / `sortingFn` you passed, so a closure over a changing value picks up the new value on the next refresh. On React, `<Column>` picks up a new function after the render that passes it, so call `refreshView()` after that render (in an effect, or on the next tick), not in the same handler that changed the state the rule reads; otherwise the refresh still runs the previous closure.
 - **The built-in header filter input passes text.** A column whose cells hold lists or ids needs its own filter UI that sets a matching filter value: the [`#filter` slot](/components/data-table-faceted-filtering) (whose `setFilter(columnId, value)` parameter applies it) or `r-model:columnFilters`. Otherwise your rule receives whatever string was typed.
 - **Clearing a filter means removing its entry from `columnFilters`.** Emptying the built-in filter input, or calling the `#filter` slot's `setFilter(columnId, value)` with `null` or `''`, does that for you. The table keeps every other value you set, so a sentinel such as `'__empty'`, `[]` or `0` stays in effect until the entry is removed.
 
