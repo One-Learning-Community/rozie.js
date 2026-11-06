@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/maplibre-svelte",
-  "version": "0.1.1",
+  "version": "0.1.6",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -41,7 +41,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-svelte": "workspace:^"

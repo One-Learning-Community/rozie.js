@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/maplibre-vue",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -41,7 +41,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "vue": "^3.4",

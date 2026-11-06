@@ -2,16 +2,6 @@
 "@rozie-ui/lexical-react": patch
 "@rozie-ui/lexical-solid": patch
 "@rozie-ui/lexical-svelte": minor
-"@rozie-ui/maplibre-react": patch
-"@rozie-ui/maplibre-svelte": minor
-"@rozie-ui/number-field-react": patch
-"@rozie-ui/number-field-svelte": minor
-"@rozie-ui/resizable-react": patch
-"@rozie-ui/resizable-svelte": minor
-"@rozie-ui/slider-react": patch
-"@rozie-ui/slider-svelte": minor
-"@rozie-ui/switch-react": patch
-"@rozie-ui/switch-svelte": minor
 ---
 
 Props types now accept the root element's HTML attributes when a component passes attributes through to a single root element (typed public surface, phase 3).

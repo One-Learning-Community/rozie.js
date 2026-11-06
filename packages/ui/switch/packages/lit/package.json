@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/switch-lit",
-  "version": "0.1.2",
+  "version": "0.1.6",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -43,7 +43,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "dependencies": {
     "@rozie/runtime-lit": "workspace:^"

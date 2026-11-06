@@ -1,22 +1,5 @@
 ---
 "@rozie-ui/lexical-lit": patch
-"@rozie-ui/maplibre-angular": patch
-"@rozie-ui/maplibre-lit": patch
-"@rozie-ui/maplibre-react": patch
-"@rozie-ui/maplibre-svelte": patch
-"@rozie-ui/maplibre-vue": patch
-"@rozie-ui/number-field-angular": patch
-"@rozie-ui/number-field-react": patch
-"@rozie-ui/number-field-vue": patch
-"@rozie-ui/resizable-angular": patch
-"@rozie-ui/resizable-react": patch
-"@rozie-ui/resizable-vue": patch
-"@rozie-ui/slider-angular": patch
-"@rozie-ui/slider-react": patch
-"@rozie-ui/slider-vue": patch
-"@rozie-ui/switch-angular": patch
-"@rozie-ui/switch-react": patch
-"@rozie-ui/switch-vue": patch
 ---
 
 Regenerated with the compiler fixes found while building `@rozie-ui/select`. Depending on the target and the component:

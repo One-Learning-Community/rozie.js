@@ -390,11 +390,17 @@ name: Release (early subset)
 #     leaf imports `rozieNativeListeners`, new in @rozie/runtime-react 0.10.1, which the
 #     "Publish toolchain" step publishes before any leaf.
 #
+# 2026-11 maplibre + number-field + resizable + slider + switch ALL-SIX DEBUT:
+#   - The five held targets (react, vue, svelte, lit, angular) of each family debut next to the
+#     Solid leaves on npm since the 2026-09-26 wave, aligned on the Solid version (dialog/pagination
+#     precedent, RELEASING.md §6 item 20): maplibre/resizable/slider/switch 0.1.7, number-field
+#     0.1.6. The "debut Solid" step pair became one all-six step pair for the five families.
+#   - Held changesets naming these leaves were split into `*-debut.md` siblings at patch; the
+#     lexical lines stay in the `-held.md` files.
+#
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
 # above is not release-verified. What is still held back is exactly what `.changeset/config.json`
-# lists under `ignore` (the lexical family, plus the React/Vue/Svelte/Lit/Angular targets of
-# maplibre, number-field, resizable, slider and switch, whose Solid leaves debuted in the
-# 2026-09-26 wave) — held back until they get their own dogfooding pass, exactly like uppy and
+# lists under `ignore` (the lexical family) — held back until it gets its own dogfooding pass, exactly like uppy and
 # every other not-yet-verified family. Do NOT widen the --filter lists below to other targets or
 # families without updating the release runbook.
 #
@@ -850,26 +856,45 @@ jobs:
           --filter=@rozie-ui/wavesurfer-angular
           build
 
-      # Build the DEBUT Solid-only leaves (2026-09-26 wave). Each carries @rozie/runtime-solid
-      # as a workspace dep (tsdown, rewritten to the concrete published version at publish time),
-      # so this sits AFTER the toolchain build, same rationale as every other non-vue leaf step
-      # above. None carries an @rozie-ui workspace peer, so there is NO ordering coupling to any
-      # other leaf family — this step can run anywhere after the toolchain build. The OTHER five
-      # targets of these families (maplibre, number-field, resizable, slider, switch) remain out
-      # of scope and are NOT built here — see the dated header note above. `lexical` is NOT in
-      # this step at all (fully held back, all six targets — no content read/write API yet).
-      # `listbox-solid` is no longer in this step: the family was renamed to `select` (2026-10)
-      # and all six select leaves build together in "Build select leaves" below. The dialog and
-      # pagination Solid leaves are no longer in this step either: since the 2026-10 all-six debut
-      # they build with their siblings in "Build dialog leaves" / "Build pagination leaves" below.
-      - name: Build debut Solid leaves
+      # Build all six leaves of maplibre, number-field, resizable, slider and switch (2026-11 all-six
+      # debut; the Solid leaves have been on npm since 2026-09-26). Mixed per-target toolchain
+      # (react/solid/lit tsdown, vue Vite lib, svelte @sveltejs/package, angular ng-packagr APF).
+      # Leaves carry @rozie/runtime-<fw> as a workspace dep (maplibre-vue has none), so this sits AFTER the
+      # toolchain build. No @rozie-ui workspace peer, so there is no ordering coupling to any other
+      # leaf family. `lexical` is NOT here: fully held back (all six targets, no content API yet).
+      - name: Build maplibre, number-field, resizable, slider and switch leaves
         run: >
           pnpm
+          --filter=@rozie-ui/maplibre-react
+          --filter=@rozie-ui/maplibre-vue
           --filter=@rozie-ui/maplibre-solid
+          --filter=@rozie-ui/maplibre-lit
+          --filter=@rozie-ui/maplibre-svelte
+          --filter=@rozie-ui/maplibre-angular
+          --filter=@rozie-ui/number-field-react
+          --filter=@rozie-ui/number-field-vue
           --filter=@rozie-ui/number-field-solid
+          --filter=@rozie-ui/number-field-lit
+          --filter=@rozie-ui/number-field-svelte
+          --filter=@rozie-ui/number-field-angular
+          --filter=@rozie-ui/resizable-react
+          --filter=@rozie-ui/resizable-vue
           --filter=@rozie-ui/resizable-solid
+          --filter=@rozie-ui/resizable-lit
+          --filter=@rozie-ui/resizable-svelte
+          --filter=@rozie-ui/resizable-angular
+          --filter=@rozie-ui/slider-react
+          --filter=@rozie-ui/slider-vue
           --filter=@rozie-ui/slider-solid
+          --filter=@rozie-ui/slider-lit
+          --filter=@rozie-ui/slider-svelte
+          --filter=@rozie-ui/slider-angular
+          --filter=@rozie-ui/switch-react
+          --filter=@rozie-ui/switch-vue
           --filter=@rozie-ui/switch-solid
+          --filter=@rozie-ui/switch-lit
+          --filter=@rozie-ui/switch-svelte
+          --filter=@rozie-ui/switch-angular
           build
 
       # Build all six dialog leaves into their compiled dist/ drop-in (2026-10 all-six debut; the
@@ -1183,6 +1208,31 @@ jobs:
           --filter @rozie-ui/resizable-solid
           --filter @rozie-ui/slider-solid
           --filter @rozie-ui/switch-solid
+          --filter @rozie-ui/maplibre-react
+          --filter @rozie-ui/maplibre-vue
+          --filter @rozie-ui/maplibre-lit
+          --filter @rozie-ui/maplibre-svelte
+          --filter @rozie-ui/maplibre-angular
+          --filter @rozie-ui/number-field-react
+          --filter @rozie-ui/number-field-vue
+          --filter @rozie-ui/number-field-lit
+          --filter @rozie-ui/number-field-svelte
+          --filter @rozie-ui/number-field-angular
+          --filter @rozie-ui/resizable-react
+          --filter @rozie-ui/resizable-vue
+          --filter @rozie-ui/resizable-lit
+          --filter @rozie-ui/resizable-svelte
+          --filter @rozie-ui/resizable-angular
+          --filter @rozie-ui/slider-react
+          --filter @rozie-ui/slider-vue
+          --filter @rozie-ui/slider-lit
+          --filter @rozie-ui/slider-svelte
+          --filter @rozie-ui/slider-angular
+          --filter @rozie-ui/switch-react
+          --filter @rozie-ui/switch-vue
+          --filter @rozie-ui/switch-lit
+          --filter @rozie-ui/switch-svelte
+          --filter @rozie-ui/switch-angular
           --filter @rozie-ui/select-react
           --filter @rozie-ui/select-vue
           --filter @rozie-ui/select-solid
@@ -1699,33 +1749,47 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: 'true'
 
-      # The DEBUT Solid-only leaves (2026-09-26 wave — dialog, listbox, maplibre,
-      # number-field, pagination, resizable, slider, switch; verified 0/8 on npm via a direct
-      # registry GET, since `npm view` lags on first-ever names). pnpm rewrites each leaf's
-      # `@rozie/runtime-solid` workspace dep to the concrete published version in the tarball —
-      # already live on npm from this same run's earlier "Publish toolchain" step. solid-js ^1.8
-      # is a required peer on all of them, alongside no @rozie-ui workspace peer on any of them, so
-      # there is no ordering coupling to any other leaf family. The OTHER five targets of the
-      # families still listed here (maplibre, number-field, resizable, slider, switch) are NOT
-      # published — they stay in `.changeset/config.json`'s `ignore` list until their own
-      # dogfooding pass; do NOT widen this filter list to them. The dialog and pagination Solid
-      # leaves left this step with the 2026-10 all-six debut: they publish with their siblings in
-      # "Publish dialog leaves" / "Publish pagination leaves" below.
-      # `lexical` is NOT in this step at all — fully held back this wave (all six targets,
-      # including Solid; no content read/write API yet), still fully in `.changeset/config.json`'s
-      # `ignore` list.
-      # `listbox-solid` is no longer in this step: the family was renamed to `select` (2026-10)
-      # and all six select leaves publish in "Publish select leaves" above.
-      # Inherits dry_run (default TRUE) via steps.flags.outputs.extra and the
-      # skip-if-already-published behavior (no --force).
-      - name: Publish debut Solid leaves (@rozie-ui/*)
+      # All six leaves of maplibre, number-field, resizable, slider and switch (2026-11 all-six debut
+      # of the five held targets; the Solid leaves have been on npm since 2026-09-26). Each family
+      # aligns on its Solid leaf version: the five held leaves were preset one patch below it and
+      # every changeset line naming them is a patch, so all six targets land on one version and
+      # the unchanged Solid leaf is skipped as already published (no --force). pnpm rewrites each
+      # `workspace:` @rozie/runtime-<fw> dep to the concrete version live on npm. `lexical` is
+      # NOT here: fully held back in `.changeset/config.json`'s `ignore` list.
+      # Inherits dry_run (default TRUE) via steps.flags.outputs.extra.
+      - name: Publish maplibre, number-field, resizable, slider and switch leaves (@rozie-ui/*)
         run: >
           pnpm
+          --filter=@rozie-ui/maplibre-react
+          --filter=@rozie-ui/maplibre-vue
           --filter=@rozie-ui/maplibre-solid
+          --filter=@rozie-ui/maplibre-lit
+          --filter=@rozie-ui/maplibre-svelte
+          --filter=@rozie-ui/maplibre-angular
+          --filter=@rozie-ui/number-field-react
+          --filter=@rozie-ui/number-field-vue
           --filter=@rozie-ui/number-field-solid
+          --filter=@rozie-ui/number-field-lit
+          --filter=@rozie-ui/number-field-svelte
+          --filter=@rozie-ui/number-field-angular
+          --filter=@rozie-ui/resizable-react
+          --filter=@rozie-ui/resizable-vue
           --filter=@rozie-ui/resizable-solid
+          --filter=@rozie-ui/resizable-lit
+          --filter=@rozie-ui/resizable-svelte
+          --filter=@rozie-ui/resizable-angular
+          --filter=@rozie-ui/slider-react
+          --filter=@rozie-ui/slider-vue
           --filter=@rozie-ui/slider-solid
+          --filter=@rozie-ui/slider-lit
+          --filter=@rozie-ui/slider-svelte
+          --filter=@rozie-ui/slider-angular
+          --filter=@rozie-ui/switch-react
+          --filter=@rozie-ui/switch-vue
           --filter=@rozie-ui/switch-solid
+          --filter=@rozie-ui/switch-lit
+          --filter=@rozie-ui/switch-svelte
+          --filter=@rozie-ui/switch-angular
           publish --access public --no-git-checks --provenance ${{ steps.flags.outputs.extra }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

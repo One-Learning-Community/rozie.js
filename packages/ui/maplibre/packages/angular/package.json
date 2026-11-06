@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/maplibre-angular",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -40,7 +40,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "peerDependencies": {
     "@angular/core": "^19 || ^20 || ^21",

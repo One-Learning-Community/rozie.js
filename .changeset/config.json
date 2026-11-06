@@ -27,34 +27,12 @@
     "@rozie-ui/lexical-svelte",
     "@rozie-ui/lexical-lit",
     "@rozie-ui/lexical-angular",
-    "@rozie-ui/lexical-solid",
-    "@rozie-ui/maplibre-react",
-    "@rozie-ui/maplibre-vue",
-    "@rozie-ui/maplibre-svelte",
-    "@rozie-ui/maplibre-lit",
-    "@rozie-ui/maplibre-angular",
-    "@rozie-ui/number-field-react",
-    "@rozie-ui/number-field-vue",
-    "@rozie-ui/number-field-svelte",
-    "@rozie-ui/number-field-lit",
-    "@rozie-ui/number-field-angular",
-    "@rozie-ui/resizable-react",
-    "@rozie-ui/resizable-vue",
-    "@rozie-ui/resizable-svelte",
-    "@rozie-ui/resizable-lit",
-    "@rozie-ui/resizable-angular",
-    "@rozie-ui/slider-react",
-    "@rozie-ui/slider-vue",
-    "@rozie-ui/slider-svelte",
-    "@rozie-ui/slider-lit",
-    "@rozie-ui/slider-angular",
-    "@rozie-ui/switch-react",
-    "@rozie-ui/switch-vue",
-    "@rozie-ui/switch-svelte",
-    "@rozie-ui/switch-lit",
-    "@rozie-ui/switch-angular"
+    "@rozie-ui/lexical-solid"
   ],
-  "privatePackages": { "version": false, "tag": false },
+  "privatePackages": {
+    "version": false,
+    "tag": false
+  },
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
     "onlyUpdatePeerDependentsWhenOutOfRange": true
   }

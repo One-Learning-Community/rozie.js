@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/switch-angular",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -42,7 +42,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "module": "./dist/fesm2022/rozie-ui-switch-angular.mjs",
   "types": "./dist/index.d.ts",

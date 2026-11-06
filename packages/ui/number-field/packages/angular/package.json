@@ -1,6 +1,6 @@
 {
   "name": "@rozie-ui/number-field-angular",
-  "version": "0.1.0",
+  "version": "0.1.5",
   "type": "module",
   "private": false,
   "license": "MIT",
@@ -42,7 +42,8 @@
   },
   "files": [
     "dist",
-    "src"
+    "src",
+    "CHANGELOG.md"
   ],
   "module": "./dist/fesm2022/rozie-ui-number-field-angular.mjs",
   "types": "./dist/index.d.ts",
