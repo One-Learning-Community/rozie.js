@@ -28,6 +28,16 @@
   are never echoed back, and `swap-oneway` replaces the dataset with fresh rows lacking id 1 —
   an external swap that must keep the D-05 clamp fallback on all six targets. No loop var / slot param named row/cell/header (Svelte
   mount-throw discipline) — the #cell slot binds value only.
+
+  Final-review wave:
+  - `page-readout` shows the grid-table's pagination model (a table write / refreshView must
+    never turn the page; a sort/filter change goes to page 1).
+  - grid-live gains `filter-owner-fay-live` (one row) and `filter-title-a-live` (four rows).
+  - grid-tmode: a 'table'-mode DataTable (ref dtT) whose editor is opened by the editCell verb.
+  - grid-cfg: a `:columns` CONFIG DataTable carrying filterFn / sortingFn (the buildConfigDef
+    path), driven by its own controlled filters/sorting.
+  - grid-oneway-noid: a one-way, title-desc-sorted grid WITHOUT getRowId; `swap-noid` swaps
+    its dataset (an external swap must clamp, not follow index-ids to another record).
 -->
 
 <rozie name="DataTableHeldViewDemo">
@@ -57,6 +67,28 @@
     { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
     { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal',  minQty: 9 },
   ],
+  rowsTmode: [
+    { id: 1, title: 'Alpha', owner: 'Dana' },
+    { id: 2, title: 'Beta',  owner: 'Eli' },
+    { id: 3, title: 'Gamma', owner: 'Fay' },
+  ],
+  sortTmode: [],
+  rowsCfg: [
+    { id: 1, title: 'Alpha',   grades: [1, 2], labels: ['a'],      owner: 'Dana' },
+    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b', 'y'], owner: 'Eli' },
+    { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Fay' },
+    { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d', 'd2'],      owner: 'Dana' },
+    { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus' },
+    { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal' },
+  ],
+  filtersCfg: [],
+  sortCfg: [],
+  rowsNoId: [
+    { id: 1, title: 'Alpha' },
+    { id: 2, title: 'Beta' },
+    { id: 3, title: 'Gamma' },
+  ],
+  sortNoId: [{ id: 'title', desc: true }],
   rowsOneWay: [
     { id: 1, title: 'Alpha' },
     { id: 2, title: 'Beta' },
@@ -184,6 +216,50 @@ const swapOneWay = (): void => {
     { id: 4, title: 'Delta' },
   ]
 }
+const filterOwnerFayLive = (): void => {
+  $data.filtersLive = [{ id: 'owner', value: 'Fay' }]
+}
+const filterTitleALive = (): void => {
+  $data.filtersLive = [{ id: 'title', value: 'a' }]
+}
+// grid-tmode: open the owner editor (col 2) of visible row 0 through the editCell verb.
+const editOwnerTmode = (): void => {
+  const api = $refs.dtT
+  if (api && api.editCell) api.editCell(0, 2)
+}
+const sortTitleDescTmode = (): void => {
+  $data.sortTmode = [{ id: 'title', desc: true }]
+}
+// grid-cfg: a `:columns` config array — the buildConfigDef path for filterFn / sortingFn.
+const cfgColumns = [
+  { field: 'id', header: 'Id' },
+  { field: 'title', header: 'Title', sortable: true },
+  { field: 'grades', header: 'Grades', filterable: true, filterFn: gradesRule },
+  { field: 'labels', header: 'Labels', filterable: true, sortable: true, filterFn: 'arrIncludesSome', sortingFn: labelsLenSort },
+  { field: 'owner', header: 'Owner', filterable: true, filterFn: 'equalsString' },
+]
+const filterEmptyCfg = (): void => {
+  $data.filtersCfg = [{ id: 'grades', value: '__empty' }]
+}
+const filterResolveCfg = (): void => {
+  $data.filtersCfg = [{ id: 'grades', value: 'two' }]
+}
+const filterLabelsXCfg = (): void => {
+  $data.filtersCfg = [{ id: 'labels', value: ['x'] }]
+}
+const sortLabelsLenCfg = (): void => {
+  $data.sortCfg = [{ id: 'labels', desc: false }]
+}
+// grid-oneway-noid: ids are source indices. Old [Alpha, Beta, Gamma] (title desc → Gamma,
+// Beta, Alpha); new [Beta, Gamma, Delta] (→ Gamma(1), Delta(2), Beta(0)). Following the
+// index-id "1" would move the cursor to index 0 (a different record); the clamp keeps index 1.
+const swapNoId = (): void => {
+  $data.rowsNoId = [
+    { id: 2, title: 'Beta' },
+    { id: 3, title: 'Gamma' },
+    { id: 4, title: 'Delta' },
+  ]
+}
 const groupOwner = (): void => {
   const api = $refs.dt
   if (api && api.applyGrouping) api.applyGrouping(['owner'])
@@ -220,6 +296,7 @@ const groupOwner = (): void => {
     <span class="readout" data-testid="selected-count">{{ $data.selectedCount }}</span>
   </div>
 
+  <span class="readout" data-testid="page-readout">{{ JSON.stringify($data.page) }}</span>
   <pre class="model" data-testid="view-state">{{ $data.viewStateText }}</pre>
   <span class="readout" data-testid="view-state-count">{{ $data.viewStateCount }}</span>
 
@@ -258,6 +335,8 @@ const groupOwner = (): void => {
   <div class="controls">
     <button type="button" data-testid="sort-title-live" @click="sortTitleLive">sort title (live)</button>
     <button type="button" data-testid="filter-owner-dana-live" @click="filterOwnerDanaLive">owner Dana (live)</button>
+    <button type="button" data-testid="filter-owner-fay-live" @click="filterOwnerFayLive">owner Fay (live)</button>
+    <button type="button" data-testid="filter-title-a-live" @click="filterTitleALive">title has a (live)</button>
   </div>
   <pre class="model" data-testid="model-readout-live">{{ JSON.stringify($data.rowsLive) }}</pre>
 
@@ -290,6 +369,54 @@ const groupOwner = (): void => {
     <DataTable interactionMode="grid" :getRowId="rowId" :data="$data.rowsOneWay">
       <Column field="id" header="Id" />
       <Column field="title" header="Title" :editable="true" editor="text" />
+    </DataTable>
+  </div>
+
+  <h3>Table-mode grid — an editor opened by editCell follows its record</h3>
+  <div class="controls">
+    <button type="button" data-testid="edit-owner-tmode" @click="editOwnerTmode">editCell(0, owner)</button>
+    <button type="button" data-testid="sort-title-desc-tmode" @click="sortTitleDescTmode">sort title desc</button>
+  </div>
+  <pre class="model" data-testid="model-readout-tmode">{{ JSON.stringify($data.rowsTmode) }}</pre>
+  <div data-testid="grid-tmode">
+    <DataTable
+      ref="dtT"
+      :getRowId="rowId"
+      r-model:data="$data.rowsTmode"
+      r-model:sorting="$data.sortTmode"
+    >
+      <Column field="id" header="Id" />
+      <Column field="title" header="Title" :editable="true" editor="text" :sortable="true" />
+      <Column field="owner" header="Owner" :editable="true" editor="text" />
+    </DataTable>
+  </div>
+
+  <h3>Columns-config grid — filterFn / sortingFn through the columns config</h3>
+  <div class="controls">
+    <button type="button" data-testid="filter-empty-cfg" @click="filterEmptyCfg">grades empty (cfg)</button>
+    <button type="button" data-testid="filter-resolve-cfg" @click="filterResolveCfg">grades two (cfg)</button>
+    <button type="button" data-testid="filter-labels-x-cfg" @click="filterLabelsXCfg">labels has x (cfg)</button>
+    <button type="button" data-testid="sort-labels-len-cfg" @click="sortLabelsLenCfg">sort labels len (cfg)</button>
+  </div>
+  <div data-testid="grid-cfg">
+    <DataTable
+      interactionMode="grid"
+      :getRowId="rowId"
+      :columns="cfgColumns"
+      :data="$data.rowsCfg"
+      r-model:columnFilters="$data.filtersCfg"
+      r-model:sorting="$data.sortCfg"
+    />
+  </div>
+
+  <h3>One-way grid without getRowId — an external swap clamps</h3>
+  <div class="controls">
+    <button type="button" data-testid="swap-noid" @click="swapNoId">swap data (no getRowId)</button>
+  </div>
+  <div data-testid="grid-oneway-noid">
+    <DataTable interactionMode="grid" :data="$data.rowsNoId" r-model:sorting="$data.sortNoId">
+      <Column field="id" header="Id" />
+      <Column field="title" header="Title" :sortable="true" />
     </DataTable>
   </div>
 </div>

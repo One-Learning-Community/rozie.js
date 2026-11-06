@@ -129,9 +129,11 @@ describe('ROZ138 corpus precision (quick task 260829-8w1)', () => {
         // held-view Part 3 (40c21f799 / f92e62eca): +118 (689/692/693 → 807/810/811) from
         // the active-cell follow/park block inserted above in clampActiveCell; same 3
         // statements, verified line-for-line against 5d51195af.
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:807',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:810',
-        'packages/ui/data-table/src/gridKeydownHandlers.rzts:811',
+        // final-review fixes: +11 (807/810/811 → 818/821/822) from the empty-grid focus park
+        // (followActiveCell / clampActiveCell's B6 branch); same 3 statements.
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:818',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:821',
+        'packages/ui/data-table/src/gridKeydownHandlers.rzts:822',
       ].sort(),
     );
   });

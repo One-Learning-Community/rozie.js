@@ -676,15 +676,21 @@ const modelIndexOfRowId = (id) => {
 // (React-stale) corner write can never resurrect it. While the view is held the ids keep
 // their order, so the range stays.
 const followActiveCell = (prevIds, nextIds, viewChangeOrWrite, rowCount, colCount, editFollowPending = false) => {
-  if (!isGrid()) return
   // An OPEN editor stays on the record it was opened for (its editing pair is index-addressed
   // over the visible rows). Done first so the active-cell move below knows the editor owns focus.
+  // NOT grid-gated: the editCell / editRow verbs open editors in 'table' mode too (final review
+  // #2); only the active-cell part below is grid-only.
   const editorOwnsFocus = followOpenEditors(prevIds, nextIds)
+  if (!isGrid()) return
   let follow = null
   if (activeCellEngaged && rowCount > 0 && !$data.activeIsHeader && !gridEmptyFallback) {
     follow = resolveFollow(prevIds, $data.activeRow, nextIds, viewChangeOrWrite)
   }
-  clampActiveCell(rowCount, colCount, follow, editFollowPending || editorOwnsFocus)
+  // Final review #3: a view change or a table write that EMPTIES the grid — B6 parks the
+  // active cell on the header fallback; when DOM focus was on the vanished body cell, move it
+  // there too (never to <body>).
+  const focusEmptyPark = rowCount <= 0 && viewChangeOrWrite
+  clampActiveCell(rowCount, colCount, follow, editFollowPending || editorOwnsFocus, focusEmptyPark)
   if (viewChangeOrWrite && !sameIdSequence(prevIds, nextIds)) clearRange()
 }
 
@@ -697,7 +703,7 @@ const followActiveCell = (prevIds, nextIds, viewChangeOrWrite, rowCount, colCoun
 // column header (`'park'`) instead of falling through to whichever row now holds its index.
 // Gated by isGrid() so 'table' mode is entirely untouched. Invoked at the rowModelVer bump
 // path (refreshRowModel → followActiveCell).
-const clampActiveCell = (rowCount, colCount, follow: any = null, editFollowPending = false) => {
+const clampActiveCell = (rowCount, colCount, follow: any = null, editFollowPending = false, focusEmptyPark = false) => {
   if (!isGrid()) return
   // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
   // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
@@ -765,6 +771,11 @@ const clampActiveCell = (rowCount, colCount, follow: any = null, editFollowPendi
     // Moving DOM focus here would steal focus AND — on React — the fallback's @focusin
     // (setActiveIsHeader true) races the next clear-filter re-seat, leaving the tab-stop stuck on
     // the header. Focus recovery is for a shrink that leaves a VALID BODY cell to land on (below).
+    // The one exception (final review #3, `focusEmptyPark`): a view change or a table write
+    // emptied the grid while DOM focus was ON a body cell (or a just-committed edit expects it
+    // back) — that focus is about to drop to <body>, so move it to the header fallback cell
+    // (the roving tab stop). Never steals focus that is elsewhere.
+    if (focusEmptyPark && (focusOnBody || editFollowPending)) recoverGridFocus('__header', 0, headerLeafLevel())
     return
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,

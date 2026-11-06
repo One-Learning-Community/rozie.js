@@ -14,6 +14,14 @@
 //     reordered to the held order. Mapped by id — getSortedRowModel shallow-copies rows.
 // Each wrapper memoizes on [base result identity, controller version], so downstream
 // table-core memos (keyed on upstream model identity) see a stable model.
+//
+// Limits worth knowing:
+//   - The held filtered stage returns the CORE rows (not the rows table-core's filtered stage
+//     produced), so they do not carry table-core's per-row `columnFilters` / `columnFiltersMeta`
+//     bookkeeping. Nothing in DataTable reads those; a future reader would have to take them
+//     from the base (live) model instead.
+//   - One controller per table: it holds a single membership / order / written-row set, so
+//     never share one controller (or its wrapped factories) between two table instances.
 
 export interface ViewState {
   held: boolean

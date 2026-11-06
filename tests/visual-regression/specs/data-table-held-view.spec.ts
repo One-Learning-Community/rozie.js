@@ -429,6 +429,72 @@ async function holdEditedOwner(page: Page): Promise<void> {
   await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.owner, { timeout: 10_000 }).toBe('Sam');
 }
 
+/** A plain-table (interactionMode 'table') instance's state, shadow-pierced: the visible row
+ *  ids (first cell of each body row) and the open editor's value + its row's id. */
+async function tableModeState(
+  page: Page,
+  scopeTestId: string,
+): Promise<{ ids: string[]; editor: { value: string; rowId: string } | null }> {
+  return page.evaluate((scopeId) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
+    const tbl = scope ? findFirst(scope, 'table') : null;
+    if (!tbl) return { ids: [], editor: null };
+    const ids = Array.from(tbl.querySelectorAll('tbody tr')).map((tr) => {
+      const c = tr.querySelector('td');
+      return ((c && c.textContent) || '').trim();
+    });
+    const ed = tbl.querySelector('[data-editing-cell]') as HTMLInputElement | null;
+    if (!ed) return { ids, editor: null };
+    const tr = ed.closest('tr');
+    const first = tr ? tr.querySelector('td') : null;
+    return { ids, editor: { value: String(ed.value ?? ''), rowId: ((first && first.textContent) || '').trim() } };
+  }, scopeTestId);
+}
+
+/** The grid-table's pagination model readout ({ pageIndex, pageSize }). */
+async function pageModel(page: Page): Promise<{ pageIndex: number; pageSize: number } | null> {
+  try {
+    return JSON.parse(await readoutText(page, 'page-readout'));
+  } catch {
+    return null;
+  }
+}
+
+/** grid-table to page 2 at pageSize 3 (rows [4, 5, 6]), optionally with holdView off. */
+async function toPageTwo(page: Page, hold: boolean): Promise<void> {
+  if (!hold) {
+    await clickTestId(page, 'hold-off');
+    await expect.poll(async () => (await viewState(page))?.held, { timeout: 10_000 }).toBe(false);
+  }
+  await clickTestId(page, 'next-page');
+  await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['4', '5', '6']);
+  expect(await pageModel(page)).toEqual({ pageIndex: 1, pageSize: 3 });
+}
+
+/** Still on page 2 (rows [4, 5, 6]) across several frames, with the tab stop on the record
+ *  whose title is `title` at row `row`. */
+async function expectStillOnPageTwo(page: Page, row: string, title: string): Promise<void> {
+  await expect.poll(async () => (await tabStop(page, 'grid-table'))?.title, { timeout: 10_000 }).toBe(title);
+  for (let i = 0; i < 3; i++) {
+    await settleFrames(page, 3);
+    expect(await pageModel(page)).toEqual({ pageIndex: 1, pageSize: 3 });
+    expect(await visibleIds(page)).toEqual(['4', '5', '6']);
+    expect(await tabStop(page, 'grid-table')).toMatchObject({ row, role: 'gridcell', title });
+  }
+}
+
 async function clickTestId(page: Page, id: string): Promise<void> {
   await page.getByTestId(id).click();
 }
@@ -737,5 +803,172 @@ for (const target of TARGETS) {
     await expect.poll(async () => visibleIds(page, 'grid-oneway'), { timeout: 10_000 }).toEqual(['2', '3', '4']);
     await settleFrames(page, 4);
     expect(await tabStop(page, 'grid-oneway')).toMatchObject({ row: '0', role: 'gridcell' });
+  });
+  // ── Final-review wave ───────────────────────────────────────────────────────────────
+  // #1: table writes and refreshView() never turn the page (holdView on AND off); a sort or
+  // filter change goes to page 1, and the active cell follows its record there (or parks on
+  // its header when page 1 does not hold it — "not on the current page" is "left the view").
+  for (const hold of [true, false]) {
+    const mode = hold ? 'hold' : 'live';
+    runnerFor(target)(`data-table-held-view [${target}]: (pg-a/${mode}) an edit and its undo keep page 2`, async ({ page }) => {
+      await gotoDemo(page, target);
+      await toPageTwo(page, hold);
+      await enterEditAt(page, 'grid-table', 1, TITLE_COL); // id 5, Epsilon
+      await commitEditorValue(page, 'Edited');
+      await expect.poll(async () => (await modelRows(page, 'model-readout'))[4]?.title, { timeout: 10_000 }).toBe('Edited');
+      await expectStillOnPageTwo(page, '1', 'Edited');
+      await clickTestId(page, 'undo-btn');
+      await expect.poll(async () => (await modelRows(page, 'model-readout'))[4]?.title, { timeout: 10_000 }).toBe('Epsilon');
+      await expectStillOnPageTwo(page, '1', 'Epsilon');
+    });
+
+    runnerFor(target)(`data-table-held-view [${target}]: (pg-b/${mode}) a paste and refreshView() keep page 2`, async ({ page }) => {
+      await gotoDemo(page, target);
+      await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+      await toPageTwo(page, hold);
+      await page.evaluate(() => navigator.clipboard.writeText('Pasted'));
+      await focusBodyCellStable(page, 'grid-table', 1, TITLE_COL);
+      await page.keyboard.press('Control+v');
+      await expect.poll(async () => (await modelRows(page, 'model-readout'))[4]?.title, { timeout: 10_000 }).toBe('Pasted');
+      await expectStillOnPageTwo(page, '1', 'Pasted');
+      await clickTestId(page, 'refresh-view');
+      await expectStillOnPageTwo(page, '1', 'Pasted');
+    });
+
+    runnerFor(target)(`data-table-held-view [${target}]: (pg-c/${mode}) a filter change goes to page 1 and the cursor follows`, async ({ page }) => {
+      await gotoDemo(page, target);
+      await toPageTwo(page, hold);
+      await focusBodyCellStable(page, 'grid-table', 0, TITLE_COL); // id 4, Delta
+      await clickTestId(page, 'filter-owner-dana');
+      await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+      await expect.poll(async () => (await pageModel(page))?.pageIndex, { timeout: 10_000 }).toBe(0);
+      await expect.poll(async () => tabStop(page, 'grid-table'), { timeout: 10_000 }).toMatchObject({ row: '1', role: 'gridcell', title: 'Delta' });
+      await settleFrames(page, 4);
+      expect(await pageModel(page)).toEqual({ pageIndex: 0, pageSize: 3 });
+      expect(await tabStop(page, 'grid-table')).toMatchObject({ row: '1', role: 'gridcell', title: 'Delta' });
+    });
+
+    runnerFor(target)(`data-table-held-view [${target}]: (pg-d/${mode}) a filter change to page 1 parks a record page 1 lacks`, async ({ page }) => {
+      await gotoDemo(page, target);
+      await toPageTwo(page, hold);
+      await focusBodyCellStable(page, 'grid-table', 1, TITLE_COL); // id 5, Epsilon (owner Gus)
+      await clickTestId(page, 'filter-owner-dana');
+      await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+      await expect.poll(async () => (await pageModel(page))?.pageIndex, { timeout: 10_000 }).toBe(0);
+      await expect.poll(async () => (await tabStop(page, 'grid-table'))?.role, { timeout: 10_000 }).toBe('columnheader');
+      expect((await tabStop(page, 'grid-table'))?.col).toBe(String(TITLE_COL));
+    });
+
+    runnerFor(target)(`data-table-held-view [${target}]: (pg-e/${mode}) a sort change goes to page 1 and the cursor follows`, async ({ page }) => {
+      await gotoDemo(page, target);
+      await toPageTwo(page, hold);
+      await focusBodyCellStable(page, 'grid-table', 0, TITLE_COL); // id 4, Delta
+      await clickTestId(page, 'sort-title');
+      // Title asc: Alpha, Beta, Delta | Epsilon, Gamma, Zed — page 1 holds Delta at row 2.
+      await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '2', '4']);
+      await expect.poll(async () => (await pageModel(page))?.pageIndex, { timeout: 10_000 }).toBe(0);
+      await expect.poll(async () => tabStop(page, 'grid-table'), { timeout: 10_000 }).toMatchObject({ row: '2', role: 'gridcell', title: 'Delta' });
+      await settleFrames(page, 4);
+      expect(await tabStop(page, 'grid-table')).toMatchObject({ row: '2', role: 'gridcell', title: 'Delta' });
+    });
+  }
+
+  // #2: an editor opened through the editCell verb in 'table' interaction mode follows its
+  // record across a re-sort, and its commit writes to that record. The sort button is
+  // dispatched (no focus move), so the editor is not blurred-and-committed by the click.
+  runnerFor(target)(`data-table-held-view [${target}]: (tm-a) table-mode editCell editor follows its record across a re-sort`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => (await tableModeState(page, 'grid-tmode')).ids, { timeout: 15_000 }).toEqual(['1', '2', '3']);
+    await clickTestId(page, 'edit-owner-tmode');
+    await expect.poll(async () => (await tableModeState(page, 'grid-tmode')).editor, { timeout: 10_000 }).toEqual({ value: 'Dana', rowId: '1' });
+    await page.getByTestId('sort-title-desc-tmode').dispatchEvent('click');
+    await expect.poll(async () => (await tableModeState(page, 'grid-tmode')).ids, { timeout: 10_000 }).toEqual(['3', '2', '1']);
+    await expect.poll(async () => (await tableModeState(page, 'grid-tmode')).editor?.rowId, { timeout: 10_000 }).toBe('1');
+    await settleFrames(page, 4);
+    expect((await tableModeState(page, 'grid-tmode')).editor).toEqual({ value: 'Dana', rowId: '1' });
+    await commitEditorValue(page, 'Ann');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-tmode')).map((r) => r.owner), { timeout: 10_000 })
+      .toEqual(['Ann', 'Eli', 'Fay']);
+  });
+
+  // #3: a write that empties the grid moves focus to a column header, never to <body>.
+  runnerFor(target)(`data-table-held-view [${target}]: (em-a) a write that empties the grid keeps focus on a header`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'filter-owner-fay-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['3']);
+    await enterEditAt(page, 'grid-live', 0, OWNER_COL);
+    await commitEditorValue(page, 'Sam');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live'))[2]?.owner, { timeout: 10_000 }).toBe('Sam');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual([]);
+    await expect.poll(async () => (await activeCellCoords(page, 'grid-live'))?.role, { timeout: 10_000 }).toBe('columnheader');
+    await settleFrames(page, 4);
+    expect((await activeCellCoords(page, 'grid-live'))?.role).toBe('columnheader');
+  });
+
+  // #5a: filterFn / sortingFn on a `:columns` CONFIG entry (the buildConfigDef path):
+  // a custom sort, a custom filter (+ its resolveFilterValue) and a built-in filter name.
+  runnerFor(target)(`data-table-held-view [${target}]: (cf-a) columns-config filterFn / sortingFn`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => visibleIds(page, 'grid-cfg'), { timeout: 15_000 }).toEqual(['1', '2', '3', '4', '5', '6']);
+    await clickTestId(page, 'sort-labels-len-cfg');
+    await expect.poll(async () => visibleIds(page, 'grid-cfg'), { timeout: 10_000 }).toEqual(['1', '3', '5', '4', '6', '2']);
+    await clickTestId(page, 'filter-empty-cfg');
+    await expect.poll(async () => visibleIds(page, 'grid-cfg'), { timeout: 10_000 }).toEqual(['3', '6']);
+    await clickTestId(page, 'filter-resolve-cfg');
+    await expect.poll(async () => visibleIds(page, 'grid-cfg'), { timeout: 10_000 }).toEqual(['1', '4']);
+    await clickTestId(page, 'filter-labels-x-cfg');
+    await expect.poll(async () => visibleIds(page, 'grid-cfg'), { timeout: 10_000 }).toEqual(['5', '2']);
+  });
+
+  // #5b: the holdView fallback warning fires exactly once per table, however many re-feeds.
+  runnerFor(target)(`data-table-held-view [${target}]: (wn-a) the fallback warning fires once`, async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.text().includes('holdView falls back')) warnings.push(msg.text());
+    });
+    await gotoDemo(page, target);
+    expect(warnings).toEqual([]);
+    await clickTestId(page, 'group-owner');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: false, filterMismatches: 0, sortMismatches: 0 });
+    for (const id of ['filter-labels-x', 'clear-filters', 'sort-title', 'flip-sort', 'filter-owner-dana', 'clear-filters']) {
+      await clickTestId(page, id);
+      await settleFrames(page, 2);
+    }
+    await settleFrames(page, 4);
+    expect(warnings.length).toBe(1);
+  });
+
+  // #5c: Tab-advance where the commit filters the record out (holdView off): the editor Tab
+  // opened on that record closes WITHOUT writing — nothing is written to the record that now
+  // sits at its old index.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-h) Tab-advance editor closes without writing when its record leaves`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'filter-title-a-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '2', '3', '4']);
+    await enterEditAt(page, 'grid-live', 0, TITLE_COL);
+    const ed = page.locator('[data-editing-cell]').first();
+    await ed.fill('Zzz');
+    await ed.press('Tab');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live'))[0]?.title, { timeout: 10_000 }).toBe('Zzz');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['2', '3', '4']);
+    await expect.poll(async () => openEditor(page, 'grid-live'), { timeout: 10_000 }).toBeNull();
+    await settleFrames(page, 4);
+    expect(await openEditor(page, 'grid-live')).toBeNull();
+    const rows = await modelRows(page, 'model-readout-live');
+    expect(rows.map((r) => r.title)).toEqual(['Zzz', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zed']);
+    expect(rows.map((r) => r.owner)).toEqual(['Dana', 'Eli', 'Fay', 'Dana', 'Gus', 'Hal']);
+  });
+
+  // #8: an external swap WITHOUT getRowId (ids are source indices) clamps — it never follows an
+  // index-id to an unrelated record. Old view (title desc) [3, 2, 1], cursor on Beta (row 1);
+  // new view [3, 4, 2]: the clamp keeps row 1; following index-id "1" would jump to row 0.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-i) external swap without getRowId clamps`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => visibleIds(page, 'grid-oneway-noid'), { timeout: 15_000 }).toEqual(['3', '2', '1']);
+    await focusBodyCellStable(page, 'grid-oneway-noid', 1, TITLE_COL);
+    await clickTestId(page, 'swap-noid');
+    await expect.poll(async () => visibleIds(page, 'grid-oneway-noid'), { timeout: 10_000 }).toEqual(['3', '4', '2']);
+    await settleFrames(page, 4);
+    expect(await tabStop(page, 'grid-oneway-noid')).toMatchObject({ row: '1', role: 'gridcell', title: 'Delta' });
   });
 }

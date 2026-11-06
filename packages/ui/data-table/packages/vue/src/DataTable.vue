@@ -463,7 +463,7 @@ const props = withDefaults(
      */
     undoLimit?: number;
     /**
-     * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
+     * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows; a table write or `refreshView()` never changes the page (a sort, filter or grouping change returns to the first page). Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
      */
     holdView?: boolean;
     /**
@@ -845,6 +845,27 @@ let lastHoldSorting: unknown = null;
 let lastHoldColumnFilters: unknown = null;
 let lastHoldGlobalFilter: unknown = null;
 let holdFallbackWarned = false;
+// The grouping reference fed last time (a change returns to page 1 — see table.resetPageIndex).
+let lastPageGrouping: unknown = null;
+// The column-set signature fed last time (see columnSetSignature / reFeed).
+let lastColumnSig = '';
+// A signature of the column set as table-core's sort / filter stages see it: each column's id
+// and whether it can sort / filter (groups flattened, iteratively — no self-recursive const,
+// which React lowers to a useCallback). table-core memoizes those stages on the sorting /
+// columnFilters references and the upstream model only, NOT on the column defs; a stage that
+// first ran before a sorted/filtered column existed (a <Column> child registering after the
+// first pull, the norm on React/Solid/Lit) silently skipped that sort/filter and stays cached.
+const columnSetSignature = (defs: any) => {
+  let sig = '';
+  const stack = (defs || []).slice().reverse();
+  while (stack.length) {
+    const d = stack.pop();
+    if (!d) continue;
+    sig += String(d.id) + (d.enableSorting ? '+' : '') + (d.enableColumnFilter ? '*' : '') + '|';
+    if (Array.isArray(d.columns)) for (let i = d.columns.length - 1; i >= 0; i--) stack.push(d.columns[i]);
+  }
+  return sig;
+};
 // The last `$props.data` reference maybeClearHistoryOnExternalSwap examined (seeded in
 // $onMount). Declared up here, before reFeed, so reFeed can call isExternalSwap() without a
 // forward reference (React useCallback ordering).
@@ -3004,6 +3025,17 @@ const rowSelectionOption = () => {
   if (props.selectionMode === 'none') return false;
   return lazyRowsActive() ? (row: any) => !rowIsLazyPlaceholder(row) : true;
 };
+// Funnel a pagination write the table makes on its own (reFeed's page reset). writePagination is echo-guarded by `programmatic`: a re-feed that runs
+// synchronously INSIDE another slice's funnel (a header filter input on the fine-grained
+// targets) would have it silently dropped, so defer it to a microtask then.
+const writePaginationSoon = (next: any) => {
+  if (!programmatic) {
+    writePagination(next);
+    return;
+  }
+  const run = () => writePagination(next);
+  if (typeof queueMicrotask !== 'undefined') queueMicrotask(run);else Promise.resolve().then(run);
+};
 // Push fresh options into table-core + re-pull the row model. Extracted so BOTH the
 // re-feed $watch (above) and the Lit data-change $onUpdate (below) call it.
 const reFeed = () => {
@@ -3018,14 +3050,54 @@ const reFeed = () => {
   // Held view: decide whether the hold applies (it falls back to live behaviour under
   // grouping, `manual`, and tree data), and re-derive on a sort/filter change. Fresh locals
   // only — the state object is read once here and passed to setOptions below.
-  const st = currentState();
-  syncHoldActive(st);
-  if (st.sorting !== lastHoldSorting || st.columnFilters !== lastHoldColumnFilters || st.globalFilter !== lastHoldGlobalFilter) {
-    lastHoldSorting = st.sorting;
-    lastHoldColumnFilters = st.columnFilters;
-    lastHoldGlobalFilter = st.globalFilter;
+  const st0 = currentState();
+  syncHoldActive(st0);
+  let st = st0;
+  // Page reset (table-core's auto reset no longer turns the page — see table.resetPageIndex): a sort / filter / grouping change
+  // returns to page 1. The first page is fed to table-core in THIS re-feed (a fresh state
+  // object), so the re-derive — and the active-cell follow, which resolves against the current
+  // page — already sees page 1; writePagination (after the refresh, below) carries it to the
+  // consumer's pagination model. Skipped when already on page 1 (no spurious page-change) and
+  // under `manual` (table-core never auto-reset there either).
+  let pageReset: {
+    pageIndex: number;
+    pageSize: number;
+  } | null = null;
+  const groupingChanged = st0.grouping !== lastPageGrouping;
+  lastPageGrouping = st0.grouping;
+  const viewChanged = st0.sorting !== lastHoldSorting || st0.columnFilters !== lastHoldColumnFilters || st0.globalFilter !== lastHoldGlobalFilter;
+  if (viewChanged) {
+    lastHoldSorting = st0.sorting;
+    lastHoldColumnFilters = st0.columnFilters;
+    lastHoldGlobalFilter = st0.globalFilter;
     holdCtrl.release();
     pendingViewChange = true;
+  }
+  if ((viewChanged || groupingChanged) && props.manual !== true && st0.pagination && st0.pagination.pageIndex !== 0) {
+    pageReset = {
+      pageIndex: 0,
+      pageSize: st0.pagination.pageSize
+    };
+    st = {
+      ...st0,
+      pagination: pageReset
+    };
+  }
+  // The column set changed (a <Column> registered, a `columns` entry was added, a column became
+  // sortable/filterable): table-core's sort and filter stages do not key on column defs, so a
+  // sort or filter that referenced a column which did not exist yet stays skipped (an initial
+  // `sorting` was ignored on React/Solid/Lit). Feed shallow copies of both arrays — the same
+  // memo invalidation refreshView() uses — so they re-run against the new columns. Not a view
+  // change: the hold (if any) is kept and the page is not reset.
+  const cols = tableColumns();
+  const colSig = columnSetSignature(cols);
+  if (colSig !== lastColumnSig) {
+    lastColumnSig = colSig;
+    st = {
+      ...st,
+      sorting: [...(st.sorting || [])],
+      columnFilters: [...(st.columnFilters || [])]
+    };
   }
   // An external swap releases the hold BEFORE this re-feed's refresh, so the one
   // view-state-change it emits is already the re-derived state (never a stale held count
@@ -3041,7 +3113,7 @@ const reFeed = () => {
   table.setOptions((prev: any) => ({
     ...prev,
     data: feedData(),
-    columns: tableColumns(),
+    columns: cols,
     state: st,
     // Held view: the SAME wrapped factory references every re-feed (see holdCtrl).
     getFilteredRowModel: heldFilteredRowModel,
@@ -3099,6 +3171,7 @@ const reFeed = () => {
     onColumnSizingInfoChange: onColumnSizingInfoChangeCb
   }));
   if (refreshRowModel) refreshRowModel();
+  if (pageReset) writePaginationSoon(pageReset);
 };
 // LIT (+ any fine-grained target whose effect-tracked watch does NOT observe the plain
 // `data` PROPERTY): the re-feed $watch reads `(this.data||[]).length` inside a
@@ -5194,15 +5267,21 @@ const modelIndexOfRowId = (id: any) => {
 // (React-stale) corner write can never resurrect it. While the view is held the ids keep
 // their order, so the range stays.
 const followActiveCell = (prevIds: any, nextIds: any, viewChangeOrWrite: any, rowCount: any, colCount: any, editFollowPending = false) => {
-  if (!isGrid()) return;
   // An OPEN editor stays on the record it was opened for (its editing pair is index-addressed
   // over the visible rows). Done first so the active-cell move below knows the editor owns focus.
+  // NOT grid-gated: the editCell / editRow verbs open editors in 'table' mode too (final review
+  // #2); only the active-cell part below is grid-only.
   const editorOwnsFocus = followOpenEditors(prevIds, nextIds);
+  if (!isGrid()) return;
   let follow: any = null;
   if (activeCellEngaged && rowCount > 0 && !activeIsHeader.value && !gridEmptyFallback) {
     follow = resolveFollow(prevIds, activeRow.value, nextIds, viewChangeOrWrite);
   }
-  clampActiveCell(rowCount, colCount, follow, editFollowPending || editorOwnsFocus);
+  // Final review #3: a view change or a table write that EMPTIES the grid — B6 parks the
+  // active cell on the header fallback; when DOM focus was on the vanished body cell, move it
+  // there too (never to <body>).
+  const focusEmptyPark = rowCount <= 0 && viewChangeOrWrite;
+  clampActiveCell(rowCount, colCount, follow, editFollowPending || editorOwnsFocus, focusEmptyPark);
   if (viewChangeOrWrite && !sameIdSequence(prevIds, nextIds)) clearRange();
 };
 // D-05 (now the FALLBACK of the Part 3 follow — see followActiveCell above): clamp the active
@@ -5214,7 +5293,7 @@ const followActiveCell = (prevIds: any, nextIds: any, viewChangeOrWrite: any, ro
 // column header (`'park'`) instead of falling through to whichever row now holds its index.
 // Gated by isGrid() so 'table' mode is entirely untouched. Invoked at the rowModelVer bump
 // path (refreshRowModel → followActiveCell).
-const clampActiveCell = (rowCount: any, colCount: any, follow: any = null, editFollowPending = false) => {
+const clampActiveCell = (rowCount: any, colCount: any, follow: any = null, editFollowPending = false, focusEmptyPark = false) => {
   if (!isGrid()) return;
   // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
   // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
@@ -5282,6 +5361,11 @@ const clampActiveCell = (rowCount: any, colCount: any, follow: any = null, editF
     // Moving DOM focus here would steal focus AND — on React — the fallback's @focusin
     // (setActiveIsHeader true) races the next clear-filter re-seat, leaving the tab-stop stuck on
     // the header. Focus recovery is for a shrink that leaves a VALID BODY cell to land on (below).
+    // The one exception (final review #3, `focusEmptyPark`): a view change or a table write
+    // emptied the grid while DOM focus was ON a body cell (or a just-committed edit expects it
+    // back) — that focus is about to drop to <body>, so move it to the header fallback cell
+    // (the roving tab stop). Never steals focus that is elsewhere.
+    if (focusEmptyPark && (focusOnBody || editFollowPending)) recoverGridFocus('__header', 0, headerLeafLevel());
     return;
   }
   // B6 recovery: the body model returned. If we were parked on the empty-grid header fallback,
@@ -6769,6 +6853,12 @@ const beginEdit = (rowIndex: any, colIndex: any, seed: any) => {
   // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
   // commit is not silently no-op'd by a PRIOR session's already-set latch.
   committedThisSession = false;
+  // A pointerdown OUTSIDE the grid that happened BEFORE this editor opened (a toolbar button
+  // that calls the editCell verb) is not a click-away from it. Left set, onEditorBlur would
+  // consume it on the first null-relatedTarget blur of this editor — e.g. the blur Solid/Lit
+  // fire when a keyed re-render MOVES the editor's row (a re-sort under the open editor) —
+  // and commit-and-close the editor (final review #2, measured on solid + lit).
+  outsidePointerDown = false;
   setInvalid('');
   // Single-cell and full-row edit are mutually exclusive (D-06): entering a single-cell
   // editor clears any row-edit state so isEditing never resolves both modes for one cell.
@@ -8124,6 +8214,8 @@ onMounted(() => {
   // call. One-shot and self-latching — see seedColumnPinning() in stateAssembly.rzts.
   seedColumnPinning();
   // Build the table instance HERE so the closures below capture the live `table`.
+  const cols0 = tableColumns();
+  lastColumnSig = columnSetSignature(cols0);
   table = createTable({
     // Plain value (NOT a `get data()` getter): an object-literal getter rebinds
     // `this` to the options object, and the Angular/Lit emitters resolve $props via
@@ -8134,7 +8226,7 @@ onMounted(() => {
     // currentData() = the bound prop when controlled, else the uncontrolled $data.dataDefault
     // (Phase 51 req-4 — so a committed edit's writeData re-feed is observed either way).
     data: feedData(),
-    columns: tableColumns(),
+    columns: cols0,
     state: currentState(),
     getCoreRowModel: getCoreRowModel(),
     // Held view: the wrapped factories, ALWAYS (see holdCtrl's declaration).
@@ -8224,6 +8316,29 @@ onMounted(() => {
     // satisfies the strict bundled-leaf tsc (deferred-items strict-tsc #2 close).
     onStateChange: () => {}
   });
+  // Page index (final review #1). table-core's autoResetPageIndex (on by default unless
+  // manualPagination) queues `table.resetPageIndex()` in a microtask whenever the core,
+  // filtered, sorted or grouped memo recomputes — which includes every table write (new data)
+  // and refreshView()'s state copy — so a write on page 2 jumped back to page 1 and left the
+  // active cell on another record. The page reset is explicit instead: reFeed returns to page 1
+  // on a sort / columnFilters / globalFilter / grouping change. An external data swap keeps the
+  // page (the #4 overflow clamp in refreshRowModel still pulls it back when the new data has
+  // fewer pages): the swap is detected on different ticks per target (reFeed vs
+  // maybeClearHistoryOnExternalSwap), so a reset there would race the auto-reset's re-write.
+  // The queued auto-reset is NOT switched off (autoResetPageIndex: false): its pagination write
+  // is a re-render tick that several React/Solid paths have come to rely on (measured: B23/WR-01
+  // relocated-row focus, the column-virtual window, header tab stop, editor focus return all
+  // regress without it — the focus polls run before the framework commits the re-sorted rows).
+  // So it is kept, but it re-writes the CURRENT page (table-core's fed state — fresh on every
+  // target, and already page 1 after an explicit reset) instead of turning to page 1.
+  table.resetPageIndex = () => {
+    if (!table) return;
+    const pg = table.getState().pagination;
+    writePagination({
+      pageIndex: pg.pageIndex,
+      pageSize: pg.pageSize
+    });
+  };
   // Held view: seed the sort/filter references the table was built with, so the first reFeed
   // (often the first write's own data re-feed) does not misread them as a view change and
   // release a just-captured hold.
@@ -8231,6 +8346,7 @@ onMounted(() => {
   lastHoldSorting = st0.sorting;
   lastHoldColumnFilters = st0.columnFilters;
   lastHoldGlobalFilter = st0.globalFilter;
+  lastPageGrouping = st0.grouping;
   syncHoldActive(st0);
   // Seed the external-swap baseline with the mount-time dataset, so the first re-feed after an
   // early write (before any maybeClearHistoryOnExternalSwap ran) cannot misread the initial,
@@ -8282,9 +8398,14 @@ onMounted(() => {
     const dataChanged = fedData !== lastFedData;
     lastFedData = fedData;
     const viewChangeOrWrite = pendingViewChange || pendingWrite && dataChanged;
+    // Final review #8: new data that is NOT one of our writes (an external swap) without
+    // `getRowId` — the row ids are source indices, meaningless across the swap, so following
+    // them could land the active cell (or an open editor) on an unrelated record. Don't follow:
+    // the D-05 clamp keeps today's position. Reads table.options (fresh on every target).
+    const swapWithoutIds = dataChanged && !pendingWrite && !pendingViewChange && table.options.getRowId == null;
     pendingViewChange = false;
     if (dataChanged) pendingWrite = false;
-    followActiveCell(prevRowIds, nextIds, viewChangeOrWrite, nextRowCount, nextColCount, pendingEditFollow != null);
+    followActiveCell(swapWithoutIds ? null : prevRowIds, nextIds, viewChangeOrWrite, nextRowCount, nextColCount, pendingEditFollow != null);
     prevRowIds = nextIds;
     // #4: clamp a pageIndex that now points PAST the last page. When the consumer holds
     // pagination.pageIndex (controlled) and shrinks the data (filter / replace) so there are
@@ -8299,11 +8420,11 @@ onMounted(() => {
     //     the clamp back through the pagination prop, the re-feed re-enters here with
     //     pageIndex === pc - 1, so `pageIndex > pc - 1` is false → no re-emit; a consumer that
     //     ignores the event triggers no further re-feed, so it stays a single emit either way.
-    //   • No fight with table-core's autoResetPageIndex: that reset only fires on table-core's OWN
-    //     setX mutations, which this fully-controlled-state architecture never calls (filters/data
-    //     flow through setOptions), so reading the live state here can only fire on a genuine
-    //     overflow — if the index is already valid we stay silent (uncontrolled self-heals too,
-    //     writing paginationDefault, with no regression since table-core does not auto-clamp here).
+    //   • table-core's auto page reset no longer turns the page (table.resetPageIndex is
+    //     overridden after createTable): the sort/filter/grouping page reset is explicit (reFeed),
+    //     and a table write, refreshView() or an external swap never turns the page. This
+    //     clamp therefore only fires on a genuine overflow — if the index is already valid we stay silent (uncontrolled self-heals too,
+    //     writing paginationDefault).
     const pgState = table.getState().pagination;
     const pc = table.getPageCount();
     if (pc > 0 && pgState.pageIndex > pc - 1) {

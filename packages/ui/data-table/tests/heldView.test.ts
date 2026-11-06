@@ -84,6 +84,21 @@ describe('heldView', () => {
     expect(ids()).toEqual(['1', '0'])
   })
 
+  // Docs promise: two edited rows that swap places count as 2 (only written rows count; the
+  // unwritten row that shifts because another moved does not).
+  it('two edited rows swapping places count as 2', () => {
+    const { ctrl, table, write, ids } = mk(baseData())
+    ctrl.setActive(true)
+    write(withRow(table.options.data, 0, { t: 'z' }))
+    expect(ctrl.viewState(table).sortMismatches).toBe(1)
+    write(withRow(table.options.data, 1, { t: 'a' }))
+    expect(ids()).toEqual(['0', '1'])
+    expect(ctrl.viewState(table).sortMismatches).toBe(2)
+    ctrl.release()
+    expect(ids()).toEqual(['1', '0'])
+    expect(ctrl.viewState(table).sortMismatches).toBe(0)
+  })
+
   it('undo reverts count', () => {
     const { ctrl, table, write, ids } = mk(baseData())
     ctrl.setActive(true)
