@@ -4970,6 +4970,10 @@ const syncActiveFromEvent = (e: any) => {
   // any OTHER cell falls through to clearRange() and clears the flag on the way past.
   if (rangeTransition) {
     rangeTransition = false;
+  } else if (!isHeader && tgt !== cellEl && editingRow.value === movedRow && editingCol.value === col) {
+    // Focus moving INTO the open editor of this cell (a built-in input, or a slot editor that
+    // focuses itself) is not navigation: keep the range so the editor can commit to it with
+    // Ctrl/Cmd+Enter.
   } else if (rangeClickPending && rangeClickPending.isHeader === isHeader && rangeClickPending.r === movedRow && rangeClickPending.c === col) {
     rangeClickPending = null;
   } else {

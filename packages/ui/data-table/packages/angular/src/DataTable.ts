@@ -6377,6 +6377,10 @@ export class DataTable {
     // any OTHER cell falls through to clearRange() and clears the flag on the way past.
     if (this.rangeTransition) {
       this.rangeTransition = false;
+    } else if (!isHeader && tgt !== cellEl && this.editingRow() === movedRow && this.editingCol() === col) {
+      // Focus moving INTO the open editor of this cell (a built-in input, or a slot editor that
+      // focuses itself) is not navigation: keep the range so the editor can commit to it with
+      // Ctrl/Cmd+Enter.
     } else if (this.rangeClickPending && this.rangeClickPending.isHeader === isHeader && this.rangeClickPending.r === movedRow && this.rangeClickPending.c === col) {
       this.rangeClickPending = null;
     } else {

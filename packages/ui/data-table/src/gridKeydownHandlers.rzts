@@ -374,6 +374,15 @@ const syncActiveFromEvent = (e) => {
   if (rangeTransition) {
     rangeTransition = false
   } else if (
+    !isHeader &&
+    tgt !== cellEl &&
+    $data.editingRow === movedRow &&
+    $data.editingCol === col
+  ) {
+    // Focus moving INTO the open editor of this cell (a built-in input, or a slot editor that
+    // focuses itself) is not navigation: keep the range so the editor can commit to it with
+    // Ctrl/Cmd+Enter.
+  } else if (
     rangeClickPending &&
     rangeClickPending.isHeader === isHeader &&
     rangeClickPending.r === movedRow &&

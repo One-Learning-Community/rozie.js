@@ -5006,6 +5006,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // any OTHER cell falls through to clearRange() and clears the flag on the way past.
     if (rangeTransition.current) {
       rangeTransition.current = false;
+    } else if (!isHeader && tgt !== cellEl && editingRow === movedRow && editingCol === col) {
+      // Focus moving INTO the open editor of this cell (a built-in input, or a slot editor that
+      // focuses itself) is not navigation: keep the range so the editor can commit to it with
+      // Ctrl/Cmd+Enter.
     } else if (rangeClickPending.current && rangeClickPending.current.isHeader === isHeader && rangeClickPending.current.r === movedRow && rangeClickPending.current.c === col) {
       rangeClickPending.current = null;
     } else {
@@ -5014,7 +5018,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     }
     // The cell box (not an inner control) receiving focus = navigation mode.
     if (tgt === cellEl) setActiveInControl(false);
-  }, [activeColIndex, activeHeaderLevel, activeIsHeader, activeRow, clearRange, headerLeafLevel, isGrid]);
+  }, [activeColIndex, activeHeaderLevel, activeIsHeader, activeRow, clearRange, editingCol, editingRow, headerLeafLevel, isGrid]);
   // onGridMouseDown: the pointer range seam (phase 51 req-7 / D-07 Shift+Click; §6 260709-3qt
   // plain drag-to-select). A focusin event carries no reliable `shiftKey`, so the modifier MUST
   // be read off the pointer event — @mousedown fires BEFORE the cell's focusin and DOES carry

@@ -1,0 +1,158 @@
+<!--
+  DataTableRangeFillDemo.rozie — behavioral consumer for range fill
+  (data-table-range-fill.spec.ts). Select a block of cells in one column, open
+  the editor, and commit with Ctrl/Cmd+Enter to write the value to every
+  selected cell.
+
+  Columns (col index):
+    0 label  — read-only
+    1 qty    — built-in number editor; the validator rejects < 0 and rejects any
+               write to the row whose `locked` is true (row 3), so a fill reports
+               "3 of 4 cells updated"
+    2 city   — built-in select editor (a / b / c)
+    3 tags   — custom slot editor; the value is an ARRAY of strings. It commits
+               on Enter (with or without Ctrl/Cmd), the way a consumer's own
+               editor does.
+    4 defer  — custom slot editor that commits only on blur
+    5 done   — checkbox (no editor; Space/Enter acts on it directly)
+-->
+
+<rozie name="DataTableRangeFillDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, label: 'Alpha', qty: 1, city: 'a', tags: ['x'], defer: 'p', done: true,  locked: false },
+    { id: 2, label: 'Beta',  qty: 2, city: 'a', tags: ['y'], defer: 'q', done: false, locked: false },
+    { id: 3, label: 'Gamma', qty: 3, city: 'b', tags: [],    defer: 'r', done: true,  locked: false },
+    { id: 4, label: 'Delta', qty: 4, city: 'b', tags: ['z'], defer: 's', done: false, locked: true  },
+    { id: 5, label: 'Echo',  qty: 5, city: 'c', tags: ['w'], defer: 't', done: false, locked: false },
+    { id: 6, label: 'Fox',   qty: 6, city: 'c', tags: [],    defer: 'u', done: true,  locked: false },
+  ],
+  cityOptions: [
+    { value: 'a', label: 'a' },
+    { value: 'b', label: 'b' },
+    { value: 'c', label: 'c' },
+  ],
+  rangeReadout: '',
+  rangeNullCount: 0,
+  commitCount: 0,
+}
+</data>
+
+<script lang="ts">
+const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
+  const f = payload ? payload.focus : null
+  $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
+  if (!f) $data.rangeNullCount = $data.rangeNullCount + 1
+}
+
+const onCellEditCommit = (): void => {
+  $data.commitCount = $data.commitCount + 1
+}
+
+// qty: no negatives, and the locked row refuses every write.
+const validateQty = (value: unknown, row: any): true | string => {
+  if (row && row.locked) return 'locked'
+  return typeof value === 'number' && value >= 0 ? true : 'must be 0 or more'
+}
+
+const parseTags = (text: string): string[] =>
+  text.split(',').map((t) => t.trim()).filter((t) => t !== '')
+
+// The tags editor commits on Enter, plain or with Ctrl/Cmd — like a consumer's own editor.
+const onTagsKey = (e: any, commit: (value: any) => void): void => {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    commit(parseTags(e.target.value))
+  }
+}
+
+// The defer editor commits only when it loses focus.
+const onDeferBlur = (e: any, commit: (value: any) => void): void => {
+  commit(e.target.value)
+}
+</script>
+
+<template>
+<div class="dt-range-fill-demo">
+  <h3>DataTable — range fill (Ctrl/Cmd+Enter)</h3>
+
+  <div class="controls">
+    <span class="label">range:</span>
+    <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
+    <span class="label">range cleared:</span>
+    <span class="readout" data-testid="range-null-count">{{ $data.rangeNullCount }}</span>
+    <span class="label">commits:</span>
+    <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  </div>
+
+  <pre class="model" data-testid="model-readout">{{ JSON.stringify($data.rows) }}</pre>
+
+  <div data-testid="grid-table">
+    <DataTable
+      ref="dt"
+      interactionMode="grid"
+      :undoable="true"
+      r-model:data="$data.rows"
+      @range-change="onRangeChange($event)"
+      @cell-edit-commit="onCellEditCommit()"
+    >
+      <Column field="label" header="Label" />
+      <Column field="qty"   header="Qty"   :editable="true" editor="number" :validate="validateQty" />
+      <Column field="city"  header="City"  :editable="true" editor="select" :editorOptions="$data.cityOptions" />
+      <Column field="tags"  header="Tags"  :editable="true" editor="custom" />
+      <Column field="defer" header="Defer" :editable="true" editor="custom" />
+      <Column field="done"  header="Done"  :editable="true" editor="checkbox" />
+
+      <template #cell="{ columnId, value }">
+        <span data-testid="cell-display">{{ Array.isArray(value) ? value.join(',') : String(value) }}</span>
+      </template>
+
+      <template #editor-tags="{ value, commit, cancel }">
+        <span class="tags-editor">
+          <input
+            class="rdt-cell-editor"
+            data-testid="tags-input"
+            :value="(value || []).join(',')"
+            @keydown="onTagsKey($event, commit)"
+          />
+        </span>
+      </template>
+
+      <template #editor-defer="{ value, commit }">
+        <input
+          class="rdt-cell-editor"
+          data-testid="defer-input"
+          :value="value"
+          @blur="onDeferBlur($event, commit)"
+        />
+      </template>
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-range-fill-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 720px;
+}
+.dt-range-fill-demo h3 { margin: 0 0 0.75rem; font-size: 1rem; }
+.controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-size: 0.8125rem; margin-bottom: 0.5rem; }
+.controls .label { color: #555; }
+.controls .readout { font-weight: 600; font-family: ui-monospace, monospace; min-width: 1.5rem; }
+.model { font-size: 0.6875rem; font-family: ui-monospace, monospace; white-space: pre-wrap; word-break: break-all; margin: 0 0 0.75rem; }
+.tags-editor { display: inline-flex; gap: 0.25rem; align-items: center; }
+</style>
+
+</rozie>
