@@ -293,6 +293,23 @@ for (const target of TARGETS) {
     await expect.poll(async () => (await modelRows(page, 'model-readout'))[0]?.title, { timeout: 10_000 }).toBe('Alpha');
   });
 
+  // table-core reads resolveFilterValue (and autoRemove) off the filter function itself; the
+  // <Column> trampoline must forward them from the CURRENT consumer fn. Without forwarding,
+  // 'two' reaches the rule unresolved and matches nothing. (autoRemove has no observable
+  // effect here: the component writes columnFilters state directly, never via
+  // column.setFilterValue, so only resolveFilterValue is provable end to end.)
+  runnerFor(target)(`data-table-held-view [${target}]: (p1-e) filterFn.resolveFilterValue on a <Column> filter is forwarded`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'filter-resolve');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '4']);
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p1-f) custom sortingFn on a <Column> orders rows`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'sort-labels-len');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '3', '5', '4', '6', '2']);
+  });
+
   // Turned on by Task 4 (refreshView): closure filterFn sees the latest value after a refresh.
   test.fixme(`data-table-held-view [${target}]: (p1-d) closure filterFn uses latest value after refreshView`, async ({ page }) => {
     await gotoDemo(page, target);

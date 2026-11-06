@@ -13,7 +13,7 @@
 
   Verb buttons drive the live $refs.dt handle (never cached), each guarded so the demo still
   compiles before a verb exists. No loop var / slot param named row/cell/header (Svelte
-  mount-throw discipline) — the #cell slot binds columnId/value only.
+  mount-throw discipline) — the #cell slot binds value only.
 -->
 
 <rozie name="DataTableHeldViewDemo">
@@ -29,11 +29,11 @@
 {
   rows: [
     { id: 1, title: 'Alpha',   grades: [1, 2], labels: ['a'],      owner: 'Dana', minQty: 1 },
-    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b'], owner: 'Eli',  minQty: 3 },
+    { id: 2, title: 'Beta',    grades: [3],    labels: ['x', 'b', 'y'], owner: 'Eli',  minQty: 3 },
     { id: 3, title: 'Gamma',   grades: [],     labels: ['c'],      owner: 'Fay',  minQty: 5 },
-    { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d'],      owner: 'Dana', minQty: 8 },
+    { id: 4, title: 'Delta',   grades: [2, 4], labels: ['d', 'd2'],      owner: 'Dana', minQty: 8 },
     { id: 5, title: 'Epsilon', grades: [5],    labels: ['x'],      owner: 'Gus',  minQty: 2 },
-    { id: 6, title: 'Zed',     grades: [],     labels: ['e'],      owner: 'Hal',  minQty: 9 },
+    { id: 6, title: 'Zed',     grades: [],     labels: ['e', 'f'],      owner: 'Hal',  minQty: 9 },
   ],
   filters: [],
   sort: [],
@@ -46,8 +46,18 @@
 const rowId = (r: { id: number }): string => String(r.id)
 
 // Custom list rule: '__empty' keeps rows whose list is empty; otherwise any overlap.
-const gradesRule = (v: any, f: any): boolean =>
-  f === '__empty' ? !v?.length : !!v?.some((x: any) => f.includes(x))
+// Carries `autoRemove` and `resolveFilterValue` (table-core reads both OFF the filter fn):
+// the filter value 'two' resolves to the list [2] before the rule runs.
+const gradesRule = Object.assign(
+  (v: any, f: any): boolean => (f === '__empty' ? !v?.length : !!v?.some((x: any) => f.includes(x))),
+  {
+    autoRemove: (f: any): boolean => f === 'none',
+    resolveFilterValue: (f: any): any => (f === 'two' ? [2] : f),
+  },
+)
+
+// Custom sort rule: by list length.
+const labelsLenSort = (a: any, b: any): number => a.length - b.length
 
 // Closure rule: reads live demo state, so it only sees a new threshold on a refresh.
 const minQtyRule = (v: any): boolean => v >= $data.threshold
@@ -63,6 +73,10 @@ const filterLabelsX = (): void => setFilters([{ id: 'labels', value: ['x'] }])
 const filterEmpty = (): void => setFilters([{ id: 'grades', value: '__empty' }])
 const filterOwnerDana = (): void => setFilters([{ id: 'owner', value: 'Dana' }])
 const filterThreshold = (): void => setFilters([{ id: 'minQty', value: 'on' }])
+const filterResolve = (): void => setFilters([{ id: 'grades', value: 'two' }])
+const sortLabelsLen = (): void => {
+  $data.sort = [{ id: 'labels', desc: false }]
+}
 const clearFilters = (): void => setFilters([])
 const bumpClosure = (): void => {
   $data.threshold = 5
@@ -82,6 +96,8 @@ const callUndo = (): void => {
     <button type="button" data-testid="filter-empty" @click="filterEmpty">grades empty</button>
     <button type="button" data-testid="filter-owner-dana" @click="filterOwnerDana">owner Dana</button>
     <button type="button" data-testid="filter-threshold" @click="filterThreshold">minQty threshold</button>
+    <button type="button" data-testid="filter-resolve" @click="filterResolve">grades two</button>
+    <button type="button" data-testid="sort-labels-len" @click="sortLabelsLen">sort labels len</button>
     <button type="button" data-testid="clear-filters" @click="clearFilters">clear filters</button>
     <button type="button" data-testid="undo-btn" @click="callUndo">undo()</button>
     <button type="button" data-testid="bump-closure" @click="bumpClosure">threshold = 5</button>
@@ -105,11 +121,11 @@ const callUndo = (): void => {
       <Column field="id" header="Id" />
       <Column field="title" header="Title" :editable="true" editor="text" :sortable="true" :filterable="true" />
       <Column field="grades" header="Grades" :filterable="true" :filterFn="gradesRule" />
-      <Column field="labels" header="Labels" :filterable="true" filterFn="arrIncludesSome" />
+      <Column field="labels" header="Labels" :filterable="true" :sortable="true" filterFn="arrIncludesSome" :sortingFn="labelsLenSort" />
       <Column field="owner" header="Owner" :editable="true" editor="text" :filterable="true" filterFn="equalsString" />
       <Column field="minQty" header="Min qty" :filterable="true" :filterFn="minQtyRule" />
 
-      <template #cell="{ columnId, value }">
+      <template #cell="{ value }">
         <span data-testid="cell-display">{{ Array.isArray(value) ? value.join(',') : value }}</span>
       </template>
     </DataTable>

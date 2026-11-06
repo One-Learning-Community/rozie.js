@@ -96,18 +96,24 @@ reg = registry;
 // idempotency flag so a reactive late-context registration (Lit async first paint,
 // REQ-30) and the $onMount registration never double-register the column.
 let registered = false;
-// the column SPEC builder — shared by the $onMount register and the late-context
-// $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
-// per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
 // Stable trampolines for custom filterFn/sortingFn. An inline arrow is a new identity every
 // consumer render; registering it directly would defeat the registerColumn equivalence guard
 // (a function compares by source, but table-core would hold a stale closure). The spec holds
 // ONE trampoline per column that always calls the latest function, refreshed in the re-register
 // watch below BEFORE the equivalence check. A mutable top-level `let` (a ref on React).
+// table-core reads `autoRemove` / `resolveFilterValue` OFF the filter function itself, so the
+// filter trampoline carries stable forwarders that read the CURRENT latestFilterFn (absent on
+// the consumer's fn => table-core's own defaults: never auto-remove, value passes through).
 let latestFilterFn: any = null;
 let latestSortingFn: any = null;
-const filterTrampoline = (...args: any[]) => latestFilterFn(...args);
-const sortingTrampoline = (...args: any[]) => latestSortingFn(...args);
+const filterTrampoline: any = Object.assign((...args: any[]) => typeof latestFilterFn === 'function' ? latestFilterFn(...args) : true, {
+  autoRemove: (value: any, column: any) => typeof latestFilterFn === 'function' && typeof latestFilterFn.autoRemove === 'function' ? latestFilterFn.autoRemove(value, column) : false,
+  resolveFilterValue: (value: any) => typeof latestFilterFn === 'function' && typeof latestFilterFn.resolveFilterValue === 'function' ? latestFilterFn.resolveFilterValue(value) : value
+});
+const sortingTrampoline = (...args: any[]) => typeof latestSortingFn === 'function' ? latestSortingFn(...args) : 0;
+// the column SPEC builder — shared by the $onMount register and the late-context
+// $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
+// per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
 const colId = () => props.id !== '' ? props.id : props.field;
 const buildSpec = () => {
   // Seed the trampolines' targets at first registration (Lit props may not exist earlier).

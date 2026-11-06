@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { rozieContext } from '@rozie/runtime-react';
 
 interface ColumnProps {
@@ -103,20 +103,25 @@ export default function Column(_props: ColumnProps): JSX.Element {
   // idempotency flag so a reactive late-context registration (Lit async first paint,
   // REQ-30) and the $onMount registration never double-register the column.
 
-  // the column SPEC builder — shared by the $onMount register and the late-context
-  // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
-  // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
   // Stable trampolines for custom filterFn/sortingFn. An inline arrow is a new identity every
   // consumer render; registering it directly would defeat the registerColumn equivalence guard
   // (a function compares by source, but table-core would hold a stale closure). The spec holds
   // ONE trampoline per column that always calls the latest function, refreshed in the re-register
   // watch below BEFORE the equivalence check. A mutable top-level `let` (a ref on React).
-  function filterTrampoline(...args: any[]) {
-    return latestFilterFn.current(...args);
-  }
+  // table-core reads `autoRemove` / `resolveFilterValue` OFF the filter function itself, so the
+  // filter trampoline carries stable forwarders that read the CURRENT latestFilterFn (absent on
+  // the consumer's fn => table-core's own defaults: never auto-remove, value passes through).
+  const filterTrampoline = useMemo(() => Object.assign((...args: any[]) => typeof latestFilterFn.current === 'function' ? latestFilterFn.current(...args) : true, {
+    autoRemove: (value: any, column: any) => typeof latestFilterFn.current === 'function' && typeof latestFilterFn.current.autoRemove === 'function' ? latestFilterFn.current.autoRemove(value, column) : false,
+    resolveFilterValue: (value: any) => typeof latestFilterFn.current === 'function' && typeof latestFilterFn.current.resolveFilterValue === 'function' ? latestFilterFn.current.resolveFilterValue(value) : value
+  }), []);
   function sortingTrampoline(...args: any[]) {
-    return latestSortingFn.current(...args);
+    return typeof latestSortingFn.current === 'function' ? latestSortingFn.current(...args) : 0;
   }
+
+  // the column SPEC builder — shared by the $onMount register and the late-context
+  // $onUpdate below. Carries METADATA ONLY (no cell/header render callbacks — D-A moved
+  // per-cell rendering to the parent's #cell/#header scoped slot, dispatched by columnId).
   const colId = useCallback(() => props.id !== '' ? props.id : props.field, [props.field, props.id]);
   const buildSpec = useCallback(() => {
     // Seed the trampolines' targets at first registration (Lit props may not exist earlier).
@@ -146,7 +151,7 @@ export default function Column(_props: ColumnProps): JSX.Element {
       editorOptions: props.editorOptions,
       validate: props.validate
     };
-  }, [colId, filterTrampoline, props.aggregationFn, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterFn, props.filterable, props.groupable, props.header, props.pinned, props.sortable, props.sortingFn, props.validate, props.width, sortingTrampoline]);
+  }, [colId, props.aggregationFn, props.editable, props.editor, props.editorOptions, props.expandable, props.field, props.filterFn, props.filterable, props.groupable, props.header, props.pinned, props.sortable, props.sortingFn, props.validate, props.width, sortingTrampoline]);
 
   const _buildSpecRef = useRef(buildSpec);
   _buildSpecRef.current = buildSpec;
