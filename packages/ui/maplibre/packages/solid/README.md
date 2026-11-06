@@ -32,7 +32,7 @@ export function Demo() {
     <div style={{ height: '400px' }}>
       <MapLibre
         center={center()}
-        onCenterChange={setCenter}
+        onCenterChange={(c) => setCenter(c as [number, number])}
         zoom={zoom()}
         onZoomChange={setZoom}
         controls={['navigation', 'scale']}
@@ -41,6 +41,22 @@ export function Demo() {
     </div>
   );
 }
+```
+
+## Declarative sources and layers
+
+The package also exports the `Source` and `Layer` child components. Nest a `Layer` inside a `Source` and it binds to that source; a `Layer` placed directly under the map takes a `source` id instead. They work alongside the `sources` / `layers` config-array props:
+
+```tsx
+import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-solid';
+
+const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+
+<MapLibre center={[0, 0]} zoom={2}>
+  <Source id="pts" spec={geojsonSource}>
+    <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
+  </Source>
+</MapLibre>
 ```
 
 ## Props

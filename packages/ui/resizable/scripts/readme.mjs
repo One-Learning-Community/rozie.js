@@ -149,17 +149,18 @@ import { Resizable } from '@rozie-ui/resizable-angular';
   imports: [Resizable],
   template: \`
     <div style="height: 320px">
-      <Resizable [(size)]="split" [min]="20" [max]="80" direction="horizontal" (resize)="onResize($event)">
+      <rozie-resizable [(size)]="split" [min]="20" [max]="80" direction="horizontal" (resize)="onResize($event)">
         <ng-template #start><nav>Sidebar</nav></ng-template>
         <ng-template #end><main>Content</main></ng-template>
-      </Resizable>
+      </rozie-resizable>
     </div>
   \`,
 })
 export class DemoComponent {
   split = 30;
-  onResize(e: { size: number }) {
-    console.log('split:', e.size);
+  // The \`resize\` output is typed \`unknown\`; its payload is { size }.
+  onResize(e: unknown) {
+    console.log('split:', (e as { size: number }).size);
   }
 }`,
   },
@@ -232,10 +233,10 @@ import { Resizable } from '@rozie-ui/resizable-angular';
   imports: [Resizable, ReactiveFormsModule],
   template: \`
     <!-- The first-panel percent IS the form control value -->
-    <Resizable [formControl]="split" [min]="20" [max]="80">
+    <rozie-resizable [formControl]="split" [min]="20" [max]="80">
       <ng-template #start><nav>Sidebar</nav></ng-template>
       <ng-template #end><main>Content</main></ng-template>
-    </Resizable>
+    </rozie-resizable>
   \`,
 })
 export class ResizableFormComponent {
@@ -243,7 +244,7 @@ export class ResizableFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Resizable [(ngModel)]="split" name="split" />`,
+//   <rozie-resizable [(ngModel)]="split" name="split" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -365,7 +366,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');
@@ -387,6 +388,12 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
     lines.push('```');
     lines.push('');
   }
+
+  // Known limitations.
+  lines.push('## Known limitations');
+  lines.push('');
+  lines.push('- ' + ('Left-to-right only: under `dir="rtl"` the arrow keys and the drag math still measure from the left edge, so both run backwards.'));
+  lines.push('');
 
   // Props
   lines.push('## Props');

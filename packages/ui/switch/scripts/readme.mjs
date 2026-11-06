@@ -137,8 +137,9 @@ import { Switch } from '@rozie-ui/switch-angular';
 })
 export class DemoComponent {
   on = false;
-  onChange(e: { checked: boolean }) {
-    console.log('switch:', e.checked);
+  // The \`change\` output is typed \`unknown\`; its payload is { checked }.
+  onChange(e: unknown) {
+    console.log('switch:', (e as { checked: boolean }).checked);
   }
 }`,
   },
@@ -344,7 +345,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'them at any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');
@@ -369,6 +370,12 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
 
   // Props — the Description cell is sourced from the single-source-of-truth
   // `docs.description` via the shared `renderPropDescription` helper.
+  // Known limitations.
+  lines.push('## Known limitations');
+  lines.push('');
+  lines.push('- ' + (target === 'angular' ? 'No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Use the Angular forms binding above.' : 'No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.'));
+  lines.push('');
+
   lines.push('## Props');
   lines.push('');
   lines.push('| Name | Type | Default | Two-way (model) | Required | Description |');

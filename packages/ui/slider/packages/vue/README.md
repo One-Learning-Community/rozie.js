@@ -21,13 +21,22 @@ import Slider from '@rozie-ui/slider-vue';
 
 const value = ref<number>(50);
 const range = ref<[number, number]>([20, 80]);
+function onChange(e: { value: unknown }) {
+  console.log('changed:', e.value);
+}
 </script>
 
 <template>
-  <Slider v-model:value="value" :min="0" :max="100" :step="1" aria-label="Volume" show-value />
+  <Slider v-model:value="value" :min="0" :max="100" :step="1" aria-label="Volume" show-value @change="onChange" />
 
   <!-- Range mode -->
   <Slider v-model:value="range" range :min="0" :max="100" aria-label="Price range" />
+
+  <!-- Custom tick labels + bubble content via scoped slots -->
+  <Slider v-model:value="value" :marks="[0, 25, 50, 75, 100]" aria-label="Volume" show-value>
+    <template #mark="{ label }"><strong>{{ label }}</strong></template>
+    <template #bubble="{ value: v }">{{ v }}%</template>
+  </Slider>
 </template>
 ```
 
@@ -38,6 +47,11 @@ Every visual value is a `--rozie-slider-*` CSS custom property — override any 
 ```ts
 import '@rozie-ui/slider-vue/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.
+- Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.
 
 ## Props
 

@@ -51,6 +51,10 @@ Every visual value is a `--rozie-switch-*` CSS custom property — override any 
 import '@rozie-ui/switch-solid/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required | Description |

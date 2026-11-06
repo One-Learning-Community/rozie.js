@@ -39,6 +39,24 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 </div>
 ```
 
+## Declarative sources and layers
+
+The package also exports the `Source` and `Layer` child components. Nest a `Layer` inside a `Source` and it binds to that source; a `Layer` placed directly under the map takes a `source` id instead. They work alongside the `sources` / `layers` config-array props:
+
+```svelte
+<script lang="ts">
+  import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-svelte';
+
+  const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+</script>
+
+<MapLibre center={[0, 0]} zoom={2}>
+  <Source id="pts" spec={geojsonSource}>
+    <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
+  </Source>
+</MapLibre>
+```
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |

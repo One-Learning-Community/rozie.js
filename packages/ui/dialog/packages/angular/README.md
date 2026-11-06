@@ -25,12 +25,12 @@ import { Dialog } from '@rozie-ui/dialog-angular';
   template: `
     <button (click)="open = true">Open dialog</button>
 
-    <Dialog [(open)]="open" ariaLabelledby="confirm-title" (close)="onClose($event)">
+    <rozie-dialog [(open)]="open" ariaLabelledby="confirm-title" (close)="onClose($event)">
       <h2 id="confirm-title">Delete file?</h2>
       <p>This cannot be undone.</p>
       <button (click)="open = false">Cancel</button>
       <button (click)="open = false">Delete</button>
-    </Dialog>
+    </rozie-dialog>
   `,
 })
 export class DemoComponent {

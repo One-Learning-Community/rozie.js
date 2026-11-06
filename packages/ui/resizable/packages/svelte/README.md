@@ -39,9 +39,13 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 
 Every visual value is a `--rozie-resizable-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/resizable-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
+
+## Known limitations
+
+- Left-to-right only: under `dir="rtl"` the arrow keys and the drag math still measure from the left edge, so both run backwards.
 
 ## Props
 

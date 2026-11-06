@@ -103,7 +103,7 @@ export function Demo() {
     <div style={{ height: 400 }}>
       <MapLibre
         center={center}
-        onCenterChange={setCenter}
+        onCenterChange={(c) => setCenter(c as [number, number])}
         zoom={zoom}
         onZoomChange={setZoom}
         controls={['navigation', 'scale']}
@@ -166,7 +166,7 @@ import { MapLibre } from '@rozie-ui/maplibre-angular';
   imports: [MapLibre],
   template: \`
     <div style="height: 400px">
-      <MapLibre
+      <rozie-map-libre
         [(center)]="center"
         [(zoom)]="zoom"
         [controls]="['navigation', 'scale']"
@@ -194,7 +194,7 @@ export function Demo() {
     <div style={{ height: '400px' }}>
       <MapLibre
         center={center()}
-        onCenterChange={setCenter}
+        onCenterChange={(c) => setCenter(c as [number, number])}
         zoom={zoom()}
         onZoomChange={setZoom}
         controls={['navigation', 'scale']}
@@ -217,6 +217,98 @@ el.zoom = 2;
 el.controls = ['navigation', 'scale'];
 el.addEventListener('center-change', (e) => { el.center = e.detail; });
 el.addEventListener('click', (e) => console.log(e.detail.lngLat));`,
+  },
+};
+
+// Per-framework import + nesting of the declarative <Source> / <Layer> children.
+// Every leaf's package entry exports all three components by name.
+export const CHILDREN_USAGE = {
+  react: {
+    lang: 'tsx',
+    code: `import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-react';
+
+const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+
+<MapLibre center={[0, 0]} zoom={2}>
+  <Source id="pts" spec={geojsonSource}>
+    <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
+  </Source>
+</MapLibre>`,
+  },
+  vue: {
+    lang: 'vue',
+    code: `<script setup lang="ts">
+import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-vue';
+
+const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+</script>
+
+<template>
+  <MapLibre :center="[0, 0]" :zoom="2">
+    <Source id="pts" :spec="geojsonSource">
+      <Layer id="circles" type="circle" :paint="{ 'circle-radius': 5 }" />
+    </Source>
+  </MapLibre>
+</template>`,
+  },
+  svelte: {
+    lang: 'svelte',
+    code: `<script lang="ts">
+  import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-svelte';
+
+  const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+</script>
+
+<MapLibre center={[0, 0]} zoom={2}>
+  <Source id="pts" spec={geojsonSource}>
+    <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
+  </Source>
+</MapLibre>`,
+  },
+  angular: {
+    lang: 'ts',
+    code: `import { Component } from '@angular/core';
+import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-angular';
+
+@Component({
+  selector: 'app-points',
+  standalone: true,
+  imports: [MapLibre, Source, Layer],
+  template: \`
+    <rozie-map-libre [center]="[0, 0]" [zoom]="2">
+      <rozie-source id="pts" [spec]="geojsonSource">
+        <rozie-layer id="circles" type="circle" [paint]="{ 'circle-radius': 5 }" />
+      </rozie-source>
+    </rozie-map-libre>
+  \`,
+})
+export class PointsComponent {
+  geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+}`,
+  },
+  solid: {
+    lang: 'tsx',
+    code: `import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-solid';
+
+const geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+
+<MapLibre center={[0, 0]} zoom={2}>
+  <Source id="pts" spec={geojsonSource}>
+    <Layer id="circles" type="circle" paint={{ 'circle-radius': 5 }} />
+  </Source>
+</MapLibre>`,
+  },
+  lit: {
+    lang: 'ts',
+    code: `// Importing the package registers all three custom elements:
+// <rozie-map-libre>, <rozie-source> and <rozie-layer>.
+import '@rozie-ui/maplibre-lit';
+
+// <rozie-map-libre>
+//   <rozie-source id="pts"><rozie-layer id="circles" type="circle"></rozie-layer></rozie-source>
+// </rozie-map-libre>
+document.querySelector('rozie-source').spec = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+document.querySelector('rozie-layer').paint = { 'circle-radius': 5 };`,
   },
 };
 
@@ -353,6 +445,23 @@ export function renderReadme(target, ir, pkgName, handleManifest = {}) {
   lines.push(usage.code);
   lines.push('```');
   lines.push('');
+
+  // Declarative <Source> / <Layer> children.
+  const children = CHILDREN_USAGE[target];
+  if (children) {
+    lines.push('## Declarative sources and layers');
+    lines.push('');
+    lines.push(
+      'The package also exports the `Source` and `Layer` child components. Nest a `Layer` inside a ' +
+        '`Source` and it binds to that source; a `Layer` placed directly under the map takes a `source` ' +
+        'id instead. They work alongside the `sources` / `layers` config-array props:',
+    );
+    lines.push('');
+    lines.push('```' + children.lang);
+    lines.push(children.code);
+    lines.push('```');
+    lines.push('');
+  }
 
   // Props
   lines.push('## Props');

@@ -28,8 +28,9 @@ import { Switch } from '@rozie-ui/switch-angular';
 })
 export class DemoComponent {
   on = false;
-  onChange(e: { checked: boolean }) {
-    console.log('switch:', e.checked);
+  // The `change` output is typed `unknown`; its payload is { checked }.
+  onChange(e: unknown) {
+    console.log('switch:', (e as { checked: boolean }).checked);
   }
 }
 ```
@@ -67,6 +68,10 @@ export class SwitchFormComponent {
 // Template-driven forms work the same way:
 //   <rozie-switch [(ngModel)]="enabled" name="enabled" />
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Use the Angular forms binding above.
 
 ## Props
 

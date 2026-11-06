@@ -15,6 +15,7 @@ Also installed: `@rozie/runtime-lit` — Rozie's small, tree-shaken runtime help
 ## Usage
 
 ```ts
+import { html } from 'lit';
 import '@rozie-ui/slider-lit';
 
 // <rozie-slider> is a custom element. Bind `value`/`min`/`max` as properties
@@ -27,6 +28,16 @@ el.value = 50;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
 });
+// `change` fires after every value change; its detail is { value }.
+el.addEventListener('change', (e) => {
+  console.log('changed:', e.detail.value);
+});
+
+// Custom tick labels + bubble content: the `mark` / `bubble` slots are
+// render-function properties returning a Lit template.
+el.marks = [0, 25, 50, 75, 100];
+el.mark = ({ label }) => html`<strong>${label}</strong>`;
+el.bubble = ({ value }) => html`${value}%`;
 ```
 
 ## Theming
@@ -36,6 +47,11 @@ Every visual value is a `--rozie-slider-*` CSS custom property — override any 
 ```ts
 import '@rozie-ui/slider-lit/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.
+- Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.
 
 ## Props
 

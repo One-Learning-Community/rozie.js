@@ -23,15 +23,25 @@ import { Slider } from '@rozie-ui/slider-angular';
   standalone: true,
   imports: [Slider],
   template: `
-    <Slider [(value)]="value" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" [showValue]="true" />
+    <rozie-slider [(value)]="value" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" [showValue]="true" (change)="onChange($event)" />
 
     <!-- Range mode: value is a sorted [lo, hi] tuple -->
-    <Slider [(value)]="range" [range]="true" [min]="0" [max]="100" ariaLabel="Price range" />
+    <rozie-slider [(value)]="range" [range]="true" [min]="0" [max]="100" ariaLabel="Price range" />
+
+    <!-- Custom tick labels + bubble content via <ng-template> content children -->
+    <rozie-slider [(value)]="value" [marks]="[0, 25, 50, 75, 100]" ariaLabel="Volume" [showValue]="true">
+      <ng-template #mark let-label="label"><strong>{{ label }}</strong></ng-template>
+      <ng-template #bubble let-v="value">{{ v }}%</ng-template>
+    </rozie-slider>
   `,
 })
 export class DemoComponent {
   value = 50;
   range: [number, number] = [20, 80];
+  // The `change` output is typed `unknown`; its payload is { value }.
+  onChange(e: unknown) {
+    console.log('changed:', (e as { value: number }).value);
+  }
 }
 ```
 
@@ -58,7 +68,7 @@ import { Slider } from '@rozie-ui/slider-angular';
   imports: [Slider, ReactiveFormsModule],
   template: `
     <!-- The slider value IS the form control value -->
-    <Slider [formControl]="volume" [min]="0" [max]="100" />
+    <rozie-slider [formControl]="volume" [min]="0" [max]="100" />
   `,
 })
 export class VolumeFormComponent {
@@ -66,8 +76,13 @@ export class VolumeFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Slider [(ngModel)]="volume" name="volume" [min]="0" [max]="100" />
+//   <rozie-slider [(ngModel)]="volume" name="volume" [min]="0" [max]="100" />
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Use the Angular forms binding above.
+- Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.
 
 ## Props
 

@@ -34,6 +34,22 @@ el.addEventListener('center-change', (e) => { el.center = e.detail; });
 el.addEventListener('click', (e) => console.log(e.detail.lngLat));
 ```
 
+## Declarative sources and layers
+
+The package also exports the `Source` and `Layer` child components. Nest a `Layer` inside a `Source` and it binds to that source; a `Layer` placed directly under the map takes a `source` id instead. They work alongside the `sources` / `layers` config-array props:
+
+```ts
+// Importing the package registers all three custom elements:
+// <rozie-map-libre>, <rozie-source> and <rozie-layer>.
+import '@rozie-ui/maplibre-lit';
+
+// <rozie-map-libre>
+//   <rozie-source id="pts"><rozie-layer id="circles" type="circle"></rozie-layer></rozie-source>
+// </rozie-map-libre>
+document.querySelector('rozie-source').spec = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
+document.querySelector('rozie-layer').paint = { 'circle-radius': 5 };
+```
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required |

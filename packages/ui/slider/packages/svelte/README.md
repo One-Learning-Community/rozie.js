@@ -22,19 +22,30 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
   let range = $state<[number, number]>([20, 80]);
 </script>
 
-<Slider bind:value min={0} max={100} step={1} ariaLabel="Volume" showValue />
+<Slider bind:value min={0} max={100} step={1} ariaLabel="Volume" showValue onchange={(e) => console.log('changed:', e.value)} />
 
 <!-- Range mode -->
 <Slider bind:value={range} range min={0} max={100} ariaLabel="Price range" />
+
+<!-- Custom tick labels + bubble content via snippets -->
+<Slider bind:value marks={[0, 25, 50, 75, 100]} ariaLabel="Volume" showValue>
+  {#snippet mark({ label })}<strong>{label}</strong>{/snippet}
+  {#snippet bubble({ value: v })}{v}%{/snippet}
+</Slider>
 ```
 
 ## Theming
 
 Every visual value is a `--rozie-slider-*` CSS custom property — override any of them at any ancestor scope. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/slider-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.
+- Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.
 
 ## Props
 

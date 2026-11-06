@@ -31,7 +31,7 @@ import { MapLibre } from '@rozie-ui/maplibre-angular';
   imports: [MapLibre],
   template: `
     <div style="height: 400px">
-      <MapLibre
+      <rozie-map-libre
         [(center)]="center"
         [(zoom)]="zoom"
         [controls]="['navigation', 'scale']"
@@ -44,6 +44,31 @@ export class DemoComponent {
   center: [number, number] = [0, 0];
   zoom = 2;
   onClick(e: any) { console.log(e.lngLat); }
+}
+```
+
+## Declarative sources and layers
+
+The package also exports the `Source` and `Layer` child components. Nest a `Layer` inside a `Source` and it binds to that source; a `Layer` placed directly under the map takes a `source` id instead. They work alongside the `sources` / `layers` config-array props:
+
+```ts
+import { Component } from '@angular/core';
+import { MapLibre, Source, Layer } from '@rozie-ui/maplibre-angular';
+
+@Component({
+  selector: 'app-points',
+  standalone: true,
+  imports: [MapLibre, Source, Layer],
+  template: `
+    <rozie-map-libre [center]="[0, 0]" [zoom]="2">
+      <rozie-source id="pts" [spec]="geojsonSource">
+        <rozie-layer id="circles" type="circle" [paint]="{ 'circle-radius': 5 }" />
+      </rozie-source>
+    </rozie-map-libre>
+  `,
+})
+export class PointsComponent {
+  geojsonSource = { type: 'geojson', data: { type: 'FeatureCollection', features: [] } };
 }
 ```
 

@@ -42,6 +42,10 @@ Every visual value is a `--rozie-resizable-*` CSS custom property — override a
 import '@rozie-ui/resizable-lit/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 
+## Known limitations
+
+- Left-to-right only: under `dir="rtl"` the arrow keys and the drag math still measure from the left edge, so both run backwards.
+
 ## Props
 
 | Name | Type | Default | Two-way (model) | Required | Description |

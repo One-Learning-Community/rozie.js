@@ -20,13 +20,27 @@ import { Slider } from '@rozie-ui/slider-solid';
 
 export function Demo() {
   const [value, setValue] = createSignal<number>(50);
-  return <Slider value={value()} onValueChange={setValue} min={0} max={100} step={1} ariaLabel="Volume" showValue />;
+  return (
+    <Slider
+      value={value()}
+      // `value` is typed `unknown` (a number, or a [lo, hi] pair in range mode) — narrow it.
+      onValueChange={(v) => setValue(v as number)}
+      onChange={(e) => console.log('changed:', e.value)}
+      min={0}
+      max={100}
+      step={1}
+      ariaLabel="Volume"
+      showValue
+    />
+  );
 }
 
 // Range mode: bind a sorted [lo, hi] tuple.
 export function RangeDemo() {
   const [range, setRange] = createSignal<[number, number]>([20, 80]);
-  return <Slider value={range()} onValueChange={setRange} range min={0} max={100} ariaLabel="Price range" />;
+  return (
+    <Slider value={range()} onValueChange={(v) => setRange(v as [number, number])} range min={0} max={100} ariaLabel="Price range" />
+  );
 }
 
 // Custom tick labels + bubble content via the scoped-slot render props —
@@ -36,7 +50,7 @@ export function MarksDemo() {
   return (
     <Slider
       value={value()}
-      onValueChange={setValue}
+      onValueChange={(v) => setValue(v as number)}
       min={0}
       max={100}
       marks={[0, 25, 50, 75, 100]}
@@ -56,6 +70,11 @@ Every visual value is a `--rozie-slider-*` CSS custom property — override any 
 ```tsx
 import '@rozie-ui/slider-solid/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.
+- Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.
 
 ## Props
 

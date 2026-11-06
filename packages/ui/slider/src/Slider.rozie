@@ -4,8 +4,9 @@
   The SECOND @rozie-ui family with NO third-party vanilla engine. Under
   Approach B the engine IS the browser's native <input type="range">: drag
   (mouse + touch), keyboard (arrows / Home / End), focus, role="slider",
-  aria-value*, step / min / max, disabled, and RTL come from the platform for
-  free. Rozie owns the author-side API, the two-way binding, the fill-var math,
+  aria-value*, step / min / max, and disabled come from the platform for free
+  (RTL is NOT handled: the fill, marks and bubbles are positioned with physical
+  `left`, so they do not mirror). Rozie owns the author-side API, the two-way binding, the fill-var math,
   the range sort, the overlays, and a thin PageUp/PageDown step augment.
 
   Two overlapping transparent native inputs implement dual-thumb range

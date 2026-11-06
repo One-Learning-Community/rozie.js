@@ -30,10 +30,11 @@ import { NumberField } from '@rozie-ui/number-field-angular';
   `,
 })
 export class DemoComponent {
-  qty: number | null = 1;
+  qty = 1; // the field writes null back when it is cleared
   currency = { style: 'currency', currency: 'USD' };
-  onChange(e: { value: number | null }) {
-    console.log('value:', e.value);
+  // The `change` output is typed `unknown`; its payload is { value }.
+  onChange(e: unknown) {
+    console.log('value:', (e as { value: number | null }).value);
   }
 }
 ```
@@ -71,6 +72,10 @@ export class NumberFormComponent {
 // Template-driven forms work the same way:
 //   <rozie-number-field [(ngModel)]="qty" name="qty" [min]="0" [max]="10" />
 ```
+
+## Known limitations
+
+- No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Use the Angular forms binding above.
 
 ## Props
 

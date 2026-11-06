@@ -78,14 +78,43 @@ import { Slider } from '@rozie-ui/slider-react';
 export function Demo() {
   const [value, setValue] = useState<number>(50);
   return (
-    <Slider value={value} onValueChange={setValue} min={0} max={100} step={1} ariaLabel="Volume" showValue />
+    <Slider
+      value={value}
+      // \`value\` is typed \`unknown\` (a number, or a [lo, hi] pair in range mode) — narrow it.
+      onValueChange={(v) => setValue(v as number)}
+      onChange={(e) => console.log('changed:', e.value)}
+      min={0}
+      max={100}
+      step={1}
+      ariaLabel="Volume"
+      showValue
+    />
   );
 }
 
 // Range mode: bind a sorted [lo, hi] tuple.
 export function RangeDemo() {
   const [range, setRange] = useState<[number, number]>([20, 80]);
-  return <Slider value={range} onValueChange={setRange} range min={0} max={100} ariaLabel="Price range" />;
+  return (
+    <Slider value={range} onValueChange={(v) => setRange(v as [number, number])} range min={0} max={100} ariaLabel="Price range" />
+  );
+}
+
+// Custom tick labels + bubble content via the scoped-slot render props —
+// renderMark receives { value, label, position } per mark, renderBubble { value }.
+export function MarksDemo() {
+  const [value, setValue] = useState<number>(25);
+  return (
+    <Slider
+      value={value}
+      onValueChange={(v) => setValue(v as number)}
+      marks={[0, 25, 50, 75, 100]}
+      ariaLabel="Volume"
+      showValue
+      renderMark={(m) => <strong>{m.label}</strong>}
+      renderBubble={(b) => <>{b.value}%</>}
+    />
+  );
 }`,
   },
   vue: {
@@ -96,13 +125,22 @@ import Slider from '@rozie-ui/slider-vue';
 
 const value = ref<number>(50);
 const range = ref<[number, number]>([20, 80]);
+function onChange(e: { value: unknown }) {
+  console.log('changed:', e.value);
+}
 </script>
 
 <template>
-  <Slider v-model:value="value" :min="0" :max="100" :step="1" aria-label="Volume" show-value />
+  <Slider v-model:value="value" :min="0" :max="100" :step="1" aria-label="Volume" show-value @change="onChange" />
 
   <!-- Range mode -->
   <Slider v-model:value="range" range :min="0" :max="100" aria-label="Price range" />
+
+  <!-- Custom tick labels + bubble content via scoped slots -->
+  <Slider v-model:value="value" :marks="[0, 25, 50, 75, 100]" aria-label="Volume" show-value>
+    <template #mark="{ label }"><strong>{{ label }}</strong></template>
+    <template #bubble="{ value: v }">{{ v }}%</template>
+  </Slider>
 </template>`,
   },
   svelte: {
@@ -114,10 +152,16 @@ const range = ref<[number, number]>([20, 80]);
   let range = $state<[number, number]>([20, 80]);
 </script>
 
-<Slider bind:value min={0} max={100} step={1} ariaLabel="Volume" showValue />
+<Slider bind:value min={0} max={100} step={1} ariaLabel="Volume" showValue onchange={(e) => console.log('changed:', e.value)} />
 
 <!-- Range mode -->
-<Slider bind:value={range} range min={0} max={100} ariaLabel="Price range" />`,
+<Slider bind:value={range} range min={0} max={100} ariaLabel="Price range" />
+
+<!-- Custom tick labels + bubble content via snippets -->
+<Slider bind:value marks={[0, 25, 50, 75, 100]} ariaLabel="Volume" showValue>
+  {#snippet mark({ label })}<strong>{label}</strong>{/snippet}
+  {#snippet bubble({ value: v })}{v}%{/snippet}
+</Slider>`,
   },
   angular: {
     lang: 'ts',
@@ -129,15 +173,25 @@ import { Slider } from '@rozie-ui/slider-angular';
   standalone: true,
   imports: [Slider],
   template: \`
-    <Slider [(value)]="value" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" [showValue]="true" />
+    <rozie-slider [(value)]="value" [min]="0" [max]="100" [step]="1" ariaLabel="Volume" [showValue]="true" (change)="onChange($event)" />
 
     <!-- Range mode: value is a sorted [lo, hi] tuple -->
-    <Slider [(value)]="range" [range]="true" [min]="0" [max]="100" ariaLabel="Price range" />
+    <rozie-slider [(value)]="range" [range]="true" [min]="0" [max]="100" ariaLabel="Price range" />
+
+    <!-- Custom tick labels + bubble content via <ng-template> content children -->
+    <rozie-slider [(value)]="value" [marks]="[0, 25, 50, 75, 100]" ariaLabel="Volume" [showValue]="true">
+      <ng-template #mark let-label="label"><strong>{{ label }}</strong></ng-template>
+      <ng-template #bubble let-v="value">{{ v }}%</ng-template>
+    </rozie-slider>
   \`,
 })
 export class DemoComponent {
   value = 50;
   range: [number, number] = [20, 80];
+  // The \`change\` output is typed \`unknown\`; its payload is { value }.
+  onChange(e: unknown) {
+    console.log('changed:', (e as { value: number }).value);
+  }
 }`,
   },
   solid: {
@@ -147,13 +201,27 @@ import { Slider } from '@rozie-ui/slider-solid';
 
 export function Demo() {
   const [value, setValue] = createSignal<number>(50);
-  return <Slider value={value()} onValueChange={setValue} min={0} max={100} step={1} ariaLabel="Volume" showValue />;
+  return (
+    <Slider
+      value={value()}
+      // \`value\` is typed \`unknown\` (a number, or a [lo, hi] pair in range mode) — narrow it.
+      onValueChange={(v) => setValue(v as number)}
+      onChange={(e) => console.log('changed:', e.value)}
+      min={0}
+      max={100}
+      step={1}
+      ariaLabel="Volume"
+      showValue
+    />
+  );
 }
 
 // Range mode: bind a sorted [lo, hi] tuple.
 export function RangeDemo() {
   const [range, setRange] = createSignal<[number, number]>([20, 80]);
-  return <Slider value={range()} onValueChange={setRange} range min={0} max={100} ariaLabel="Price range" />;
+  return (
+    <Slider value={range()} onValueChange={(v) => setRange(v as [number, number])} range min={0} max={100} ariaLabel="Price range" />
+  );
 }
 
 // Custom tick labels + bubble content via the scoped-slot render props —
@@ -163,7 +231,7 @@ export function MarksDemo() {
   return (
     <Slider
       value={value()}
-      onValueChange={setValue}
+      onValueChange={(v) => setValue(v as number)}
       min={0}
       max={100}
       marks={[0, 25, 50, 75, 100]}
@@ -177,7 +245,8 @@ export function MarksDemo() {
   },
   lit: {
     lang: 'ts',
-    code: `import '@rozie-ui/slider-lit';
+    code: `import { html } from 'lit';
+import '@rozie-ui/slider-lit';
 
 // <rozie-slider> is a custom element. Bind \`value\`/\`min\`/\`max\` as properties
 // and listen for the \`value-change\` event to receive the new value (a number
@@ -188,7 +257,17 @@ el.max = 100;
 el.value = 50;
 el.addEventListener('value-change', (e) => {
   el.value = e.detail;
-});`,
+});
+// \`change\` fires after every value change; its detail is { value }.
+el.addEventListener('change', (e) => {
+  console.log('changed:', e.detail.value);
+});
+
+// Custom tick labels + bubble content: the \`mark\` / \`bubble\` slots are
+// render-function properties returning a Lit template.
+el.marks = [0, 25, 50, 75, 100];
+el.mark = ({ label }) => html\`<strong>\${label}</strong>\`;
+el.bubble = ({ value }) => html\`\${value}%\`;`,
   },
 };
 
@@ -217,7 +296,7 @@ import { Slider } from '@rozie-ui/slider-angular';
   imports: [Slider, ReactiveFormsModule],
   template: \`
     <!-- The slider value IS the form control value -->
-    <Slider [formControl]="volume" [min]="0" [max]="100" />
+    <rozie-slider [formControl]="volume" [min]="0" [max]="100" />
   \`,
 })
 export class VolumeFormComponent {
@@ -225,7 +304,7 @@ export class VolumeFormComponent {
 }
 
 // Template-driven forms work the same way:
-//   <Slider [(ngModel)]="volume" name="volume" [min]="0" [max]="100" />`,
+//   <rozie-slider [(ngModel)]="volume" name="volume" [min]="0" [max]="100" />`,
 };
 
 // Per-framework "obtain the imperative handle" snippets (`$expose`).
@@ -346,7 +425,7 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
       'any ancestor scope. Ready-made design-system bridges ship in the package:',
   );
   lines.push('');
-  lines.push('```' + (target === 'lit' ? 'ts' : usage.lang === 'vue' ? 'ts' : usage.lang));
+  lines.push('```' + (usage.lang === 'tsx' ? 'tsx' : 'ts'));
   lines.push(`import '${pkgName}/themes/shadcn.css';    // or material.css, bootstrap.css, base.css`);
   lines.push('```');
   lines.push('');
@@ -369,6 +448,13 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
     lines.push('```');
     lines.push('');
   }
+
+  // Known limitations.
+  lines.push('## Known limitations');
+  lines.push('');
+  lines.push('- ' + (target === 'angular' ? 'No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Use the Angular forms binding above.' : 'No native form submission: the component renders no `name`d form field, so a plain `<form>` submit does not include its value. Read the bound value instead.'));
+  lines.push('- ' + ('Left-to-right only: the native thumbs mirror under `dir="rtl"`, but the fill, marks and bubbles are positioned with physical `left`, so they do not follow.'));
+  lines.push('');
 
   // Props
   lines.push('## Props');

@@ -39,7 +39,7 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 
 Every cosmetic value is a `--rozie-dialog-*` CSS custom property — override any of them at any ancestor scope. The structural behaviour (top-layer, `::backdrop`, focus trap, centering) comes from the native `<dialog>` and is not tokenised. Ready-made design-system bridges ship in the package:
 
-```svelte
+```ts
 import '@rozie-ui/dialog-svelte/themes/shadcn.css';    // or material.css, bootstrap.css, base.css
 ```
 
