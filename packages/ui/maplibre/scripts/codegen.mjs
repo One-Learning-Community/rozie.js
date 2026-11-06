@@ -65,13 +65,19 @@ const PARENT = 'MapLibre';
 const COMPONENTS = [PARENT, 'Source', 'Layer'];
 
 /** Per-target leaf dir + emitted file extension (build mode is informational). */
+//
+// `barrelExt` is the module-path suffix the `src/index.ts` barrel uses ('.vue' /
+// '.svelte' for SFCs, '' for extensionless TS modules). `exportStyle` is how each
+// component module exports its component: 'default' (react/solid/lit .tsx/.ts and
+// the vue/svelte SFCs) or 'named' (angular emits `export class <Name>` plus an
+// `export default <Name>`).
 const TARGETS = {
-  react: { dir: 'react', ext: 'tsx', build: 'tsdown' },
-  vue: { dir: 'vue', ext: 'vue', build: 'source' },
-  svelte: { dir: 'svelte', ext: 'svelte', build: 'source' },
-  angular: { dir: 'angular', ext: 'ts', build: 'source' },
-  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown' },
-  lit: { dir: 'lit', ext: 'ts', build: 'tsdown' },
+  react: { dir: 'react', ext: 'tsx', build: 'tsdown', barrelExt: '', exportStyle: 'default' },
+  vue: { dir: 'vue', ext: 'vue', build: 'source', barrelExt: '.vue', exportStyle: 'default' },
+  svelte: { dir: 'svelte', ext: 'svelte', build: 'source', barrelExt: '.svelte', exportStyle: 'default' },
+  angular: { dir: 'angular', ext: 'ts', build: 'source', barrelExt: '', exportStyle: 'named' },
+  solid: { dir: 'solid', ext: 'tsx', build: 'tsdown', barrelExt: '', exportStyle: 'default' },
+  lit: { dir: 'lit', ext: 'ts', build: 'tsdown', barrelExt: '', exportStyle: 'default' },
 };
 
 function leafPkgName(dir) {
@@ -141,29 +147,34 @@ function main() {
       }
     }
 
-    // Bundled leaves (tsdown) entry on src/index.ts. Each component is a DEFAULT
-    // export, so the multi-export barrel re-exports every component's default under
-    // its named export (an `export *` would NOT forward a default). The PARENT
-    // also re-exports the package default + the `MapLibreHandle` type (React/Solid
-    // emit `export interface MapLibreHandle` in the .tsx; Lit's handle is the
-    // custom element itself, so it gets no named type).
-    if (cfg.build === 'tsdown') {
-      const childExports = COMPONENTS.filter((n) => n !== PARENT)
-        .map((n) => `export { default as ${n} } from './${n}';\n`)
-        .join('');
-      const parentBlock =
-        (target === 'react' || target === 'solid') && ir.expose.length > 0
-          ? `export { default as MapLibre } from './MapLibre';\n` +
-            `export { default } from './MapLibre';\n` +
-            childExports +
-            `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
-              .map((m) => m.name)
-              .join(', ')} }. */\n` +
-            `export type { MapLibreHandle } from './MapLibre';\n`
-          : `export { default as MapLibre } from './MapLibre';\nexport { default } from './MapLibre';\n` +
-            childExports;
-      writeFileSync(resolve(leafSrc, 'index.ts'), parentBlock);
-    }
+    // Named-export BARREL on src/index.ts — written for EVERY target, not only
+    // the bundled tsdown leaves (the @rozie-ui/rete pattern). Without it the
+    // source-shipped leaves (vue/svelte/angular) could only point `exports["."]`
+    // at MapLibre.<ext>, so `Source` / `Layer` were unreachable from the Svelte
+    // and Angular packages. The barrel re-exports every component by name plus a
+    // back-compat package default (= MapLibre). A default-exported component is
+    // re-exported as `export { default as X }` (an `export *` would NOT forward a
+    // default); angular re-exports the class by name. React/Solid also re-export
+    // the `MapLibreHandle` type (Lit's handle is the custom element itself, and
+    // importing the Lit barrel evaluates every module, so all three custom
+    // elements register).
+    const bx = cfg.barrelExt;
+    const reexport = (name) =>
+      cfg.exportStyle === 'named'
+        ? `export { ${name} } from './${name}${bx}';\n`
+        : `export { default as ${name} } from './${name}${bx}';\n`;
+    const childExports = COMPONENTS.filter((n) => n !== PARENT)
+      .map(reexport)
+      .join('');
+    const handleType =
+      (target === 'react' || target === 'solid') && ir.expose.length > 0
+        ? `\n/** The \`$expose\` imperative handle received via \`ref\` — { ${ir.expose
+            .map((m) => m.name)
+            .join(', ')} }. */\n` + `export type { MapLibreHandle } from './MapLibre';\n`
+        : '';
+    const barrel =
+      reexport(PARENT) + `export { default } from './${PARENT}${bx}';\n` + childExports + handleType;
+    writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
 
     // (4) README from the single PARENT IR parse.
     const pkgName = leafPkgName(cfg.dir);
