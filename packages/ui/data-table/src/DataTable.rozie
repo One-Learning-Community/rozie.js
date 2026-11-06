@@ -484,6 +484,17 @@ export interface DataTableVisibleRangeChangePayload { start: number; end: number
         'Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.',
     },
   },
+  // Opt-in vertical grid lines. Off by default: the table draws row lines only.
+  columnLines: {
+    type: Boolean,
+    default: false,
+    docs: {
+      description:
+        'Draw a line between columns, plus a left line on the first column and a top line on ' +
+        'the header row. The colour follows `--rozie-data-table-border-color` unless ' +
+        '`--rozie-data-table-column-border-color` is set.',
+    },
+  },
 
   // Interaction mode (D-02): 'table' (default, row-oriented) | 'grid' (full WAI-ARIA
   // grid cell navigation). Both values are GA — grid cell-nav is fully
@@ -2462,7 +2473,7 @@ $expose({
 >
 <table
   class="rozie-data-table"
-  :class="{ 'rdt-sticky': $props.stickyHeader, 'rdt-col-windowed': colsWindowed() }"
+  :class="{ 'rdt-sticky': $props.stickyHeader, 'rdt-col-windowed': colsWindowed(), 'rdt-column-lines': $props.columnLines }"
   :role="tableRole()"
   :aria-rowcount="gridAriaRowCount()"
   :aria-colcount="gridAriaColCount()"
@@ -3066,7 +3077,7 @@ $expose({
 <table
   r-else
   class="rozie-data-table"
-  :class="{ 'rdt-sticky': $props.stickyHeader }"
+  :class="{ 'rdt-sticky': $props.stickyHeader, 'rdt-column-lines': $props.columnLines }"
   :role="tableRole()"
   :aria-rowcount="gridAriaRowCount()"
   :aria-colcount="gridAriaColCount()"
@@ -3655,6 +3666,8 @@ $expose({
   --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
   --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, var(--rdt-ds-column-border-color)));
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, var(--rdt-ds-pinned-bg));
   --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
   --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
   --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
@@ -3677,7 +3690,12 @@ $expose({
 }
 
 .rozie-data-table {
-  border-collapse: collapse;
+  /* SEPARATE, not collapse. With collapsed borders the browser keeps a sticky cell's shared
+     border in the scrolling grid, so a 1px line of scrolled content shows beside pinned
+     columns and above the sticky header. Separate borders travel with their cell; zero
+     spacing keeps lines 1px because each cell draws only its own sides (see the cell rule). */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
@@ -3767,7 +3785,32 @@ $expose({
 .rozie-data-table .rdt-td {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
   text-align: left;
+  /* Reset every side, then draw only the row line. Under separate borders each cell owns its
+     lines, and the reset keeps a host's plain `table td { border }` rule from drawing a second
+     set inside the table (this class-scoped rule outranks it). */
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+/* The detail-panel cell spans the row. It draws no line of its own (as before), but gets the
+   reset so a host rule can't box it. */
+.rozie-data-table .rdt-detail-cell {
+  border: 0;
+}
+/* Opt-in column lines (the columnLines prop): a right line on every cell, plus the outer
+   left line on the first column and the outer top line on the header row. The first real
+   cell is the row's first child, or the cell right after a windowed-columns spacer. */
+.rozie-data-table.rdt-column-lines .rdt-th,
+.rozie-data-table.rdt-column-lines .rdt-td,
+.rozie-data-table.rdt-column-lines .rdt-filter-cell,
+.rozie-data-table.rdt-column-lines .rdt-detail-cell {
+  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines tr > :first-child:not(.rdt-col-spacer),
+.rozie-data-table.rdt-column-lines tr > .rdt-col-spacer:first-child + * {
+  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines .rdt-thead > tr:first-child > .rdt-th {
+  border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table .rdt-thead .rdt-th {
   font-weight: var(--rdt-header-weight, 600);
@@ -3944,8 +3987,18 @@ $expose({
 .rozie-data-table .rdt-pinned {
   box-sizing: border-box;
 }
+/* Pinned BODY cells are opaque so scrolled content never shows through them (header cells
+   already carry the opaque --rdt-header-bg). The translucent range tint is layered over the
+   opaque colour so it stays visible on a pinned cell. */
+.rozie-data-table .rdt-td.rdt-pinned {
+  background-color: var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table .rdt-td.rdt-pinned.rdt-in-range {
+  background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table .rdt-filter-cell {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table-wrap .rdt-filter-row :deep(.rdt-col-filter) {

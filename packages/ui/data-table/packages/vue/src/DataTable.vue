@@ -24,7 +24,7 @@
     <span v-for="gk in groupingKeys()" :key="gk" class="rdt-group-token" data-group-token="">{{ gk }}</span>
   </slot>
 </div><div v-if="isWindowed()" class="rdt-scroll" :style="rowsWindowed() && props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto'">
-<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-col-windowed': colsWindowed() }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+<table :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-col-windowed': colsWindowed(), 'rdt-column-lines': props.columnLines }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       
@@ -132,7 +132,7 @@
     </tr>
   </tbody>
 </table>
-</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
+</div><table v-else :class="['rozie-data-table', { 'rdt-sticky': props.stickyHeader, 'rdt-column-lines': props.columnLines }]" :role="tableRole()" :aria-rowcount="(gridAriaRowCount()) ?? undefined" :aria-colcount="(gridAriaColCount()) ?? undefined" @keydown="onGridKeyDown($event)" @focusin="syncActiveFromEvent($event)" @focusout="onGridFocusOut($event)" @mousedown="onGridMouseDown($event)" @dblclick="onGridDblClick($event)" @click="onGridClick($event)">
   <thead class="rdt-thead" role="rowgroup">
     <tr v-for="(hg, hgLevel) in headerGroups" :key="hg.id" class="rdt-tr" role="row" :aria-rowindex="hgLevel + 1">
       <th v-for="header in hg.headers" :key="header.id" :class="['rdt-th', { 'rdt-select-th': isSelectColumn(header.column.id), 'rdt-expander-th': isExpanderColumn(header.column.id), 'rdt-pinned': columnPinSide(header.column.id) !== '', 'rdt-th-resizing': columnIsResizing(header.column.id), 'rdt-cell-active': isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) }]" role="columnheader" :data-col="header.column.id" data-grid-cell="" data-row="__header" :data-header-level="hgLevel" :colspan="(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined" :data-col-index="headerColIndexOf(hg, header)" :aria-colindex="headerLeafStart(hg, header) + 1" :tabindex="(cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)) ?? undefined" :aria-sort="ariaSortFor(header.column.id)" :style="thStyle(header)">
@@ -446,6 +446,7 @@ const props = withDefaults(
      * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
      */
     stickyHeader?: boolean;
+    columnLines?: boolean;
     /**
      * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
      */
@@ -483,7 +484,7 @@ const props = withDefaults(
      */
     maxHeight?: string;
   }>(),
-  { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, holdView: false, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }
+  { columns: () => [], selectionMode: 'none', manual: false, rowCount: null, pageCount: null, expandable: false, getRowId: null, getSubRows: null, groupable: false, stickyHeader: false, columnLines: false, interactionMode: 'table', singleClickEdit: false, undoable: false, undoLimit: 100, holdView: false, virtual: false, estimateRowHeight: 40, autoMeasure: false, maxHeight: '' }
 );
 
 const __rozieVm = getCurrentInstance()!;
@@ -8703,6 +8704,8 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
   --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, var(--rdt-ds-column-border-color)));
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, var(--rdt-ds-pinned-bg));
   --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
   --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
   --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
@@ -8724,7 +8727,12 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
   --rdt-page-size-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
 }
 .rozie-data-table {
-  border-collapse: collapse;
+  /* SEPARATE, not collapse. With collapsed borders the browser keeps a sticky cell's shared
+     border in the scrolling grid, so a 1px line of scrolled content shows beside pinned
+     columns and above the sticky header. Separate borders travel with their cell; zero
+     spacing keeps lines 1px because each cell draws only its own sides (see the cell rule). */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
@@ -8783,7 +8791,27 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 .rozie-data-table .rdt-td {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
   text-align: left;
+  /* Reset every side, then draw only the row line. Under separate borders each cell owns its
+     lines, and the reset keeps a host's plain `table td { border }` rule from drawing a second
+     set inside the table (this class-scoped rule outranks it). */
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table .rdt-detail-cell {
+  border: 0;
+}
+.rozie-data-table.rdt-column-lines .rdt-th,
+.rozie-data-table.rdt-column-lines .rdt-td,
+.rozie-data-table.rdt-column-lines .rdt-filter-cell,
+.rozie-data-table.rdt-column-lines .rdt-detail-cell {
+  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines tr > :first-child:not(.rdt-col-spacer),
+.rozie-data-table.rdt-column-lines tr > .rdt-col-spacer:first-child + * {
+  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines .rdt-thead > tr:first-child > .rdt-th {
+  border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table .rdt-thead .rdt-th {
   font-weight: var(--rdt-header-weight, 600);
@@ -8887,8 +8915,15 @@ defineExpose({ sortColumn, clearSorting, toggleRowExpanded, expandAll, collapseA
 .rozie-data-table .rdt-pinned {
   box-sizing: border-box;
 }
+.rozie-data-table .rdt-td.rdt-pinned {
+  background-color: var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table .rdt-td.rdt-pinned.rdt-in-range {
+  background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table .rdt-filter-cell {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table-wrap .rdt-filter-row :deep(.rdt-col-filter) {

@@ -39,6 +39,8 @@ rozie-data-table {
   --rdt-color: var(--rozie-data-table-fg, hsl(var(--foreground, 222.2 47.4% 11.2%)));
   --rdt-select-accent: var(--rozie-data-table-select-accent, var(--rozie-data-table-accent, hsl(var(--primary, 222.2 47.4% 11.2%))));
   --rdt-border: 1px solid var(--rozie-data-table-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, hsl(var(--border, 214.3 31.8% 91.4%))));
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, hsl(var(--background, 0 0% 100%)));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, hsl(var(--border, 214.3 31.8% 91.4%)));
   --rdt-filter-radius: var(--rozie-data-table-radius, var(--radius, 0.5rem));
   --rdt-header-bg: var(--rozie-data-table-header-bg, hsl(var(--muted, 210 40% 96.1%)));
@@ -65,6 +67,7 @@ rozie-data-table {
   --rdt-ds-fg: hsl(var(--foreground, 222.2 47.4% 11.2%));
   --rdt-ds-select-accent: hsl(var(--primary, 222.2 47.4% 11.2%));
   --rdt-ds-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
+  --rdt-ds-pinned-bg: hsl(var(--background, 0 0% 100%));
   --rdt-ds-control-border-color: hsl(var(--border, 214.3 31.8% 91.4%));
   --rdt-ds-radius: var(--radius, 0.5rem);
   --rdt-ds-header-bg: hsl(var(--muted, 210 40% 96.1%));

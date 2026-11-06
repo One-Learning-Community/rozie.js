@@ -286,7 +286,7 @@ interface EditorCtx {
     </div>
     }@if (isWindowed()) {
     <div class="rdt-scroll" [attr.style]="__style">
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader(), 'rdt-col-windowed': colsWindowed() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" [attr.aria-colcount]="rozieAttr(gridAriaColCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader(), 'rdt-col-windowed': colsWindowed(), 'rdt-column-lines': columnLines() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" [attr.aria-colcount]="rozieAttr(gridAriaColCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
@@ -536,7 +536,7 @@ interface EditorCtx {
     </table>
     </div>
     } @else {
-    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" [attr.aria-colcount]="rozieAttr(gridAriaColCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
+    <table class="rozie-data-table" [ngClass]="{ 'rdt-sticky': stickyHeader(), 'rdt-column-lines': columnLines() }" [attr.role]="rozieAttr(tableRole())" [attr.aria-rowcount]="rozieAttr(gridAriaRowCount())" [attr.aria-colcount]="rozieAttr(gridAriaColCount())" (keydown)="onGridKeyDown($event)" (focusin)="syncActiveFromEvent($event)" (focusout)="onGridFocusOut($event)" (mousedown)="onGridMouseDown($event)" (dblclick)="onGridDblClick($event)" (click)="onGridClick($event)">
       <thead class="rdt-thead" role="rowgroup">
         @for (hg of headerGroups(); track hg.id; let hgLevel = $index) {
     <tr class="rdt-tr" role="row" [attr.aria-rowindex]="rozieAttr(hgLevel + 1)">
@@ -773,6 +773,8 @@ interface EditorCtx {
       --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
       --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
       --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+      --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, var(--rdt-ds-column-border-color)));
+      --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, var(--rdt-ds-pinned-bg));
       --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
       --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
       --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
@@ -794,7 +796,12 @@ interface EditorCtx {
       --rdt-page-size-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
     }
     .rozie-data-table {
-      border-collapse: collapse;
+      /* SEPARATE, not collapse. With collapsed borders the browser keeps a sticky cell's shared
+         border in the scrolling grid, so a 1px line of scrolled content shows beside pinned
+         columns and above the sticky header. Separate borders travel with their cell; zero
+         spacing keeps lines 1px because each cell draws only its own sides (see the cell rule). */
+      border-collapse: separate;
+      border-spacing: 0;
       width: 100%;
       font: var(--rdt-font, 14px system-ui, sans-serif);
       color: var(--rdt-color, inherit);
@@ -853,7 +860,27 @@ interface EditorCtx {
     .rozie-data-table .rdt-td {
       padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
       text-align: left;
+      /* Reset every side, then draw only the row line. Under separate borders each cell owns its
+         lines, and the reset keeps a host's plain \`table td { border }\` rule from drawing a second
+         set inside the table (this class-scoped rule outranks it). */
+      border: 0;
       border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+    }
+    .rozie-data-table .rdt-detail-cell {
+      border: 0;
+    }
+    .rozie-data-table.rdt-column-lines .rdt-th,
+    .rozie-data-table.rdt-column-lines .rdt-td,
+    .rozie-data-table.rdt-column-lines .rdt-filter-cell,
+    .rozie-data-table.rdt-column-lines .rdt-detail-cell {
+      border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+    }
+    .rozie-data-table.rdt-column-lines tr > :first-child:not(.rdt-col-spacer),
+    .rozie-data-table.rdt-column-lines tr > .rdt-col-spacer:first-child + * {
+      border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+    }
+    .rozie-data-table.rdt-column-lines .rdt-thead > tr:first-child > .rdt-th {
+      border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
     }
     .rozie-data-table .rdt-thead .rdt-th {
       font-weight: var(--rdt-header-weight, 600);
@@ -957,8 +984,15 @@ interface EditorCtx {
     .rozie-data-table .rdt-pinned {
       box-sizing: border-box;
     }
+    .rozie-data-table .rdt-td.rdt-pinned {
+      background-color: var(--rdt-pinned-bg, #fff);
+    }
+    .rozie-data-table .rdt-td.rdt-pinned.rdt-in-range {
+      background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
+    }
     .rozie-data-table .rdt-filter-cell {
       padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+      border: 0;
       border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
     }
     .rozie-data-table-wrap .rdt-filter-row ::ng-deep .rdt-col-filter {
@@ -1324,6 +1358,7 @@ export class DataTable {
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   stickyHeader = input<boolean>(false);
+  columnLines = input<boolean>(false);
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */

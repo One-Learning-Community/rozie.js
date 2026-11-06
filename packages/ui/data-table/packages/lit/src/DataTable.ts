@@ -268,6 +268,8 @@ export default class DataTable extends SignalWatcher(LitElement) {
   --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
   --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, var(--rdt-ds-column-border-color)));
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, var(--rdt-ds-pinned-bg));
   --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
   --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
   --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
@@ -289,7 +291,12 @@ export default class DataTable extends SignalWatcher(LitElement) {
   --rdt-page-size-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] {
-  border-collapse: collapse;
+  /* SEPARATE, not collapse. With collapsed borders the browser keeps a sticky cell's shared
+     border in the scrolling grid, so a 1px line of scrolled content shows beside pinned
+     columns and above the sticky header. Separate borders travel with their cell; zero
+     spacing keeps lines 1px because each cell draws only its own sides (see the cell rule). */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
@@ -348,7 +355,27 @@ export default class DataTable extends SignalWatcher(LitElement) {
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
   text-align: left;
+  /* Reset every side, then draw only the row line. Under separate borders each cell owns its
+     lines, and the reset keeps a host's plain \`table td { border }\` rule from drawing a second
+     set inside the table (this class-scoped rule outranks it). */
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
+  border: 0;
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
+  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > [data-rozie-s-d5dcab4c]:first-child:not(.rdt-col-spacer[data-rozie-s-d5dcab4c]),
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > .rdt-col-spacer[data-rozie-s-d5dcab4c]:first-child + *[data-rozie-s-d5dcab4c] {
+  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] > tr[data-rozie-s-d5dcab4c]:first-child > .rdt-th[data-rozie-s-d5dcab4c] {
+  border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
   font-weight: var(--rdt-header-weight, 600);
@@ -473,8 +500,15 @@ export default class DataTable extends SignalWatcher(LitElement) {
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-pinned[data-rozie-s-d5dcab4c] {
   box-sizing: border-box;
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background-color: var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned.rdt-in-range[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-filter-row[data-rozie-s-d5dcab4c] .rdt-col-filter {
@@ -799,6 +833,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   @property({ type: Boolean, reflect: true, attribute: 'sticky-header' }) stickyHeader: boolean = false;
+  @property({ type: Boolean, reflect: true, attribute: 'column-lines' }) columnLines: boolean = false;
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
@@ -1757,7 +1792,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     ${repeat<any>(this.groupingKeys(), (gk, _idx) => gk, (gk, _idx) => html`<span class="rdt-group-token" data-group-token="" data-rozie-s-d5dcab4c>${rozieDisplay(gk)}</span>`)}
   </slot>`}
 </div>` : nothing}${this.isWindowed() ? html`<div class="rdt-scroll" style=${rozieStyle(this.rowsWindowed() && this.maxHeight ? 'max-height:' + this.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + this.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c>
-<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader, 'rdt-col-windowed': this.colsWindowed() }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} aria-colcount=${rozieAttr(this.gridAriaColCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
+<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader, 'rdt-col-windowed': this.colsWindowed(), 'rdt-column-lines': this.columnLines }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} aria-colcount=${rozieAttr(this.gridAriaColCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, hgLevel) => hg.id, (hg, hgLevel) => html`<tr class="rdt-tr" role="row" aria-rowindex=${rozieAttr(hgLevel + 1)} data-rozie-s-d5dcab4c>
       
@@ -1863,7 +1898,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     </tr>
   </tbody>
 </table>
-</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} aria-colcount=${rozieAttr(this.gridAriaColCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
+</div>` : html`<table class="${Object.entries({ "rozie-data-table": true, 'rdt-sticky': this.stickyHeader, 'rdt-column-lines': this.columnLines }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role=${rozieAttr(this.tableRole())} aria-rowcount=${rozieAttr(this.gridAriaRowCount())} aria-colcount=${rozieAttr(this.gridAriaColCount())} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridKeyDown($event); }} @focusin=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.syncActiveFromEvent($event); }} @focusout=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridFocusOut($event); }} @mousedown=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridMouseDown($event); }} @dblclick=${($event: Event & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridDblClick($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLTableElement; target: HTMLTableElement }) => { this.onGridClick($event); }} data-rozie-s-d5dcab4c>
   <thead class="rdt-thead" role="rowgroup" data-rozie-s-d5dcab4c>
     ${repeat<any>(this._headerGroups.value, (hg, hgLevel) => hg.id, (hg, hgLevel) => html`<tr class="rdt-tr" role="row" aria-rowindex=${rozieAttr(hgLevel + 1)} data-rozie-s-d5dcab4c>
       ${repeat<any>(hg.headers, (header, _idx) => header.id, (header, _idx) => html`<th class="${Object.entries({ "rdt-th": true, 'rdt-select-th': this.isSelectColumn(header.column.id), 'rdt-expander-th': this.isExpanderColumn(header.column.id), 'rdt-pinned': this.columnPinSide(header.column.id) !== '', 'rdt-th-resizing': this.columnIsResizing(header.column.id), 'rdt-cell-active': this.isActiveCell('__header', this.headerColIndexOf(hg, header), hgLevel) }).filter(([, v]) => v).map(([k]) => k).join(' ')}" role="columnheader" data-col=${rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level=${rozieAttr(hgLevel)} colspan=${rozieAttr(header.colSpan > 1 ? header.colSpan : null)} data-col-index=${rozieAttr(this.headerColIndexOf(hg, header))} aria-colindex=${rozieAttr(this.headerLeafStart(hg, header) + 1)} tabindex=${rozieAttr(this.cellTabindex('__header', this.headerColIndexOf(hg, header), hgLevel))} aria-sort=${rozieAttr(this.ariaSortFor(header.column.id))} style=${rozieStyle(this.thStyle(header))} data-rozie-s-d5dcab4c>

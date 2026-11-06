@@ -4,6 +4,8 @@
   --rdt-border: 1px solid var(--rozie-data-table-border-color, var(--rdt-ds-border-color));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, var(--rdt-ds-control-border-color));
   --rdt-filter-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, var(--rdt-ds-column-border-color)));
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, var(--rdt-ds-pinned-bg));
   --rdt-font: var(--rozie-data-table-font, var(--rdt-ds-font));
   --rdt-cell-padding: var(--rozie-data-table-cell-padding, var(--rdt-ds-cell-padding));
   --rdt-header-bg: var(--rozie-data-table-header-bg, var(--rdt-ds-header-bg));
@@ -25,7 +27,12 @@
   --rdt-page-size-radius: var(--rozie-data-table-radius, var(--rdt-ds-radius));
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] {
-  border-collapse: collapse;
+  /* SEPARATE, not collapse. With collapsed borders the browser keeps a sticky cell's shared
+     border in the scrolling grid, so a 1px line of scrolled content shows beside pinned
+     columns and above the sticky header. Separate borders travel with their cell; zero
+     spacing keeps lines 1px because each cell draws only its own sides (see the cell rule). */
+  border-collapse: separate;
+  border-spacing: 0;
   width: 100%;
   font: var(--rdt-font, 14px system-ui, sans-serif);
   color: var(--rdt-color, inherit);
@@ -84,7 +91,27 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-cell-padding, 0.5rem 0.75rem);
   text-align: left;
+  /* Reset every side, then draw only the row line. Under separate borders each cell owns its
+     lines, and the reset keeps a host's plain `table td { border }` rule from drawing a second
+     set inside the table (this class-scoped rule outranks it). */
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
+  border: 0;
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c],
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
+  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > [data-rozie-s-d5dcab4c]:first-child:not(.rdt-col-spacer[data-rozie-s-d5dcab4c]),
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > .rdt-col-spacer[data-rozie-s-d5dcab4c]:first-child + *[data-rozie-s-d5dcab4c] {
+  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+}
+.rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] > tr[data-rozie-s-d5dcab4c]:first-child > .rdt-th[data-rozie-s-d5dcab4c] {
+  border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] .rdt-th[data-rozie-s-d5dcab4c] {
   font-weight: var(--rdt-header-weight, 600);
@@ -188,8 +215,15 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-pinned[data-rozie-s-d5dcab4c] {
   box-sizing: border-box;
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background-color: var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned.rdt-in-range[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c] {
   padding: var(--rdt-filter-cell-padding, 0.35rem 0.75rem);
+  border: 0;
   border-bottom: var(--rdt-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table-wrap[data-rozie-s-d5dcab4c] .rdt-filter-row[data-rozie-s-d5dcab4c] .rdt-col-filter {

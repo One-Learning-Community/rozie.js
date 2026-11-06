@@ -259,6 +259,7 @@ interface DataTableProps {
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   stickyHeader?: boolean;
+  columnLines?: boolean;
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
@@ -370,7 +371,7 @@ export interface DataTableHandle {
 const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable(_props: DataTableProps, ref): JSX.Element {
   const __ctx_data_table_columns = rozieContext("data-table:columns");
   const __defaultColumns = useState(() => (() => [])())[0];
-  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getRowId' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'holdView' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getRowId: ((...args: any[]) => any) | null; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; holdView: boolean; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
+  const props: Omit<DataTableProps, 'columns' | 'selectionMode' | 'manual' | 'rowCount' | 'pageCount' | 'expandable' | 'getRowId' | 'getSubRows' | 'groupable' | 'stickyHeader' | 'columnLines' | 'interactionMode' | 'singleClickEdit' | 'undoable' | 'undoLimit' | 'holdView' | 'virtual' | 'estimateRowHeight' | 'autoMeasure' | 'maxHeight'> & { columns: any[]; selectionMode: string; manual: boolean; rowCount: (number) | null; pageCount: (number) | null; expandable: boolean; getRowId: ((...args: any[]) => any) | null; getSubRows: ((...args: any[]) => any) | null; groupable: boolean; stickyHeader: boolean; columnLines: boolean; interactionMode: string; singleClickEdit: boolean; undoable: boolean; undoLimit: number; holdView: boolean; virtual: boolean | string; estimateRowHeight: number; autoMeasure: boolean; maxHeight: string } = {
     ..._props,
     columns: _props.columns ?? __defaultColumns,
     selectionMode: _props.selectionMode ?? 'none',
@@ -382,6 +383,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     getSubRows: _props.getSubRows ?? null,
     groupable: _props.groupable ?? false,
     stickyHeader: _props.stickyHeader ?? false,
+    columnLines: _props.columnLines ?? false,
     interactionMode: _props.interactionMode ?? 'table',
     singleClickEdit: _props.singleClickEdit ?? false,
     undoable: _props.undoable ?? false,
@@ -8898,7 +8900,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     {!!(props.groupable) && <div className={"rdt-group-bar-host"} data-rozie-s-d5dcab4c="">
       {(props.renderGroupBar ?? props.slots?.['groupBar']) ? ((props.renderGroupBar ?? props.slots?.['groupBar']) as Function)({ grouping: groupingKeys(), groupableColumns: groupableColumns(), applyGrouping, clearGrouping }) : groupingKeys().map((gk) => <span key={gk} className={"rdt-group-token"} data-group-token="" data-rozie-s-d5dcab4c="">{rozieDisplay(gk)}</span>)}
     </div>}{(isWindowed()) ? <div className={"rdt-scroll"} style={parseInlineStyle(rowsWindowed() && props.maxHeight ? 'max-height:' + props.maxHeight + ';overflow:auto;--rozie-data-table-max-height:' + props.maxHeight : 'overflow:auto')} data-rozie-s-d5dcab4c="">
-    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader, "rdt-col-windowed": colsWindowed() })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} aria-colcount={gridAriaColCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader, "rdt-col-windowed": colsWindowed(), "rdt-column-lines": props.columnLines })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} aria-colcount={gridAriaColCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" aria-rowindex={hgLevel + 1} data-rozie-s-d5dcab4c="">
           
@@ -8985,7 +8987,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         </tr>
       </tbody>
     </table>
-    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} aria-colcount={gridAriaColCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
+    </div> : <table className={clsx("rozie-data-table", { "rdt-sticky": props.stickyHeader, "rdt-column-lines": props.columnLines })} role={rozieAttr(tableRole())} aria-rowcount={gridAriaRowCount()} aria-colcount={gridAriaColCount()} onKeyDown={($event) => { onGridKeyDown($event); }} onFocus={($event) => { syncActiveFromEvent($event); }} onBlur={($event) => { onGridFocusOut($event); }} onMouseDown={($event) => { onGridMouseDown($event); }} onDoubleClick={($event) => { onGridDblClick($event); }} onClick={($event) => { onGridClick($event); }} data-rozie-s-d5dcab4c="">
       <thead className={"rdt-thead"} role="rowgroup" data-rozie-s-d5dcab4c="">
         {headerGroups.map((hg, hgLevel) => <tr key={hg.id} className={"rdt-tr"} role="row" aria-rowindex={hgLevel + 1} data-rozie-s-d5dcab4c="">
           {hg.headers.map((header) => <th key={header.id} className={clsx("rdt-th", { "rdt-select-th": isSelectColumn(header.column.id), "rdt-expander-th": isExpanderColumn(header.column.id), "rdt-pinned": columnPinSide(header.column.id) !== '', "rdt-th-resizing": columnIsResizing(header.column.id), "rdt-cell-active": isActiveCell('__header', headerColIndexOf(hg, header), hgLevel) })} role="columnheader" data-col={rozieAttr(header.column.id)} data-grid-cell="" data-row="__header" data-header-level={rozieAttr(hgLevel)} colSpan={(header.colSpan > 1 ? header.colSpan : undefined) ?? undefined} data-col-index={rozieAttr(headerColIndexOf(hg, header))} aria-colindex={headerLeafStart(hg, header) + 1} tabIndex={cellTabindex('__header', headerColIndexOf(hg, header), hgLevel)} aria-sort={rozieAttr(ariaSortFor(header.column.id))} style={parseInlineStyle(thStyle(header))} data-rozie-s-d5dcab4c="">

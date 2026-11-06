@@ -75,6 +75,12 @@
   --rdt-border: 1px solid var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08));
   --rdt-filter-border: 1px solid var(--rozie-data-table-control-border-color, rgba(0, 0, 0, 0.2));
   --rdt-filter-radius: var(--rozie-data-table-radius, 4px);
+  /* Column lines are off unless the `columnLines` prop is set. Their colour follows the
+     row-line colour unless the column token is set, so one variable themes both. */
+  --rdt-column-border: 1px solid var(--rozie-data-table-column-border-color, var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08)));
+  /* Pinned body cells are opaque so scrolled content never shows through them. Set this
+     to the surface colour behind the table. */
+  --rdt-pinned-bg: var(--rozie-data-table-pinned-bg, #fff);
 
   /* ── typography / cell metrics ──────────────────────────────────────────── */
   --rdt-font: var(--rozie-data-table-font, 14px system-ui, sans-serif);
@@ -125,6 +131,8 @@
   --rdt-ds-fg: currentColor;
   --rdt-ds-select-accent: #0066cc;
   --rdt-ds-border-color: rgba(0, 0, 0, 0.08);
+  --rdt-ds-column-border-color: var(--rdt-ds-border-color);
+  --rdt-ds-pinned-bg: #fff;
   --rdt-ds-control-border-color: rgba(0, 0, 0, 0.2);
   --rdt-ds-radius: 4px;
   --rdt-ds-font: 14px system-ui, sans-serif;

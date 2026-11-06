@@ -195,6 +195,7 @@ export interface DataTableProps {
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   stickyHeader?: boolean;
+  columnLines?: boolean;
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
    */
