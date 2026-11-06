@@ -7,6 +7,7 @@ import Popover from '@rozie-ui/popover-react';
 import { isSafeKey, wrapAggregationFn, indexDefsById, editorKindWarning, collectGroupableLeafDefs } from './helpers/columnDefUtils';
 import { columnRuleKeys } from './helpers/columnRuleUtils';
 import { applyUpdater, clamp, focusables } from './helpers/indexMath';
+import { resolveFollow, sameIdSequence } from './helpers/activeFollow';
 import { escapeTsvField, parseTsv, tileGridToBox, tileIndex } from './helpers/tsvGrid';
 import { replaceRowValue, indexOfRowIn, replaceRowValues } from './helpers/rowValueUtils';
 import { createTable, getCoreRowModel, getSortedRowModel, getFilteredRowModel, getPaginationRowModel, getExpandedRowModel, getGroupedRowModel,
@@ -398,6 +399,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const lastPropsData = useRef<unknown>(null);
   const refreshRowModel = useRef<any>(null);
   const virtualizer = useRef<any>(null);
+  const lastFedData = useRef<unknown>(null);
+  const pendingViewChange = useRef(false);
+  const pendingWrite = useRef(false);
+  const prevRowIds = useRef<string[] | null>(null);
   const pendingEditFollow = useRef<any>(null);
   const lastViewState = useRef(CLEAN_VIEW_STATE);
   const gridRoot = useRef<any>(null);
@@ -430,6 +435,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const colRtlObserverEl = useRef<any>(null);
   const colRtlObserver = useRef<any>(null);
   const lastColSizeSig = useRef(0);
+  const activeCellEngaged = useRef(false);
   const gridEmptyFallback = useRef(false);
   const rangeActive = useRef(false);
   const selectAllBox = useRef<any>(null);
@@ -446,13 +452,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const redoStack = useRef<unknown[]>([]);
   const lastRangeStart = useRef(-1);
   const lastRangeEnd = useRef(-1);
-  const pendingViewChange = useRef(false);
   const focusIntentEpoch = useRef(0);
   const committedThisSession = useRef(false);
   const rowDraftSync = useRef<Record<string, any>>({});
   const editTransition = useRef(false);
   const restoringHistory = useRef<boolean>(false);
-  const pendingWrite = useRef(false);
   const groupRowDescriptorCache = useRef<any>(null);
   const groupRowDescriptorCacheVer = useRef<any>(undefined);
   const dropinTabFlush = useRef<{
@@ -719,6 +723,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // Set when the view was re-derived (a sort/filter change, refreshView()) and by writeData on
   // every table write; consumed by the active-cell follow (Task 5). Plain `let`s, NOT $data —
   // written and read inside refreshRowModel's call graph (ROZ138 / React stale reads).
+  // Part 3 (active cell follows its record): the visible row ids at the end of the last
+  // refreshRowModel, and the data array that refresh fed. pendingWrite is consumed only by the
+  // refresh whose fed data CHANGED — in controlled `r-model:data` mode writeData's own
+  // $data.dataDefault write re-feeds the OLD `$props.data` first, and the parent's echo arrives
+  // a pass later; consuming the flag on that first, unchanged pass would turn the write's
+  // vanished row into a clamp instead of a park.
   // The last emitted view-state-change payload (refreshRowModel edge-triggers the emit).
   // reFeed bookkeeping: the sort/filter references fed last time (a change releases the hold)
   // and the one-shot fallback warning latch.
@@ -738,7 +748,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const syncHoldActive = useCallback((st: any) => {
     const wanted = props.holdView === true;
     const active = wanted && props.manual !== true && props.getSubRows == null && !(st.grouping || []).length;
+    // A setActive that RELEASES a hold (holdView on→off, or a fallback flipping the controller
+    // inactive while it was holding) re-derives the live view: for the active-cell follow that
+    // is a view change (a record the live view drops parks on its header).
+    const wasHolding = holdCtrl.isHolding();
     holdCtrl.setActive(active);
+    if (wasHolding && !holdCtrl.isHolding()) pendingViewChange.current = true;
     if (wanted && !active && !holdFallbackWarned.current) {
       holdFallbackWarned.current = true;
       console.warn('[rozie-data-table] holdView falls back to live behaviour while grouping is active, in manual mode, or with tree data (getSubRows); the view is not held.');
@@ -2957,6 +2972,9 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     // against that same lastPropsData, so a transiently-stale `$props.data` (the reference
     // already recorded) never reads as a swap.
     if (holdCtrl.isHolding() && isExternalSwap()) holdCtrl.release();
+    // An external swap is a reset, not one of our writes: drop a write flag the echo never
+    // consumed (one-way `data`, no r-model), so the swap keeps the D-05 clamp fallback.
+    if (pendingWrite.current && isExternalSwap()) pendingWrite.current = false;
     table.current.setOptions((prev: any) => ({
       ...prev,
       data: feedData(),
@@ -4852,6 +4870,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (!tgt || !tgt.closest) return;
     const cellEl = tgt.closest('[data-grid-cell]');
     if (!cellEl) return;
+    activeCellEngaged.current = true;
     const rowAttr = cellEl.getAttribute('data-row');
     const colAttr = cellEl.getAttribute('data-col-index');
     if (rowAttr == null || colAttr == null) return;
@@ -5143,11 +5162,40 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tryFocus);else setTimeout(tryFocus, 0);
   }
 
-  // D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
-  // pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
-  // row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
-  // mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
-  const clampActiveCell = useCallback((rowCount: any, colCount: any) => {
+  // Part 3 (design 2026-11-06): the active cell follows its RECORD across every re-derive.
+  // refreshRowModel hands over the previous and next visible row ids (fresh locals — never the
+  // React-stale $data.rows) and whether the rows changed because of a view change (sort /
+  // columnFilters / globalFilter / refreshView / a holdView release) or one of the table's own
+  // writes. resolveFollow (helpers/activeFollow.ts) decides:
+  //   • stay / clamp → the D-05 clamp below, unchanged (clamp = the row is gone after navigation
+  //     or a reset: paging, page size, expand/collapse, an external data swap);
+  //   • move → re-seat the active row at the record's new index;
+  //   • park → the record left the view after a view change / write: park on its column header.
+  // Skipped while a header is active (nothing to follow), on an empty model (B6 owns that), and
+  // before the active cell was ever engaged (it is still just the D-04 entry cell, not a record).
+  // The range is cleared when such a change altered row membership or order — a rectangle
+  // cannot follow rows that are no longer adjacent. Cleared AFTER the clamp so clampRange's
+  // (React-stale) corner write can never resurrect it. While the view is held the ids keep
+  // their order, so the range stays.
+  const followActiveCell = useCallback((prevIds: any, nextIds: any, viewChangeOrWrite: any, rowCount: any, colCount: any, editFollowPending = false) => {
+    if (!isGrid()) return;
+    let follow: any = null;
+    if (activeCellEngaged.current && rowCount > 0 && !activeIsHeader && !gridEmptyFallback.current) {
+      follow = resolveFollow(prevIds, activeRow, nextIds, viewChangeOrWrite);
+    }
+    clampActiveCell(rowCount, colCount, follow, editFollowPending);
+    if (viewChangeOrWrite && !sameIdSequence(prevIds, nextIds)) clearRange();
+  }, [activeIsHeader, activeRow, clampActiveCell, clearRange, isGrid]);
+  // D-05 (now the FALLBACK of the Part 3 follow — see followActiveCell above): clamp the active
+  // cell to bounds on an underlying-data change whose record could not be followed for a
+  // navigation / reset reason (paging, page size, expand/collapse, an external data swap), and
+  // on every change that left it in place. KEEP the same indices; clamp ONLY when the grid shrank
+  // — NO bounce-to-top. Where the record CAN be found it is followed first (`follow.kind ===
+  // 'move'`), and a record that left the view after a view change or a table write parks on its
+  // column header (`'park'`) instead of falling through to whichever row now holds its index.
+  // Gated by isGrid() so 'table' mode is entirely untouched. Invoked at the rowModelVer bump
+  // path (refreshRowModel → followActiveCell).
+  function clampActiveCell(rowCount: any, colCount: any, follow: any = null, editFollowPending = false) {
     if (!isGrid()) return;
     // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
     // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
@@ -5171,6 +5219,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     let recoverFocus = false;
     let doomedRow = -1;
     let doomedCol = 0;
+    // Part 3: is DOM focus on ANY body cell of this grid (the follow re-focuses only then)?
+    let focusOnBody = false;
     if (gridRoot.current) {
       const rootNode = gridRoot.current.getRootNode ? gridRoot.current.getRootNode() : null;
       const focusedEl = rootNode ? rootNode.activeElement : null;
@@ -5179,6 +5229,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         const fRowAttr = focusedCell.getAttribute('data-row');
         const fColAttr = focusedCell.getAttribute('data-col-index');
         if (fRowAttr != null && fRowAttr !== '__header') {
+          focusOnBody = true;
           const fr = parseInt(fRowAttr, 10);
           const fc = parseInt(fColAttr, 10);
           if (Number.isFinite(fr) && fr > rowN - 1) {
@@ -5222,6 +5273,43 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       setActiveIsHeader(false);
       setActiveRow(0);
     }
+    // Part 3 move: the record is still in the view at a NEW index — follow it. Emit the new
+    // position (consumers tracking the active cell would otherwise hold a stale index) and, when
+    // DOM focus was on a body cell of this grid, re-focus at the new position (which also scrolls
+    // it into view). A pending B23 edit-follow owns focus instead (refreshRowModel resolves the
+    // same row by identity). Fresh locals only — no $data re-read after the writes (ROZ138).
+    if (follow && follow.kind === 'move') {
+      const nextRow = follow.index;
+      setActiveRow(nextRow);
+      clampRange(rowN - 1, colN - 1);
+      props.onActivecellChange && props.onActivecellChange({
+        rowIndex: toAbsRow(nextRow),
+        colIndex: col,
+        isHeader: false
+      });
+      if (focusOnBody && !editFollowPending) focusCellWhenReady(nextRow, col);
+      return;
+    }
+    // Part 3 park: the record left the view after a view change or one of the table's own
+    // writes. Park on the column's leaf header (keeping the column) rather than falling through
+    // to whichever record now sits at the old index — a typed character then lands on a header
+    // and edits nothing. NOT the B6 empty-grid fallback (no gridEmptyFallback): this park is
+    // user-visible and sticky until the person navigates. When DOM focus was on the vanished
+    // cell (or a just-committed edit expects focus back), move focus to that header so it never
+    // drops to <body> (the B25 problem).
+    if (follow && follow.kind === 'park') {
+      const level = headerLeafLevel();
+      setActiveIsHeader(true);
+      setActiveHeaderLevel(level);
+      clampRange(rowN - 1, colN - 1);
+      props.onActivecellChange && props.onActivecellChange({
+        rowIndex: null,
+        colIndex: col,
+        isHeader: true
+      });
+      if (focusOnBody || editFollowPending) recoverGridFocus('__header', col, level);
+      return;
+    }
     if (!activeIsHeader) {
       const lastRow = rowN - 1;
       const maxRow = lastRow < 0 ? 0 : lastRow;
@@ -5240,7 +5328,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       const recCol = clamp(doomedCol, 0, maxCol < 0 ? 0 : maxCol);
       recoverGridFocus(String(recRow), recCol, null);
     }
-  }, [activeColIndex, activeIsHeader, activeRow, bodyRowCount, clampRange, headerLeafLevel, isGrid, recoverGridFocus, visibleColCount]);
+  }
   // ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
   // the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to
   // colsWindowed()/windowedColIndices() in the merged per-target output never TDZs on React —
@@ -5369,6 +5457,10 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // re-seats activeRow 0 on React too. The other 5 targets are byte-behaviorally identical (they
   // already read reactive $data synchronously). A top-level reassigned `let` referenced from the
   // refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
+  // Part 3: has the active cell ever been placed on a grid cell (a focusin on a cell — click, Tab-in,
+  // keyboard nav, focusCell)? Until then the active cell is only the D-04 ENTRY cell, not a record
+  // cursor, so a mount-time re-derive (columns registering, grouping engaging) must not drag it off
+  // row 0 by following whichever record happened to sit there. Plain `let` (ROZ138-safe).
   // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
   // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS
   // (rangeAnchor/rangeFocus = { rowIndex, colIndex }) — NEVER a stored DOM node, so the
@@ -8021,8 +8113,6 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return col.getFacetedMinMaxValues() || null; // [number, number] | null
   }
 
-  const _clampActiveCellRef = useRef(clampActiveCell);
-  _clampActiveCellRef.current = clampActiveCell;
   const _colsWindowedRef = useRef(colsWindowed);
   _colsWindowedRef.current = colsWindowed;
   const _columnVirtualizerOptionsRef = useRef(columnVirtualizerOptions);
@@ -8039,6 +8129,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   _feedDataRef.current = feedData;
   const _focusCellWhenReadyRef = useRef(focusCellWhenReady);
   _focusCellWhenReadyRef.current = focusCellWhenReady;
+  const _followActiveCellRef = useRef(followActiveCell);
+  _followActiveCellRef.current = followActiveCell;
   const _isGridRef = useRef(isGrid);
   _isGridRef.current = isGrid;
   const _isWindowedRef = useRef(isWindowed);
@@ -8261,15 +8353,27 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       // through here) — guarded internally on colsWindowed() && colVirtualizer, so this is a no-op
       // on every other path.
       _remeasureColumnWindowRef.current();
-      // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
-      // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
-      // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
-      // B8/B23: pass the FRESH bounds derived from `nextRows` (NOT $data.rows, which is the
+      // Part 3 + D-05: on every data change (re-sort/filter/paginate/page-size/writes — all
+      // re-pull here) the active cell FOLLOWS its record by row id; where it cannot (paging,
+      // expand/collapse, an external swap) it falls back to the D-05 clamp (same indices, clamped
+      // if the grid shrank), and a record that left the view after a view change or a table write
+      // parks on its column header (followActiveCell, gridKeydownHandlers.rzts). isGrid()-gated so
+      // 'table' mode is untouched.
+      // B8/B23: pass the FRESH bounds and ids derived from `nextRows` (NOT $data.rows, which is the
       // async-stale useState snapshot on React) so a filter-to-fewer clamps the active cell AND
-      // the range corners on React too — never re-reading the pre-change model.
+      // the range corners on React too — never re-reading the pre-change model. The follow flags
+      // are plain `let`s, read and cleared here (ROZ138-safe).
       const nextRowCount = nextRows.length;
       const nextColCount = nextRows.length ? nextRows[0].getVisibleCells().length : nextGroups.length ? (nextGroups[nextGroups.length - 1].headers || []).length : 0;
-      _clampActiveCellRef.current(nextRowCount, nextColCount);
+      const nextIds = nextRows.map((r: any) => r.id);
+      const fedData = table.current.options.data;
+      const dataChanged = fedData !== lastFedData.current;
+      lastFedData.current = fedData;
+      const viewChangeOrWrite = pendingViewChange.current || pendingWrite.current && dataChanged;
+      pendingViewChange.current = false;
+      if (dataChanged) pendingWrite.current = false;
+      _followActiveCellRef.current(prevRowIds.current, nextIds, viewChangeOrWrite, nextRowCount, nextColCount, pendingEditFollow.current != null);
+      prevRowIds.current = nextIds;
       // #4: clamp a pageIndex that now points PAST the last page. When the consumer holds
       // pagination.pageIndex (controlled) and shrinks the data (filter / replace) so there are
       // fewer pages, the body renders blank ("Page 6 of 3" with Next disabled). Read table-core's

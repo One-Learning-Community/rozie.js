@@ -1,3 +1,5 @@
+import { resolveFollow, sameIdSequence } from './helpers/activeFollow'
+
 // THE single delegated keydown handler (RESEARCH "Single delegated keydown handler"). Wired
 // as ONE keydown listener on the <table> root — NOT per-cell, NOT with .stop/.prevent modifiers (the
 // Angular .stop-in-@for hoist bug, F5/ROZ723). e.preventDefault() is called IMPERATIVELY for
@@ -319,6 +321,7 @@ const syncActiveFromEvent = (e) => {
   if (!tgt || !tgt.closest) return
   const cellEl = tgt.closest('[data-grid-cell]')
   if (!cellEl) return
+  activeCellEngaged = true
   const rowAttr = cellEl.getAttribute('data-row')
   const colAttr = cellEl.getAttribute('data-col-index')
   if (rowAttr == null || colAttr == null) return
@@ -607,11 +610,41 @@ const recoverGridFocus = (rowKey, col, level, guardMoved = false) => {
   else setTimeout(tryFocus, 0)
 }
 
-// D-05: clamp the active cell to bounds on every underlying-data change (re-sort, filter,
-// pagination, page-size). KEEP the same indices; clamp ONLY when the grid shrank — NO
-// row-id following, NO bounce-to-top on a filter keystroke. Gated by isGrid() so 'table'
-// mode is entirely untouched. Invoked at the rowModelVer bump path (refreshRowModel).
-const clampActiveCell = (rowCount, colCount) => {
+// Part 3 (design 2026-11-06): the active cell follows its RECORD across every re-derive.
+// refreshRowModel hands over the previous and next visible row ids (fresh locals — never the
+// React-stale $data.rows) and whether the rows changed because of a view change (sort /
+// columnFilters / globalFilter / refreshView / a holdView release) or one of the table's own
+// writes. resolveFollow (helpers/activeFollow.ts) decides:
+//   • stay / clamp → the D-05 clamp below, unchanged (clamp = the row is gone after navigation
+//     or a reset: paging, page size, expand/collapse, an external data swap);
+//   • move → re-seat the active row at the record's new index;
+//   • park → the record left the view after a view change / write: park on its column header.
+// Skipped while a header is active (nothing to follow), on an empty model (B6 owns that), and
+// before the active cell was ever engaged (it is still just the D-04 entry cell, not a record).
+// The range is cleared when such a change altered row membership or order — a rectangle
+// cannot follow rows that are no longer adjacent. Cleared AFTER the clamp so clampRange's
+// (React-stale) corner write can never resurrect it. While the view is held the ids keep
+// their order, so the range stays.
+const followActiveCell = (prevIds, nextIds, viewChangeOrWrite, rowCount, colCount, editFollowPending = false) => {
+  if (!isGrid()) return
+  let follow = null
+  if (activeCellEngaged && rowCount > 0 && !$data.activeIsHeader && !gridEmptyFallback) {
+    follow = resolveFollow(prevIds, $data.activeRow, nextIds, viewChangeOrWrite)
+  }
+  clampActiveCell(rowCount, colCount, follow, editFollowPending)
+  if (viewChangeOrWrite && !sameIdSequence(prevIds, nextIds)) clearRange()
+}
+
+// D-05 (now the FALLBACK of the Part 3 follow — see followActiveCell above): clamp the active
+// cell to bounds on an underlying-data change whose record could not be followed for a
+// navigation / reset reason (paging, page size, expand/collapse, an external data swap), and
+// on every change that left it in place. KEEP the same indices; clamp ONLY when the grid shrank
+// — NO bounce-to-top. Where the record CAN be found it is followed first (`follow.kind ===
+// 'move'`), and a record that left the view after a view change or a table write parks on its
+// column header (`'park'`) instead of falling through to whichever row now holds its index.
+// Gated by isGrid() so 'table' mode is entirely untouched. Invoked at the rowModelVer bump
+// path (refreshRowModel → followActiveCell).
+const clampActiveCell = (rowCount, colCount, follow: any = null, editFollowPending = false) => {
   if (!isGrid()) return
   // B8/B23 React-stale guard: the bounds come from the FRESH model the caller (refreshRowModel)
   // just derived and passes in — NEVER re-read $data.rows here. `$data.rows = nextRows` is an
@@ -635,6 +668,8 @@ const clampActiveCell = (rowCount, colCount) => {
   let recoverFocus = false
   let doomedRow = -1
   let doomedCol = 0
+  // Part 3: is DOM focus on ANY body cell of this grid (the follow re-focuses only then)?
+  let focusOnBody = false
   if (gridRoot) {
     const rootNode = gridRoot.getRootNode ? gridRoot.getRootNode() : null
     const focusedEl = rootNode ? rootNode.activeElement : null
@@ -643,6 +678,7 @@ const clampActiveCell = (rowCount, colCount) => {
       const fRowAttr = focusedCell.getAttribute('data-row')
       const fColAttr = focusedCell.getAttribute('data-col-index')
       if (fRowAttr != null && fRowAttr !== '__header') {
+        focusOnBody = true
         const fr = parseInt(fRowAttr, 10)
         const fc = parseInt(fColAttr, 10)
         if (Number.isFinite(fr) && fr > rowN - 1) {
@@ -686,6 +722,35 @@ const clampActiveCell = (rowCount, colCount) => {
     $data.activeIsHeader = false
     $data.activeRow = 0
   }
+  // Part 3 move: the record is still in the view at a NEW index — follow it. Emit the new
+  // position (consumers tracking the active cell would otherwise hold a stale index) and, when
+  // DOM focus was on a body cell of this grid, re-focus at the new position (which also scrolls
+  // it into view). A pending B23 edit-follow owns focus instead (refreshRowModel resolves the
+  // same row by identity). Fresh locals only — no $data re-read after the writes (ROZ138).
+  if (follow && follow.kind === 'move') {
+    const nextRow = follow.index
+    $data.activeRow = nextRow
+    clampRange(rowN - 1, colN - 1)
+    $emit('activecell-change', { rowIndex: toAbsRow(nextRow), colIndex: col, isHeader: false })
+    if (focusOnBody && !editFollowPending) focusCellWhenReady(nextRow, col)
+    return
+  }
+  // Part 3 park: the record left the view after a view change or one of the table's own
+  // writes. Park on the column's leaf header (keeping the column) rather than falling through
+  // to whichever record now sits at the old index — a typed character then lands on a header
+  // and edits nothing. NOT the B6 empty-grid fallback (no gridEmptyFallback): this park is
+  // user-visible and sticky until the person navigates. When DOM focus was on the vanished
+  // cell (or a just-committed edit expects focus back), move focus to that header so it never
+  // drops to <body> (the B25 problem).
+  if (follow && follow.kind === 'park') {
+    const level = headerLeafLevel()
+    $data.activeIsHeader = true
+    $data.activeHeaderLevel = level
+    clampRange(rowN - 1, colN - 1)
+    $emit('activecell-change', { rowIndex: null, colIndex: col, isHeader: true })
+    if (focusOnBody || editFollowPending) recoverGridFocus('__header', col, level)
+    return
+  }
   if (!$data.activeIsHeader) {
     const lastRow = rowN - 1
     const maxRow = lastRow < 0 ? 0 : lastRow
@@ -706,4 +771,4 @@ const clampActiveCell = (rowCount, colCount) => {
   }
 }
 
-export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell }
+export { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell, followActiveCell }

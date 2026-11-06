@@ -989,6 +989,14 @@ const heldSortedRowModel = holdCtrl.wrapSorted(getSortedRowModel())
 // written and read inside refreshRowModel's call graph (ROZ138 / React stale reads).
 let pendingViewChange = false
 let pendingWrite = false
+// Part 3 (active cell follows its record): the visible row ids at the end of the last
+// refreshRowModel, and the data array that refresh fed. pendingWrite is consumed only by the
+// refresh whose fed data CHANGED — in controlled `r-model:data` mode writeData's own
+// $data.dataDefault write re-feeds the OLD `$props.data` first, and the parent's echo arrives
+// a pass later; consuming the flag on that first, unchanged pass would turn the write's
+// vanished row into a clamp instead of a park.
+let prevRowIds: string[] | null = null
+let lastFedData: unknown = null
 // The last emitted view-state-change payload (refreshRowModel edge-triggers the emit).
 let lastViewState = CLEAN_VIEW_STATE
 // reFeed bookkeeping: the sort/filter references fed last time (a change releases the hold)
@@ -1014,7 +1022,12 @@ const isExternalSwap = () => {
 const syncHoldActive = (st) => {
   const wanted = $props.holdView === true
   const active = wanted && $props.manual !== true && $props.getSubRows == null && !((st.grouping || []).length)
+  // A setActive that RELEASES a hold (holdView on→off, or a fallback flipping the controller
+  // inactive while it was holding) re-derives the live view: for the active-cell follow that
+  // is a view change (a record the live view drops parks on its header).
+  const wasHolding = holdCtrl.isHolding()
   holdCtrl.setActive(active)
+  if (wasHolding && !holdCtrl.isHolding()) pendingViewChange = true
   if (wanted && !active && !holdFallbackWarned) {
     holdFallbackWarned = true
     console.warn('[rozie-data-table] holdView falls back to live behaviour while grouping is active, in manual mode, or with tree data (getSubRows); the view is not held.')
@@ -1309,17 +1322,29 @@ $onMount(() => {
     // through here) — guarded internally on colsWindowed() && colVirtualizer, so this is a no-op
     // on every other path.
     remeasureColumnWindow()
-    // D-05: on every data change (re-sort/filter/paginate/page-size — all re-pull here),
-    // clamp the active cell to the new bounds (same indices, clamped if the grid shrank;
-    // no row-id following, no top-bounce). isGrid()-gated so 'table' mode is untouched.
-    // B8/B23: pass the FRESH bounds derived from `nextRows` (NOT $data.rows, which is the
+    // Part 3 + D-05: on every data change (re-sort/filter/paginate/page-size/writes — all
+    // re-pull here) the active cell FOLLOWS its record by row id; where it cannot (paging,
+    // expand/collapse, an external swap) it falls back to the D-05 clamp (same indices, clamped
+    // if the grid shrank), and a record that left the view after a view change or a table write
+    // parks on its column header (followActiveCell, gridKeydownHandlers.rzts). isGrid()-gated so
+    // 'table' mode is untouched.
+    // B8/B23: pass the FRESH bounds and ids derived from `nextRows` (NOT $data.rows, which is the
     // async-stale useState snapshot on React) so a filter-to-fewer clamps the active cell AND
-    // the range corners on React too — never re-reading the pre-change model.
+    // the range corners on React too — never re-reading the pre-change model. The follow flags
+    // are plain `let`s, read and cleared here (ROZ138-safe).
     const nextRowCount = nextRows.length
     const nextColCount = nextRows.length
       ? nextRows[0].getVisibleCells().length
       : (nextGroups.length ? ((nextGroups[nextGroups.length - 1].headers || []).length) : 0)
-    clampActiveCell(nextRowCount, nextColCount)
+    const nextIds = nextRows.map((r) => r.id)
+    const fedData = table.options.data
+    const dataChanged = fedData !== lastFedData
+    lastFedData = fedData
+    const viewChangeOrWrite = pendingViewChange || (pendingWrite && dataChanged)
+    pendingViewChange = false
+    if (dataChanged) pendingWrite = false
+    followActiveCell(prevRowIds, nextIds, viewChangeOrWrite, nextRowCount, nextColCount, pendingEditFollow != null)
+    prevRowIds = nextIds
     // #4: clamp a pageIndex that now points PAST the last page. When the consumer holds
     // pagination.pageIndex (controlled) and shrinks the data (filter / replace) so there are
     // fewer pages, the body renders blank ("Page 6 of 3" with Next disabled). Read table-core's
@@ -1664,6 +1689,9 @@ const reFeed = () => {
   // against that same lastPropsData, so a transiently-stale `$props.data` (the reference
   // already recorded) never reads as a swap.
   if (holdCtrl.isHolding() && isExternalSwap()) holdCtrl.release()
+  // An external swap is a reset, not one of our writes: drop a write flag the echo never
+  // consumed (one-way `data`, no r-model), so the swap keeps the D-05 clamp fallback.
+  if (pendingWrite && isExternalSwap()) pendingWrite = false
   table.setOptions((prev) => ({
     ...prev,
     data: feedData(),
@@ -1872,7 +1900,7 @@ import { sortColumn, clearSorting, getColumnDefs, toggleAllRows, clearSelection,
 
 import { isGrid, tableRole, cellRole, rowIndexOf, colIndexOf, headerColIndexOf, headerLeafStart, pageRowOffset, toAbsRow, prePaginationRowCount, cellTabindex, isActiveCell, resolveCellEl, focusActiveCell, totalRowCount, headerRowCount, gridAriaRowCount, bodyAriaRowIndex, visibleColCount, gridAriaColCount, bodyRowCount, clamp, moveCol, moveRow, gotoColEdge, gotoRowEdge, gotoStart, gotoEnd, currentCellEl, focusables, activeCellHasControls, enterControl, cycleWithinCell } from './gridFocusNav.rzts'
 
-import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell } from './gridKeydownHandlers.rzts'
+import { onGridKeyDown, syncActiveFromEvent, onGridMouseDown, onGridDblClick, onGridClick, onGridFocusOut, clampActiveCell, followActiveCell } from './gridKeydownHandlers.rzts'
 
 // ══ Phase 87 87-04/87-05 — column-axis template windowing (D-06/D-11; declared HERE (after
 // the columnChrome/gridFocusNav imports above) so a forward cross-partial reference to
@@ -1993,6 +2021,11 @@ const remeasureColumnWindow = () => {
 // already read reactive $data synchronously). A top-level reassigned `let` referenced from the
 // refreshRowModel/clampActiveCell chain → React hoists to useRef → persists per-instance.
 let gridEmptyFallback = false
+// Part 3: has the active cell ever been placed on a grid cell (a focusin on a cell — click, Tab-in,
+// keyboard nav, focusCell)? Until then the active cell is only the D-04 ENTRY cell, not a record
+// cursor, so a mount-time re-derive (columns registering, grouping engaging) must not drag it off
+// row 0 by following whichever record happened to sit there. Plain `let` (ROZ138-safe).
+let activeCellEngaged = false
 
 // ══ Cell-range selection (phase 51 plan 04 / req-7 / D-07) ═══════════════════════════════
 // A rectangular cell range over the FULL visible model, addressed BY INDEX PAIRS

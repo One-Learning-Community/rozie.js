@@ -223,8 +223,8 @@ async function commitEditorValue(page: Page, value: string): Promise<void> {
 }
 
 /** Visible row ids: the first cell's text of each body row, shadow-pierced. */
-async function visibleIds(page: Page): Promise<string[]> {
-  return page.evaluate(() => {
+async function visibleIds(page: Page, scopeTestId = 'grid-table'): Promise<string[]> {
+  return page.evaluate((scopeId) => {
     const findFirst = (root: ParentNode, selector: string): Element | null => {
       const direct = root.querySelector(selector);
       if (direct) return direct;
@@ -237,7 +237,7 @@ async function visibleIds(page: Page): Promise<string[]> {
       }
       return null;
     };
-    const scope = findFirst(document, '[data-testid="grid-table"]');
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
     if (!scope) return [];
     const grid = findFirst(scope, 'table[role="grid"]');
     if (!grid) return [];
@@ -245,7 +245,69 @@ async function visibleIds(page: Page): Promise<string[]> {
       const c = tr.querySelector('td,[role="gridcell"]');
       return ((c && c.textContent) || '').trim();
     });
-  });
+  }, scopeTestId);
+}
+
+/** The roving tab stop (the ONE `[data-grid-cell][tabindex="0"]`) in a scoped grid, plus the
+ *  title text of its body row — the active cell whether or not DOM focus is in the grid. */
+async function tabStop(
+  page: Page,
+  scopeTestId: string,
+): Promise<{ row: string | null; col: string | null; role: string | null; title: string | null } | null> {
+  return page.evaluate(({ scopeId, titleCol }) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
+    if (!scope) return null;
+    const grid = findFirst(scope, 'table[role="grid"]');
+    if (!grid) return null;
+    const cell = grid.querySelector('[data-grid-cell][tabindex="0"]');
+    if (!cell) return null;
+    const row = cell.getAttribute('data-row');
+    const tc = row != null && row !== '__header'
+      ? grid.querySelector(`[data-grid-cell][data-row="${row}"][data-col-index="${titleCol}"]`)
+      : null;
+    return {
+      row,
+      col: cell.getAttribute('data-col-index'),
+      role: cell.getAttribute('role'),
+      title: tc ? (tc.textContent || '').trim() : null,
+    };
+  }, { scopeId: scopeTestId, titleCol: 1 });
+}
+
+/** The focused cell's body-row title text within a scoped grid (null when focus is not on a body cell). */
+async function focusedRowTitle(page: Page, scopeTestId: string): Promise<string | null> {
+  const a = await activeCellCoords(page, scopeTestId);
+  if (!a || a.row == null || a.row === '__header') return null;
+  return page.evaluate(({ scopeId, r }) => {
+    const findFirst = (root: ParentNode, selector: string): Element | null => {
+      const direct = root.querySelector(selector);
+      if (direct) return direct;
+      for (const el of Array.from(root.querySelectorAll('*'))) {
+        const sr = (el as Element & { shadowRoot?: ShadowRoot | null }).shadowRoot;
+        if (sr) {
+          const inner = findFirst(sr, selector);
+          if (inner) return inner;
+        }
+      }
+      return null;
+    };
+    const scope = findFirst(document, `[data-testid="${scopeId}"]`);
+    const grid = scope ? findFirst(scope, 'table[role="grid"]') : null;
+    const tc = grid ? grid.querySelector(`[data-grid-cell][data-row="${r}"][data-col-index="1"]`) : null;
+    return tc ? (tc.textContent || '').trim() : null;
+  }, { scopeId: scopeTestId, r: a.row });
 }
 
 
@@ -506,5 +568,52 @@ for (const target of TARGETS) {
     await expect.poll(async () => (await viewState(page))?.held, { timeout: 10_000 }).toBe(true);
     await clickTestId(page, 'group-owner');
     await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: false, filterMismatches: 0, sortMismatches: 0 });
+  });
+  // ── Part 3: the active cell follows its record (Task 5; holdView OFF — the live grid) ──
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-a) follows after a paste moves the row`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await clickTestId(page, 'sort-title-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await page.evaluate(() => navigator.clipboard.writeText('Zzz'));
+    await focusBodyCellStable(page, 'grid-live', 0, TITLE_COL);
+    await page.keyboard.press('Control+v');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live'))[0]?.title, { timeout: 10_000 }).toBe('Zzz');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['2', '4', '5', '3', '6', '1']);
+    // The pasted row sorted to the end; the active cell (and DOM focus) followed it there.
+    await expect.poll(async () => (await activeCellCoords(page, 'grid-live'))?.row, { timeout: 10_000 }).toBe('5');
+    expect(await focusedRowTitle(page, 'grid-live')).toBe('Zzz');
+    expect((await tabStop(page, 'grid-live'))?.title).toBe('Zzz');
+  });
+
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-b) parks when the edited row is filtered out`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'filter-owner-dana-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '4']);
+    await enterEditAt(page, 'grid-live', 0, OWNER_COL);
+    await commitEditorValue(page, 'Sam');
+    await expect.poll(async () => (await modelRows(page, 'model-readout-live'))[0]?.owner, { timeout: 10_000 }).toBe('Sam');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['4']);
+    // The row vanished from the view: the active cell parks on the column header, with focus.
+    await expect.poll(async () => (await activeCellCoords(page, 'grid-live'))?.role, { timeout: 10_000 }).toBe('columnheader');
+    expect((await activeCellCoords(page, 'grid-live'))?.col).toBe(String(OWNER_COL));
+    const before = await readoutText(page, 'model-readout-live');
+    await page.keyboard.press('a');
+    await page.keyboard.press('Enter');
+    await settleFrames(page, 4);
+    expect(await readoutText(page, 'model-readout-live')).toBe(before);
+  });
+
+  // Gamma, not Beta: Beta keeps index 1 under the title sort, so it cannot tell following
+  // from the old same-index clamp. Gamma moves 2 → 4.
+  runnerFor(target)(`data-table-held-view [${target}]: (p3-c) follows a consumer sort change`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await expect.poll(async () => (await visibleIds(page, 'grid-live')).length, { timeout: 15_000 }).toBe(6);
+    await focusBodyCellStable(page, 'grid-live', 2, TITLE_COL);
+    expect(await focusedRowTitle(page, 'grid-live')).toBe('Gamma');
+    await clickTestId(page, 'sort-title-live');
+    await expect.poll(async () => visibleIds(page, 'grid-live'), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await expect.poll(async () => (await tabStop(page, 'grid-live'))?.title, { timeout: 10_000 }).toBe('Gamma');
+    expect((await tabStop(page, 'grid-live'))?.row).toBe('4');
   });
 }
