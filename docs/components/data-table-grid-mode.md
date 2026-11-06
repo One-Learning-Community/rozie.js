@@ -21,7 +21,7 @@ What flips on:
 - **2-D keyboard navigation (APG).** `ArrowLeft/Right/Up/Down` move one cell; `Home`/`End` jump to the row's first/last cell; `Ctrl+Home`/`Ctrl+End` jump to the first/last cell of the grid; `PageUp`/`PageDown` jump by a row page. `ArrowUp` from the first body row crosses into the header row. Every index is clamped to the visible model — a move past an edge is a no-op (and does **not** emit `activecell-change`).
 - **Cell-level interaction.** `Enter` (or `F2`) focuses the active cell's first interactive control; `Tab`/`Shift+Tab` then cycle *within* the cell (focus containment); `Escape` returns focus to the cell and resumes navigation. Keys are only intercepted while a cell is focused — a caret inside an in-cell `<input>` reached without `Enter` keeps its native behavior.
 - **Mouse + roving model stay in sync.** Clicking a cell makes it the active cell (the roving `tabindex="0"` follows), so the next arrow key continues from where you clicked.
-- **Index-addressed, sort/filter-stable.** The active cell is tracked as a `{ rowIndex, colIndex }` pair over the *visible* model — never a stored DOM node — so it survives a re-sort, filter, page change, or column hide/reorder/pin (it clamps to the new bounds rather than getting lost). Hidden columns are simply absent from the navigable order.
+- **Index-addressed, and it follows its record.** The active cell is reported as a `{ rowIndex, colIndex }` pair over the *visible* model — never a stored DOM node — and it stays on the same record when the rows move under it. Hidden columns are simply absent from the navigable order. See [The active cell follows its record](#active-cell-follows-its-record) for exactly what happens on a re-sort, a filter change, a write and a page change.
 
 **Cell range selection.** In grid mode a rectangular cell-range selection extends via `Shift+Arrow` / `Shift+Click`, surfaced through the one-way `range-change` event (payload `{ anchor, focus }`, each corner a `{ rowIndex, colIndex }` pair, or `{ anchor: null, focus: null }`) and the `getSelectedRange()` verb. It is never a `model:true` slice.
 
@@ -32,6 +32,57 @@ The APG grid pattern's selection keys work from any body cell:
 - `Escape` in navigation mode collapses the current cell range. It only calls `preventDefault` when there is a range to clear, so your own `Escape` handling is untouched otherwise.
 
 Drive and observe it imperatively via the [`focusCell`](/components/data-table-api#imperative-handle) / `getActiveCell` / `clearActiveCell` handle verbs and the [`activecell-change`](/components/data-table-api#events) event. The exact behavioral contract is locked by a cross-framework visual-regression matrix proving the same behavior on all six targets.
+
+## The active cell follows its record {#active-cell-follows-its-record}
+
+The active cell is shown by position, but it is tied to the record it sits on. When the rows are re-derived, the table looks that record up again and acts on what it finds. This never turns the page: "still in the view" means still on the current page (or in the current windowed model).
+
+- **The record is still in the view at a new position:** the active cell moves with it and `activecell-change` fires with the new position. If DOM focus was on the active cell, focus moves to the new position, which also scrolls it into view; otherwise nothing scrolls. This covers a re-sort, a filter change, `refreshView()`, and the table's own writes (an edit, paste, fill, cut, clear, the boolean toggle, undo and redo).
+- **The record left the view after a sort, filter or `refreshView()` change, or after one of the table's own writes:** the active cell parks on that column's header, and `activecell-change` fires with `{ rowIndex: null, colIndex, isHeader: true }`. If DOM focus was on the cell, it moves to the header instead of dropping to `<body>`. The active cell never falls through to whichever record now sits at the old position, so the next keystroke or paste lands on a header and edits nothing.
+- **Paging, a page-size change, expanding or collapsing a row, or an external `data` swap:** the table still tries the record first (a swap that keeps a row's `getRowId` keeps the active cell on that record). If the record isn't in the new view, the active cell keeps its position, clamped to the new bounds, as before.
+- **An open cell or row editor follows its record too.** If its record leaves the view, the editor closes without writing.
+- **The cell range.** A sort, filter or `refreshView()` change, or a write, that changes which rows are shown or their order clears the cell range, since a rectangle can't follow rows that are no longer next to each other. A page-size change clamps it instead. While the view is held (below) nothing is re-derived, so the range stays.
+
+## Holding the view while editing {#holding-the-view-while-editing}
+
+Under an active filter or sort, every edit re-runs both. A row you just fixed so it no longer matches the filter disappears before you can see the value landed; a renamed row jumps to its new sorted position; a fill down twenty rows can make all twenty vanish. Set `holdView` to keep the view still through the table's own writes instead:
+
+```rozie
+<DataTable ref="table" :data="$data.rows" interactionMode="grid" :undoable="true" :holdView="true"
+  r-model:columnFilters="$data.columnFilters"
+  r-model:sorting="$data.sorting"
+  @view-state-change="$data.view = $event">
+  <Column field="title" header="Title" :editable="true" :sortable="true" />
+  <Column field="owner" header="Owner" :editable="true" :filterable="true" filterFn="equalsString" />
+</DataTable>
+
+<p r-if="$data.view && $data.view.filterMismatches + $data.view.sortMismatches > 0" role="status">
+  {{ $data.view.filterMismatches }} rows no longer match your filters,
+  {{ $data.view.sortMismatches }} are out of sort order.
+  <button @click="$refs.table.refreshView()">Refresh</button>
+</p>
+```
+
+**What is held.** With `holdView` on, the table's own writes (cell and row edits, paste, fill, cut, clear, the boolean toggle, undo and redo) leave the view alone: rows keep the membership and order they had before the write, and the new values render in place. Any number of edits across rows and columns stay put until the view is re-derived. `getRowId` is not required.
+
+**When the view is re-derived.** The view is rebuilt from the current filters and sort, and both counts go back to 0, when `sorting`, `columnFilters` or `globalFilter` change, when you call `refreshView()`, when the dataset is swapped from outside, or when `holdView` is switched on or off.
+
+**What is not a re-derive.** Changing page or page size, column visibility, order, pinning or sizing, expanding rows, and changing a column's `filterFn` / `sortingFn` all leave the held rows alone; paging moves through the held rows. After changing a rule's logic, call `refreshView()` (see [Custom filter and sort rules](/components/data-table-sort-filter-paginate#custom-filter-and-sort-rules)).
+
+**What's on screen is what the table acts on.** Select-all and the "all rows selected" state, the row and page counts, `aria-rowcount`, keyboard navigation and every verb use the held rows. There is no hidden second row set.
+
+**Tracking mismatches.** `getViewState()` returns, and the `view-state-change` event carries, `{ held, filterMismatches, sortMismatches }`. The event fires only when one of the three changes.
+
+- `held` is whether the view is actually being held right now. It is `false` when `holdView` is off and when the table has fallen back to live behaviour (below); both counts are then 0. Check it before offering a Refresh that can never apply.
+- `filterMismatches` counts rows whose membership differs from the current filters, **in either direction**: rows on screen that the filters would now exclude, plus rows the last re-derive hid that a later write made match again. For example, a refresh hides row A, then `undo()` makes A match again: A stays hidden, `filterMismatches` goes up, and `refreshView()` brings A back.
+- `sortMismatches` counts rows written since the last re-derive whose position in the held order differs from where a live sort would put them (sorting every page, not just the current one). Only written rows count, so untouched rows that shift because another row moved don't add to it; two edited rows that swap places count as 2.
+- There is no separate "dirty" flag: the view is out of date when `filterMismatches + sortMismatches > 0`.
+
+`refreshView()` re-derives the view and resets both counts. It also works with `holdView` off, where it forces custom filter and sort rules to re-run.
+
+**Saving.** Passing a fresh `data` array that didn't come from the table, such as reloading rows from the server after a save, is an external swap: it re-derives the view and clears undo history, as it always has. If you want the view (and undo) to survive a save, keep the array you already have instead of reloading it.
+
+**Fallbacks.** The view is not held, and the table behaves live, while `grouping` is non-empty, in `manual` mode, or with tree data (`getSubRows`). The table logs one console warning (once per table) and reports `held: false`. Turning grouping on while the view is held fires `view-state-change` with `held: false` and both counts 0.
 
 ## Clipboard, fill & clear
 

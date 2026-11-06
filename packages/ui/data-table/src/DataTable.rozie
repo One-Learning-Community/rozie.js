@@ -540,7 +540,7 @@ export interface DataTableVisibleRangeChangePayload { start: number; end: number
     default: false,
     docs: {
       description:
-        'When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one dev warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.',
+        'When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows. Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.',
     },
   },
 
@@ -786,7 +786,7 @@ export interface DataTableVisibleRangeChangePayload { start: number; end: number
 
 <emits>
 {
-  'activecell-change':    { payload: 'DataTableActiveCellChangePayload', docs: { description: 'Fired (grid interaction mode only) whenever the active cell moves, by keyboard navigation or a `focusCell` call.' } },
+  'activecell-change':    { payload: 'DataTableActiveCellChangePayload', docs: { description: 'Fired (grid interaction mode only) whenever the active cell moves: by keyboard navigation, a click or a `focusCell` call, when it follows its record to a new position after a re-sort, filter change or table write, or when it parks on the column header because its record left the view.' } },
   'cell-edit-commit':     { payload: 'DataTableCellEditCommitPayload', docs: { description: 'Fired once per committed, validated cell edit (including each cell of a paste or fill).' } },
   'expand-change':        { payload: 'ExpandedState', docs: { description: 'Fired when the expanded-row set changes. The payload is the `true` expand-all literal or a `{ [rowId]: true }` object.' } },
   'filter-change':        { payload: 'DataTableFilterChangePayload', docs: { description: 'Fired when a filter changes: `{ globalFilter }` for the search box, `{ columnFilters }` for a per-column filter.' } },

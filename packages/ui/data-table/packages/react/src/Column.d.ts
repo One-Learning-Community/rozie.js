@@ -44,11 +44,11 @@ export interface ColumnProps {
    */
   aggregationFn?: (string | ((...args: any[]) => any)) | null;
   /**
-   * The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.
+   * The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue, row) => boolean`, where `row` is the original data object. Null → table-core's auto rule for the column's value type.
    */
   filterFn?: (string | ((...args: any[]) => any)) | null;
   /**
-   * The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.
+   * The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom ascending comparator `(a, b, rowA, rowB) => number` over the cell values, with the original data objects as `rowA` / `rowB`. Null → table-core's auto rule for the column's value type.
    */
   sortingFn?: (string | ((...args: any[]) => any)) | null;
   /**

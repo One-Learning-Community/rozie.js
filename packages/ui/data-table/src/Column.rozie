@@ -153,7 +153,7 @@
 
   // filterFn / sortingFn: the table-core per-column filter and sort rule. Either a built-in
   // name string (e.g. 'arrIncludesSome', 'equalsString'; 'alphanumeric', 'basic', …) or a custom
-  // function — filterFn `(value, filterValue) => boolean`, sortingFn `(a, b) => number`. Null
+  // function — filterFn `(value, filterValue, row) => boolean`, sortingFn `(a, b, rowA, rowB) => number`. Null
   // (default) → table-core's auto rule. A custom function is registered through a stable
   // trampoline, so an inline arrow re-created each consumer render does not re-register.
   filterFn: {
@@ -161,7 +161,7 @@
     default: null,
     docs: {
       description:
-        "The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue) => boolean`. Null → table-core's auto rule for the column's value type.",
+        "The table-core filter rule for this column. Either a built-in name string (e.g. `'arrIncludesSome'`, `'equalsString'`) or a custom function `(value, filterValue, row) => boolean`, where `row` is the original data object. Null → table-core's auto rule for the column's value type.",
     },
   },
   sortingFn: {
@@ -169,7 +169,7 @@
     default: null,
     docs: {
       description:
-        "The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom comparator `(a, b) => number`. Null → table-core's auto rule for the column's value type.",
+        "The table-core sort rule for this column. Either a built-in name string (e.g. `'alphanumeric'`, `'basic'`) or a custom ascending comparator `(a, b, rowA, rowB) => number` over the cell values, with the original data objects as `rowA` / `rowB`. Null → table-core's auto rule for the column's value type.",
     },
   },
 
