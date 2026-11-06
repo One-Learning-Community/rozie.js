@@ -577,7 +577,9 @@ interface FilterSlotCtx { columnId: string; value: any; uniqueValues: any[]; min
 
 interface CellSlotCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; }
 
-interface EditorSlotCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean; }
+interface EditorSlotCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number; }
 
 interface DataTableProps {
   /**
@@ -760,7 +762,9 @@ interface DataTableProps {
   filterSlot?: (ctx: FilterSlotCtx) => JSX.Element;
   cellSlot?: (ctx: CellSlotCtx) => JSX.Element;
   editorSlot?: (ctx: EditorSlotCtx) => JSX.Element;
-  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; label: string }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => JSX.Element) | undefined; [key: `editor-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
+  slots?: { [key: `colHeader-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; label: string }) => JSX.Element) | undefined; [key: `filter-${string}`]: ((ctx: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => JSX.Element) | undefined; [key: `cell-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => JSX.Element) | undefined; [key: `editor-${string}`]: ((ctx: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number }) => JSX.Element) | undefined; [key: string]: ((...args: any[]) => JSX.Element) | undefined; };
   ref?: (h: DataTableHandle) => void;
 }
 
@@ -1193,6 +1197,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       };
       document.addEventListener('pointerdown', docPointerDown, true);
     }
+    // Range fill: a CAPTURE-phase keydown on the grid root runs before any editor's own keydown
+    // handler — built-in, drop-in or slotted (on Lit the slotted editor's composed path still
+    // passes through the grid root). Registered here in script rather than as a template
+    // `.capture` binding so it is the same code on all six targets. It reads no reactive state
+    // (a mount-time closure would see stale state on React); the commit checks the range.
+    if (gridRoot) gridRoot.addEventListener('keydown', onEditorDropinKeyDownCapture, true);
     // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
     // page load AND was non-deterministic on React/Solid (the entry cell may not be
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -1328,6 +1338,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       document.removeEventListener('pointerdown', docPointerDown, true);
       docPointerDown = null;
     }
+    if (gridRoot) gridRoot.removeEventListener('keydown', onEditorDropinKeyDownCapture, true);
     if (virtualizerCleanup) virtualizerCleanup();
     // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
     // No-op when column windowing was off (cleanup stays null).
@@ -8091,6 +8102,43 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     return true;
   }
 
+  // commitEditToRange(overrideValue): the Ctrl/Cmd+Enter commit. Writes the editor's value to
+  // every selected cell in the editing cell's column through fillActiveColumn (the paste/fill
+  // funnel: skip rule, one undo step, one cell-edit-commit per changed cell, "N of M cells
+  // updated"), then closes the editor and returns focus to the active cell WITHOUT clearing the
+  // range. The value is checked against the editing cell first: if the cell being edited rejects
+  // it, the editor stays open with the error, exactly as a single-cell commit does.
+  function commitEditToRange(overrideValue = undefined) {
+    if (editingRow() < 0) return false;
+    if (committedThisSession) return false;
+    const colId = editingColumnId();
+    if (colId == null) {
+      endEdit();
+      return false;
+    }
+    const rawValue = overrideValue !== undefined ? overrideValue : draftValue();
+    const err = runValidator(colId, coerceCellValue(colId, rawValue), editingRowOriginal());
+    if (err !== true) {
+      setInvalid(err);
+      focusEditorWhenReady(editingRow(), editingCol());
+      return false;
+    }
+    setInvalid('');
+    const focusRow = editingRow();
+    const focusCol = editingCol();
+    // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
+    editTransition = true;
+    committedThisSession = true;
+    fillActiveColumn(rawValue);
+    endEdit();
+    editTransition = false;
+    // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
+    // range (the selection stays put after a fill, as in a spreadsheet).
+    rangeTransition = true;
+    focusCellWhenReady(focusRow, focusCol);
+    return true;
+  }
+
   // toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
   // single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
   // EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
@@ -8516,6 +8564,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     committed: boolean;
   } | null = null;
 
+  // rangeCommitIntent: set by the drop-in wrapper's CAPTURE-phase keydown when Ctrl/Cmd+Enter is
+  // pressed while a range is selected, so the slot editor's own commit — which runs during that
+  // same keypress — goes to the whole range. Cleared by the bubble-phase handler and by a
+  // setTimeout(0), so an editor that does not commit during the keypress falls back to one cell.
+  let rangeCommitIntent = false;
+
   // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
   // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
   // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -8539,9 +8593,17 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
   // row-mode commit targets the right draft key.
   function editorCommitFor(colId: any) {
-    return (value: any) => {
+    return (value: any, options: any) => {
       if (inRowEdit()) {
         setRowDraft$local(colId, value);
+        return;
+      }
+      // Range fill: an explicit `commit(v, { toRange: true })`, or any commit made during a
+      // Ctrl/Cmd+Enter keypress (rangeCommitIntent), writes v to every selected cell in this column.
+      const wantsRange = options != null && options.toRange === true || rangeCommitIntent;
+      rangeCommitIntent = false;
+      if (wantsRange && !dropinTabFlush && rangeSize() > 1) {
+        commitEditToRange(value);
         return;
       }
       // C-10: during the drop-in wrapper's Tab flush, record the outcome and skip the focus
@@ -8655,7 +8717,12 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
       }
       return;
     }
-    if (key === 'Enter') {
+    if (key === 'Enter' && (e.ctrlKey || e.metaKey) && rangeSize() > 1) {
+      // Ctrl/Cmd+Enter with a range selected: write the draft to every selected cell in this
+      // column. Plain Enter (below) still commits the active cell only.
+      e.preventDefault();
+      commitEditToRange(undefined);
+    } else if (key === 'Enter') {
       e.preventDefault();
       commitEdit(undefined);
     } else if (key === 'Tab') {
@@ -8743,8 +8810,23 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
   // advances. `dropinTabFlush` tells editorCommitFor to report the outcome and skip the focus
   // return. A drop-in that does not commit on blur (EditorCheckbox commits on change, so it holds
   // nothing pending) falls back to the host-draft path, which is exactly right in that case.
+  // Capture-phase keydown on the grid root (registered at mount): runs BEFORE any editor's own
+  // keydown handler. Ctrl/Cmd+Enter marks the commit an editor makes during this keypress as a
+  // range commit; editorCommitFor decides whether a range is actually selected. The mark expires
+  // after this event, so a commit that comes later (on blur, after an async step) writes one
+  // cell, as usual. Reads NO reactive state: it is a mount-time closure (stale on React).
+  function onEditorDropinKeyDownCapture(e: any) {
+    if (!e) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      rangeCommitIntent = true;
+      setTimeout(() => {
+        rangeCommitIntent = false;
+      }, 0);
+    }
+  }
   function onEditorDropinKeyDown(e: any) {
     if (!e) return;
+    rangeCommitIntent = false;
     const key = e.key;
     if (inRowEdit()) {
       if (key === 'Enter') {
@@ -9323,7 +9405,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               {_props.slots?.[`cell-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return cell().getValue(); } }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return cell().getValue(); } }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
-                {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
+                {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); }, get rangeSize() { return inRowEdit() ? 1 : rangeSize(); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(row()); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, rowIndexOf(row())); }, get rangeSize() { return inRowEdit() ? 1 : rangeSize(); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
               </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (editorValueFor(cell().column.id))); }} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
               </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
@@ -9400,7 +9482,7 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
               {_props.slots?.[`cell-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return cell().getValue(); } }) ?? (_props.cellSlot ?? _props.slots?.['cell'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return cell().getValue(); } }) ?? rozieDisplay(cell().getValue())}
             </span>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">
               {<Show when={editorTypeOf(cell().column.id) === 'number'} fallback={<Show when={editorTypeOf(cell().column.id) === 'select'} fallback={<Show when={editorTypeOf(cell().column.id) === 'checkbox'} fallback={<Show when={editorTypeOf(cell().column.id) === 'custom'} fallback={<input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}><span style={{ display: "contents" }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSpanElement; target: Element }) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
-                {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
+                {_props.slots?.[`editor-${cell().column.id}`]?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); }, get rangeSize() { return inRowEdit() ? 1 : rangeSize(); } }) ?? (_props.editorSlot ?? _props.slots?.['editor'])?.({ get columnId() { return cell().column.id; }, get column() { return cell().column; }, get row() { return cellSlotRow(wr().row); }, get value() { return editorValueFor(cell().column.id); }, get commit() { return editorCommitFor(cell().column.id); }, get cancel() { return editorCancelFor(); }, get columnLabel() { return headerLabel(cell().column.id); }, get autofocus() { return editorAutofocusFor(cell().column.id, wr().vi.index); }, get rangeSize() { return inRowEdit() ? 1 : rangeSize(); } }) ?? <input type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}
               </span></Show>}><input type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} checked={editorCheckedFor(cell().column.id)} onChange={($event: Event & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorCheckbox(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}><select data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} ref={(el) => { rozieSelectValue(el as HTMLSelectElement, () => (editorValueFor(cell().column.id))); }} onChange={($event: Event & { currentTarget: HTMLSelectElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLSelectElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 <Key each={editorOptionsOf(cell().column.id) as readonly any[]} by={(opt) => opt.value}>{(opt) => <option value={rozieAttr(opt().value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt().label)}</option>}</Key>
               </select></Show>}><input type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg() ? 'true' : null)} class={"rdt-cell-editor"} value={editorValueFor(cell().column.id)} onInput={($event: InputEvent & { currentTarget: HTMLInputElement; target: Element }) => { onCellEditorInput(cell().column.id, $event); }} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorKeyDown($event); }} onBlur={($event: FocusEvent & { currentTarget: HTMLInputElement; target: Element }) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /></Show>}</span></Show>}><span style={{ display: "contents" }} data-rozie-s-d5dcab4c="">

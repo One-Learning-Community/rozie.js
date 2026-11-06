@@ -1477,6 +1477,12 @@ $onMount(() => {
     }
     document.addEventListener('pointerdown', docPointerDown, true)
   }
+  // Range fill: a CAPTURE-phase keydown on the grid root runs before any editor's own keydown
+  // handler — built-in, drop-in or slotted (on Lit the slotted editor's composed path still
+  // passes through the grid root). Registered here in script rather than as a template
+  // `.capture` binding so it is the same code on all six targets. It reads no reactive state
+  // (a mount-time closure would see stale state on React); the commit checks the range.
+  if (gridRoot) gridRoot.addEventListener('keydown', onEditorDropinKeyDownCapture, true)
   // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
   // page load AND was non-deterministic on React/Solid (the entry cell may not be
   // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -1616,6 +1622,7 @@ $onUnmount(() => {
     document.removeEventListener('pointerdown', docPointerDown, true)
     docPointerDown = null
   }
+  if (gridRoot) gridRoot.removeEventListener('keydown', onEditorDropinKeyDownCapture, true)
   if (virtualizerCleanup) virtualizerCleanup()
   // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
   // No-op when column windowing was off (cleanup stays null).
@@ -2200,7 +2207,7 @@ let rangeDragUp = null
 let rangeDragMoved = false
 import { teardownRangeDrag, beginRangeDrag } from './dragSelect.rzts'
 
-import { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
+import { commitEditToRange, activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
 
 import { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
 
@@ -2246,6 +2253,12 @@ let rowDraftSync: Record<string, any> = {}
 // moves focus on to the next editor itself).
 let dropinTabFlush: { called: boolean; committed: boolean } | null = null
 
+// rangeCommitIntent: set by the drop-in wrapper's CAPTURE-phase keydown when Ctrl/Cmd+Enter is
+// pressed while a range is selected, so the slot editor's own commit — which runs during that
+// same keypress — goes to the whole range. Cleared by the bubble-phase handler and by a
+// setTimeout(0), so an editor that does not commit during the keypress falls back to one cell.
+let rangeCommitIntent = false
+
 // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
 // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
 // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -2253,7 +2266,7 @@ let dropinTabFlush: { called: boolean; committed: boolean } | null = null
 // helpers let the ONE editor template branch serve BOTH modes (no per-mode template fork):
 // the template binds editorValueFor(colId)/editorCheckedFor(colId) and writes via
 // onCellEditorInput(colId, evt)/onCellEditorCheckbox(colId, evt).
-import { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow } from './editorBindings.rzts'
+import { onEditorDropinKeyDownCapture, inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow } from './editorBindings.rzts'
 
 import { focusCell, getActiveCell, clearActiveCell } from './gridActiveCellVerbs.rzts'
 
@@ -2961,7 +2974,8 @@ $expose({
               :cancel="editorCancelFor()"
               :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
-              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
+              :rangeSize="inRowEdit() ? 1 : rangeSize()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any, options?: { toRange?: boolean }) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean', rangeSize: 'number' }"
             >
               <slot
                 name="editor"
@@ -2973,7 +2987,8 @@ $expose({
                 :cancel="editorCancelFor()"
                 :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, wr.vi.index)"
-              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
+              :rangeSize="inRowEdit() ? 1 : rangeSize()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any, options?: { toRange?: boolean }) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean', rangeSize: 'number' }"
               >
                 <input
                   class="rdt-cell-editor"
@@ -3497,7 +3512,8 @@ $expose({
               :cancel="editorCancelFor()"
               :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
-              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
+              :rangeSize="inRowEdit() ? 1 : rangeSize()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any, options?: { toRange?: boolean }) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean', rangeSize: 'number' }"
             >
               <slot
                 name="editor"
@@ -3509,7 +3525,8 @@ $expose({
                 :cancel="editorCancelFor()"
                 :columnLabel="headerLabel(cell.column.id)"
               :autofocus="editorAutofocusFor(cell.column.id, rowIndexOf(row))"
-              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean' }"
+              :rangeSize="inRowEdit() ? 1 : rangeSize()"
+              :param-types="{ columnId: 'string', column: 'TableColumn<any, unknown>', row: 'any', value: 'any', commit: '(value: any, options?: { toRange?: boolean }) => void', cancel: '() => void', columnLabel: 'string', autofocus: 'boolean', rangeSize: 'number' }"
               >
                 <input
                   class="rdt-cell-editor"

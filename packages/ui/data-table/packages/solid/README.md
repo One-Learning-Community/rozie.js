@@ -598,9 +598,9 @@ A misspelled family key does not fail to compile — the emitted type carries a 
 | placeholder | index, columnId |
 | selectCell | row, checked, toggle |
 | cell-<id> | columnId, column, row, value |
-| editor-<id> | columnId, column, row, value, commit, cancel, columnLabel, autofocus |
+| editor-<id> | columnId, column, row, value, commit, cancel, columnLabel, autofocus, rangeSize |
 | detail | row |
 | colHeader | columnId, column, label |
 | filter | columnId, value, uniqueValues, minMax, columnLabel, setFilter |
 | cell | columnId, column, row, value |
-| editor | columnId, column, row, value, commit, cancel, columnLabel, autofocus |
+| editor | columnId, column, row, value, commit, cancel, columnLabel, autofocus, rangeSize |

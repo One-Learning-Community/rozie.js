@@ -188,15 +188,20 @@ interface CellCtx {
 }
 
 interface EditorCtx {
-  $implicit: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean };
+  $implicit: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number };
   columnId: string;
   column: TableColumn<any, unknown>;
   row: any;
   value: any;
-  commit: (value: any) => void;
+  commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void;
   cancel: () => void;
   columnLabel: string;
   autofocus: boolean;
+  rangeSize: number;
 }
 
 interface ColHeaderCtx {
@@ -225,15 +230,20 @@ interface CellCtx {
 }
 
 interface EditorCtx {
-  $implicit: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean };
+  $implicit: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number };
   columnId: string;
   column: TableColumn<any, unknown>;
   row: any;
   value: any;
-  commit: (value: any) => void;
+  commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void;
   cancel: () => void;
   columnLabel: string;
   autofocus: boolean;
+  rangeSize: number;
 }
 
 @Component({
@@ -480,11 +490,11 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'custom') {
     <span style="display:contents" (keydown)="onEditorDropinKeyDown($event)">
                 @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }" />
     } @else {
 
                   @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
-    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }" />
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }" />
     } @else {
 
                     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [attr.aria-invalid]="rozieAttr(invalidMsg() ? 'true' : null)" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -701,11 +711,11 @@ interface EditorCtx {
     } @else if (editorTypeOf(cell.column.id) === 'custom') {
     <span style="display:contents" (keydown)="onEditorDropinKeyDown($event)">
                 @if ((__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`])) {
-    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    <ng-container *ngTemplateOutlet="(__rozieFillMap()[\`editor-\${cell.column.id}\`] ?? templates()?.[\`editor-\${cell.column.id}\`]); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }" />
     } @else {
 
                   @if ((editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor'])) {
-    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }" />
+    <ng-container *ngTemplateOutlet="(editorTpl ?? __rozieFillMap()['editor'] ?? templates()?.['editor']); context: { $implicit: { columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }, columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }" />
     } @else {
 
                     <input class="rdt-cell-editor" type="text" data-editing-cell="" data-builtin-editor="" [attr.aria-invalid]="rozieAttr(invalidMsg() ? 'true' : null)" [value]="editorValueFor(cell.column.id)" (input)="onCellEditorInput(cell.column.id, $event)" (keydown)="onEditorKeyDown($event)" (blur)="onEditorBlur($event)" />
@@ -1500,6 +1510,7 @@ export class DataTable {
         document.removeEventListener('pointerdown', this.docPointerDown, true);
         this.docPointerDown = null;
       }
+      if (this.gridRoot) this.gridRoot.removeEventListener('keydown', this.onEditorDropinKeyDownCapture, true);
       if (this.virtualizerCleanup) this.virtualizerCleanup();
       // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
       // No-op when column windowing was off (cleanup stays null).
@@ -1897,6 +1908,17 @@ export class DataTable {
       };
       document.addEventListener('pointerdown', this.docPointerDown, true);
     }
+    // Range fill: a CAPTURE-phase keydown on the grid root runs before any editor's own keydown
+    // handler — built-in, drop-in or slotted (on Lit the slotted editor's composed path still
+    // passes through the grid root). Registered here in script rather than as a template
+    // `.capture` binding so it is the same code on all six targets. It reads no reactive state
+    // (a mount-time closure would see stale state on React); the commit checks the range.
+    // Range fill: a CAPTURE-phase keydown on the grid root runs before any editor's own keydown
+    // handler — built-in, drop-in or slotted (on Lit the slotted editor's composed path still
+    // passes through the grid root). Registered here in script rather than as a template
+    // `.capture` binding so it is the same code on all six targets. It reads no reactive state
+    // (a mount-time closure would see stale state on React); the commit checks the range.
+    if (this.gridRoot) this.gridRoot.addEventListener('keydown', this.onEditorDropinKeyDownCapture, true);
     // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
     // page load AND was non-deterministic on React/Solid (the entry cell may not be
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -8526,6 +8548,44 @@ export class DataTable {
     }
     return true;
   };
+  // commitEditToRange(overrideValue): the Ctrl/Cmd+Enter commit. Writes the editor's value to
+  // every selected cell in the editing cell's column through fillActiveColumn (the paste/fill
+  // funnel: skip rule, one undo step, one cell-edit-commit per changed cell, "N of M cells
+  // updated"), then closes the editor and returns focus to the active cell WITHOUT clearing the
+  // range. The value is checked against the editing cell first: if the cell being edited rejects
+  // it, the editor stays open with the error, exactly as a single-cell commit does.
+  commitEditToRange = (overrideValue: any = undefined) => {
+    const __editingRow = this.editingRow();
+    const __editingCol = this.editingCol();
+    if (__editingRow < 0) return false;
+    if (this.committedThisSession) return false;
+    const colId = this.editingColumnId();
+    if (colId == null) {
+      this.endEdit();
+      return false;
+    }
+    const rawValue = overrideValue !== undefined ? overrideValue : this.draftValue();
+    const err = this.runValidator(colId, this.coerceCellValue(colId, rawValue), this.editingRowOriginal());
+    if (err !== true) {
+      this.setInvalid(err);
+      this.focusEditorWhenReady(__editingRow, __editingCol);
+      return false;
+    }
+    this.setInvalid('');
+    const focusRow = __editingRow;
+    const focusCol = __editingCol;
+    // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
+    this.editTransition = true;
+    this.committedThisSession = true;
+    this.fillActiveColumn(rawValue);
+    this.endEdit();
+    this.editTransition = false;
+    // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
+    // range (the selection stays put after a fill, as in a spreadsheet).
+    this.rangeTransition = true;
+    this.focusCellWhenReady(focusRow, focusCol);
+    return true;
+  };
   // toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
   // single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
   // EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
@@ -8942,6 +9002,11 @@ export class DataTable {
     called: boolean;
     committed: boolean;
   } | null = null;
+  // rangeCommitIntent: set by the drop-in wrapper's CAPTURE-phase keydown when Ctrl/Cmd+Enter is
+  // pressed while a range is selected, so the slot editor's own commit — which runs during that
+  // same keypress — goes to the whole range. Cleared by the bubble-phase handler and by a
+  // setTimeout(0), so an editor that does not commit during the keypress falls back to one cell.
+  rangeCommitIntent = false;
   // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
   // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
   // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -8957,9 +9022,17 @@ export class DataTable {
   // only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
   // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
   // row-mode commit targets the right draft key.
-  editorCommitFor = (colId: any) => (value: any) => {
+  editorCommitFor = (colId: any) => (value: any, options: any) => {
     if (this.inRowEdit()) {
       this.setRowDraft(colId, value);
+      return;
+    }
+    // Range fill: an explicit `commit(v, { toRange: true })`, or any commit made during a
+    // Ctrl/Cmd+Enter keypress (rangeCommitIntent), writes v to every selected cell in this column.
+    const wantsRange = options != null && options.toRange === true || this.rangeCommitIntent;
+    this.rangeCommitIntent = false;
+    if (wantsRange && !this.dropinTabFlush && this.rangeSize() > 1) {
+      this.commitEditToRange(value);
       return;
     }
     // C-10: during the drop-in wrapper's Tab flush, record the outcome and skip the focus
@@ -9067,7 +9140,12 @@ export class DataTable {
       }
       return;
     }
-    if (key === 'Enter') {
+    if (key === 'Enter' && (e.ctrlKey || e.metaKey) && this.rangeSize() > 1) {
+      // Ctrl/Cmd+Enter with a range selected: write the draft to every selected cell in this
+      // column. Plain Enter (below) still commits the active cell only.
+      e.preventDefault();
+      this.commitEditToRange(undefined);
+    } else if (key === 'Enter') {
       e.preventDefault();
       this.commitEdit(undefined);
     } else if (key === 'Tab') {
@@ -9154,8 +9232,23 @@ export class DataTable {
   // advances. `dropinTabFlush` tells editorCommitFor to report the outcome and skip the focus
   // return. A drop-in that does not commit on blur (EditorCheckbox commits on change, so it holds
   // nothing pending) falls back to the host-draft path, which is exactly right in that case.
+  // Capture-phase keydown on the grid root (registered at mount): runs BEFORE any editor's own
+  // keydown handler. Ctrl/Cmd+Enter marks the commit an editor makes during this keypress as a
+  // range commit; editorCommitFor decides whether a range is actually selected. The mark expires
+  // after this event, so a commit that comes later (on blur, after an async step) writes one
+  // cell, as usual. Reads NO reactive state: it is a mount-time closure (stale on React).
+  onEditorDropinKeyDownCapture = (e: any) => {
+    if (!e) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      this.rangeCommitIntent = true;
+      setTimeout(() => {
+        this.rangeCommitIntent = false;
+      }, 0);
+    }
+  };
   onEditorDropinKeyDown = (e: any) => {
     if (!e) return;
+    this.rangeCommitIntent = false;
     const key = e.key;
     if (this.inRowEdit()) {
       if (key === 'Enter') {

@@ -143,7 +143,9 @@ interface FilterCtx { columnId: string; value: any; uniqueValues: any[]; minMax:
 
 interface CellCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; }
 
-interface EditorCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean; }
+interface EditorCtx { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number; }
 
 interface DataTableProps {
   /**
@@ -325,7 +327,9 @@ interface DataTableProps {
   renderFilter?: (ctx: FilterCtx) => ReactNode;
   renderCell?: (ctx: CellCtx) => ReactNode;
   renderEditor?: (ctx: EditorCtx) => ReactNode;
-  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; label: string }) => import('react').ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => import('react').ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => import('react').ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => import('react').ReactNode) | undefined; [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
+  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; label: string }) => import('react').ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => import('react').ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => import('react').ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number }) => import('react').ReactNode) | undefined; [key: string]: ((...args: any[]) => import('react').ReactNode) | undefined; };
 }
 
 export interface DataTableHandle {
@@ -447,6 +451,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   const rowDraftSync = useRef<Record<string, any>>({});
   const rangeActive = useRef(false);
   const selectAllBox = useRef<any>(null);
+  const rangeCommitIntent = useRef(false);
   const fillDragMove = useRef<any>(null);
   const fillDragUp = useRef<any>(null);
   const fillDragging = useRef(false);
@@ -7193,6 +7198,43 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     return true;
   }
 
+  // commitEditToRange(overrideValue): the Ctrl/Cmd+Enter commit. Writes the editor's value to
+  // every selected cell in the editing cell's column through fillActiveColumn (the paste/fill
+  // funnel: skip rule, one undo step, one cell-edit-commit per changed cell, "N of M cells
+  // updated"), then closes the editor and returns focus to the active cell WITHOUT clearing the
+  // range. The value is checked against the editing cell first: if the cell being edited rejects
+  // it, the editor stays open with the error, exactly as a single-cell commit does.
+  function commitEditToRange(overrideValue = undefined) {
+    if (editingRow < 0) return false;
+    if (committedThisSession.current) return false;
+    const colId = editingColumnId();
+    if (colId == null) {
+      endEdit();
+      return false;
+    }
+    const rawValue = overrideValue !== undefined ? overrideValue : draftValue;
+    const err = runValidator(colId, coerceCellValue(colId, rawValue), editingRowOriginal());
+    if (err !== true) {
+      setInvalid(err);
+      focusEditorWhenReady(editingRow, editingCol);
+      return false;
+    }
+    setInvalid('');
+    const focusRow = editingRow;
+    const focusCol = editingCol;
+    // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
+    editTransition.current = true;
+    committedThisSession.current = true;
+    fillActiveColumn(rawValue);
+    endEdit();
+    editTransition.current = false;
+    // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
+    // range (the selection stays put after a fill, as in a spreadsheet).
+    rangeTransition.current = true;
+    focusCellWhenReady(focusRow, focusCol);
+    return true;
+  }
+
   // toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
   // single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
   // EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
@@ -7608,6 +7650,11 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // wrapper's Tab flush (see onEditorDropinKeyDown). While set, a drop-in's `commit(v)` records
   // that it ran and whether it committed, and commits WITHOUT the focus return (the Tab handler
   // moves focus on to the next editor itself).
+
+  // rangeCommitIntent: set by the drop-in wrapper's CAPTURE-phase keydown when Ctrl/Cmd+Enter is
+  // pressed while a range is selected, so the slot editor's own commit — which runs during that
+  // same keypress — goes to the whole range. Cleared by the bubble-phase handler and by a
+  // setTimeout(0), so an editor that does not commit during the keypress falls back to one cell.
   // ── Per-cell editor draft source (req-6) ──────────────────────────────────────────────
   // In single-cell mode every editor binds the shared $data.draftValue. In full-row mode
   // (editingRowIndex != null) each editable cell owns its OWN draft keyed by columnId in
@@ -7631,9 +7678,17 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
   // row-mode commit targets the right draft key.
   function editorCommitFor(colId: any) {
-    return (value: any) => {
+    return (value: any, options: any) => {
       if (inRowEdit()) {
         setRowDraft$local(colId, value);
+        return;
+      }
+      // Range fill: an explicit `commit(v, { toRange: true })`, or any commit made during a
+      // Ctrl/Cmd+Enter keypress (rangeCommitIntent), writes v to every selected cell in this column.
+      const wantsRange = options != null && options.toRange === true || rangeCommitIntent.current;
+      rangeCommitIntent.current = false;
+      if (wantsRange && !dropinTabFlush.current && rangeSize() > 1) {
+        commitEditToRange(value);
         return;
       }
       // C-10: during the drop-in wrapper's Tab flush, record the outcome and skip the focus
@@ -7747,7 +7802,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       }
       return;
     }
-    if (key === 'Enter') {
+    if (key === 'Enter' && (e.ctrlKey || e.metaKey) && rangeSize() > 1) {
+      // Ctrl/Cmd+Enter with a range selected: write the draft to every selected cell in this
+      // column. Plain Enter (below) still commits the active cell only.
+      e.preventDefault();
+      commitEditToRange(undefined);
+    } else if (key === 'Enter') {
       e.preventDefault();
       commitEdit(undefined);
     } else if (key === 'Tab') {
@@ -7790,7 +7850,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       e.preventDefault();
       cancelEdit();
     }
-  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, modelIndexOfRowId, nextEditableCell, prevEditableCell, rowEditTab, rowIdInModel]);
+  }, [beginEdit, cancelEdit, cancelRow, commitEdit, commitEditToRange, commitRow, editingCol, editingRow, focusCellWhenReady, inRowEdit, modelIndexOfRowId, nextEditableCell, prevEditableCell, rangeSize, rowEditTab, rowIdInModel]);
   // DECLARED AFTER onEditorKeyDown ON PURPOSE. It delegates to it, and the React emitter lowers
   // both to `useCallback`s whose DEPENDENCY ARRAY is evaluated EAGERLY at declaration time — so
   // with this one first, its deps array referenced `onEditorKeyDown` before the const existed and
@@ -7834,8 +7894,23 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
   // advances. `dropinTabFlush` tells editorCommitFor to report the outcome and skip the focus
   // return. A drop-in that does not commit on blur (EditorCheckbox commits on change, so it holds
   // nothing pending) falls back to the host-draft path, which is exactly right in that case.
+  // Capture-phase keydown on the grid root (registered at mount): runs BEFORE any editor's own
+  // keydown handler. Ctrl/Cmd+Enter marks the commit an editor makes during this keypress as a
+  // range commit; editorCommitFor decides whether a range is actually selected. The mark expires
+  // after this event, so a commit that comes later (on blur, after an async step) writes one
+  // cell, as usual. Reads NO reactive state: it is a mount-time closure (stale on React).
+  const onEditorDropinKeyDownCapture = useCallback((e: any) => {
+    if (!e) return;
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      rangeCommitIntent.current = true;
+      setTimeout(() => {
+        rangeCommitIntent.current = false;
+      }, 0);
+    }
+  }, []);
   const onEditorDropinKeyDown = useCallback((e: any) => {
     if (!e) return;
+    rangeCommitIntent.current = false;
     const key = e.key;
     if (inRowEdit()) {
       if (key === 'Enter') {
@@ -8671,6 +8746,12 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
       };
       document.addEventListener('pointerdown', docPointerDown.current, true);
     }
+    // Range fill: a CAPTURE-phase keydown on the grid root runs before any editor's own keydown
+    // handler — built-in, drop-in or slotted (on Lit the slotted editor's composed path still
+    // passes through the grid root). Registered here in script rather than as a template
+    // `.capture` binding so it is the same code on all six targets. It reads no reactive state
+    // (a mount-time closure would see stale state on React); the commit checks the range.
+    if (gridRoot.current) gridRoot.current.addEventListener('keydown', onEditorDropinKeyDownCapture, true);
     // WR-04: NO on-mount auto-focus of the entry cell. Auto-focusing here stole focus on
     // page load AND was non-deterministic on React/Solid (the entry cell may not be
     // committed to the DOM yet at the $onMount microtask). The roving tabindex="0" entry
@@ -8807,6 +8888,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
         document.removeEventListener('pointerdown', docPointerDown.current, true);
         docPointerDown.current = null;
       }
+      if (gridRoot.current) gridRoot.current.removeEventListener('keydown', onEditorDropinKeyDownCapture, true);
       if (virtualizerCleanup.current) virtualizerCleanup.current();
       // Phase 87 87-04: tear down the column virtualizer's scroll-element ResizeObserver too.
       // No-op when column windowing was off (cleanup stays null).
@@ -8996,7 +9078,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               {(editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'custom') ? <span style={{ display: "contents" }} onKeyDown={($event) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, wr.vi.index), rangeSize: inRowEdit() ? 1 : rangeSize() }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
               </span> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {typeof props.slots?.[`cell-${cell.column.id}`] === 'function' ? (props.slots?.[`cell-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }) : (props.slots?.[`cell-${cell.column.id}`] ?? ((props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(wr.row), value: cell.getValue() }) : (rozieDisplay(cell.getValue()))))}
             </span>}{!!(isFillHandleCell(wr.vi.index, colIndexOf(wr.row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}
@@ -9075,7 +9157,7 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
               {(editorTypeOf(cell.column.id) === 'number') ? <input className={"rdt-cell-editor"} type="number" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'select') ? <select className={"rdt-cell-editor"} data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onChange={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="">
                 {editorOptionsOf(cell.column.id).map((opt) => <option key={opt.value} value={rozieAttr(opt.value)} data-rozie-s-d5dcab4c="">{rozieDisplay(opt.label)}</option>)}
               </select> : (editorTypeOf(cell.column.id) === 'checkbox') ? <input className={"rdt-cell-editor"} type="checkbox" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} checked={editorCheckedFor(cell.column.id)} onChange={($event) => { onCellEditorCheckbox(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" /> : (editorTypeOf(cell.column.id) === 'custom') ? <span style={{ display: "contents" }} onKeyDown={($event) => { onEditorDropinKeyDown($event); }} data-rozie-s-d5dcab4c="">
-                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)) }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
+                {typeof props.slots?.[`editor-${cell.column.id}`] === 'function' ? (props.slots?.[`editor-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }) : (props.slots?.[`editor-${cell.column.id}`] ?? ((props.renderEditor ?? props.slots?.['editor']) ? ((props.renderEditor ?? props.slots?.['editor']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: editorValueFor(cell.column.id), commit: editorCommitFor(cell.column.id), cancel: editorCancelFor(), columnLabel: headerLabel(cell.column.id), autofocus: editorAutofocusFor(cell.column.id, rowIndexOf(row)), rangeSize: inRowEdit() ? 1 : rangeSize() }) : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />))}
               </span> : <input className={"rdt-cell-editor"} type="text" data-editing-cell="" data-builtin-editor="" aria-invalid={rozieAttr(invalidMsg ? 'true' : undefined)} value={editorValueFor(cell.column.id)} onInput={($event) => { onCellEditorInput(cell.column.id, $event); }} onKeyDown={($event) => { onEditorKeyDown($event); }} onBlur={($event) => { onEditorBlur($event); }} data-rozie-s-d5dcab4c="" />}</span> : (cellIsPlaceholder(cell)) ? <span style={{ display: "contents" }} data-rozie-s-d5dcab4c="" /> : <span className={"rdt-cell-value"} data-rozie-s-d5dcab4c="">
               {typeof props.slots?.[`cell-${cell.column.id}`] === 'function' ? (props.slots?.[`cell-${cell.column.id}`] as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }) : (props.slots?.[`cell-${cell.column.id}`] ?? ((props.renderCell ?? props.slots?.['cell']) ? ((props.renderCell ?? props.slots?.['cell']) as Function)({ columnId: cell.column.id, column: cell.column, row: cellSlotRow(row), value: cell.getValue() }) : (rozieDisplay(cell.getValue()))))}
             </span>}{!!(isFillHandleCell(rowIndexOf(row), colIndexOf(row, cell))) && <span className={"rdt-fill-handle"} data-fill-handle="" data-testid="fill-handle" aria-hidden="true" onPointerDown={($event) => { onFillHandlePointerDown($event); }} data-rozie-s-d5dcab4c="" />}</td>)}

@@ -44,6 +44,12 @@
   rangeReadout: '',
   rangeNullCount: 0,
   commitCount: 0,
+  // The tags editor's current text, for its "Apply to all" button.
+  tagsDraft: null,
+  // The defer editor's current text. The handlers commit the draft recorded by @input rather
+  // than the element's value: on React a `:value`-bound input is controlled and snaps back to
+  // the cell value after each keystroke.
+  deferDraft: null,
 }
 </data>
 
@@ -71,13 +77,32 @@ const parseTags = (text: string): string[] =>
 const onTagsKey = (e: any, commit: (value: any) => void): void => {
   if (e.key === 'Enter') {
     e.preventDefault()
-    commit(parseTags(e.target.value))
+    const text = $data.tagsDraft != null ? $data.tagsDraft : e.target.value
+    $data.tagsDraft = null
+    commit(parseTags(text))
   }
+}
+
+const onTagsInput = (e: any): void => {
+  $data.tagsDraft = e.target.value
+}
+
+// "Apply to all": the explicit range commit, for editors that commit from a button.
+const applyTagsToAll = (commit: (value: any, options?: { toRange?: boolean }) => void, value: any): void => {
+  const text = $data.tagsDraft != null ? $data.tagsDraft : (value || []).join(',')
+  $data.tagsDraft = null
+  commit(parseTags(text), { toRange: true })
 }
 
 // The defer editor commits only when it loses focus.
 const onDeferBlur = (e: any, commit: (value: any) => void): void => {
-  commit(e.target.value)
+  const text = $data.deferDraft != null ? $data.deferDraft : e.target.value
+  $data.deferDraft = null
+  commit(text)
+}
+
+const onDeferInput = (e: any): void => {
+  $data.deferDraft = e.target.value
 }
 </script>
 
@@ -116,14 +141,17 @@ const onDeferBlur = (e: any, commit: (value: any) => void): void => {
         <span data-testid="cell-display">{{ Array.isArray(value) ? value.join(',') : String(value) }}</span>
       </template>
 
-      <template #editor-tags="{ value, commit, cancel }">
+      <template #editor-tags="{ value, commit, cancel, rangeSize }">
         <span class="tags-editor">
           <input
             class="rdt-cell-editor"
             data-testid="tags-input"
             :value="(value || []).join(',')"
+            @input="onTagsInput($event)"
             @keydown="onTagsKey($event, commit)"
           />
+          <span r-if="rangeSize > 1" data-testid="apply-hint">Apply to {{ rangeSize }} cells</span>
+          <button r-if="rangeSize > 1" type="button" data-testid="apply-all" @click="applyTagsToAll(commit, value)">Apply to all</button>
         </span>
       </template>
 
@@ -132,6 +160,7 @@ const onDeferBlur = (e: any, commit: (value: any) => void): void => {
           class="rdt-cell-editor"
           data-testid="defer-input"
           :value="value"
+          @input="onDeferInput($event)"
           @blur="onDeferBlur($event, commit)"
         />
       </template>

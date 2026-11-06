@@ -259,8 +259,12 @@ export interface DataTableProps {
   renderColHeader?: (params: { columnId: string; column: TableColumn<any, unknown>; label: string }) => ReactNode;
   renderFilter?: (params: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => ReactNode;
   renderCell?: (params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => ReactNode;
-  renderEditor?: (params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => ReactNode;
-  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; label: string }) => ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any) => void; cancel: () => void; columnLabel: string; autofocus: boolean }) => ReactNode) | undefined; [key: string]: ((...args: any[]) => ReactNode) | undefined; };
+  renderEditor?: (params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number }) => ReactNode;
+  slots?: { [key: `colHeader-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; label: string }) => ReactNode) | undefined; [key: `filter-${string}`]: ((params: { columnId: string; value: any; uniqueValues: any[]; minMax: [number, number] | null; columnLabel: string; setFilter: (columnId: string, value: any) => void }) => ReactNode) | undefined; [key: `cell-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any }) => ReactNode) | undefined; [key: `editor-${string}`]: ((params: { columnId: string; column: TableColumn<any, unknown>; row: any; value: any; commit: (value: any, options?: {
+    toRange?: boolean;
+  }) => void; cancel: () => void; columnLabel: string; autofocus: boolean; rangeSize: number }) => ReactNode) | undefined; [key: string]: ((...args: any[]) => ReactNode) | undefined; };
 }
 
 export interface DataTableHandle {

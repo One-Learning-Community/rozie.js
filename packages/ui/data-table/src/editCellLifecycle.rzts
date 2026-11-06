@@ -495,6 +495,40 @@ const commitEdit = (overrideValue = undefined, skipFocusReturn = false) => {
   return true
 }
 
+// commitEditToRange(overrideValue): the Ctrl/Cmd+Enter commit. Writes the editor's value to
+// every selected cell in the editing cell's column through fillActiveColumn (the paste/fill
+// funnel: skip rule, one undo step, one cell-edit-commit per changed cell, "N of M cells
+// updated"), then closes the editor and returns focus to the active cell WITHOUT clearing the
+// range. The value is checked against the editing cell first: if the cell being edited rejects
+// it, the editor stays open with the error, exactly as a single-cell commit does.
+const commitEditToRange = (overrideValue = undefined) => {
+  if ($data.editingRow < 0) return false
+  if (committedThisSession) return false
+  const colId = editingColumnId()
+  if (colId == null) { endEdit(); return false }
+  const rawValue = overrideValue !== undefined ? overrideValue : $data.draftValue
+  const err = runValidator(colId, coerceCellValue(colId, rawValue), editingRowOriginal())
+  if (err !== true) {
+    setInvalid(err)
+    focusEditorWhenReady($data.editingRow, $data.editingCol)
+    return false
+  }
+  setInvalid('')
+  const focusRow = $data.editingRow
+  const focusCol = $data.editingCol
+  // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
+  editTransition = true
+  committedThisSession = true
+  fillActiveColumn(rawValue)
+  endEdit()
+  editTransition = false
+  // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
+  // range (the selection stays put after a fill, as in a spreadsheet).
+  rangeTransition = true
+  focusCellWhenReady(focusRow, focusCol)
+  return true
+}
+
 // toggleActiveBooleanCell (design doc 2026-07-05, Change 1): the spreadsheet-standard
 // single-keystroke boolean toggle. Flips the ACTIVE cell's value and commits it through the
 // EXACT SAME write funnel commitEdit uses (replaceRowValue → writeData → single $emit) but
@@ -563,4 +597,4 @@ const cancelEdit = () => {
   focusCellWhenReady(focusRow, focusCol)
 }
 
-export { activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit }
+export { commitEditToRange, activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit }

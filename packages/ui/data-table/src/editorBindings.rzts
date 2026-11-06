@@ -7,8 +7,16 @@ const editorCheckedFor = (colId) => !!(inRowEdit() ? ($data.rowDraft ? $data.row
 // only WRITES this column's draft (the row commits as a unit later — never per cell). cancel()
 // reverts the cell (single) or the whole row (row mode). Factory-bound per columnId so the
 // row-mode commit targets the right draft key.
-const editorCommitFor = (colId) => (value) => {
+const editorCommitFor = (colId) => (value, options) => {
   if (inRowEdit()) { setRowDraft(colId, value); return }
+  // Range fill: an explicit `commit(v, { toRange: true })`, or any commit made during a
+  // Ctrl/Cmd+Enter keypress (rangeCommitIntent), writes v to every selected cell in this column.
+  const wantsRange = (options != null && options.toRange === true) || rangeCommitIntent
+  rangeCommitIntent = false
+  if (wantsRange && !dropinTabFlush && rangeSize() > 1) {
+    commitEditToRange(value)
+    return
+  }
   // C-10: during the drop-in wrapper's Tab flush, record the outcome and skip the focus
   // return — the Tab handler advances focus to the next editor itself.
   if (dropinTabFlush) {
@@ -100,7 +108,12 @@ const onEditorKeyDown = (e) => {
     else if (key === 'Tab') { e.preventDefault(); rowEditTab(e.target, e.shiftKey) }
     return
   }
-  if (key === 'Enter') {
+  if (key === 'Enter' && (e.ctrlKey || e.metaKey) && rangeSize() > 1) {
+    // Ctrl/Cmd+Enter with a range selected: write the draft to every selected cell in this
+    // column. Plain Enter (below) still commits the active cell only.
+    e.preventDefault()
+    commitEditToRange(undefined)
+  } else if (key === 'Enter') {
     e.preventDefault()
     commitEdit(undefined)
   } else if (key === 'Tab') {
@@ -190,8 +203,21 @@ const onEditorKeyDown = (e) => {
 // advances. `dropinTabFlush` tells editorCommitFor to report the outcome and skip the focus
 // return. A drop-in that does not commit on blur (EditorCheckbox commits on change, so it holds
 // nothing pending) falls back to the host-draft path, which is exactly right in that case.
+// Capture-phase keydown on the grid root (registered at mount): runs BEFORE any editor's own
+// keydown handler. Ctrl/Cmd+Enter marks the commit an editor makes during this keypress as a
+// range commit; editorCommitFor decides whether a range is actually selected. The mark expires
+// after this event, so a commit that comes later (on blur, after an async step) writes one
+// cell, as usual. Reads NO reactive state: it is a mount-time closure (stale on React).
+const onEditorDropinKeyDownCapture = (e) => {
+  if (!e) return
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    rangeCommitIntent = true
+    setTimeout(() => { rangeCommitIntent = false }, 0)
+  }
+}
 const onEditorDropinKeyDown = (e) => {
   if (!e) return
+  rangeCommitIntent = false
   const key = e.key
   if (inRowEdit()) {
     if (key === 'Enter') { e.preventDefault(); commitRow(); return }
@@ -398,4 +424,4 @@ const editRow = (rowIndex) => {
   beginRowEdit(row)
 }
 
-export { inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow }
+export { onEditorDropinKeyDownCapture, inRowEdit, editorValueFor, editorCheckedFor, editorCommitFor, editorCancelFor, onCellEditorInput, onCellEditorCheckbox, setRowDraft, rowEditTab, onEditorKeyDown, onEditorDropinKeyDown, onEditorBlur, editCell, commitEditing, editRow }
