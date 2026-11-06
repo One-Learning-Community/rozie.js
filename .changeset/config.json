@@ -22,6 +22,12 @@
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
   "ignore": [
+    "@rozie-ui/maplibre-react",
+    "@rozie-ui/maplibre-vue",
+    "@rozie-ui/maplibre-svelte",
+    "@rozie-ui/maplibre-lit",
+    "@rozie-ui/maplibre-angular",
+    "@rozie-ui/maplibre-solid",
     "@rozie-ui/lexical-react",
     "@rozie-ui/lexical-vue",
     "@rozie-ui/lexical-svelte",

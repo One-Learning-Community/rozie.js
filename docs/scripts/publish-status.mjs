@@ -37,6 +37,7 @@ export const TARGET_LABELS = {
 // means the family is fully held back (no target published yet, including
 // its Solid leaf, e.g. `lexical` — no content read/write API yet).
 export const PARTIAL_DEBUTS = {
+  maplibre: ['solid'],
   lexical: [],
 };
 

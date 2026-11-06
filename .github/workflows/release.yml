@@ -390,17 +390,19 @@ name: Release (early subset)
 #     leaf imports `rozieNativeListeners`, new in @rozie/runtime-react 0.10.1, which the
 #     "Publish toolchain" step publishes before any leaf.
 #
-# 2026-11 maplibre + number-field + resizable + slider + switch ALL-SIX DEBUT:
+# 2026-11 number-field + resizable + slider + switch ALL-SIX DEBUT:
 #   - The five held targets (react, vue, svelte, lit, angular) of each family debut next to the
 #     Solid leaves on npm since the 2026-09-26 wave, aligned on the Solid version (dialog/pagination
-#     precedent, RELEASING.md §6 item 20): maplibre/resizable/slider/switch 0.1.7, number-field
-#     0.1.6. The "debut Solid" step pair became one all-six step pair for the five families.
+#     precedent, RELEASING.md §6 item 20): resizable/slider/switch 0.1.7, number-field 0.1.6.
+#     The "debut Solid" step pair became one step pair for these four families (all six targets)
+#     plus maplibre-solid. maplibre's other five targets stay held: its map events (click,
+#     dblclick, …) collide with native DOM events on Angular and Lit; settle the naming first.
 #   - Held changesets naming these leaves were split into `*-debut.md` siblings at patch; the
 #     lexical lines stay in the `-held.md` files.
 #
 # Everything else is DELIBERATELY out of scope: any @rozie-ui family/target not enumerated
 # above is not release-verified. What is still held back is exactly what `.changeset/config.json`
-# lists under `ignore` (the lexical family) — held back until it gets its own dogfooding pass, exactly like uppy and
+# lists under `ignore` (the lexical family and maplibre's react/vue/svelte/lit/angular targets) — held back until they get its own dogfooding pass, exactly like uppy and
 # every other not-yet-verified family. Do NOT widen the --filter lists below to other targets or
 # families without updating the release runbook.
 #
@@ -859,18 +861,13 @@ jobs:
       # Build all six leaves of maplibre, number-field, resizable, slider and switch (2026-11 all-six
       # debut; the Solid leaves have been on npm since 2026-09-26). Mixed per-target toolchain
       # (react/solid/lit tsdown, vue Vite lib, svelte @sveltejs/package, angular ng-packagr APF).
-      # Leaves carry @rozie/runtime-<fw> as a workspace dep (maplibre-vue has none), so this sits AFTER the
+      # Leaves carry @rozie/runtime-<fw> as a workspace dep, so this sits AFTER the
       # toolchain build. No @rozie-ui workspace peer, so there is no ordering coupling to any other
       # leaf family. `lexical` is NOT here: fully held back (all six targets, no content API yet).
       - name: Build maplibre, number-field, resizable, slider and switch leaves
         run: >
           pnpm
-          --filter=@rozie-ui/maplibre-react
-          --filter=@rozie-ui/maplibre-vue
           --filter=@rozie-ui/maplibre-solid
-          --filter=@rozie-ui/maplibre-lit
-          --filter=@rozie-ui/maplibre-svelte
-          --filter=@rozie-ui/maplibre-angular
           --filter=@rozie-ui/number-field-react
           --filter=@rozie-ui/number-field-vue
           --filter=@rozie-ui/number-field-solid
@@ -1208,11 +1205,6 @@ jobs:
           --filter @rozie-ui/resizable-solid
           --filter @rozie-ui/slider-solid
           --filter @rozie-ui/switch-solid
-          --filter @rozie-ui/maplibre-react
-          --filter @rozie-ui/maplibre-vue
-          --filter @rozie-ui/maplibre-lit
-          --filter @rozie-ui/maplibre-svelte
-          --filter @rozie-ui/maplibre-angular
           --filter @rozie-ui/number-field-react
           --filter @rozie-ui/number-field-vue
           --filter @rozie-ui/number-field-lit
@@ -1760,12 +1752,7 @@ jobs:
       - name: Publish maplibre, number-field, resizable, slider and switch leaves (@rozie-ui/*)
         run: >
           pnpm
-          --filter=@rozie-ui/maplibre-react
-          --filter=@rozie-ui/maplibre-vue
           --filter=@rozie-ui/maplibre-solid
-          --filter=@rozie-ui/maplibre-lit
-          --filter=@rozie-ui/maplibre-svelte
-          --filter=@rozie-ui/maplibre-angular
           --filter=@rozie-ui/number-field-react
           --filter=@rozie-ui/number-field-vue
           --filter=@rozie-ui/number-field-solid

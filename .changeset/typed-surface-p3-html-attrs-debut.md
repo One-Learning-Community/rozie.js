@@ -1,6 +1,4 @@
 ---
-"@rozie-ui/maplibre-react": patch
-"@rozie-ui/maplibre-svelte": patch
 "@rozie-ui/number-field-react": patch
 "@rozie-ui/number-field-svelte": patch
 "@rozie-ui/resizable-react": patch

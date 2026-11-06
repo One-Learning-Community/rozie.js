@@ -1,5 +1,4 @@
 ---
-"@rozie-ui/maplibre-lit": patch
 "@rozie-ui/number-field-lit": patch
 "@rozie-ui/resizable-lit": patch
 "@rozie-ui/slider-lit": patch

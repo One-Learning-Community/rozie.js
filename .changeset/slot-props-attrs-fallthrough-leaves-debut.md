@@ -1,5 +1,4 @@
 ---
-"@rozie-ui/maplibre-react": patch
 "@rozie-ui/resizable-react": patch
 "@rozie-ui/slider-react": patch
 "@rozie-ui/switch-react": patch

@@ -1,5 +1,10 @@
 ---
 "@rozie-ui/lexical-lit": patch
+"@rozie-ui/maplibre-angular": patch
+"@rozie-ui/maplibre-lit": patch
+"@rozie-ui/maplibre-react": patch
+"@rozie-ui/maplibre-svelte": patch
+"@rozie-ui/maplibre-vue": patch
 ---
 
 Regenerated with the compiler fixes found while building `@rozie-ui/select`. Depending on the target and the component:

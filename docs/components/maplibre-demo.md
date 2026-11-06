@@ -40,7 +40,7 @@ const zoom = ref(4);
 
 # MapLibre — live demo
 
-This is the **real `@rozie-ui/maplibre-vue` package** running on this page (VitePress is itself a Vue app) — driving an actual WebGL [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) map. Pan it, scroll to zoom, or use the controls below — the `[lng, lat]` / zoom readout updates live because the camera is **two-way bound**. The same `MapLibre` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. The map uses a network-free offline style (a solid background + a colored GeoJSON polygon), so it needs **no tiles and no network**.
+This is the **real `@rozie-ui/maplibre-vue` package** running on this page (VitePress is itself a Vue app) — built from this repo's workspace, not npm: `@rozie-ui/maplibre-vue` has not published yet, only `@rozie-ui/maplibre-solid` has debuted so far — driving an actual WebGL [MapLibre GL JS](https://maplibre.org/maplibre-gl-js/docs/) map. Pan it, scroll to zoom, or use the controls below — the `[lng, lat]` / zoom readout updates live because the camera is **two-way bound**. The same `MapLibre` component, with the same API, ships for React, Vue, Svelte, Angular, Solid, and Lit. The map uses a network-free offline style (a solid background + a colored GeoJSON polygon), so it needs **no tiles and no network**.
 
 <ClientOnly>
 <div class="map-live">
