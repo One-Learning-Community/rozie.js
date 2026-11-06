@@ -595,6 +595,21 @@ for (const target of TARGETS) {
     await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
   });
 
+  // Cancelling an editor is not a write: no model change, no mismatch counted, rows unchanged.
+  runnerFor(target)(`data-table-held-view [${target}]: (p2-g) cancelled edit is not a write`, async ({ page }) => {
+    await gotoDemo(page, target);
+    await clickTestId(page, 'sort-title');
+    await expect.poll(async () => visibleIds(page), { timeout: 10_000 }).toEqual(['1', '2', '4', '5', '3', '6']);
+    await enterEditAt(page, 'grid-table', 0, TITLE_COL);
+    await page.locator('[data-editing-cell]').first().fill('Zzz');
+    await page.keyboard.press('Escape');
+    await expect.poll(async () => openEditor(page, 'grid-table'), { timeout: 5_000 }).toBeNull();
+    expect((await modelRows(page, 'model-readout'))[0]?.title).toBe('Alpha');
+    await expect.poll(async () => viewState(page), { timeout: 10_000 }).toEqual({ held: true, filterMismatches: 0, sortMismatches: 0 });
+    expect(await readoutText(page, 'canundo-readout')).toBe('false');
+    expect(await visibleIds(page)).toEqual(['1', '2', '4', '5', '3', '6']);
+  });
+
   runnerFor(target)(`data-table-held-view [${target}]: (p2-c) undo after refresh is counted, not shown`, async ({ page }) => {
     await gotoDemo(page, target);
     await holdEditedOwner(page);
