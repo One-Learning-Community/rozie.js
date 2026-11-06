@@ -40,7 +40,7 @@ jobs:
   # chain must never hide a downstream failure behind a skip.
   build:
     name: Build workspace (shared turbo cache producer)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -124,7 +124,7 @@ jobs:
           key: ${{ runner.os }}-turbo-react-${{ github.sha }}
 
   react-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     needs: build
     # 260825-hp3: `needs: build` is for ORDERING only. `!cancelled()` keeps
     # this job running even when the producer is red, so it falls back to a
@@ -275,7 +275,7 @@ jobs:
   # sibling job (not a matrix include) because it needs none of the
   # react-version-override steps.
   preact-compat:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     needs: build
     # 260825-hp3: `needs: build` is for ORDERING only. `!cancelled()` keeps
     # this job running even when the producer is red, so it falls back to a

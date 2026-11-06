@@ -44,7 +44,7 @@ jobs:
   # chain must never hide a downstream failure behind a skip.
   build:
     name: Build workspace (shared turbo cache producer)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -140,7 +140,7 @@ jobs:
           key: ${{ runner.os }}-turbo-angular-${{ github.sha }}
 
   angular-matrix:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     needs: build
     # 260825-hp3: `needs: build` is for ORDERING only. `!cancelled()` keeps
     # this job running even when the producer is red, so it falls back to a
@@ -337,7 +337,7 @@ jobs:
   integration-build:
     name: Angular AnalogJS integration (Phase 5 success criterion #3)
     needs: [angular-matrix]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # pinned: Playwright (host install) does not support ubuntu-26.04 yet
     timeout-minutes: 20
     strategy:
       fail-fast: false
