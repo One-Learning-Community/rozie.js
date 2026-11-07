@@ -157,7 +157,7 @@ describe('template @event .passive / .once on React', () => {
     expect(code).toMatch(/onClick/);
   });
 
-  for (const mod of ['capture', 'passive', 'once']) {
+  for (const mod of ['capture', 'passive']) {
     it(`.${mod} on a component event is an error (a component event is a callback prop, not a DOM listener)`, () => {
       const { diagnostics } = emit(
         `<Child @ping.${mod}="onClick" />`,

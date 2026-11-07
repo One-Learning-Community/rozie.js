@@ -11,3 +11,4 @@ export { RozieListen, ROZIE_LISTEN_SLOTS } from './rozie-listen.directive';
 export type { RozieListenEvent } from './rozie-listen.directive';
 export { RozieListenController } from './rozieListenController';
 export type { RozieListenOptions } from './rozieListenController';
+export { RozieOnce } from './rozie-once.directive';

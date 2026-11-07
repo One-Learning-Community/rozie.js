@@ -250,6 +250,12 @@ export interface EmitNodeCtx {
    */
   keynavItemIndexAlias?: string | null;
   /**
+   * The key expressions of the enclosing `r-for` loops, outermost first (the item alias when a
+   * loop has no `:key`). A component event's `.once` keys its fired state by these, so each
+   * rendered child fires once.
+   */
+  loopKeys?: string[];
+  /**
    * command-palette-portal-overlay phase — mutable out-flag flipped by
    * `emitElement` when it emits a `TemplateElementIR.portalTo` node. Reusing
    * the existing single tree-walk (rather than a second dedicated walker)
@@ -371,6 +377,7 @@ function emitLoop(node: TemplateLoopIR, ctx: EmitNodeCtx): string {
     ...ctx,
     pendingKey: keyCode,
     keynavItemIndexAlias: indexAlias,
+    loopKeys: [...(ctx.loopKeys ?? []), keyCode ?? node.itemAlias],
   };
   let bodyJsx: string;
   if (node.body.length === 1) {
@@ -766,6 +773,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
             collectors: ctx.collectors,
             injectionCounter: ctx.injectionCounter,
             isComponent: node.tagKind !== 'html',
+            loopKeys: ctx.loopKeys ?? [],
           });
           if (result.scriptInjection !== null) {
             ctx.scriptInjections.push(result.scriptInjection);
@@ -1114,6 +1122,7 @@ function emitElementListeners(
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
       isComponent: node.tagKind !== 'html',
+      loopKeys: ctx.loopKeys ?? [],
     });
     if (result.scriptInjection !== null) {
       ctx.scriptInjections.push(result.scriptInjection);
@@ -1303,6 +1312,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
       isComponent: node.tagKind !== 'html',
+      loopKeys: ctx.loopKeys ?? [],
     });
     if (result.scriptInjection !== null) {
       ctx.scriptInjections.push(result.scriptInjection);

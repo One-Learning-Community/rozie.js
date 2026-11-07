@@ -389,6 +389,9 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const nativeOptions: string[] = [];
   let scriptInjection: string | null = null;
   let handlerRef: string | null = null;
+  // `.once` on a component event: a callback prop has no listener options, so the prop becomes
+  // `/* @once */ rozieOnce(() => handler)`, made once per rendered child.
+  let componentOnce = false;
 
   for (const entry of listener.modifierPipeline) {
     let modifierName: string;
@@ -433,7 +436,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     if (desc.kind === 'native') {
       // capture/passive/once: a JSX event prop takes no options, so on a DOM element the
       // listener is attached in the element's ref (`rozieNativeListeners`). A component tag's
-      // event is a component event, not a DOM listener — no options to give it.
+      // event is a component event, not a DOM listener — no options to give it, except
+      // `.once`, which wraps the callback prop instead.
+      if (ctx.elementTag === undefined && desc.token === 'once') {
+        componentOnce = true;
+        continue;
+      }
       if (ctx.elementTag === undefined) {
         diagnostics.push({
           code: RozieErrorCode.TARGET_SOLID_RESERVED,
@@ -574,6 +582,13 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       scriptInjection,
       diagnostics,
     };
+  }
+
+  if (componentOnce) {
+    // `@once` keeps Solid's compiler from turning the prop into a getter, which would
+    // make a fresh wrapper (and lose the fired state) on every read of the prop.
+    ctx.collectors.runtime.add('rozieOnce');
+    handlerExpr = `/* @once */ rozieOnce(() => ${handlerExpr})`;
   }
 
   return {

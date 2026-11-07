@@ -4,7 +4,7 @@
  *
  * Root cause (pre-fix): EVERY inlineGuard-bearing handler (`.stop`, `.prevent`,
  * `.self`, key filters) was hoisted into a class-field arrow
- * `private _guardedN = ($event) => { <guard>; <handler>; }`. That arrow body runs
+ * `protected _guardedN = ($event) => { <guard>; <handler>; }`. That arrow body runs
  * in CLASS scope, so (a) a template `@for` loop variable (`header`) is undeclared
  * → `ReferenceError`, and (b) a non-colliding top-level user handler
  * (`const onPick = () => {}`) was referenced BARE (not `this.onPick`) because
@@ -101,7 +101,7 @@ const onBare = () => {};
 </script>
 </rozie>`);
     // Still hoisted (if/return is not a valid Angular template statement).
-    expect(r.code).toMatch(/private _guarded\w* = \(\$event: any\) => \{/);
+    expect(r.code).toMatch(/protected _guarded\w* = \(\$event: any\) => \{/);
     expect(r.code).toContain('if ($event.target !== $event.currentTarget) return;');
     // Top-level user fn correctly prefixed with `this.` inside the wrapper.
     expect(r.code).toContain('this.onBare()');

@@ -334,7 +334,7 @@ const onComplete = (payload) => { console.log(payload); };
     });
     expect(code).toMatch(/\(rangeComplete\)="_guarded\w*\(\$event\)"/);
     expect(code).not.toMatch(/\(range-complete\)=/);
-    expect(code).toMatch(/private _guarded\w* = \(\$event: any\) => \{/);
+    expect(code).toMatch(/protected _guarded\w* = \(\$event: any\) => \{/);
     expect(code).toContain('if ($event.target !== $event.currentTarget) return;');
     expect(code).toContain('this.onComplete($event)');
   });
@@ -351,7 +351,7 @@ const onComplete = (payload) => { console.log(payload); };
     });
     expect(code).toContain('(rangeComplete)="debouncedOnComplete($event)"');
     expect(code).not.toMatch(/\(range-complete\)=/);
-    expect(code).toContain('private debouncedOnComplete = (() => {');
+    expect(code).toContain('protected debouncedOnComplete = (() => {');
   });
 
   it("the modifier's own descriptor context still receives the AUTHORED (hyphenated) event name — resolution applies ONLY to the emitted binding string", () => {
@@ -506,7 +506,7 @@ const handlerB = () => {};
     expect(code).toContain('this.handlerB()');
     // The synthesized wrapper field name is a valid JS identifier — no
     // literal hyphen leaked into the class-field name.
-    const wrapperMatch = /private (_merged\w+) = \(\$event: any\) => \{/.exec(code);
+    const wrapperMatch = /protected (_merged\w+) = \(\$event: any\) => \{/.exec(code);
     expect(wrapperMatch).not.toBeNull();
     const wrapperName = wrapperMatch![1]!;
     expect(wrapperName).toMatch(/^[A-Za-z_$][\w$]*$/);

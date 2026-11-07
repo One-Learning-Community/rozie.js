@@ -682,6 +682,10 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
   if (tmplResult.usesRozieListen) {
     imports.addRuntime('RozieListen');
   }
+  // `.once` on a component event is gated by the RozieOnce directive.
+  if (tmplResult.usesRozieOnce) {
+    imports.addRuntime('RozieOnce');
+  }
   if (tmplResult.usesNgStyle) {
     imports.addCommon('NgStyle');
   }
@@ -768,6 +772,7 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
     usesNgClass: tmplResult.usesNgClass,
     usesNgStyle: tmplResult.usesNgStyle,
     usesRozieListen: tmplResult.usesRozieListen,
+    usesRozieOnce: tmplResult.usesRozieOnce,
     componentDecls: components,
     selfReferenced,
     // Phase 23 — gate providers: NG_VALUE_ACCESSOR + host: (focusout) on the

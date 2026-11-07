@@ -56,6 +56,8 @@ export interface EmitEventCtx {
   addEventListener?: boolean;
   /** The listener is on a component tag: its event is a callback prop, not a DOM listener. */
   isComponent?: boolean;
+  /** Key expressions of the enclosing `r-for` loops (see `EmitNodeCtx.loopKeys`). */
+  loopKeys?: string[];
 }
 
 export interface EmitTemplateEventResult {
@@ -336,6 +338,9 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   let scriptInjection: string | null = null;
   let handlerRef: string | null = null; // If a wrap is created, JSX uses this name
   const listenerOptions: string[] = [];
+  // `.once` on a component event: a callback prop has no listener options, so the prop is
+  // wrapped with a hoisted `useRozieOnce()` keyed by the enclosing loop keys.
+  let componentOnce = false;
 
   for (const entry of listener.modifierPipeline) {
     let modifierName: string;
@@ -372,9 +377,11 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (desc.kind === 'native') {
-      if (ctx.isComponent) {
+      if (ctx.isComponent && desc.token === 'once') {
+        componentOnce = true;
+      } else if (ctx.isComponent) {
         // A Rozie component event is a callback prop, not a DOM listener, so it has
-        // no capture phase or listener options. `onPingCapture` would never be called.
+        // no capture phase or passive mode. `onPingCapture` would never be called.
         diagnostics.push({
           code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
           severity: 'error',
@@ -506,6 +513,14 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       handlerInvocation = renderHandler(listener.handler, ctx.ir);
     }
     handlerExpr = `($event) => { ${guardLines} ${handlerInvocation}; }`;
+  }
+
+  if (componentOnce) {
+    ctx.collectors.runtime.add('useRozieOnce');
+    const onceName = `_rozieOnce${ctx.injectionCounter.next++}`;
+    const decl = `const ${onceName} = useRozieOnce();`;
+    scriptInjection = scriptInjection === null ? decl : `${scriptInjection}\n${decl}`;
+    handlerExpr = `${onceName}([${(ctx.loopKeys ?? []).join(', ')}], ${handlerExpr})`;
   }
 
   return {

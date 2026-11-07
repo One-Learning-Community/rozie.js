@@ -32,7 +32,7 @@ export class ComputedInDebounceLift {
     this.__rozieApplyAttrs(el, this.__rozieGetHostAttrs());
   });
 
-  private debouncedHandler1_1 = (() => {
+  protected debouncedHandler1_1 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);

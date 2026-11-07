@@ -155,6 +155,8 @@ export interface EmitTemplateResult {
    * decorator `imports: [...]`. Same emitted-template scan as `usesNgClass`.
    */
   usesRozieListen: boolean;
+  /** `.once` on a component event put the `RozieOnce` directive on a tag (`rozieOnce #ref`). */
+  usesRozieOnce: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -270,6 +272,7 @@ export function emitTemplate(
       usesNgStyle: false,
       usesMergeStyle: false,
       usesRozieListen: false,
+      usesRozieOnce: false,
       diagnostics,
     };
   }
@@ -310,6 +313,7 @@ export function emitTemplate(
     ...detectNgDirectives(template),
     usesMergeStyle: detectMergeStyleUsage(template),
     usesRozieListen: /\(rozieOn\d+Fire\)="/.test(template),
+    usesRozieOnce: /\brozieOnce #__rozieOnce\d+="rozieOnce"/.test(template),
     diagnostics,
   };
 }

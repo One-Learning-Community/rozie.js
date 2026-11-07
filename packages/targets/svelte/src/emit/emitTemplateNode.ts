@@ -448,6 +448,7 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
         isComponent,
       });
       out.push(result.eventAttr);
+      if (result.componentOnce) ctx.runtimeImports.add('rozieOnce');
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
       for (const d of result.diagnostics) ctx.diagnostics.push(d);
       continue;
@@ -456,6 +457,9 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
     // Multiple listeners — merge into a single arrow. We synthesize each
     // handler's body inline (inlineGuards + invocation) inside an IIFE block.
     const handlerBodies: string[] = [];
+    // `.once` wrappers are lifted out of the merged arrow (created once, passed in); built
+    // inside it they would be re-made, and re-armed, on every event.
+    const onceWrappers: string[] = [];
     for (const ev of group) {
       const result = emitTemplateEvent(ev, {
         ir: ctx.ir,
@@ -465,6 +469,13 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
       });
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
       for (const d of result.diagnostics) ctx.diagnostics.push(d);
+      if (result.componentOnce) {
+        ctx.runtimeImports.add('rozieOnce');
+        const param = `__rozieOnce${onceWrappers.length}`;
+        onceWrappers.push(result.handlerValue);
+        handlerBodies.push(`${param}($event);`);
+        continue;
+      }
       // Extract the inner arrow body. emitTemplateEvent always returns either
       //   `onevent={handler}` (bare identifier) — we wrap as `handler($event);`
       //   `onevent={($event) => { ...body... }}` — we lift the `...body...` out.
@@ -491,8 +502,16 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
 
     // `eventName` is the grouping key = the final Svelte attr name (already
     // `on...` and hyphen-stripped for components via svelteEventAttrName).
-    const merged = `${eventName}={($event) => { ${handlerBodies.join(' ')} }}`;
-    out.push(merged);
+    const dispatcher = `($event) => { ${handlerBodies.join(' ')} }`;
+    if (onceWrappers.length === 0) {
+      out.push(`${eventName}={${dispatcher}}`);
+    } else {
+      // A call expression, so Svelte memoizes it per instance like a single `.once` prop.
+      const params = onceWrappers
+        .map((_, i) => `__rozieOnce${i}: (...a: any[]) => unknown`)
+        .join(', ');
+      out.push(`${eventName}={((${params}) => ${dispatcher})(${onceWrappers.join(', ')})}`);
+    }
   }
 
   if (actionAttr) out.push(actionAttr);

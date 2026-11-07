@@ -74,6 +74,8 @@ export interface EmitDecoratorOpts {
   usesNgStyle?: boolean;
   /** Template uses a `RozieListen` slot — drives `RozieListen` in `imports: [...]`. */
   usesRozieListen?: boolean;
+  /** Template uses the `RozieOnce` directive — drives `RozieOnce` in `imports: [...]`. */
+  usesRozieOnce?: boolean;
   /**
    * Phase 06.2 P2 (D-115/D-118): IR components table — non-self entries
    * are appended to `imports: [...]` as bare class names (e.g., `CardHeader`).
@@ -159,6 +161,7 @@ function buildDecoratorImportsList(opts: {
   usesNgClass?: boolean;
   usesNgStyle?: boolean;
   usesRozieListen?: boolean;
+  usesRozieOnce?: boolean;
   componentDecls: readonly ComponentDecl[];
   selfReferenced: boolean;
   componentName: string;
@@ -182,6 +185,7 @@ function buildDecoratorImportsList(opts: {
   if (opts.usesNgClass) items.push('NgClass');
   if (opts.usesNgStyle) items.push('NgStyle');
   if (opts.usesRozieListen) items.push('RozieListen');
+  if (opts.usesRozieOnce) items.push('RozieOnce');
   if (opts.hasNgModel) items.push('FormsModule');
   for (const decl of opts.componentDecls) {
     if (decl.localName === opts.componentName) continue; // self handled below
@@ -238,6 +242,7 @@ export function emitDecorator(
     usesNgClass: opts.usesNgClass ?? false,
     usesNgStyle: opts.usesNgStyle ?? false,
     usesRozieListen: opts.usesRozieListen ?? false,
+    usesRozieOnce: opts.usesRozieOnce ?? false,
     componentDecls: opts.componentDecls ?? [],
     selfReferenced: opts.selfReferenced ?? false,
     componentName: opts.componentName,

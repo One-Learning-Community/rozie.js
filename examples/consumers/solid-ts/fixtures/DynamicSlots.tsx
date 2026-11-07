@@ -12,7 +12,7 @@ interface DynamicSlotsProps extends Omit<import('solid-js').ComponentProps<'div'
 
 export default function DynamicSlots(_props: DynamicSlotsProps): JSX.Element {
   const _merged = mergeProps({ row: (() => ({}))() as Record<string, any>, total: 0, cellKey: 'status', freeSlotName: 'freeform' }, _props);
-  const [local, attrs] = splitProps(_merged, ['row', 'total', 'cellKey', 'freeSlotName']);
+  const [local, attrs] = splitProps(_merged, ['row', 'total', 'cellKey', 'freeSlotName', 'slots']);
 
   return (
     <>

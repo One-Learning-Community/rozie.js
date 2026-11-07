@@ -20,8 +20,8 @@ export default class DynamicSlots extends SignalWatcher(LitElement) {
 
   @property({ type: Object }) row: any = {};
   @property({ type: Number, reflect: true }) total: number = 0;
-  @property({ type: String, reflect: true }) cellKey: string = 'status';
-  @property({ type: String, reflect: true }) freeSlotName: string = 'freeform';
+  @property({ type: String, reflect: true, attribute: 'cell-key' }) cellKey: string = 'status';
+  @property({ type: String, reflect: true, attribute: 'free-slot-name' }) freeSlotName: string = 'freeform';
 
   @state() private _hasSlotCellTotal = false;
   @queryAssignedElements({ slot: 'cell-total', flatten: true }) private _slotCellTotalElements!: Element[];

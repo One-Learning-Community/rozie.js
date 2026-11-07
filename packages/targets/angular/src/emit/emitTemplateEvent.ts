@@ -96,6 +96,12 @@ export interface EmitEventCtx {
    * rejected with ROZ722. Set by `emitEvents` for plain DOM elements only.
    */
   allowNativeOptions?: boolean | undefined;
+  /**
+   * `.once` on a component event (an Angular output, so no listener option). The tag carries
+   * `rozieOnce #<ref>="rozieOnce"`, and the binding is gated by `<ref>.take(<id>)`: one directive
+   * instance per rendered element, one id per `.once` listener on it. Set by `emitEvents`.
+   */
+  componentOnce?: { ref: string; id: number } | undefined;
 }
 
 /**
@@ -161,12 +167,14 @@ function makeWrapName(
 
 /**
  * Inline IIFE for a debounce wrapper as a class-body field initializer.
- * Used as `private debouncedFoo = (() => { ... })();` per OQ A8/A9 RESOLVED
+ * Used as `protected debouncedFoo = (() => { ... })();` per OQ A8/A9 RESOLVED
+ * (`protected`, not `private`: the template calls it, and strict template type-checking
+ * rejects a private member there, TS2341)
  * (no @rozie/runtime-angular).
  */
 function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): string {
   return [
-    `private ${wrapName} = (() => {`,
+    `protected ${wrapName} = (() => {`,
     `  let timer: ReturnType<typeof setTimeout> | null = null;`,
     `  return (...args: any[]) => {`,
     `    if (timer !== null) clearTimeout(timer);`,
@@ -178,7 +186,7 @@ function buildDebounceIIFE(wrapName: string, origCode: string, ms: string): stri
 
 function buildThrottleIIFE(wrapName: string, origCode: string, ms: string): string {
   return [
-    `private ${wrapName} = (() => {`,
+    `protected ${wrapName} = (() => {`,
     `  let lastCall = 0;`,
     `  return (...args: any[]) => {`,
     `    const now = Date.now();`,
@@ -390,6 +398,8 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (descriptor.kind === 'native') {
+      // Component tag `.once`: gated by the RozieOnce directive below.
+      if (descriptor.token === 'once' && ctx.componentOnce !== undefined) continue;
       // Plain DOM element: collect the flag; the caller attaches the listener
       // through the RozieListen directive with these options.
       if (ctx.allowNativeOptions === true) {
@@ -498,6 +508,9 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   // Compose the handler attribute. Angular event-binding syntax:
   //   (eventName)="handler($event)" or (eventName)="<expr>"
   let attrValue: string;
+  // `.once` on a component event: run the handler only while the tag's RozieOnce allows it.
+  const once = ctx.componentOnce;
+  const gate = (expr: string): string => (once === undefined ? expr : `${once.ref}.take(${once.id}) && ${expr}`);
   if (inlineGuards.length === 0 && handlerKind === 'identifier') {
     // Short form: `(click)="handler($event)"`.
     // Quick task 260520-w18 bug class 6(i) — when the bound handler is a
@@ -510,13 +523,13 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     // kept (the IIFE wrapper takes `...args`).
     const originalName = t.isIdentifier(listener.handler) ? listener.handler.name : undefined;
     const arity = originalName !== undefined ? ctx.handlerArity?.get(originalName) : undefined;
-    attrValue = arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`;
+    attrValue = gate(arity === 0 ? `${handlerRef}()` : `${handlerRef}($event)`);
   } else if (inlineGuards.length === 0 && handlerKind === 'statement') {
     // Statement-form handler — splice as-is (e.g., `closeOnBackdrop && close()`).
-    attrValue = handlerRef;
+    attrValue = ctx.componentOnce !== undefined ? gate(`(${handlerRef})`) : handlerRef;
   } else if (inlineGuards.length === 0 && handlerKind === 'callable') {
     // Callable but not bare identifier — invoke with $event.
-    attrValue = `(${handlerRef})($event)`;
+    attrValue = gate(`(${handlerRef})($event)`);
   } else if (inlineGuards.every((g) => classifyGuard(g) === 'sideEffect')) {
     // angular-stop-handler-in-loop — ALL guards are plain side-effect
     // statements (`.stop` → `$event.stopPropagation();`, `.prevent` →
@@ -545,7 +558,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       // statement — splice the template-scope expression as-is.
       invocation = handlerRef;
     }
-    attrValue = `${guardChain} ${invocation}`;
+    attrValue = `${guardChain} ${ctx.componentOnce !== undefined && handlerKind === 'statement' ? gate(`(${invocation})`) : gate(invocation)}`;
   } else {
     // At least one early-return guard (`.self` / a key/button filter →
     // `if (C) return;`). Angular template-statement grammar has no `if`/`return`
@@ -614,13 +627,13 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       innerInvocation = thisPrefixed;
     }
     const decl = [
-      `private ${wrapperName} = ($event: any) => {`,
+      `protected ${wrapperName} = ($event: any) => {`,
       guardLines,
       `  ${innerInvocation};`,
       `};`,
     ].join('\n');
     scriptInjection = { name: wrapperName, decl };
-    attrValue = `${wrapperName}($event)`;
+    attrValue = gate(`${wrapperName}($event)`);
   }
 
   // Quick task 260811-r2m (D-01), resolution superseded by 260811-trz (D-05)

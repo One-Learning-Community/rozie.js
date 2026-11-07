@@ -1,0 +1,24 @@
+<!--
+  EventOptionsPing.rozie — child for EventOptionsDemo's component-event cases: a button
+  that emits `ping` with its label on every click. The parent listens with `.once`.
+-->
+
+<rozie name="EventOptionsPing">
+
+<props>
+{
+  label: { type: String, default: '' },
+}
+</props>
+
+<emits>
+{
+  ping: { payload: 'string' },
+}
+</emits>
+
+<template>
+<button type="button" :data-testid="$props.label" @click="$emit('ping', $props.label)">{{ $props.label }}</button>
+</template>
+
+</rozie>

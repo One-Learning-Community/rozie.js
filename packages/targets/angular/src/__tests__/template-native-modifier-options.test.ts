@@ -89,7 +89,7 @@ describe('Angular template @event .capture/.passive/.once', () => {
     expect(errors(diagnostics)).toEqual([]);
     expect(code).toMatch(/\(rozieOn0Fire\)="debouncedOnKey(_\d+)?\(\$event\)"/);
     expect(code).toContain(`[rozieOn0]="'input'" [rozieOn0Options]="{ passive: true }"`);
-    expect(code).toMatch(/private debouncedOnKey(_\d+)? = \(\(\) => \{/);
+    expect(code).toMatch(/protected debouncedOnKey(_\d+)? = \(\(\) => \{/);
   });
 
   it('inside r-for: loop variables and $event stay in template scope', () => {
@@ -127,14 +127,14 @@ describe('Angular template @event .capture/.passive/.once', () => {
     expect(code).toContain('(rozieOn0Fire)="onKey($event)"');
   });
 
-  it('component tag: @event.once keeps the pre-existing ROZ722 (an Angular output has no listener options)', () => {
+  it('component tag: @event.capture keeps the pre-existing ROZ722 (an Angular output has no listener options)', () => {
     const src = `<rozie name="X">
 <components>{ Child: "./Child.rozie" }</components>
 <script>
 const onKey = (e) => {}
 </script>
 <template>
-<Child @change.once="onKey" />
+<Child @change.capture="onKey" />
 </template>
 </rozie>`;
     const { code, diagnostics } = compile(src);

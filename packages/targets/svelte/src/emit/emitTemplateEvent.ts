@@ -102,6 +102,8 @@ export interface EmitTemplateEventResult {
   nativeOptions?: NativeListenerOptions;
   /** Optional script-level injection (debounce/throttle wrap). */
   scriptInjection?: SvelteScriptInjection;
+  /** `.once` on a component event: the value is `rozieOnce(() => …)` (needs the runtime import). */
+  componentOnce?: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -243,6 +245,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
 
   const inlineGuards: string[] = [];
   let nativeOptions: NativeListenerOptions | undefined;
+  let componentOnce = false;
   let scriptInjection: SvelteScriptInjection | undefined;
   // Classify the original handler shape BEFORE rewriting (so structural
   // information from the Babel AST is available) — wrap-name substitution
@@ -286,7 +289,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       // options. On a DOM element the option is collected and the caller
       // attaches the listener through the `rozieListeners` action instead.
       // On a component tag the event is a callback prop — there is no DOM
-      // listener to pass options to, so the token stays rejected there.
+      // listener to pass options to, so the token stays rejected there —
+      // except `.once`, which wraps the callback prop in `rozieOnce` instead.
+      if (ctx.isComponent === true && descriptor.token === 'once') {
+        componentOnce = true;
+        continue;
+      }
       if (ctx.isComponent === true) {
         diagnostics.push({
           code: RozieErrorCode.TARGET_SVELTE_RESERVED, // ROZ621
@@ -400,9 +408,16 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     attrValue = `($event) => { ${guardPrefix}${body}; }`;
   }
 
+  if (componentOnce) {
+    // Svelte memoizes a call-expression prop per component instance, and the thunk keeps
+    // reactive reads out of that memo, so the wrapper is made once per rendered child.
+    attrValue = `rozieOnce(() => ${attrValue})`;
+  }
+
   const eventAttr = `${attrName}={${attrValue}}`;
 
   const result: EmitTemplateEventResult = { eventAttr, handlerValue: attrValue, diagnostics };
+  if (componentOnce) result.componentOnce = true;
   if (nativeOptions) result.nativeOptions = nativeOptions;
   if (scriptInjection) {
     result.scriptInjection = scriptInjection;

@@ -6,10 +6,18 @@
   - `.capture.stop` on a wrapper stops the event before it reaches the inner button;
   - `.once` fires a single time, even after the component re-renders;
   - `.capture.once` on `r-for` items fires once per item;
-  - `.passive` makes `preventDefault()` a no-op (compared with a plain listener).
+  - `.passive` makes `preventDefault()` a no-op (compared with a plain listener);
+  - `.once` on a COMPONENT event (a callback prop / output, not a DOM listener) fires once,
+    alongside a plain listener for the same event, and once per child inside `r-for`.
 -->
 
 <rozie name="EventOptionsDemo">
+
+<components>
+{
+  EventOptionsPing: './EventOptionsPing.rozie',
+}
+</components>
 
 <data>
 {
@@ -20,6 +28,10 @@
   items: ['a', 'b', 'c'],
   passiveResult: '',
   activeResult: '',
+  compOnce: 0,
+  compPlain: 0,
+  compMergedOnce: 0,
+  compHitLog: [],
 }
 </data>
 
@@ -47,6 +59,22 @@ const hit = (item: string): void => {
 const tryPassive = (e: Event): void => {
   e.preventDefault()
   $data.passiveResult = String(e.defaultPrevented)
+}
+
+const countCompOnce = (): void => {
+  $data.compOnce = $data.compOnce + 1
+}
+
+const countCompPlain = (): void => {
+  $data.compPlain = $data.compPlain + 1
+}
+
+const countCompMergedOnce = (): void => {
+  $data.compMergedOnce = $data.compMergedOnce + 1
+}
+
+const compHit = (label: string): void => {
+  $data.compHitLog = [...$data.compHitLog, label]
 }
 
 const tryActive = (e: Event): void => {
@@ -84,6 +112,16 @@ const tryActive = (e: Event): void => {
     <div class="box" data-testid="active" @wheel="tryActive($event)">active</div>
     <span data-testid="passive-result">{{ $data.passiveResult }}</span>
     <span data-testid="active-result">{{ $data.activeResult }}</span>
+  </section>
+
+  <section>
+    <EventOptionsPing label="comp-once" @ping.once="countCompOnce" />
+    <span data-testid="comp-once-count">{{ $data.compOnce }}</span>
+    <EventOptionsPing label="comp-merged" @ping="countCompPlain" @ping.once="countCompMergedOnce" />
+    <span data-testid="comp-plain-count">{{ $data.compPlain }}</span>
+    <span data-testid="comp-merged-once-count">{{ $data.compMergedOnce }}</span>
+    <EventOptionsPing r-for="item in $data.items" :key="item" :label="'comp-' + item" @ping.once="compHit($event)" />
+    <span data-testid="comp-hit-log">{{ $data.compHitLog.join(',') }}</span>
   </section>
 </div>
 </template>

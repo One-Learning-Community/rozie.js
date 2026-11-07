@@ -187,7 +187,7 @@ export class Modal {
     return true;
   }
 
-  private _guardedHandler0 = ($event: any) => {
+  protected _guardedHandler0 = ($event: any) => {
     if ($event.target !== $event.currentTarget) return;
     this.closeOnBackdrop() && this._close();
   };

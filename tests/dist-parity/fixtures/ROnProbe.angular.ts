@@ -37,7 +37,7 @@ export class ROnProbe {
 
   private __rozieDestroyRef = inject(DestroyRef);
 
-  private debouncedOnInput = (() => {
+  protected debouncedOnInput = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -75,7 +75,7 @@ export class ROnProbe {
     }
   });
 
-  private _merged_click_2 = ($event: any) => {
+  protected _merged_click_2 = ($event: any) => {
     this.f1()($event);
     this.f2()($event);
   };

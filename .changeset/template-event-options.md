@@ -15,4 +15,6 @@ Where a target's template syntax can't carry the option, the listener is attache
 - Angular: a `RozieListen` directive (new in `@rozie/runtime-angular`), added to the component's `imports` only when used.
 - Solid: `rozieNativeListeners` (new in `@rozie/runtime-solid`) called from the element's ref, so it works on solid-js 1.8.
 
-On a component tag these modifiers are a compile error on React, Svelte, Angular and Solid, since a component event is a callback, not a DOM listener. (React used to emit an `on<Event>Capture` prop that was never called.)
+`.once` on a child component's event (`<Child @ping.once="...">`) now works on every target too, where React, Svelte, Angular and Solid used to reject it. Each rendered child gets its own once, including each child in an `r-for`: React uses a `useRozieOnce` hook keyed by the loop keys, Svelte and Solid a `rozieOnce` wrapper made once per child, and Angular a `RozieOnce` directive on the tag. `.capture` and `.passive` stay a compile error on a component event, since a component event is a callback, not a DOM listener. (React used to emit an `on<Event>Capture` prop that was never called.)
+
+Angular: the class members that template event bindings call (the wrappers for key and other guards, `.debounce`, `.throttle`, and several listeners merged onto one event) are now `protected` instead of `private`. Strict template type-checking, which the Angular CLI enables by default, rejected the `private` ones with TS2341, so an app compiling `.rozie` source with strict templates failed to build.

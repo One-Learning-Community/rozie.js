@@ -1,7 +1,7 @@
-import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, model, signal, untracked, viewChild } from '@angular/core';
+import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieModel } from '@rozie/runtime-angular';
 
 interface TriggerCtx {
   $implicit: { open: any; toggle: any };
@@ -58,7 +58,9 @@ interface DefaultCtx {
   host: { '(focusout)': '__rozieCvaOnTouched()' },
 })
 export class Dropdown {
-  open = model<boolean>(false);
+  readonly __rozieModelIn_open = input<boolean | undefined>(undefined, { alias: 'open' });
+  openChange = output<boolean>();
+  open = rozieModel<boolean, import('@angular/core').ModelSignal<boolean>>(this.__rozieModelIn_open, this.openChange, false, { signal, computed, untracked });
   closeOnOutsideClick = input<boolean>(true);
   closeOnEscape = input<boolean>(true);
   triggerEl = viewChild<ElementRef<HTMLDivElement>>('triggerEl');
@@ -84,13 +86,15 @@ export class Dropdown {
 
       effect((onCleanup) => {
         if (!(this.open() && this.closeOnOutsideClick())) return;
+        const listenTarget = typeof document === 'undefined' ? null : document;
+        if (!listenTarget) return;
         const handler = ($event: MouseEvent) => {
           const target = $event.target as Node;
           if (this.triggerEl()?.nativeElement?.contains(target) || this.panelEl()?.nativeElement?.contains(target)) return;
           ((this.close) as (...args: any[]) => any)($event);
         };
-        const unlisten = renderer.listen('document', 'click', handler);
-        onCleanup(unlisten);
+        listenTarget.addEventListener('click', handler as EventListener, true);
+        onCleanup(() => listenTarget.removeEventListener('click', handler as EventListener, true));
       });
 
       effect((onCleanup) => {

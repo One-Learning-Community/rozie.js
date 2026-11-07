@@ -98,7 +98,7 @@ export class Spike012R5C3 {
     }
   });
 
-  private debouncedHandler2_2 = (() => {
+  protected debouncedHandler2_2 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);

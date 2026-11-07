@@ -486,6 +486,21 @@ function emitEvents(
   }
   events = plainEvents;
 
+  // `.once` on a component event (an Angular output, so no listener option): one RozieOnce
+  // directive on the tag, exposed as a template ref, gates each `.once` listener by its id.
+  const onceIds = new Map<Listener, number>();
+  if (tagKind !== 'html') {
+    for (const ev of events) {
+      if (ev.modifierPipeline.some((e) => e.kind === 'listenerOption' && e.option === 'once')) {
+        onceIds.set(ev, onceIds.size);
+      }
+    }
+  }
+  const onceRef = onceIds.size > 0 ? `__rozieOnce${ctx.injectionCounter.next++}` : null;
+  if (onceRef !== null) out.push(`rozieOnce #${onceRef}="rozieOnce"`);
+  const componentOnceFor = (ev: Listener) =>
+    onceRef !== null && onceIds.has(ev) ? { ref: onceRef, id: onceIds.get(ev)! } : undefined;
+
   // Group by the LOWERED bound event-BINDING name (quick task 260811-r2m /
   // D-01, resolution superseded by 260811-trz / D-05 — the grouping key must
   // be derived from the SAME name the emitted binding will use, not the raw
@@ -523,6 +538,7 @@ function emitEvents(
         nonNullReads: ctx.nonNullReads,
         elementTagKind: tagKind,
         producerEmits,
+        componentOnce: componentOnceFor(group[0]!),
       });
       out.push(result.eventAttr);
       if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
@@ -555,6 +571,7 @@ function emitEvents(
         nonNullReads: ctx.nonNullReads,
         elementTagKind: tagKind,
         producerEmits,
+        componentOnce: componentOnceFor(ev),
       });
       if (sub.scriptInjection) ctx.scriptInjections.push(sub.scriptInjection);
       for (const d of sub.diagnostics) ctx.diagnostics.push(d);
@@ -606,10 +623,17 @@ function emitEvents(
       guardLines.push(`  ${inner};`);
     }
 
-    const decl = [`private ${wrapperName} = ($event: any) => {`, ...guardLines, `};`].join('\n');
+    // `protected`: the template calls it (strict template type-checking rejects a private
+    // member, TS2341). A `.once` listener's gate reads the tag's RozieOnce template ref, which
+    // is not in class scope, so the ref is passed in under its own name.
+    const mergedOnce = group.some((ev) => onceIds.has(ev)) ? onceRef : null;
+    const params = mergedOnce !== null ? `$event: any, ${mergedOnce}: RozieOnce` : '$event: any';
+    const decl = [`protected ${wrapperName} = (${params}) => {`, ...guardLines, `};`].join('\n');
     ctx.scriptInjections.push({ name: wrapperName, decl });
 
-    out.push(`(${eventName})="${wrapperName}($event)"`);
+    out.push(
+      `(${eventName})="${wrapperName}($event${mergedOnce !== null ? `, ${mergedOnce}` : ''})"`,
+    );
   }
 
   return out.join(' ');

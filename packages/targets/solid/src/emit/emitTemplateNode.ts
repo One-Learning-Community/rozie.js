@@ -868,16 +868,12 @@ function emitElementEvents(
       continue;
     }
     // Multi-listener merge: build a dispatcher arrow.
-    const branches = items.map((it) => {
-      const body = it.body;
-      if (/^[A-Za-z_$][\w$]*$/.test(body)) {
-        return `${body}($event);`;
-      }
-      return `(${body})($event);`;
-    });
     // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
     // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
-    const dispatcher = `(${solidEventParam(name, node.tagKind === 'html' ? node.tagName : undefined)}) => { ${branches.join(' ')} }`;
+    const dispatcher = buildDispatcher(
+      solidEventParam(name, node.tagKind === 'html' ? node.tagName : undefined),
+      items.map((it) => it.body),
+    );
     out.push(`${name}={${dispatcher}}`);
   }
   return out.join(' ');
@@ -933,6 +929,32 @@ function parseNamedProps(attrStr: string): { named: Map<string, string>; rest: s
   return { named, rest };
 }
 
+/** A component event's `.once` prop value: `/* @once *\/ rozieOnce(...)` (see emitTemplateEvent). */
+const ONCE_PROP_VALUE = /^\/\* @once \*\/ (rozieOnce\([\s\S]*\))$/;
+
+/**
+ * One arrow that calls each handler body with the event, for listeners merged onto one prop.
+ * A `.once` wrapper is lifted out and passed in, so it is made once per rendered element; made
+ * inside the arrow it would be re-created, and re-armed, on every event.
+ */
+function buildDispatcher(param: string, bodies: readonly string[]): string {
+  const onceWrappers: string[] = [];
+  const calls = bodies.map((body) => {
+    const once = body.match(ONCE_PROP_VALUE);
+    if (once) {
+      onceWrappers.push(once[1]!);
+      return `__rozieOnce${onceWrappers.length - 1}($event);`;
+    }
+    // If body is already a bare identifier, call it; otherwise invoke the expression.
+    if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}($event);`;
+    return `(${body})($event);`;
+  });
+  const arrow = `(${param}) => { ${calls.join(' ')} }`;
+  if (onceWrappers.length === 0) return arrow;
+  const params = onceWrappers.map((_, i) => `__rozieOnce${i}: (...a: any[]) => unknown`).join(', ');
+  return `/* @once */ ((${params}) => ${arrow})(${onceWrappers.join(', ')})`;
+}
+
 /**
  * Merge duplicate event-prop strings between the static-attrs output and the
  * events-handler output.  When r-model and @event.modifier both generate
@@ -958,15 +980,10 @@ function mergeEventAttributes(attrsJsx: string, eventsJsx: string, elementTag?: 
     const eventsBody = eventsNamed.get(name);
     if (eventsBody !== undefined) {
       // Merge: build a dispatcher that calls both handlers with `e`.
-      const wrap = (body: string) => {
-        // If body is already a bare identifier, call it; otherwise invoke the expression.
-        if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}($event);`;
-        return `(${body})($event);`;
-      };
       // Spike-012 NEW-3 — typed dispatcher param (strict-consumer TS7006); the
       // event's specific DOM interface (`name` is the JSX prop, e.g. onKeyDown).
       merged.push(
-        `${name}={(${solidEventParam(name, elementTag)}) => { ${wrap(attrsBody)} ${wrap(eventsBody)} }}`,
+        `${name}={${buildDispatcher(solidEventParam(name, elementTag), [attrsBody, eventsBody])}}`,
       );
       eventsNamed.delete(name);
     } else {

@@ -16,6 +16,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   E3 — `.once` fires a single time, including after the component re-renders.
  *   E4 — `.capture.once` on `r-for` items fires once per item.
  *   E5 — `.passive` makes `preventDefault()` a no-op; a plain listener can still cancel.
+ *   E6 — `.once` on a COMPONENT event fires once, even after the parent re-renders.
+ *   E7 — a plain and a `.once` listener for the same component event: plain every time, once once.
+ *   E8 — `.once` on a component event inside `r-for` fires once per child.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -74,5 +77,33 @@ for (const target of TARGETS) {
     await expect(mount.getByTestId('active-result')).toHaveText('true');
     await mount.getByTestId('passive').dispatchEvent('wheel', { cancelable: true, bubbles: true });
     await expect(mount.getByTestId('passive-result')).toHaveText('false');
+  });
+
+  runnerFor(target)(`event-options [${target}]: E6 .once on a component event fires once, even after a re-render`, async ({ page }) => {
+    const mount = await gotoDemo(page, target);
+    await mount.getByTestId('comp-once').click();
+    await expect(mount.getByTestId('comp-once-count')).toHaveText('1');
+    await mount.getByTestId('comp-once').click();
+    await mount.getByTestId('rerender').click();
+    await expect(mount.getByTestId('renders')).toHaveText('1');
+    await mount.getByTestId('comp-once').click();
+    await mount.getByTestId('rerender').click();
+    await expect(mount.getByTestId('renders')).toHaveText('2');
+    await expect(mount.getByTestId('comp-once-count')).toHaveText('1');
+  });
+
+  runnerFor(target)(`event-options [${target}]: E7 plain and .once listeners for one component event`, async ({ page }) => {
+    const mount = await gotoDemo(page, target);
+    for (let i = 0; i < 3; i++) await mount.getByTestId('comp-merged').click();
+    await expect(mount.getByTestId('comp-plain-count')).toHaveText('3');
+    await expect(mount.getByTestId('comp-merged-once-count')).toHaveText('1');
+  });
+
+  runnerFor(target)(`event-options [${target}]: E8 .once on a component event in r-for fires once per child`, async ({ page }) => {
+    const mount = await gotoDemo(page, target);
+    for (const id of ['comp-a', 'comp-a', 'comp-b', 'comp-b', 'comp-a']) {
+      await mount.getByTestId(id).click();
+    }
+    await expect(mount.getByTestId('comp-hit-log')).toHaveText('comp-a,comp-b');
   });
 }

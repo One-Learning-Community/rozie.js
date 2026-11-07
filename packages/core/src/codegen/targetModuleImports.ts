@@ -102,6 +102,8 @@ export const REACT_RUNTIME_IMPORTS = [
   // Native DOM listeners attached through the element's ref — `@change` on an
   // `<input>` / `<textarea>`, where JSX `onChange` is a per-keystroke event.
   'rozieNativeListeners',
+  // `.once` on a component event (a callback prop, so no listener option).
+  'useRozieOnce',
   'isEnter',
   'isEscape',
   'isTab',
@@ -172,6 +174,8 @@ export const SOLID_RUNTIME_IMPORTS = [
   // byte-identical to pre-phase (SPEC-3).
   'rozieDisplay',
   'rozieNativeListeners',
+  // `.once` on a component event (a callback prop, so no listener option).
+  'rozieOnce',
   // 260608-sya — attribute-position display helper (nullish DROPS the
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
@@ -288,6 +292,7 @@ export const SVELTE_RUNTIME_IMPORTS = [
   'rozieClass',
   'rozieDisplay',
   'rozieListeners',
+  'rozieOnce',
   'roziePortal',
   'rozieStyle',
 ] as const;
@@ -387,6 +392,7 @@ export const ANGULAR_COMMON_IMPORTS = ['NgTemplateOutlet', 'NgClass', 'NgStyle']
 export const ANGULAR_RUNTIME_IMPORTS = [
   'RozieSlot',
   'RozieListen',
+  'RozieOnce',
   'rozieDisplay',
   'rozieAttr',
   'rozieToken',

@@ -101,7 +101,7 @@ export class SearchInput {
     }
   });
 
-  private debouncedOnSearch_2 = (() => {
+  protected debouncedOnSearch_2 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -109,17 +109,17 @@ export class SearchInput {
     };
   })();
 
-  private _guardedOnSearch_4 = ($event: any) => {
+  protected _guardedOnSearch_4 = ($event: any) => {
     if ($event.key !== 'Enter') return;
     this.onSearch();
   };
 
-  private _guarded_clear_5 = ($event: any) => {
+  protected _guarded_clear_5 = ($event: any) => {
     if ($event.key !== 'Escape') return;
     this._clear();
   };
 
-  private _merged_keydown_3 = ($event: any) => {
+  protected _merged_keydown_3 = ($event: any) => {
     this._guardedOnSearch_4($event);
     this._guarded_clear_5($event);
   };

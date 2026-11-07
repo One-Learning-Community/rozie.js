@@ -41,6 +41,7 @@ export class TypedEvents {
   rowOpen = output<{
     index: number;
   }>({ alias: 'row-open' });
+  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['reset', 'select'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('row', { read: TemplateRef }) rowTpl?: TemplateRef<RowCtx>;
   templates = input<Record<string, TemplateRef<unknown>> | undefined>(undefined);
   __rozieFills = contentChildren(RozieSlot, { descendants: true });

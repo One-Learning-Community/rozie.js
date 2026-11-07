@@ -51,3 +51,4 @@ export { rozieStyle } from './rozieStyle.js';
 export { keynav, type KeynavActionOpts } from './keynav.js';
 export { roziePortal } from './roziePortal.js';
 export { rozieListeners, type RozieListener } from './rozieListeners.js';
+export { rozieOnce } from './rozieOnce.js';

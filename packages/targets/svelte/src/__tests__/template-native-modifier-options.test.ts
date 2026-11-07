@@ -133,11 +133,11 @@ describe('Svelte template @event — .capture/.passive/.once attach with listene
     expect(markup).toContain('use:rozieListeners={[["click", onKey, { capture: true }]]}');
   });
 
-  it('on a COMPONENT tag the options stay ROZ621 (the event is a callback prop, not a DOM listener)', () => {
+  it('on a COMPONENT tag .capture stays ROZ621 (the event is a callback prop, not a DOM listener)', () => {
     const src = `${PROLOGUE}
 <components>{ Child: './Child.rozie' }</components>
 <template>
-<Child @change.once="onKey" />
+<Child @change.capture="onKey" />
 </template>
 <script>
 const onKey = (e) => undefined;

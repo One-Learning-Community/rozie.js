@@ -41,6 +41,8 @@ The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifi
 
 `.capture`, `.passive` and `.once` work on template `@event` bindings and on `<listener>` elements alike, on all six targets. Where a target's template syntax has no form for the option (React, Svelte, Angular and Solid for some or all of the three), the binding is attached with `addEventListener` instead, so the handler, its guards and `$event` stay the same.
 
+On a child component's event (`<Child @ping.once="...">`), `.once` also works on all six targets: the handler runs the first time that child emits the event, and each child rendered by an `r-for` has its own once. `.capture` and `.passive` are DOM listener options, so they are a compile error on a component event.
+
 Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`, Lit's `firstUpdated` wiring + `disconnectedCallback` cleanup (with `.debounce`/`.throttle` hoisted to stable class fields). **You write the modifier; Rozie writes the rest.**
 
 ## Custom modifiers — the `registerModifier` extension API

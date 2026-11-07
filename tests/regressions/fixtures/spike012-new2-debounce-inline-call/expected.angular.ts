@@ -67,7 +67,7 @@ export class DebounceInlineCall {
     }
   });
 
-  private debouncedHandler2_2 = (() => {
+  protected debouncedHandler2_2 = (() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     return (...args: any[]) => {
       if (timer !== null) clearTimeout(timer);
@@ -75,7 +75,7 @@ export class DebounceInlineCall {
     };
   })();
 
-  private throttledHandler3_3 = (() => {
+  protected throttledHandler3_3 = (() => {
     let lastCall = 0;
     return (...args: any[]) => {
       const now = Date.now();
