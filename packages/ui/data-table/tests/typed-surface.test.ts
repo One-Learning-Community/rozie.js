@@ -153,7 +153,9 @@ describe('DataTable typed slot params (F9)', () => {
   it('react: slot contexts carry real param types', () => {
     const code = emit('react');
     const ctx = (name: string) => {
-      const m = code.match(new RegExp(`interface ${name} \\{([^}]*)\\}`));
+      // Up to the interface's own closing brace: a member type may contain braces of its own
+      // (EditorCtx's `commit` takes `options?: { toRange?: boolean }`).
+      const m = code.match(new RegExp(`interface ${name} \\{([\\s\\S]*?) \\}\\n`));
       expect(m, `${name} interface`).not.toBeNull();
       return m![1];
     };
@@ -162,7 +164,8 @@ describe('DataTable typed slot params (F9)', () => {
     expect(ctx('ColHeaderCtx')).toMatch(/label: string/);
     expect(ctx('SelectAllCtx')).toMatch(/checked: boolean/);
     expect(ctx('PlaceholderCtx')).toMatch(/index: number/);
-    expect(ctx('EditorCtx')).toMatch(/commit: \(value: any\) => void/);
+    expect(ctx('EditorCtx')).toMatch(/commit: \(value: any, options\?: \{\s*toRange\?: boolean;\s*\}\) => void/);
+    expect(ctx('EditorCtx')).toMatch(/rangeSize: number/);
     expect(ctx('EditorCtx')).toMatch(/cancel: \(\) => void/);
     expect(ctx('FilterCtx')).toMatch(/setFilter: \(columnId: string, value: any\) => void/);
     expect(ctx('GroupBarCtx')).toMatch(/grouping: string\[\]/);

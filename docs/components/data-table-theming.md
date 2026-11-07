@@ -14,9 +14,9 @@ Scope, stated plainly: remapping the public tokens re-skins the table's primary 
 ```css
 :root {
   --rozie-data-table-fg: currentColor;
+  --rozie-data-table-column-border-color: var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08));
+  --rozie-data-table-pinned-bg: #fff;
   --rozie-data-table-font: 14px system-ui, sans-serif;
-  --rozie-data-table-header-bg: #f7f7f7;
-  --rozie-data-table-sort-indicator-opacity: 0.7;
 }
 ```
 
@@ -34,6 +34,18 @@ Scope, stated plainly: remapping the public tokens re-skins the table's primary 
 | `--rozie-data-table-border-color` | `rgba(0, 0, 0, 0.08)` |
 | `--rozie-data-table-control-border-color` | `rgba(0, 0, 0, 0.2)` |
 | `--rozie-data-table-radius` | `4px` |
+
+Column lines are off unless the `columnLines` prop is set. Their colour follows the row-line colour unless the column token is set, so one variable themes both.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-data-table-column-border-color` | `var(--rozie-data-table-border-color, rgba(0, 0, 0, 0.08))` |
+
+Pinned body cells are opaque so scrolled content never shows through them. Set this to the surface colour behind the table.
+
+| Token | Default |
+| --- | --- |
+| `--rozie-data-table-pinned-bg` | `#fff` |
 
 ### typography / cell metrics
 

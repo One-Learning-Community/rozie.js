@@ -30,9 +30,16 @@ A printable keypress also opens the editor, but what it does with the typed char
 
 **Full-row edit.** `Shift+F2` on a row (or the [`editRow(rowIndex)`](/components/data-table-api#imperative-handle) verb) opens every editable cell in the row at once; `Tab`/`Shift+Tab` move between editors. `Enter` commits the whole row in one `r-model:data` write + one `row-edit-commit` (validated together — one failure blocks the commit); `Escape` reverts the row as a unit. Like every other pointer/keyboard edit-entry path, `Shift+F2` is gated on `interactionMode="grid"`; the imperative `editRow` verb is not.
 
-**The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel, autofocus }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving; `autofocus` tells the editor whether the host wants it to take initial focus — drive your input's focus from it.
+**The `#editor` scoped slot** (scope `{ columnId, column, row, value, commit, cancel, autofocus, rangeSize }`) replaces the built-in editor for a column — dispatch by `columnId`. `commit(newValue)` validates + commits (firing `cell-edit-commit`); `cancel()` closes without saving; `autofocus` tells the editor whether the host wants it to take initial focus — drive your input's focus from it.
 
 The grid keeps its keymap around your editor: `Tab`/`Shift+Tab` commit and move to the next/previous editable cell, exactly as they do for the built-in editors, and in full-row edit `Enter` commits the whole row and `Escape` reverts it. To carry your editor's value, `Tab` moves focus off it, so **call `commit(draft)` from your control's blur handler** — every shipped drop-in does. If your editor handles `Tab` itself (a multi-field editor, say), call `preventDefault()` on the event and the grid leaves it alone. In full-row edit, `commit(value)` only stages that cell's draft; the row is written once, on `Enter`. On React/Solid it is the `renderEditor` / `editorSlot` render prop and on Lit the `.editor` property (the documented divergence).
+
+**Filling a range from the editor.** With a block of cells selected, `Ctrl`/`Cmd`+`Enter` in the editor writes its value to every selected cell in the active cell's column; plain `Enter` and blur still commit the active cell only. Your editor needs no changes for this: any `commit(value)` it makes while handling that keypress goes to the range. Two scope fields cover the rest:
+
+- `rangeSize` is the number of cells a range fill would write (`1` when no range is selected). Use it to show something like "Apply to 24 cells".
+- `commit(value, { toRange: true })` fills the range explicitly, for an "Apply to all" button or an editor that commits after the keypress (on blur, or after an async step).
+
+A range fill writes the value as is, with no conversion to text, so an array or object survives. It follows the paste rules: cells whose validator rejects the value are skipped, the whole fill is one undo step, `cell-edit-commit` fires once per changed cell, and the result is announced as "N of M cells updated". If the cell being edited rejects the value, the editor stays open with the error, as it does for a single-cell commit. The range stays selected afterwards. See [Grid mode — clipboard, fill & clear](/components/data-table-grid-mode#clipboard-fill-clear).
 
 **Per-column `editor-<columnId>` slot family.** Instead of dispatching `#editor` by `columnId` yourself, you can fill a single column's editor directly — `#editor-status="{ row, value, commit, cancel }"` — which wins over a generic `#editor` fill for that one column, which in turn wins over the built-in editor. Both the family and the generic `#editor` tier are gated identically: they reach only columns declaring `editor="custom"`. See [Columns — per-column slot families](/components/data-table-columns#per-column-slot-families) for the full precedence and gate rules shared across all four seams.
 
@@ -82,7 +89,7 @@ import { DataTable, Column, EditorText, EditorNumber, EditorSelect, EditorCheckb
 //  Lit: the single side-effect import registers the <rozie-editor-*> custom elements.)
 ```
 
-Each drop-in takes the `#editor` slot scope as its props — `{ columnId, column, row, value, commit, cancel, autofocus }` — and `EditorSelect` additionally takes `options: [{ value, label }]` (the same shape as `<Column editorOptions>`). Mark the column `editor="custom"` so the slot drives rendering, then dispatch by `columnId` inside `#editor` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke editor.
+Each drop-in takes the `#editor` slot scope as its props — `{ columnId, column, row, value, commit, cancel, autofocus }` (`rangeSize` is there too, for your own editors) — and `EditorSelect` additionally takes `options: [{ value, label }]` (the same shape as `<Column editorOptions>`). Mark the column `editor="custom"` so the slot drives rendering, then dispatch by `columnId` inside `#editor` and forward the scope to the matching drop-in. Use them **as-is**, or fork one as a template for a bespoke editor.
 
 | Component | Renders | Extra props |
 | --- | --- | --- |
