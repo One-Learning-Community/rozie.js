@@ -19,6 +19,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   B5 — the range tint stays visible on a pinned cell (layered over its opaque background).
  *   B6 — the group-row band stays visible on a pinned cell.
  *   B7 — pinned filter-row cells are opaque (with the filter-row band layered on top).
+ *   B8 — column lines follow the writing direction: under dir="rtl" the outer line sits on the
+ *        right of the first cell and each cell's separator on its left.
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -155,5 +157,16 @@ for (const target of TARGETS) {
     expect(s).not.toBeNull();
     expect(s?.bg).not.toBe('rgba(0, 0, 0, 0)');
     expect(s?.bgImage).not.toBe('none');
+  });
+
+  runnerFor(target)(`data-table-borders [${target}]: B8 column lines follow the writing direction`, async ({ page }) => {
+    const mount = await gotoBorders(page, target, false);
+    await mount.getByTestId('toggle-dir').click();
+    await mount.getByTestId('toggle-column-lines').check();
+    await expect.poll(async () => (await cellStyle(page, INNER_TD))?.bl, { timeout: 10_000 }).toBe('1px');
+    const inner = await cellStyle(page, INNER_TD);
+    expect(inner?.br).toBe('0px');
+    const first = await cellStyle(page, PINNED_TD);
+    expect([first?.bl, first?.br]).toEqual(['1px', '1px']);
   });
 }

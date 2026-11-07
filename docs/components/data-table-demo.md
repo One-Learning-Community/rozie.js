@@ -289,6 +289,8 @@ Each is a real component for its framework — React `forwardRef` + hooks, Vue `
   border: 1px solid var(--vp-c-divider);
   border-radius: 12px;
   background: var(--vp-c-bg-soft);
+  /* Pinned cells are opaque: give them the surface colour behind the table. */
+  --rozie-data-table-pinned-bg: var(--vp-c-bg-soft);
 }
 /* base.css ships light defaults only. In the site's dark theme, set the public tokens on an
    ANCESTOR of the table — the same override a consumer writes for their own dark mode. */

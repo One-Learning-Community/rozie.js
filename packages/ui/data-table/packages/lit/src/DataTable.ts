@@ -375,11 +375,11 @@ export default class DataTable extends SignalWatcher(LitElement) {
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c],
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c],
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
-  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-end: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > [data-rozie-s-d5dcab4c]:first-child:not(.rdt-col-spacer[data-rozie-s-d5dcab4c]),
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > .rdt-col-spacer[data-rozie-s-d5dcab4c]:first-child + *[data-rozie-s-d5dcab4c] {
-  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-start: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] > tr[data-rozie-s-d5dcab4c]:first-child > .rdt-th[data-rozie-s-d5dcab4c] {
   border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
@@ -846,6 +846,9 @@ export default class DataTable extends SignalWatcher(LitElement) {
    * Pure-CSS sticky header: the `<thead>` sticks to the top of the scroll container.
    */
   @property({ type: Boolean, reflect: true, attribute: 'sticky-header' }) stickyHeader: boolean = false;
+  /**
+   * Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set.
+   */
   @property({ type: Boolean, reflect: true, attribute: 'column-lines' }) columnLines: boolean = false;
   /**
    * `'table'` (default, row-oriented, byte-behaviorally identical to a plain accessible table) | `'grid'` — lights up the full WAI-ARIA **[grid interaction mode](/components/data-table-grid-mode)**: `role="grid"`, a roving single tab-stop, 2-D APG arrow-key cell navigation, range selection, and clipboard support.
@@ -864,7 +867,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true, attribute: 'undo-limit' }) undoLimit: number = 100;
   /**
-   * When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows; a table write or `refreshView()` never changes the page (a sort, filter or grouping change returns to the first page). Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
+   * When `true`, the table holds its current view through its own writes (edit, paste, fill, range fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows; a table write or `refreshView()` never changes the page (a sort, filter or grouping change returns to the first page). Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.
    */
   @property({ type: Boolean, reflect: true, attribute: 'hold-view' }) holdView: boolean = false;
   /**
@@ -8975,6 +8978,7 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // value (one value for all, not a per-cell flip) through the paste/fill funnel: invalid cells
   // skipped, one undo step, one cell-edit-commit per changed cell, "N of M cells updated".
   if (this.rangeSize() > 1) {
+    this.setInvalid('');
     this.fillActiveColumn(newValue);
     return;
   }

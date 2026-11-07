@@ -104,11 +104,11 @@
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-td[data-rozie-s-d5dcab4c],
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-filter-cell[data-rozie-s-d5dcab4c],
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-detail-cell[data-rozie-s-d5dcab4c] {
-  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-end: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > [data-rozie-s-d5dcab4c]:first-child:not(.rdt-col-spacer[data-rozie-s-d5dcab4c]),
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] tr[data-rozie-s-d5dcab4c] > .rdt-col-spacer[data-rozie-s-d5dcab4c]:first-child + *[data-rozie-s-d5dcab4c] {
-  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-start: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines[data-rozie-s-d5dcab4c] .rdt-thead[data-rozie-s-d5dcab4c] > tr[data-rozie-s-d5dcab4c]:first-child > .rdt-th[data-rozie-s-d5dcab4c] {
   border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));

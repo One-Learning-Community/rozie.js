@@ -1,15 +1,15 @@
 /*
  * @rozie-ui/data-table — base token reference.
  *
- * This file is the PUBLIC token reference. It wires each of the 18 public
+ * This file is the PUBLIC token reference. It wires each of the 20 public
  * `--rozie-data-table-*` tokens, with its default, onto the short internal `--rdt-*`
- * token the component's scoped `<style>` actually reads. The component reads 82 internal `--rdt-*`
+ * token the component's scoped `<style>` actually reads. The component reads 84 internal `--rdt-*`
  * tokens in total, each with an inline `var(--rdt-x, <fallback>)` default, so the
  * table renders ZERO-CONFIG without importing this file.
  *
  * Scope, stated plainly: remapping the public tokens re-skins the table's primary
  * surfaces — type, borders, background, header, row, cell padding, accent, and the
- * max-height. It does NOT reach every cosmetic value. 58 of the 82 internal tokens
+ * max-height. It does NOT reach every cosmetic value. 58 of the 84 internal tokens
  * have no public counterpart today, including the grid active-cell ring, the range
  * highlight, the fill handle, the invalid-cell outline, the group tokens, the filter
  * row, the per-header column ⋯ menu (its panel is a composed @rozie-ui/popover, so its
@@ -27,7 +27,7 @@
  * the element itself), never on the `.rozie-data-table` / `.rozie-data-table-wrap`
  * classes — on that target both of those render inside the component's shadow root,
  * where a document stylesheet cannot reach them. The tokens themselves inherit across
- * the boundary, and the component carries the mapping internally, so every one of the 18
+ * the boundary, and the component carries the mapping internally, so every one of the 20
  * works there.
  *
  * NOTE the split: the STRUCTURAL rules — `border-collapse`, the keyed-r-for

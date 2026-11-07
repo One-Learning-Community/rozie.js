@@ -489,10 +489,9 @@ export interface DataTableVisibleRangeChangePayload { start: number; end: number
     type: Boolean,
     default: false,
     docs: {
+      // One string literal: the README renderer reads literals only, not concatenations.
       description:
-        'Draw a line between columns, plus a left line on the first column and a top line on ' +
-        'the header row. The colour follows `--rozie-data-table-border-color` unless ' +
-        '`--rozie-data-table-column-border-color` is set.',
+        'Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set.',
     },
   },
 
@@ -551,7 +550,7 @@ export interface DataTableVisibleRangeChangePayload { start: number; end: number
     default: false,
     docs: {
       description:
-        'When `true`, the table holds its current view through its own writes (edit, paste, fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows; a table write or `refreshView()` never changes the page (a sort, filter or grouping change returns to the first page). Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.',
+        'When `true`, the table holds its current view through its own writes (edit, paste, fill, range fill, cut, clear, the boolean toggle, undo and redo): rows keep the membership and order they had before the write and new values render in place, so an edited row does not jump or vanish under an active sort or filter. The view is re-derived (and both mismatch counts reset to 0) when `sorting`, `columnFilters` or `globalFilter` change, when `refreshView()` is called, when the dataset is swapped externally, or when `holdView` is toggled. Paging, page size, column visibility/order/pinning/sizing and expanding rows move through the held rows; a table write or `refreshView()` never changes the page (a sort, filter or grouping change returns to the first page). Falls back to live behaviour (with one console warning) while grouping is active, in `manual` mode, or with tree data (`getSubRows`). Passing a fresh `data` array that did not come from the table (for example reloading from the server after a save) is an external swap: it re-derives the view and clears undo history. Track mismatches with `view-state-change` / `getViewState()`.',
     },
   },
 
@@ -3813,18 +3812,19 @@ $expose({
 .rozie-data-table .rdt-detail-cell {
   border: 0;
 }
-/* Opt-in column lines (the columnLines prop): a right line on every cell, plus the outer
-   left line on the first column and the outer top line on the header row. The first real
-   cell is the row's first child, or the cell right after a windowed-columns spacer. */
+/* Opt-in column lines (the columnLines prop): a line at the END of every cell, plus the outer
+   line at the START of each row's first cell and above the header row. Logical sides, so the
+   lines follow the writing direction (under dir="rtl" the first cell is the rightmost). The
+   first real cell is the row's first child, or the cell right after a windowed-columns spacer. */
 .rozie-data-table.rdt-column-lines .rdt-th,
 .rozie-data-table.rdt-column-lines .rdt-td,
 .rozie-data-table.rdt-column-lines .rdt-filter-cell,
 .rozie-data-table.rdt-column-lines .rdt-detail-cell {
-  border-right: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-end: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines tr > :first-child:not(.rdt-col-spacer),
 .rozie-data-table.rdt-column-lines tr > .rdt-col-spacer:first-child + * {
-  border-left: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
+  border-inline-start: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));
 }
 .rozie-data-table.rdt-column-lines .rdt-thead > tr:first-child > .rdt-th {
   border-top: var(--rdt-column-border, 1px solid rgba(0, 0, 0, 0.08));

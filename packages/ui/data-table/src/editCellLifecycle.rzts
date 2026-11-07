@@ -572,6 +572,7 @@ const toggleActiveBooleanCell = () => {
   // value (one value for all, not a per-cell flip) through the paste/fill funnel: invalid cells
   // skipped, one undo step, one cell-edit-commit per changed cell, "N of M cells updated".
   if (rangeSize() > 1) {
+    setInvalid('')
     fillActiveColumn(newValue)
     return
   }

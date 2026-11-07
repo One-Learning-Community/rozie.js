@@ -31,6 +31,7 @@
   pagination: { pageIndex: 0, pageSize: 100 },
   columnLines: false,
   grouping: [],
+  dir: 'ltr',
   rangeReadout: '',
 }
 </data>
@@ -46,6 +47,10 @@ $onMount(() => {
 
 const toggleColumnLines = (): void => {
   $data.columnLines = !$data.columnLines
+}
+
+const toggleDir = (): void => {
+  $data.dir = $data.dir === 'rtl' ? 'ltr' : 'rtl'
 }
 
 const toggleGrouping = (): void => {
@@ -67,11 +72,12 @@ const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number }
       <input type="checkbox" data-testid="toggle-column-lines" :checked="$data.columnLines" @change="toggleColumnLines" />
       column lines
     </label>
+    <button type="button" data-testid="toggle-dir" @click="toggleDir">toggle rtl</button>
     <button type="button" data-testid="toggle-grouping" @click="toggleGrouping">group by grp</button>
     <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
   </div>
 
-  <div class="scroll-box" data-testid="scroll-box">
+  <div class="scroll-box" data-testid="scroll-box" :dir="$data.dir">
     <DataTable
       interactionMode="grid"
       :data="$data.rows"
