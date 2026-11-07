@@ -389,8 +389,8 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const nativeOptions: string[] = [];
   let scriptInjection: string | null = null;
   let handlerRef: string | null = null;
-  // `.once` on a component event: a callback prop has no listener options, so the prop becomes
-  // `/* @once */ rozieOnce(() => handler)`, made once per rendered child.
+  // `.once` on a component event: a callback prop has no listener options, so the prop becomes a
+  // self-keyed function that calls `rozieOnceCall`, made once per rendered child.
   let componentOnce = false;
 
   for (const entry of listener.modifierPipeline) {
@@ -585,10 +585,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   }
 
   if (componentOnce) {
-    // `@once` keeps Solid's compiler from turning the prop into a getter, which would
-    // make a fresh wrapper (and lose the fired state) on every read of the prop.
-    ctx.collectors.runtime.add('rozieOnce');
-    handlerExpr = `/* @once */ rozieOnce(() => ${handlerExpr})`;
+    // A function literal: Solid's compiler keeps it static, so it is made once per rendered
+    // child and can key the fired state by itself. A call expression would become a getter that
+    // runs on every read of the prop (a fresh, un-fired wrapper each time), and `/* @once */`
+    // does not prevent that inside a loop callback.
+    ctx.collectors.runtime.add('rozieOnceCall');
+    handlerExpr = `function __rozieOnce(...args: any[]) { return rozieOnceCall(__rozieOnce, 0, () => ${handlerExpr}, args); }`;
   }
 
   return {

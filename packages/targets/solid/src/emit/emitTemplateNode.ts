@@ -929,30 +929,28 @@ function parseNamedProps(attrStr: string): { named: Map<string, string>; rest: s
   return { named, rest };
 }
 
-/** A component event's `.once` prop value: `/* @once *\/ rozieOnce(...)` (see emitTemplateEvent). */
-const ONCE_PROP_VALUE = /^\/\* @once \*\/ (rozieOnce\([\s\S]*\))$/;
+/** A component event's `.once` prop value (see emitTemplateEvent); group 1 is the handler. */
+const ONCE_PROP_VALUE =
+  /^function __rozieOnce\(\.\.\.args: any\[\]\) \{ return rozieOnceCall\(__rozieOnce, 0, \(\) => ([\s\S]*), args\); \}$/;
 
 /**
- * One arrow that calls each handler body with the event, for listeners merged onto one prop.
- * A `.once` wrapper is lifted out and passed in, so it is made once per rendered element; made
- * inside the arrow it would be re-created, and re-armed, on every event.
+ * The prop value that calls each handler body with the event, for listeners merged onto one prop.
+ * With a `.once` listener among them it is a named function expression keyed by itself (each
+ * `.once` with its own id), so the fired state lives as long as the rendered element: Solid keeps
+ * a function-literal prop static, while a once wrapper built inside an arrow would be re-made on
+ * every event.
  */
 function buildDispatcher(param: string, bodies: readonly string[]): string {
-  const onceWrappers: string[] = [];
+  let onceCount = 0;
   const calls = bodies.map((body) => {
     const once = body.match(ONCE_PROP_VALUE);
-    if (once) {
-      onceWrappers.push(once[1]!);
-      return `__rozieOnce${onceWrappers.length - 1}($event);`;
-    }
+    if (once) return `rozieOnceCall(__rozieOnce, ${onceCount++}, () => ${once[1]!}, [$event]);`;
     // If body is already a bare identifier, call it; otherwise invoke the expression.
     if (/^[A-Za-z_$][\w$]*$/.test(body)) return `${body}($event);`;
     return `(${body})($event);`;
   });
-  const arrow = `(${param}) => { ${calls.join(' ')} }`;
-  if (onceWrappers.length === 0) return arrow;
-  const params = onceWrappers.map((_, i) => `__rozieOnce${i}: (...a: any[]) => unknown`).join(', ');
-  return `/* @once */ ((${params}) => ${arrow})(${onceWrappers.join(', ')})`;
+  if (onceCount > 0) return `function __rozieOnce(${param}) { ${calls.join(' ')} }`;
+  return `(${param}) => { ${calls.join(' ')} }`;
 }
 
 /**

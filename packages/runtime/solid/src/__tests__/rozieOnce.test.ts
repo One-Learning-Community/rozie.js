@@ -1,44 +1,44 @@
 /**
- * `rozieOnce` — `.once` on a component event (a callback prop). The emitter creates one wrapper per
- * child instance and passes the handler as a thunk, read at call time, so the current handler runs
- * and re-creating the handler can't re-arm the wrapper.
+ * `rozieOnceCall` — `.once` on a component event (a callback prop). The emitter binds a named
+ * function expression per rendered child and keys the fired state by it; `id` separates `.once`
+ * listeners merged into one prop. The handler is a thunk read at call time.
  */
 import { describe, expect, it } from 'vitest';
-import { rozieOnce } from '../rozieOnce.js';
+import { rozieOnceCall } from '../rozieOnce.js';
 
-describe('rozieOnce', () => {
-  it('runs the handler once and passes its arguments through', () => {
+describe('rozieOnceCall', () => {
+  it('runs the handler once per owner and passes the arguments through', () => {
     const calls: unknown[][] = [];
-    const fn = rozieOnce(() => (...a: unknown[]) => calls.push(a));
-    fn(1, 2);
-    fn(3);
+    const owner = {};
+    const h = () => (...a: unknown[]) => calls.push(a);
+    rozieOnceCall(owner, 0, h, [1, 2]);
+    rozieOnceCall(owner, 0, h, [3]);
     expect(calls).toEqual([[1, 2]]);
   });
 
-  it('reads the handler when the event fires, not when the wrapper is made', () => {
-    let current = (_: unknown) => 'old';
-    const fn = rozieOnce(() => current);
+  it('reads the handler when the event fires', () => {
+    let current = () => 'old';
+    const owner = {};
+    const get = () => current;
     current = () => 'new';
-    expect(fn(0)).toBe('new');
+    expect(rozieOnceCall(owner, 0, get, [])).toBe('new');
   });
 
   it('a missing handler (optional callback prop) is a no-op that still uses up the once', () => {
-    let handler: (() => void) | undefined;
+    const owner = {};
     let n = 0;
-    const fn = rozieOnce(() => handler);
-    fn();
-    handler = () => n++;
-    fn();
+    rozieOnceCall(owner, 0, () => undefined, []);
+    rozieOnceCall(owner, 0, () => () => n++, []);
     expect(n).toBe(0);
   });
 
-  it('separate wrappers (separate child instances) fire independently', () => {
+  it('separate owners (separate children) and separate ids fire independently', () => {
     let n = 0;
-    const a = rozieOnce(() => () => n++);
-    const b = rozieOnce(() => () => n++);
-    a();
-    b();
-    a();
-    expect(n).toBe(2);
+    const a = {};
+    const b = {};
+    for (const [o, id] of [[a, 0], [b, 0], [a, 1], [a, 0], [b, 0], [a, 1]] as const) {
+      rozieOnceCall(o, id, () => () => n++, []);
+    }
+    expect(n).toBe(3);
   });
 });

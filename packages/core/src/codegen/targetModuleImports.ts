@@ -175,7 +175,7 @@ export const SOLID_RUNTIME_IMPORTS = [
   'rozieDisplay',
   'rozieNativeListeners',
   // `.once` on a component event (a callback prop, so no listener option).
-  'rozieOnce',
+  'rozieOnceCall',
   // 260608-sya — attribute-position display helper (nullish DROPS the
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
