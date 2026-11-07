@@ -197,4 +197,24 @@ for (const target of TARGETS) {
       ).toContain(b0);
     },
   );
+
+  // The test above waits for each announcement between presses. A real user
+  // pressing Arrow keys quickly does not: every move must still build on the
+  // previous one. On Angular the bound items used to lag one change detection
+  // behind, so the second ArrowDown moved the wrong row.
+  runner(
+    `sortable-drag-keyboard [${target}]: back-to-back presses move the lifted row, not a neighbour`,
+    async ({ page }) => {
+      await page.goto(`/?example=SortableList&target=${target}`);
+      const mount = page.getByTestId('rozie-mount');
+      const items = mount.locator(ITEM);
+      await expect(items).toHaveCount(SEED_ITEM_COUNT);
+      await expect(items.first()).toHaveAttribute('tabindex', '0');
+      const [b0, b1, b2, ...bRest] = await displayedLabels(items);
+      await items.first().focus();
+      for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      await expect(mount.locator(ARIA_LIVE)).toContainText(`Dropped ${b0} at position 3`);
+      await expect.poll(() => displayedLabels(items)).toEqual([b1, b2, b0, ...bRest]);
+    },
+  );
 }

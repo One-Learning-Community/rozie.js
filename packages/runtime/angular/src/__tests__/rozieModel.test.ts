@@ -11,12 +11,42 @@ function setup(bound: string | undefined) {
 }
 
 describe('rozieModel', () => {
-  it('controlled: a write emits but the value stays the bound one', () => {
-    const { input, emitted, model } = setup('apple');
+  it('controlled: a refused write emits, then the value goes back to the bound one', async () => {
+    const { emitted, model } = setup('apple');
     model.set('banana');
     expect(emitted).toEqual(['banana']);
+    // The consumer never sends 'banana' back: after one task the bound value wins.
+    await new Promise((r) => setTimeout(r, 0));
     expect(model()).toBe('apple');
-    input.set('cherry');
+  });
+
+  it('controlled: a read right after a write sees the written value (key bursts)', () => {
+    // Angular pushes the consumer's answer down only on its next change detection,
+    // a task later. A second keydown in between used to read the old value and
+    // build on it, losing the first write (number-field ArrowUp ×10 → +1).
+    const { emitted, model } = setup('1');
+    model.set(String(Number(model()) + 1));
+    model.set(String(Number(model()) + 1));
+    model.set(String(Number(model()) + 1));
+    expect(emitted).toEqual(['2', '3', '4']);
+    expect(model()).toBe('4');
+  });
+
+  it('controlled: any value the consumer sends wins over the pending write', () => {
+    const { input, model } = setup('apple');
+    model.set('banana');
+    input.set('cherry'); // accepted and transformed (e.g. clamped)
+    expect(model()).toBe('cherry');
+    input.set('apple'); // and a later value is honored too
+    expect(model()).toBe('apple');
+  });
+
+  it('controlled: a newer write keeps its pending value past the older write\'s timer', async () => {
+    const { model } = setup('apple');
+    model.set('banana');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(model()).toBe('apple');
+    model.set('cherry');
     expect(model()).toBe('cherry');
   });
 
@@ -54,7 +84,7 @@ describe('rozieModel', () => {
     const change = { emit: () => {} } as unknown as OutputEmitterRef<string>;
     const model = rozieModel<string>(input, change, 'init', prims);
     model.set('b');
-    expect(used).toEqual(['signal', 'computed', 'untracked']);
+    expect(used).toEqual(['signal', 'signal', 'computed', 'untracked']);
     const view = computed(() => model());
     expect(view()).toBe('b');
     input.set('bound');

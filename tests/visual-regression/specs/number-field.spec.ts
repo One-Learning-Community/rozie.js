@@ -94,4 +94,20 @@ for (const target of TARGETS) {
     await page.getByTestId('set-qty').click();
     await expect(value).toHaveText('8', { timeout: 10_000 });
   });
+
+  // Each press reads the bound value and writes the next one. Pressed back to
+  // back (no wait between), every press must build on the previous one: on
+  // Angular the bound value used to lag one change detection behind, so three
+  // quick presses from 5 landed on 6.
+  runner(`number-field [${target}]: back-to-back ArrowUp presses each count`, async ({ page }) => {
+    await page.goto(`/?example=NumberFieldBehavior&target=${target}`);
+    const value = page.getByTestId('readout-value');
+    const input = page.locator('input[role="spinbutton"]').first();
+    await expect(input).toBeVisible({ timeout: 15_000 });
+    await expect(value).toHaveText('5');
+    await input.focus();
+    for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowUp');
+    await expect(value).toHaveText('8', { timeout: 10_000 });
+    await expect(input).toHaveAttribute('aria-valuenow', '8');
+  });
 }

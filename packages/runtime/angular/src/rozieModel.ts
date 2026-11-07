@@ -64,8 +64,22 @@ export function rozieModel<T, M = ModelSignal<T>>(
       return undefined;
     }
   };
+  // A controlled write is held here until the consumer answers. Angular pushes
+  // the consumer's value down only on its next change detection, a task later,
+  // and input events run before it: without this, a second keydown in a burst
+  // read the old value and built on it, losing the first write. `base` is the
+  // bound value at write time: once the consumer sends anything else (accepted,
+  // clamped, a new value) the pending write is moot. A refused write (the bound
+  // value never changes) is dropped after one task, so the control goes back to
+  // the consumer's value as before.
+  const pending = signal<{ value: T; base: T | undefined; answered: boolean } | null>(null);
   const read = computed<T>(() => {
     const value = bound();
+    const held = pending();
+    if (held !== null && !held.answered) {
+      if (value === held.base) return held.value;
+      held.answered = true; // the consumer answered: never resurrect this write
+    }
     return value === undefined ? local() : value;
   });
   const model = (() => read()) as unknown as ModelSignal<T>;
@@ -74,8 +88,20 @@ export function rozieModel<T, M = ModelSignal<T>>(
     (model as unknown as Record<symbol, unknown>)[key] = (read as unknown as Record<symbol, unknown>)[key];
   }
   model.set = (value: T): void => {
-    if (untracked(bound) === undefined) local.set(value);
+    const base = untracked(bound);
+    if (base === undefined) {
+      local.set(value);
+      change.emit(value);
+      return;
+    }
+    const held = { value, base, answered: false };
+    pending.set(held);
     change.emit(value);
+    // Queued after the emit, so after the change detection the consumer's answer
+    // scheduled: by then an accepted value is already bound.
+    setTimeout(() => {
+      if (untracked(pending) === held) pending.set(null);
+    }, 0);
   };
   model.update = (fn: (value: T) => T): void => model.set(fn(untracked(read)));
   model.asReadonly = (): Signal<T> => read as unknown as Signal<T>;
