@@ -24,7 +24,7 @@ interface DefaultCtx {}
   imports: [NgTemplateOutlet],
   template: `
 
-    <dialog class="rozie-dialog" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-labelledby]="rozieAttr(ariaLabelledby())" #rozieSpread_0 (cancel)="onCancel($event)" (close)="onNativeClose()" (pointerdown)="onPointerDown($event)" (click)="onClick($event)" #rozieListenersTarget_1>
+    <dialog class="rozie-dialog" [attr.aria-label]="rozieAttr(ariaLabel())" [attr.aria-labelledby]="rozieAttr(ariaLabelledby())" #rozieSpread_0 (cancel)="onCancel($event)" (close)="onNativeClose()" (submit)="onSubmit($event)" (pointerdown)="onPointerDown($event)" (click)="onClick($event)" #rozieListenersTarget_1>
       
       <div class="rozie-dialog-panel" #panelEl>
         <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot'])" />
@@ -321,6 +321,32 @@ export class Dialog {
     const el = this.dialogEl;
     if (!el || el.open || !this.open()) return;
     this.closeWith('programmatic');
+  };
+  // A `<form method="dialog">` submit closes the form's nearest ancestor dialog in
+  // the DOM tree. Where the <dialog> sits in a shadow root (Lit) and the form is
+  // slotted light DOM, there is no such ancestor and the submit does nothing. So we
+  // do that close ourselves for any form whose nearest dialog in the FLAT tree
+  // (through slots and shadow hosts) is this one. Elsewhere the native close runs
+  // right after and finds the dialog already closed. The resulting native `close`
+  // event goes through onNativeClose like any other unrouted close.
+  nearestFlatDialog = (node: any) => {
+    let n: any = node;
+    while (n) {
+      if (n.tagName === 'DIALOG') return n;
+      n = n.assignedSlot || n.parentNode || n.host || null;
+    }
+    return null;
+  };
+  onSubmit = (e: any) => {
+    const el = this.dialogEl;
+    const form: any = e && e.target;
+    if (!el || !el.open || e.defaultPrevented || !form || form.tagName !== 'FORM') return;
+    const submitter: any = e.submitter || null;
+    const method = submitter && submitter.hasAttribute('formmethod') ? submitter.formMethod : form.method;
+    if (method !== 'dialog' || this.nearestFlatDialog(form) !== el) return;
+    // Native would close a DIFFERENT dialog (or none): take over the submit.
+    if (form.closest('dialog') !== el) e.preventDefault();
+    el.close(submitter && submitter.hasAttribute('value') ? submitter.value : undefined);
   };
   // ---- lifecycle ---------------------------------------------------------
   // ---- imperative handle -------------------------------------------------

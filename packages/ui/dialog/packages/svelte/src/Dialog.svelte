@@ -219,6 +219,32 @@ const onNativeClose = () => {
   if (!el || el.open || !open) return;
   closeWith('programmatic');
 };
+// A `<form method="dialog">` submit closes the form's nearest ancestor dialog in
+// the DOM tree. Where the <dialog> sits in a shadow root (Lit) and the form is
+// slotted light DOM, there is no such ancestor and the submit does nothing. So we
+// do that close ourselves for any form whose nearest dialog in the FLAT tree
+// (through slots and shadow hosts) is this one. Elsewhere the native close runs
+// right after and finds the dialog already closed. The resulting native `close`
+// event goes through onNativeClose like any other unrouted close.
+const nearestFlatDialog = (node: any) => {
+  let n: any = node;
+  while (n) {
+    if (n.tagName === 'DIALOG') return n;
+    n = n.assignedSlot || n.parentNode || n.host || null;
+  }
+  return null;
+};
+const onSubmit = (e: any) => {
+  const el = dialogEl;
+  const form: any = e && e.target;
+  if (!el || !el.open || e.defaultPrevented || !form || form.tagName !== 'FORM') return;
+  const submitter: any = e.submitter || null;
+  const method = submitter && submitter.hasAttribute('formmethod') ? submitter.formMethod : form.method;
+  if (method !== 'dialog' || nearestFlatDialog(form) !== el) return;
+  // Native would close a DIFFERENT dialog (or none): take over the submit.
+  if (form.closest('dialog') !== el) e.preventDefault();
+  el.close(submitter && submitter.hasAttribute('value') ? submitter.value : undefined);
+};
 
 // ---- lifecycle ---------------------------------------------------------
 // ---- imperative handle -------------------------------------------------
@@ -262,7 +288,7 @@ onDestroy(() => (() => {
 })());
 </script>
 
-<dialog aria-label={ariaLabel} aria-labelledby={ariaLabelledby} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclose={($event) => { onNativeClose(); }} onpointerdown={($event) => { onPointerDown($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
+<dialog aria-label={ariaLabel} aria-labelledby={ariaLabelledby} {...__rozieAttrs} class={["rozie-dialog", (__rozieAttrs)?.class]} oncancel={($event) => { onCancel($event); }} onclose={($event) => { onNativeClose(); }} onsubmit={($event) => { onSubmit($event); }} onpointerdown={($event) => { onPointerDown($event); }} onclick={($event) => { onClick($event); }} use:applyListeners={__rozieAttrs} data-rozie-s-2a679072><div class="rozie-dialog-panel" bind:this={panelEl} data-rozie-s-2a679072>{@render children?.()}</div></dialog>
 
 <style>
 :global {

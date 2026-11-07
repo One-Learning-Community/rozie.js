@@ -186,7 +186,7 @@ private __rozieWatchInitial_0 = true;
 
   render() {
     return html`
-<dialog class="rozie-dialog" aria-label=${rozieAttr(this.ariaLabel)} aria-labelledby=${rozieAttr(this.ariaLabelledby)} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @close=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onNativeClose(); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onPointerDown($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
+<dialog class="rozie-dialog" aria-label=${rozieAttr(this.ariaLabel)} aria-labelledby=${rozieAttr(this.ariaLabelledby)} ${rozieSpread(this.$attrs)} @cancel=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onCancel($event); }} @close=${($event: Event & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onNativeClose(); }} @submit=${($event: SubmitEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onSubmit($event); }} @pointerdown=${($event: PointerEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onPointerDown($event); }} @click=${($event: MouseEvent & { currentTarget: HTMLDialogElement; target: HTMLDialogElement }) => { this.onClick($event); }} ${rozieListeners(this.$listeners)} data-rozie-s-2a679072>
   
   <div class="rozie-dialog-panel" data-rozie-ref="panelEl" data-rozie-s-2a679072>
     <slot></slot>
@@ -358,6 +358,34 @@ private __rozieWatchInitial_0 = true;
   const el = this.dialogEl;
   if (!el || el.open || !this.open) return;
   this.closeWith('programmatic');
+};
+
+  // A `<form method="dialog">` submit closes the form's nearest ancestor dialog in
+  // the DOM tree. Where the <dialog> sits in a shadow root (Lit) and the form is
+  // slotted light DOM, there is no such ancestor and the submit does nothing. So we
+  // do that close ourselves for any form whose nearest dialog in the FLAT tree
+  // (through slots and shadow hosts) is this one. Elsewhere the native close runs
+  // right after and finds the dialog already closed. The resulting native `close`
+  // event goes through onNativeClose like any other unrouted close.
+  nearestFlatDialog = (node: any) => {
+  let n: any = node;
+  while (n) {
+    if (n.tagName === 'DIALOG') return n;
+    n = n.assignedSlot || n.parentNode || n.host || null;
+  }
+  return null;
+};
+
+  onSubmit = (e: any) => {
+  const el = this.dialogEl;
+  const form: any = e && e.target;
+  if (!el || !el.open || e.defaultPrevented || !form || form.tagName !== 'FORM') return;
+  const submitter: any = e.submitter || null;
+  const method = submitter && submitter.hasAttribute('formmethod') ? submitter.formMethod : form.method;
+  if (method !== 'dialog' || this.nearestFlatDialog(form) !== el) return;
+  // Native would close a DIFFERENT dialog (or none): take over the submit.
+  if (form.closest('dialog') !== el) e.preventDefault();
+  el.close(submitter && submitter.hasAttribute('value') ? submitter.value : undefined);
 };
 
   // ---- lifecycle ---------------------------------------------------------

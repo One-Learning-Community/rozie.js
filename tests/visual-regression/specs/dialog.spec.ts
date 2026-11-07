@@ -295,15 +295,10 @@ for (const target of TARGETS) {
 
     await page.getByTestId('open-dialog').click();
     await expect(body).toBeVisible({ timeout: 10_000 });
-    if (target === 'lit') {
-      // On Lit the <dialog> sits in the element's shadow root and the slotted <form> is
-      // light DOM: a form closes its nearest ANCESTOR dialog in the DOM tree, so the
-      // submit has no dialog to close (a platform limit). Close the native dialog directly
-      // instead, which is the same unrouted native close.
-      await page.locator('dialog[aria-label="Demo dialog"]').evaluate((d) => (d as HTMLDialogElement).close());
-    } else {
-      await page.getByTestId('form-close').click();
-    }
+    // A real submit on every target. On Lit the <dialog> sits in the element's shadow
+    // root and the slotted <form> is light DOM, so the browser finds no ancestor dialog;
+    // the component's own submit handler closes it instead.
+    await page.getByTestId('form-close').click();
     await expect(body).toBeHidden({ timeout: 10_000 });
     await expect.poll(() => text(open), { timeout: 10_000 }).toBe('false');
     await expect.poll(() => text(reason), { timeout: 10_000 }).toBe('programmatic');

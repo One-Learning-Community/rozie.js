@@ -239,6 +239,32 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
     if (!el || el.open || !open) return;
     closeWith('programmatic');
   }, [closeWith, open]);
+  // A `<form method="dialog">` submit closes the form's nearest ancestor dialog in
+  // the DOM tree. Where the <dialog> sits in a shadow root (Lit) and the form is
+  // slotted light DOM, there is no such ancestor and the submit does nothing. So we
+  // do that close ourselves for any form whose nearest dialog in the FLAT tree
+  // (through slots and shadow hosts) is this one. Elsewhere the native close runs
+  // right after and finds the dialog already closed. The resulting native `close`
+  // event goes through onNativeClose like any other unrouted close.
+  function nearestFlatDialog(node: any) {
+    let n: any = node;
+    while (n) {
+      if (n.tagName === 'DIALOG') return n;
+      n = n.assignedSlot || n.parentNode || n.host || null;
+    }
+    return null;
+  }
+  const onSubmit = useCallback((e: any) => {
+    const el = dialogEl.current;
+    const form: any = e && e.target;
+    if (!el || !el.open || e.defaultPrevented || !form || form.tagName !== 'FORM') return;
+    const submitter: any = e.submitter || null;
+    const method = submitter && submitter.hasAttribute('formmethod') ? submitter.formMethod : form.method;
+    if (method !== 'dialog' || nearestFlatDialog(form) !== el) return;
+    // Native would close a DIFFERENT dialog (or none): take over the submit.
+    if (form.closest('dialog') !== el) e.preventDefault();
+    el.close(submitter && submitter.hasAttribute('value') ? submitter.value : undefined);
+  }, [nearestFlatDialog]);
   // ---- lifecycle ---------------------------------------------------------
   // ---- imperative handle -------------------------------------------------
   // show()/hide() — named to avoid the `open` model + `@close` event collisions.
@@ -290,7 +316,7 @@ const Dialog = forwardRef<DialogHandle, DialogProps>(function Dialog(_props: Dia
 
   return (
     <>
-    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClose: ($event) => { onNativeClose(); }, onPointerDown: ($event) => { onPointerDown($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
+    <dialog aria-label={rozieAttr(props.ariaLabel)} aria-labelledby={rozieAttr(props.ariaLabelledby)} {...attrs} className={clsx("rozie-dialog", (attrs.className as string | undefined))} {...mergeListeners({ onCancel: ($event) => { onCancel($event); }, onClose: ($event) => { onNativeClose(); }, onSubmit: ($event) => { onSubmit($event); }, onPointerDown: ($event) => { onPointerDown($event); }, onClick: ($event) => { onClick($event); } } satisfies import('react').ComponentPropsWithoutRef<'dialog'> & Record<string, unknown>, pickListeners(attrs))} data-rozie-s-2a679072="">
       
       <div className={"rozie-dialog-panel"} ref={panelEl} data-rozie-s-2a679072="">
         {(typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)() : (props.children ?? props.slots?.['']))}
