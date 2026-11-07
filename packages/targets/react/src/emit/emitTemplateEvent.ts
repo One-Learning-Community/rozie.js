@@ -9,8 +9,8 @@
  *     calling the user handler. e.g., `$event.stopPropagation();` from .stop.
  *   - 'native' kind — capture-only is supported via the JSX onClickCapture
  *     suffix. .passive / .once on JSX events have no native form (addEventListener
- *     options); emit an info diagnostic and fall through to inline guard fallback
- *     where possible (no-op for .passive on JSX).
+ *     options) and are a compile error, except on the addEventListener path
+ *     (`<input @change>`), where they become listener options.
  *   - 'helper' kind — debounce/throttle wraps require a hook call at component-body
  *     top; emit a script-injection `const debouncedX = useDebouncedCallback(...)`
  *     and reference the wrap name in the JSX attribute. .outside is listenerOnly
@@ -374,13 +374,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       } else if (ctx.addEventListener) {
         listenerOptions.push(desc.token);
       } else {
-        // .passive / .once on JSX events have no native form; emit an info
-        // diagnostic and skip (the JSX prop will fire normally without the
-        // option flag — observable behavior for .once differs minimally as
-        // re-fires are uncommon for typical JSX usage; .passive likewise).
+        // .passive / .once have no JSX-prop form. Binding the prop without the
+        // option would run the handler wrongly (a .once handler firing every
+        // time), so this is an error, as on Solid, Svelte and Angular.
         diagnostics.push({
           code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
-          severity: 'warning',
+          severity: 'error',
           message: `Modifier '.${desc.token}' has no JSX-prop equivalent in React (addEventListener-only). Move handler to <listeners> block to use this modifier.`,
           loc: entry.sourceLoc,
         });

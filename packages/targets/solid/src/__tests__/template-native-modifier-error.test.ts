@@ -1,8 +1,8 @@
 /**
- * `.capture` / `.passive` / `.once` on a TEMPLATE `@event` are `<listeners>`-only. Svelte (ROZ621),
- * Angular (ROZ722) and Lit (TARGET_LIT_RESERVED) reject them with an ERROR. Solid used to only
- * WARN and then bind the handler without the option — a capture-phase handler silently ran in the
- * bubble phase. It is now an error too, so the four targets agree and nothing compiles wrong.
+ * `.capture` / `.passive` / `.once` on a TEMPLATE `@event` have no Solid JSX form. Svelte (ROZ621)
+ * and Angular (ROZ722) reject them with an ERROR. Solid used to only WARN and then bind the handler
+ * without the option — a capture-phase handler silently ran in the bubble phase. It is now an error
+ * too, so nothing compiles wrong. (Vue and Lit support all three on template events.)
  */
 
 import { createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
