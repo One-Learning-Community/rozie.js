@@ -104,7 +104,17 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced to `e2e327a91eabc9b0d28d1172ac99a4dcd538dfae`
+ * 4b). Advanced to `e9e18bb108a2ca0770bf4d5c9fd0ee538b1ac930`
+ * (e9e18bb10): the class fields Angular templates call — guarded (`_guarded*`),
+ * `debounced*` / `throttled*` and same-event `_merged_*` wrappers — are
+ * `protected` instead of `private` (strict template type-checking rejects a
+ * private member, TS2341). The owed prohibition-5 hand-diff (performed, not
+ * deferred): `git diff e2e327a91 e9e18bb10` over the three tracked globs
+ * changed 8 of 132 fixtures, every changed line a `private` → `protected`
+ * swap on one of those wrappers, and no tracked fixture at e9e18bb10 still has
+ * a `private` wrapper its template calls (Dropdown's `<listeners>`
+ * `throttledLReposition` stays private: only class code calls it).
+ * Previously advanced to `e2e327a91eabc9b0d28d1172ac99a4dcd538dfae`
  * (e2e327a91): `rozieModel(...)` takes the component's own
  * `{ signal, computed, untracked }` (the runtime's own `@angular/core` copy made
  * signals the app's change detection could not see), and `untracked` joins the
@@ -175,7 +185,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'e2e327a91';
+const BASELINE_COMMIT = 'e9e18bb10';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
