@@ -291,4 +291,17 @@ for (const target of TARGETS) {
     expect(await rows(page, 'qty')).toEqual([1, 2, 3, 4, 5, 6]);
     expect(await readout(page, 'commit-count')).toBe('2');
   });
+
+  runnerFor(target)(`data-table-range-fill [${target}]: R11 Space on a checkbox range sets every cell to one value`, async ({ page }) => {
+    await gotoFill(page, target);
+    // done = [true, false, true, false, false, true]; the range is rows 0..3, active row 3 (false).
+    await rangeDown(page, 0, 5, 3);
+    await page.keyboard.press('Space');
+    await expect.poll(async () => JSON.stringify(await rows(page, 'done')), { timeout: 10_000 }).toBe(JSON.stringify([true, true, true, true, false, true]));
+    expect(await readout(page, 'commit-count')).toBe('2');
+    await page.waitForTimeout(200);
+    expect(await inRangeCount(page)).toBe(4);
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(async () => JSON.stringify(await rows(page, 'done')), { timeout: 10_000 }).toBe(JSON.stringify([true, false, true, false, false, true]));
+  });
 }

@@ -8946,6 +8946,13 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   const rowId = row.id;
   const oldValue = this.cellValueAt(this._activeRow.value, this._activeColIndex.value);
   const newValue = !oldValue;
+  // With a range selected, set every selected cell in this column to the active cell's new
+  // value (one value for all, not a per-cell flip) through the paste/fill funnel: invalid cells
+  // skipped, one undo step, one cell-edit-commit per changed cell, "N of M cells updated".
+  if (this.rangeSize() > 1) {
+    this.fillActiveColumn(newValue);
+    return;
+  }
   // D-01: same discipline as commitEdit — a rejecting validator blocks the toggle. There is
   // no editor to keep open here, so the toggle simply does not apply (no model write).
   const err = this.runValidator(colId, newValue, rowOriginal);
