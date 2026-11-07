@@ -42,6 +42,7 @@
     { value: 'c', label: 'c' },
   ],
   rangeReadout: '',
+  sorting: [],
   rangeNullCount: 0,
   commitCount: 0,
   // The tags editor's current text, for its "Apply to all" button.
@@ -58,6 +59,11 @@ const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number }
   const f = payload ? payload.focus : null
   $data.rangeReadout = f ? f.rowIndex + ',' + f.colIndex : ''
   if (!f) $data.rangeNullCount = $data.rangeNullCount + 1
+}
+
+// Sort by city — a fill on the city column then re-sorts the filled rows.
+const sortByCity = (): void => {
+  $data.sorting = [{ id: 'city', desc: false }]
 }
 
 const onCellEditCommit = (): void => {
@@ -111,6 +117,7 @@ const onDeferInput = (e: any): void => {
   <h3>DataTable — range fill (Ctrl/Cmd+Enter)</h3>
 
   <div class="controls">
+    <button type="button" data-testid="sort-city" @click="sortByCity">sort city ↑</button>
     <span class="label">range:</span>
     <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
     <span class="label">range cleared:</span>
@@ -127,12 +134,13 @@ const onDeferInput = (e: any): void => {
       interactionMode="grid"
       :undoable="true"
       r-model:data="$data.rows"
+      r-model:sorting="$data.sorting"
       @range-change="onRangeChange($event)"
       @cell-edit-commit="onCellEditCommit()"
     >
       <Column field="label" header="Label" />
       <Column field="qty"   header="Qty"   :editable="true" editor="number" :validate="validateQty" />
-      <Column field="city"  header="City"  :editable="true" editor="select" :editorOptions="$data.cityOptions" />
+      <Column field="city"  header="City"  :sortable="true" :editable="true" editor="select" :editorOptions="$data.cityOptions" />
       <Column field="tags"  header="Tags"  :editable="true" editor="custom" />
       <Column field="defer" header="Defer" :editable="true" editor="custom" />
       <Column field="done"  header="Done"  :editable="true" editor="checkbox" />

@@ -7,6 +7,8 @@
   - each cell resets its borders, so a host's plain `table td { border }` rule
     can't draw a second set of lines inside the table;
   - pinned body cells are opaque;
+  - group-row and filter-row bands stay visible on pinned cells (layered over
+    the opaque background);
   - the opt-in `columnLines` prop (toggled by the checkbox) draws a right border
     on every cell, plus the outer left and top edge lines.
 
@@ -28,6 +30,7 @@
   rows: [],
   pagination: { pageIndex: 0, pageSize: 100 },
   columnLines: false,
+  grouping: [],
   rangeReadout: '',
 }
 </data>
@@ -36,13 +39,17 @@
 $onMount(() => {
   const out = []
   for (let i = 1; i <= 30; i++) {
-    out.push({ id: i, name: 'Row ' + i, a: 'a' + i, b: 'b' + i, c: 'c' + i, d: 'd' + i, e: 'e' + i, f: 'f' + i })
+    out.push({ id: i, name: 'Row ' + i, grp: i % 2 === 0 ? 'even' : 'odd', a: 'a' + i, b: 'b' + i, c: 'c' + i, d: 'd' + i, e: 'e' + i, f: 'f' + i })
   }
   $data.rows = out
 })
 
 const toggleColumnLines = (): void => {
   $data.columnLines = !$data.columnLines
+}
+
+const toggleGrouping = (): void => {
+  $data.grouping = $data.grouping.length ? [] : ['grp']
 }
 
 const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number } | null; focus: { rowIndex: number; colIndex: number } | null }): void => {
@@ -60,6 +67,7 @@ const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number }
       <input type="checkbox" data-testid="toggle-column-lines" :checked="$data.columnLines" @change="toggleColumnLines" />
       column lines
     </label>
+    <button type="button" data-testid="toggle-grouping" @click="toggleGrouping">group by grp</button>
     <span class="readout" data-testid="range-readout">{{ $data.rangeReadout }}</span>
   </div>
 
@@ -70,10 +78,12 @@ const onRangeChange = (payload: { anchor: { rowIndex: number; colIndex: number }
       :stickyHeader="true"
       :columnLines="$data.columnLines"
       r-model:pagination="$data.pagination"
+      r-model:grouping="$data.grouping"
       @range-change="onRangeChange($event)"
     >
-      <Column field="name" header="Name" pinned="left" />
-      <Column field="a" header="A" />
+      <Column field="name" header="Name" pinned="left" :filterable="true" />
+      <Column field="grp" header="Group" />
+      <Column field="a" header="A" :filterable="true" />
       <Column field="b" header="B" />
       <Column field="c" header="C" />
       <Column field="d" header="D" />

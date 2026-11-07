@@ -4005,10 +4005,17 @@ $expose({
   box-sizing: border-box;
 }
 /* Pinned BODY cells are opaque so scrolled content never shows through them (header cells
-   already carry the opaque --rdt-header-bg). The translucent range tint is layered over the
-   opaque colour so it stays visible on a pinned cell. */
+   already carry the opaque --rdt-header-bg). Translucent bands and tints — the group-row band,
+   the filter-row band, the range tint — are layered over the opaque colour so they stay
+   visible on a pinned cell. */
 .rozie-data-table .rdt-td.rdt-pinned {
   background-color: var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table .rdt-group-header > .rdt-td.rdt-pinned {
+  background: linear-gradient(var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025)), var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025))), var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table .rdt-filter-cell.rdt-pinned {
+  background: linear-gradient(var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015)), var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015))), var(--rdt-pinned-bg, #fff);
 }
 .rozie-data-table .rdt-td.rdt-pinned.rdt-in-range {
   background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);

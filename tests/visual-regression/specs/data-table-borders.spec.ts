@@ -17,6 +17,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   B4 — the opt-in columnLines prop draws a right line on every cell, a left line on the
  *        first column and a top line on the header row; inner cells get no left line.
  *   B5 — the range tint stays visible on a pinned cell (layered over its opaque background).
+ *   B6 — the group-row band stays visible on a pinned cell.
+ *   B7 — pinned filter-row cells are opaque (with the filter-row band layered on top).
  */
 
 const TARGETS = ['vue', 'react', 'svelte', 'angular', 'solid', 'lit'] as const;
@@ -80,8 +82,8 @@ async function gotoBorders(page: Page, target: Target, injectHostRule: boolean) 
 
 // Body cells: a pinned first column, then inner cells.
 const PINNED_TD = 'tbody [data-grid-cell][data-row="1"][data-col-index="0"]';
-const INNER_TD = 'tbody [data-grid-cell][data-row="1"][data-col-index="2"]';
-const HEADER_TH = 'thead th[role="columnheader"]:nth-of-type(3)';
+const INNER_TD = 'tbody [data-grid-cell][data-row="1"][data-col-index="3"]';
+const HEADER_TH = 'thead th[role="columnheader"]:nth-of-type(4)';
 
 for (const target of TARGETS) {
   runnerFor(target)(`data-table-borders [${target}]: B1 separate borders with zero spacing`, async ({ page }) => {
@@ -137,5 +139,21 @@ for (const target of TARGETS) {
     const tinted = await cellStyle(page, PINNED_TD);
     const visible = (tinted?.bgImage ?? 'none') !== 'none' || tinted?.bg !== plain?.bg;
     expect(visible).toBe(true);
+  });
+
+  runnerFor(target)(`data-table-borders [${target}]: B6 the group-row band stays visible on a pinned cell`, async ({ page }) => {
+    const mount = await gotoBorders(page, target, false);
+    await mount.getByTestId('toggle-grouping').click();
+    await expect.poll(async () => (await cellStyle(page, 'tr.rdt-group-header > td.rdt-pinned')) !== null, { timeout: 10_000 }).toBe(true);
+    const s = await cellStyle(page, 'tr.rdt-group-header > td.rdt-pinned');
+    expect(s?.bgImage).not.toBe('none');
+  });
+
+  runnerFor(target)(`data-table-borders [${target}]: B7 pinned filter cells are opaque`, async ({ page }) => {
+    await gotoBorders(page, target, false);
+    const s = await cellStyle(page, '.rdt-filter-cell.rdt-pinned');
+    expect(s).not.toBeNull();
+    expect(s?.bg).not.toBe('rgba(0, 0, 0, 0)');
+    expect(s?.bgImage).not.toBe('none');
   });
 }

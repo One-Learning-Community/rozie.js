@@ -23,6 +23,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   R9  — an editor that only commits on blur writes the active cell only.
  *   R10 — a range across two columns fills only the active cell's column.
  *   R11 — Space on a checkbox range sets every cell to the opposite of the active cell.
+ *   R12 — under a sort on the filled column, focus follows the active cell's record.
+ *   R13 — moving to another cell right after a fill collapses the range (no stale range).
  *
  * Column indices: 0 label, 1 qty, 2 city, 3 tags, 4 defer, 5 done. Row 3 is locked.
  */
@@ -303,5 +305,40 @@ for (const target of TARGETS) {
     expect(await inRangeCount(page)).toBe(4);
     await page.keyboard.press('ControlOrMeta+z');
     await expect.poll(async () => JSON.stringify(await rows(page, 'done')), { timeout: 10_000 }).toBe(JSON.stringify([true, false, true, false, false, true]));
+  });
+
+  runnerFor(target)(`data-table-range-fill [${target}]: R12 under a sort, focus follows the active record after a fill`, async ({ page }) => {
+    const mount = await gotoFill(page, target);
+    await mount.getByTestId('sort-city').click();
+    // Sorted by city: Alpha, Beta (a) · Gamma, Delta (b) · Echo, Fox (c).
+    await rangeDown(page, 0, 2, 1);
+    await chooseInSelect(page, 'c');
+    await page.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(async () => JSON.stringify(await rows(page, 'city')), { timeout: 10_000 }).toBe(JSON.stringify(['c', 'c', 'b', 'b', 'c', 'c']));
+    // Alpha and Beta re-sort to the end; the active record (Beta) is now the last row.
+    await expect.poll(async () => inGrid<string>(page, `
+      const root = grid ? grid.getRootNode() : document;
+      const a = root.activeElement;
+      const tr = a ? a.closest('tr') : null;
+      return tr ? (tr.textContent || '') : '';
+    `), { timeout: 10_000 }).toContain('Beta');
+  });
+
+  runnerFor(target)(`data-table-range-fill [${target}]: R13 moving to another cell right after a fill collapses the range`, async ({ page }) => {
+    await gotoFill(page, target);
+    await rangeDown(page, 0, 2, 3);
+    await chooseInSelect(page, 'c');
+    // Ctrl+Enter and a focus move to another cell in the same task, before the fill's
+    // deferred focus return runs.
+    await inGrid(page, `
+      const sel = findDeep(document, 'select.rdt-cell-editor');
+      sel.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, composed: true, cancelable: true }));
+      const other = grid.querySelector('[data-grid-cell][data-row="5"][data-col-index="0"]');
+      if (other) other.focus();
+    `);
+    await expect.poll(async () => JSON.stringify(await rows(page, 'city')), { timeout: 10_000 }).toBe(JSON.stringify(['c', 'c', 'c', 'c', 'c', 'c']));
+    await page.waitForTimeout(300);
+    expect(await activeCell(page)).toBe('5,0');
+    expect(await inRangeCount(page)).toBe(0);
   });
 }

@@ -473,8 +473,8 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     called: boolean;
     committed: boolean;
   } | null>(null);
-  const rangeTransition = useRef(false);
   const rangeClickPending = useRef<any>(null);
+  const rangeTransition = useRef(false);
   const rangeDragMoved = useRef(false);
   const [data, setData] = useControllableState({
     value: props.data,
@@ -7222,16 +7222,35 @@ const DataTable = forwardRef<DataTableHandle, DataTableProps>(function DataTable
     setInvalid('');
     const focusRow = editingRow;
     const focusCol = editingCol;
+    const rowOriginal = editingRowOriginal();
+    const rowId = editingRowId();
     // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
     editTransition.current = true;
     committedThisSession.current = true;
-    fillActiveColumn(rawValue);
+    const result = fillActiveColumn(rawValue);
     endEdit();
     editTransition.current = false;
-    // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
-    // range (the selection stays put after a fill, as in a spreadsheet).
-    rangeTransition.current = true;
-    focusCellWhenReady(focusRow, focusCol);
+    // Keep the range when focus comes back to the active cell (the selection stays put after a
+    // fill, as in a spreadsheet). Coordinate-matched, like a Shift+Click: if focus lands anywhere
+    // else first (the user clicks another cell, or the focus return gives up), that focusin
+    // clears the range as usual instead of inheriting a stale "keep" flag.
+    rangeClickPending.current = {
+      isHeader: false,
+      r: focusRow,
+      c: focusCol
+    };
+    if (result && result.changed > 0) {
+      // A write can re-sort or re-filter the rows (holdView off), so follow the active cell's
+      // RECORD rather than its old index — the same B23 path commitEdit uses. A re-order also
+      // clears the range, so the coordinate match above only keeps it when nothing moved.
+      pendingEditFollow.current = {
+        rowOriginal,
+        rowId,
+        col: focusCol
+      };
+    } else {
+      focusCellWhenReady(focusRow, focusCol);
+    }
     return true;
   }
 

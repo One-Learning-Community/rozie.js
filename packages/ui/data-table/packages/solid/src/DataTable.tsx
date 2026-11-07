@@ -346,6 +346,12 @@ __rozieInjectStyle('DataTable-d5dcab4c', `[data-rozie-s-d5dcab4c]:host {
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
   background-color: var(--rdt-pinned-bg, #fff);
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] > .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025)), var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025))), var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015)), var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned.rdt-in-range[data-rozie-s-d5dcab4c] {
   background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
 }
@@ -8126,16 +8132,35 @@ export default function DataTable(_props: DataTableProps): JSX.Element {
     setInvalid('');
     const focusRow = editingRow();
     const focusCol = editingCol();
+    const rowOriginal = editingRowOriginal();
+    const rowId = editingRowId();
     // Same teardown guards as commitEdit: the unmount blur of the editor must not commit again.
     editTransition = true;
     committedThisSession = true;
-    fillActiveColumn(rawValue);
+    const result = fillActiveColumn(rawValue);
     endEdit();
     editTransition = false;
-    // The focus return lands on the active cell; rangeTransition tells that focusin to keep the
-    // range (the selection stays put after a fill, as in a spreadsheet).
-    rangeTransition = true;
-    focusCellWhenReady(focusRow, focusCol);
+    // Keep the range when focus comes back to the active cell (the selection stays put after a
+    // fill, as in a spreadsheet). Coordinate-matched, like a Shift+Click: if focus lands anywhere
+    // else first (the user clicks another cell, or the focus return gives up), that focusin
+    // clears the range as usual instead of inheriting a stale "keep" flag.
+    rangeClickPending = {
+      isHeader: false,
+      r: focusRow,
+      c: focusCol
+    };
+    if (result && result.changed > 0) {
+      // A write can re-sort or re-filter the rows (holdView off), so follow the active cell's
+      // RECORD rather than its old index — the same B23 path commitEdit uses. A re-order also
+      // clears the range, so the coordinate match above only keeps it when nothing moved.
+      pendingEditFollow = {
+        rowOriginal,
+        rowId,
+        col: focusCol
+      };
+    } else {
+      focusCellWhenReady(focusRow, focusCol);
+    }
     return true;
   }
 

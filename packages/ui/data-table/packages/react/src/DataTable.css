@@ -218,6 +218,12 @@
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
   background-color: var(--rdt-pinned-bg, #fff);
 }
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-group-header[data-rozie-s-d5dcab4c] > .rdt-td.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025)), var(--rdt-group-header-bg, rgba(0, 0, 0, 0.025))), var(--rdt-pinned-bg, #fff);
+}
+.rozie-data-table[data-rozie-s-d5dcab4c] .rdt-filter-cell.rdt-pinned[data-rozie-s-d5dcab4c] {
+  background: linear-gradient(var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015)), var(--rdt-filter-row-bg, rgba(0, 0, 0, 0.015))), var(--rdt-pinned-bg, #fff);
+}
 .rozie-data-table[data-rozie-s-d5dcab4c] .rdt-td.rdt-pinned.rdt-in-range[data-rozie-s-d5dcab4c] {
   background: linear-gradient(var(--rdt-range-bg, rgba(37, 99, 235, 0.12)), var(--rdt-range-bg, rgba(37, 99, 235, 0.12))), var(--rdt-pinned-bg, #fff);
 }
