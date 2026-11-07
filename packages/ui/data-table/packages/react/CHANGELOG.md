@@ -1,5 +1,14 @@
 # @rozie-ui/data-table-react
 
+## 0.9.1
+
+### Patch Changes
+
+- e2ef5f6: Docs: `virtual` is chosen when the table mounts. Changing it afterwards isn't supported, so remount the table instead (for example with a `:key`). `columnLines` notes that each line takes 1px inside the cell, so unpinned columns outside column windowing render 1px wider.
+- a60b6f6: Rebuilt with the current compiler: the `<input>`/`<textarea>` change listener now passes its event names to `rozieNativeListeners`, so its handler gets the precise event type. No behaviour change.
+- Updated dependencies [a60b6f6]
+  - @rozie/runtime-react@0.10.2
+
 ## 0.9.0
 
 ### Minor Changes

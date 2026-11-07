@@ -1,5 +1,12 @@
 # @rozie/unplugin
 
+## 0.10.2
+
+### Patch Changes
+
+- Updated dependencies [a60b6f6]
+  - @rozie/core@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

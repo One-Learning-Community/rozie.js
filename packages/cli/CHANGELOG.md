@@ -1,5 +1,17 @@
 # @rozie/cli
 
+## 0.10.2
+
+### Patch Changes
+
+- Updated dependencies [a60b6f6]
+  - @rozie/core@0.10.2
+  - @rozie/runtime-react@0.10.2
+  - @rozie/runtime-svelte@0.10.2
+  - @rozie/runtime-solid@0.10.2
+  - @rozie/runtime-vue@0.10.2
+  - @rozie/runtime-lit@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

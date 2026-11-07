@@ -1,5 +1,11 @@
 # @rozie/runtime-lit
 
+## 0.10.2
+
+### Patch Changes
+
+- @rozie/runtime-keynav-core@0.10.2
+
 ## 0.10.1
 
 ### Patch Changes

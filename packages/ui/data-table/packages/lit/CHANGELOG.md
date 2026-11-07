@@ -1,5 +1,12 @@
 # @rozie-ui/data-table-lit
 
+## 0.9.1
+
+### Patch Changes
+
+- e2ef5f6: Docs: `virtual` is chosen when the table mounts. Changing it afterwards isn't supported, so remount the table instead (for example with a `:key`). `columnLines` notes that each line takes 1px inside the cell, so unpinned columns outside column windowing render 1px wider.
+  - @rozie/runtime-lit@0.10.2
+
 ## 0.9.0
 
 ### Minor Changes

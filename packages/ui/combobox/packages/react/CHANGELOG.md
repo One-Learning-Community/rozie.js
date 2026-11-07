@@ -1,5 +1,13 @@
 # @rozie-ui/combobox-react
 
+## 0.8.5
+
+### Patch Changes
+
+- a60b6f6: Rebuilt with the current compiler: the `<input>`/`<textarea>` change listener now passes its event names to `rozieNativeListeners`, so its handler gets the precise event type. No behaviour change.
+- Updated dependencies [a60b6f6]
+  - @rozie/runtime-react@0.10.2
+
 ## 0.8.4
 
 ### Patch Changes
