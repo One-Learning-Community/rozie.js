@@ -7,3 +7,7 @@ export { createRozieHostAttrsReader } from './rozieHostAttrs';
 export { rozieModel } from './rozieModel';
 export type { RozieAttrRenderer } from './rozieAttrApplier';
 export type { RozieHostRef } from './rozieHostAttrs';
+export { RozieListen, ROZIE_LISTEN_SLOTS } from './rozie-listen.directive';
+export type { RozieListenEvent } from './rozie-listen.directive';
+export { RozieListenController } from './rozieListenController';
+export type { RozieListenOptions } from './rozieListenController';

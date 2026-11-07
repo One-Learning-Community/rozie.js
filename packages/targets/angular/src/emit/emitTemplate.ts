@@ -148,6 +148,13 @@ export interface EmitTemplateResult {
    * only ever writes that exact token for this lowering).
    */
   usesMergeStyle: boolean;
+  /**
+   * True when the template routed at least one `.capture`/`.passive`/`.once`
+   * listener through a `RozieListen` slot (`(rozieOn<N>Fire)=`). emitAngular
+   * adds `RozieListen` to the `@rozie/runtime-angular` import AND the
+   * decorator `imports: [...]`. Same emitted-template scan as `usesNgClass`.
+   */
+  usesRozieListen: boolean;
   diagnostics: Diagnostic[];
 }
 
@@ -262,6 +269,7 @@ export function emitTemplate(
       usesNgClass: false,
       usesNgStyle: false,
       usesMergeStyle: false,
+      usesRozieListen: false,
       diagnostics,
     };
   }
@@ -301,6 +309,7 @@ export function emitTemplate(
     usedGlobals: detectUsedGlobals(template),
     ...detectNgDirectives(template),
     usesMergeStyle: detectMergeStyleUsage(template),
+    usesRozieListen: /\(rozieOn\d+Fire\)="/.test(template),
     diagnostics,
   };
 }

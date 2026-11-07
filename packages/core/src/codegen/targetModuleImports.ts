@@ -171,6 +171,7 @@ export const SOLID_RUNTIME_IMPORTS = [
   // primitive-only component's `@rozie/runtime-solid` import line stays
   // byte-identical to pre-phase (SPEC-3).
   'rozieDisplay',
+  'rozieNativeListeners',
   // 260608-sya — attribute-position display helper (nullish DROPS the
   // attribute, matching Vue's `:attr` semantics). Added by the attribute
   // emitter ONLY on the wrapped whole-value generic-attr binding branch.
@@ -286,6 +287,7 @@ export const SVELTE_RUNTIME_IMPORTS = [
   'rozieAttr',
   'rozieClass',
   'rozieDisplay',
+  'rozieListeners',
   'roziePortal',
   'rozieStyle',
 ] as const;
@@ -384,6 +386,7 @@ export const ANGULAR_COMMON_IMPORTS = ['NgTemplateOutlet', 'NgClass', 'NgStyle']
 /** `import { … } from '@rozie/runtime-angular'` (see `ANGULAR_RUNTIME_LOCAL_ALIAS`). */
 export const ANGULAR_RUNTIME_IMPORTS = [
   'RozieSlot',
+  'RozieListen',
   'rozieDisplay',
   'rozieAttr',
   'rozieToken',
@@ -491,6 +494,11 @@ export const LIT_RUNTIME_IMPORTS = [
    * attached listener (T-15-V5-04 leak defense).
    */
   'rozieListeners',
+  /**
+   * Element directive for a `.capture`/`.passive`/`.once` template listener whose event
+   * already has a binding on the same element (Lit forbids duplicate attribute names).
+   */
+  'rozieOptionListeners',
   /**
    * Pre-Phase-16 cleanup Item 3 — `__rozieReconcileAfterDomMutation` runtime
    * helper, shipped from `@rozie/runtime-lit`. Added by `rewriteScript` when

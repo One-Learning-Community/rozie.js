@@ -278,6 +278,9 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   if (templateResult.rozieListenersUsed) {
     runtimeImports.add('rozieListeners');
   }
+  if (templateResult.rozieOptionListenersUsed) {
+    runtimeImports.add('rozieOptionListeners');
+  }
 
   // Item 3 (engine-CSS shadow bridge) — register the `adoptDocumentStyles`
   // import when the `<rozie adopt-document-styles>` envelope attr is set; the

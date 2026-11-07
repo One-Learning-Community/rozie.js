@@ -35,5 +35,7 @@ export { rozieDisplay } from './rozieDisplay.js';
 export { rozieAttr } from './rozieAttr.js';
 export type { RozieAttrValue } from './rozieAttr.js';
 export { rozieSelectValue } from './rozieSelectValue.js';
+export { rozieNativeListeners } from './rozieNativeListeners.js';
+export type { RozieNativeListener } from './rozieNativeListeners.js';
 export { rozieClass } from './rozieClass.js';
 export { rozieContext } from './rozieContext.js';

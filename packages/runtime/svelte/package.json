@@ -21,6 +21,12 @@
       "types": "./src/applyListeners.ts",
       "import": "./src/applyListeners.ts",
       "default": "./src/applyListeners.ts"
+    },
+    "./rozieListeners": {
+      "svelte": "./src/rozieListeners.ts",
+      "types": "./src/rozieListeners.ts",
+      "import": "./src/rozieListeners.ts",
+      "default": "./src/rozieListeners.ts"
     }
   },
   "files": [

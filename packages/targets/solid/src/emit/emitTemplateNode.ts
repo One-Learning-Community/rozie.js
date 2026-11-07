@@ -44,11 +44,15 @@ import type {
 import { RozieErrorCode } from '@rozie/core';
 import { jsxBoundaryText } from '../../../../core/src/emit/jsxBoundaryWhitespace.js';
 import type {
+  RuntimeSolidImport,
   RuntimeSolidImportCollector,
   SolidImportCollector,
 } from '../rewrite/collectSolidImports.js';
 import type { NarrowedReads, ScopeAccessorParams } from '../rewrite/rewriteTemplateExpression.js';
-import { rewriteTemplateExpression, withoutNarrowedRoots } from '../rewrite/rewriteTemplateExpression.js';
+import {
+  rewriteTemplateExpression,
+  withoutNarrowedRoots,
+} from '../rewrite/rewriteTemplateExpression.js';
 import { emitConditional } from './emitConditional.js';
 // Phase 71 (r-keynav) — REFERENCE emitter wiring modeled on the React target
 // (see emitKeynav.ts's module doc comment).
@@ -618,16 +622,23 @@ function hasBareAttrsSpread(attrs: AttributeBinding[]): boolean {
 function emitElementListeners(
   node: TemplateElementIR,
   ctx: EmitNodeCtx,
-): { eventsJsx: string; extraSpreads: string[] } {
+): { eventsJsx: string; extraSpreads: string[]; nativeListeners: string[] } {
   const hasEvents = node.events.length > 0;
   const hasSpreads = node.listenerSpreads.length > 0;
+  // `.capture`/`.passive`/`.once` listeners — attached in the element's ref (see
+  // `withNativeListenersRef`), never as JSX props or `mergeListeners` entries.
+  const nativeListeners: string[] = [];
 
   if (!hasEvents && !hasSpreads) {
-    return { eventsJsx: '', extraSpreads: [] };
+    return { eventsJsx: '', extraSpreads: [], nativeListeners };
   }
 
   if (!hasSpreads) {
-    return { eventsJsx: emitElementEvents(node, ctx), extraSpreads: [] };
+    return {
+      eventsJsx: emitElementEvents(node, ctx, nativeListeners),
+      extraSpreads: [],
+      nativeListeners,
+    };
   }
 
   const dynamic = hasDynamicListenerSpread(node);
@@ -644,7 +655,11 @@ function emitElementListeners(
       ...node,
       events: [...node.events, ...syntheticEvents],
     };
-    return { eventsJsx: emitElementEvents(merged, ctx), extraSpreads: [] };
+    return {
+      eventsJsx: emitElementEvents(merged, ctx, nativeListeners),
+      extraSpreads: [],
+      nativeListeners,
+    };
   }
 
   // CASE: single dynamic-spread, no events — direct emit with no runtime
@@ -672,7 +687,7 @@ function emitElementListeners(
       isBareIdentifierExpr(only.expression, '$listeners') &&
       hasBareAttrsSpread(node.attributes)
     ) {
-      return { eventsJsx: '', extraSpreads: [] };
+      return { eventsJsx: '', extraSpreads: [], nativeListeners };
     }
     const attrCtx: import('./emitTemplateAttribute.js').EmitAttrCtx = {
       ir: ctx.ir,
@@ -680,7 +695,7 @@ function emitElementListeners(
       invokeAccessors: ctx.invokeAccessors,
       loopValueBindings: ctx.loopValueBindings,
     };
-    return { eventsJsx: '', extraSpreads: [emitListenerSpread(only, attrCtx)] };
+    return { eventsJsx: '', extraSpreads: [emitListenerSpread(only, attrCtx)], nativeListeners };
   }
 
   // CASE: mixed / dynamic merge — single runtime `mergeListeners(...)` call.
@@ -702,6 +717,10 @@ function emitElementListeners(
       elementTag: node.tagKind === 'html' ? node.tagName : undefined,
     });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    if (result.nativeListener !== undefined) {
+      nativeListeners.push(result.nativeListener);
+      continue;
+    }
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
     if (!match) continue;
     emitted.push({ jsxName: match[1]!, body: match[2]! });
@@ -750,7 +769,34 @@ function emitElementListeners(
 
   ctx.collectors.runtime.add('mergeListeners');
   const spreadToken = `{...mergeListeners(${mergeArgs.join(', ')})}`;
-  return { eventsJsx: '', extraSpreads: [spreadToken] };
+  return { eventsJsx: '', extraSpreads: [spreadToken], nativeListeners };
+}
+
+/**
+ * Attach `.capture`/`.passive`/`.once` template listeners in the element's ref:
+ * `rozieNativeListeners(el, [[type, handler, options], …])`. Solid JSX allows one
+ * `ref=` per element, so the call goes at the front of an existing
+ * `ref={(el) => { … }}` (author `ref="x"`, keynav, `<select>` value) when there
+ * is one, else a new ref is added. The ref runs once per element, which is what
+ * `.once` needs; the helper removes the listeners on cleanup. Mutates `parts`.
+ */
+function withNativeListenersRef(
+  parts: string[],
+  nativeListeners: string[],
+  ctx: EmitNodeCtx,
+): void {
+  if (nativeListeners.length === 0) return;
+  ctx.collectors.runtime.add('rozieNativeListeners');
+  const call = `rozieNativeListeners(el, [${nativeListeners.join(', ')}]);`;
+  const head = 'ref={(el) => { ';
+  const re = /(^|\s)ref=\{\(el\) => \{ /;
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (part === undefined || !re.test(part)) continue;
+    parts[i] = part.replace(re, (_m, pre: string) => `${pre}${head}${call} `);
+    return;
+  }
+  parts.unshift(`${head}${call} }}`);
 }
 
 /**
@@ -761,7 +807,11 @@ function emitElementListeners(
  * `Listener` entries (via `listenerFromLiteralKey`) and participate in the
  * same per-key dispatcher merge as `@event` handlers.
  */
-function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
+function emitElementEvents(
+  node: TemplateElementIR,
+  ctx: EmitNodeCtx,
+  nativeListeners: string[],
+): string {
   if (node.events.length === 0) return '';
 
   type EmittedAttr = { jsxName: string; body: string };
@@ -783,6 +833,10 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       elementTag: node.tagKind === 'html' ? node.tagName : undefined,
     });
     for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    if (result.nativeListener !== undefined) {
+      nativeListeners.push(result.nativeListener);
+      continue;
+    }
 
     // Parse `<jsxName>={<body>}` so we can re-group when names collide.
     const match = result.jsxAttr.match(/^([A-Za-z][\w]*)=\{(.*)\}$/s);
@@ -1094,6 +1148,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
       `innerHTML={${exprCode}}`,
       ...keynavAttrs,
     ].filter(Boolean);
+    withNativeListenersRef(headParts, listenerResult.nativeListeners, ctx);
     if (scopeAttrJsx) headParts.push(scopeAttrJsx);
     const head = headParts.length > 0 ? ' ' + headParts.join(' ') : '';
     return `<${node.tagName}${head} />`;
@@ -1172,6 +1227,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
     ...listenerResult.extraSpreads,
     ...keynavAttrs,
   ];
+  withNativeListenersRef(headParts, listenerResult.nativeListeners, ctx);
   if (rShowStyleAttr) headParts.push(rShowStyleAttr);
   if (scopeAttrJsx) headParts.push(scopeAttrJsx);
 

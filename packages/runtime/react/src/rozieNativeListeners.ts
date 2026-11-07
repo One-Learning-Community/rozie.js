@@ -1,12 +1,23 @@
 /**
  * `rozieNativeListeners` — attach DOM listeners to an element through its
- * callback ref, for template events whose JSX prop is a different event.
+ * callback ref, for template events JSX can't express as a prop.
  *
- * The case that needs it: `@change` on an `<input>` / `<textarea>` means the
- * DOM `change` event (the user committed an edit), but React's JSX `onChange`
- * fires on every keystroke. The emitter lowers such listeners to
+ * Two cases need it:
+ *   - `@change` on an `<input>` / `<textarea>` means the DOM `change` event
+ *     (the user committed an edit), but React's JSX `onChange` fires on every
+ *     keystroke.
+ *   - a listener carrying `.passive` or `.once` (with or without `.capture`):
+ *     JSX props take no listener options (`.capture` alone maps to the
+ *     `on<Event>Capture` prop and stays on JSX).
  *
- *   ref={rozieNativeListeners<HTMLInputElement>([["change", handler]], authorRef)}
+ * The emitter lowers such listeners to
+ *
+ *   ref={rozieNativeListeners<HTMLDivElement, ["keydown"]>([["keydown", handler, { once: true }]], authorRef)}
+ *
+ * The second type argument lists the event names in order, so each handler's
+ * event is typed from `HTMLElementEventMap` (`KeyboardEvent` for `keydown`;
+ * plain `Event` for a name the map doesn't know). Omitted, every handler gets
+ * `Event`, which is the shape older compiled output relies on.
  *
  * The returned callback is created on every render, so React detaches the
  * previous one (called with `null`) and attaches this one: the listener always
@@ -19,23 +30,35 @@
  *
  * @public — runtime API consumed by emitted .tsx files.
  */
-export type RozieNativeListener<T extends Element> = readonly [
-  type: string,
-  handler: (event: Event & { currentTarget: T; target: T }) => void,
+
+/** The event a listener for `type` receives on an element of type `T`. */
+export type RozieNativeEvent<T extends Element, K extends string = string> = (K extends keyof HTMLElementEventMap
+  ? HTMLElementEventMap[K]
+  : Event) & { currentTarget: T; target: T };
+
+export type RozieNativeListener<T extends Element, K extends string = string> = readonly [
+  type: K,
+  handler: (event: RozieNativeEvent<T, K>) => void,
   options?: boolean | AddEventListenerOptions,
 ];
+
+/** One `RozieNativeListener` per event name in `Ks`, in order. */
+export type RozieNativeListeners<T extends Element, Ks extends readonly string[]> = {
+  readonly [I in keyof Ks]: RozieNativeListener<T, Ks[I]>;
+};
 
 export type RozieForwardRef<T> = { current: T | null } | ((el: T | null) => void) | null | undefined;
 
 /** Listener slots (`<index>:<type>`) whose `.once` listener already fired. */
 const firedOnce = new WeakMap<Element, Set<string>>();
 
-export function rozieNativeListeners<T extends Element>(
-  listeners: ReadonlyArray<RozieNativeListener<T>>,
-  forward?: RozieForwardRef<T>,
-): (el: T | null) => void {
+export function rozieNativeListeners<
+  T extends Element,
+  Ks extends readonly string[] = readonly string[],
+>(listeners: RozieNativeListeners<T, Ks>, forward?: RozieForwardRef<T>): (el: T | null) => void {
   let attached: T | null = null;
-  const wrapped = listeners.map(([type, handler, options], i) => {
+  const entries = listeners as unknown as ReadonlyArray<RozieNativeListener<T>>;
+  const wrapped = entries.map(([type, handler, options], i) => {
     const once = typeof options === 'object' && options.once === true;
     // `once` is tracked in `firedOnce` instead of passed on: the DOM's own flag
     // would reset every time the listener is re-added.

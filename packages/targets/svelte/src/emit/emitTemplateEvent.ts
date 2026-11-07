@@ -20,10 +20,13 @@
  *     the wrapped name as the event handler.
  *   - `kind: 'helper'` with `listenerOnly: true` (.outside) — ROZ621 (only
  *     valid in <listeners> blocks).
- *   - `kind: 'native'` (capture/passive/once tokens) — REJECTED in template
- *     context with ROZ621. Per RESEARCH Pitfall 4, Svelte 5 has no template-
- *     side native modifier passthrough. These tokens are valid ONLY in the
- *     listeners-block addEventListener options object (Plan 02a Task 3).
+ *   - `kind: 'native'` (capture/passive/once tokens) — collected into
+ *     `nativeOptions`. Svelte 5's `on<event>={...}` attribute carries no
+ *     listener options (Pitfall 4), so the caller (`emitTemplateNode.ts`
+ *     `emitEvents`) attaches an option-bearing listener on a DOM element
+ *     through the `rozieListeners` action from `@rozie/runtime-svelte`
+ *     instead, with the same `handlerValue`. On a COMPONENT tag the event is
+ *     a callback prop, not a DOM listener, so the tokens stay ROZ621 there.
  *
  * Per CONTEXT D-08 collected-not-thrown: never throws; pushes diagnostics.
  *
@@ -79,9 +82,24 @@ export function svelteEventAttrName(eventName: string, isComponent: boolean): st
   return isComponent ? svelteCallbackPropName(eventName) : `on${eventName.toLowerCase()}`;
 }
 
+/** Native listener options requested by `.capture` / `.passive` / `.once`. */
+export interface NativeListenerOptions {
+  capture?: true;
+  passive?: true;
+  once?: true;
+}
+
 export interface EmitTemplateEventResult {
   /** The emitted attribute string, e.g., `onclick={handler}`. */
   eventAttr: string;
+  /** The attribute's value expression alone (`handler` / `($event) => { ... }`). */
+  handlerValue: string;
+  /**
+   * Set when the listener carries `.capture` / `.passive` / `.once` on a DOM
+   * element. Such a listener can't be an `on<event>` attribute; the caller
+   * attaches `[event, handlerValue, nativeOptions]` via `use:rozieListeners`.
+   */
+  nativeOptions?: NativeListenerOptions;
   /** Optional script-level injection (debounce/throttle wrap). */
   scriptInjection?: SvelteScriptInjection;
   diagnostics: Diagnostic[];
@@ -224,6 +242,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const eventName = listener.event;
 
   const inlineGuards: string[] = [];
+  let nativeOptions: NativeListenerOptions | undefined;
   let scriptInjection: SvelteScriptInjection | undefined;
   // Classify the original handler shape BEFORE rewriting (so structural
   // information from the Babel AST is available) — wrap-name substitution
@@ -263,15 +282,21 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (descriptor.kind === 'native') {
-      // Pitfall 4: Svelte 5 has no template-side native modifier passthrough.
-      // The `native` variant is valid ONLY in listeners-block addEventListener
-      // options. Reject in template-event context.
-      diagnostics.push({
-        code: RozieErrorCode.TARGET_SVELTE_RESERVED, // ROZ621
-        severity: 'error',
-        message: `Modifier '.${modifierName}' emits a native '${descriptor.token}' option, which Svelte 5 does NOT support on template @event bindings (Pitfall 4 — Svelte 5 dropped the legacy colon-event syntax + pipe-modifier shorthand). Move this modifier to a <listeners> block.`,
-        loc: entry.sourceLoc,
-      });
+      // Pitfall 4: Svelte 5's `on<event>={...}` attribute takes no listener
+      // options. On a DOM element the option is collected and the caller
+      // attaches the listener through the `rozieListeners` action instead.
+      // On a component tag the event is a callback prop — there is no DOM
+      // listener to pass options to, so the token stays rejected there.
+      if (ctx.isComponent === true) {
+        diagnostics.push({
+          code: RozieErrorCode.TARGET_SVELTE_RESERVED, // ROZ621
+          severity: 'error',
+          message: `Modifier '.${modifierName}' emits a native '${descriptor.token}' listener option, which has no meaning on a component event (a callback prop, not a DOM listener). Put the listener on a DOM element instead.`,
+          loc: entry.sourceLoc,
+        });
+        continue;
+      }
+      nativeOptions = { ...nativeOptions, [descriptor.token]: true };
       continue;
     }
 
@@ -377,7 +402,8 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
 
   const eventAttr = `${attrName}={${attrValue}}`;
 
-  const result: EmitTemplateEventResult = { eventAttr, diagnostics };
+  const result: EmitTemplateEventResult = { eventAttr, handlerValue: attrValue, diagnostics };
+  if (nativeOptions) result.nativeOptions = nativeOptions;
   if (scriptInjection) {
     result.scriptInjection = scriptInjection;
   }

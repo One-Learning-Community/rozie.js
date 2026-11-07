@@ -1,0 +1,102 @@
+<!--
+  EventOptionsDemo.rozie — behavioral consumer for `.capture`, `.passive` and `.once`
+  on TEMPLATE `@event` bindings (event-options.spec.ts), on all six targets:
+
+  - `.capture` runs the outer handler before the target's own handler;
+  - `.capture.stop` on a wrapper stops the event before it reaches the inner button;
+  - `.once` fires a single time, even after the component re-renders;
+  - `.capture.once` on `r-for` items fires once per item;
+  - `.passive` makes `preventDefault()` a no-op (compared with a plain listener).
+-->
+
+<rozie name="EventOptionsDemo">
+
+<data>
+{
+  log: [],
+  onceCount: 0,
+  renders: 0,
+  hitLog: [],
+  items: ['a', 'b', 'c'],
+  passiveResult: '',
+  activeResult: '',
+}
+</data>
+
+<script lang="ts">
+const record = (entry: string): void => {
+  $data.log = [...$data.log, entry]
+}
+
+const clearLog = (): void => {
+  $data.log = []
+}
+
+const countOnce = (): void => {
+  $data.onceCount = $data.onceCount + 1
+}
+
+const bump = (): void => {
+  $data.renders = $data.renders + 1
+}
+
+const hit = (item: string): void => {
+  $data.hitLog = [...$data.hitLog, item]
+}
+
+const tryPassive = (e: Event): void => {
+  e.preventDefault()
+  $data.passiveResult = String(e.defaultPrevented)
+}
+
+const tryActive = (e: Event): void => {
+  e.preventDefault()
+  $data.activeResult = String(e.defaultPrevented)
+}
+</script>
+
+<template>
+<div class="eo-demo">
+  <section>
+    <div class="box" data-testid="capture-outer" @click.capture="record('outer-capture')" @click="record('outer-bubble')">
+      <button type="button" data-testid="capture-inner" @click="record('inner')">capture</button>
+    </div>
+    <div class="box" data-testid="stop-outer" @click.capture.stop="record('guard')">
+      <button type="button" data-testid="stop-inner" @click="record('stopped-inner')">capture + stop</button>
+    </div>
+    <button type="button" data-testid="clear-log" @click="clearLog">clear</button>
+    <span data-testid="log">{{ $data.log.join(',') }}</span>
+  </section>
+
+  <section>
+    <button type="button" data-testid="once" @click.once="countOnce">once</button>
+    <button type="button" data-testid="rerender" @click="bump">rerender</button>
+    <span data-testid="renders">{{ $data.renders }}</span>
+    <span data-testid="once-count">{{ $data.onceCount }}</span>
+    <ul>
+      <li r-for="item in $data.items" :key="item" :data-testid="'item-' + item" @click.capture.once="hit(item)">{{ item }}</li>
+    </ul>
+    <span data-testid="hit-log">{{ $data.hitLog.join(',') }}</span>
+  </section>
+
+  <section>
+    <div class="box" data-testid="passive" @wheel.passive="tryPassive($event)">passive</div>
+    <div class="box" data-testid="active" @wheel="tryActive($event)">active</div>
+    <span data-testid="passive-result">{{ $data.passiveResult }}</span>
+    <span data-testid="active-result">{{ $data.activeResult }}</span>
+  </section>
+</div>
+</template>
+
+<style>
+.eo-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.eo-demo section { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.box { padding: 0.5rem; border: 1px solid #ccc; }
+</style>
+
+</rozie>

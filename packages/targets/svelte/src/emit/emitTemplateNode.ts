@@ -32,7 +32,7 @@ import type {
   TemplateSlotInvocationIR,
   TemplateStaticTextIR,
 } from '@rozie/core';
-import { RozieErrorCode } from '@rozie/core';
+import { isEventModifier, RozieErrorCode } from '@rozie/core';
 import {
   collectTopLevelScriptBindings,
   findRForLoopVarShadows,
@@ -388,6 +388,41 @@ function listenerFromLiteralKey(
 function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean): string {
   if (events.length === 0) return '';
 
+  // `.capture` / `.passive` / `.once` on a DOM element: Svelte 5's
+  // `on<event>={...}` attribute carries no listener options, so each such
+  // listener becomes one `[event, handler, options]` entry of a single
+  // `use:rozieListeners={[...]}` action (`@rozie/runtime-svelte`). The handler
+  // value is the same one the attribute would carry; option-less listeners —
+  // including a same-event sibling — keep the attribute path below.
+  const actionEntries: string[] = [];
+  if (!isComponent) {
+    const plain: Listener[] = [];
+    for (const ev of events) {
+      if (!hasNativeListenerOption(ev, ctx.registry)) {
+        plain.push(ev);
+        continue;
+      }
+      const result = emitTemplateEvent(ev, {
+        ir: ctx.ir,
+        registry: ctx.registry,
+        injectionCounter: ctx.injectionCounter,
+        isComponent,
+      });
+      if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
+      for (const d of result.diagnostics) ctx.diagnostics.push(d);
+      const opts = result.nativeOptions ?? {};
+      const optText = (['capture', 'passive', 'once'] as const)
+        .filter((k) => opts[k] === true)
+        .map((k) => `${k}: true`)
+        .join(', ');
+      actionEntries.push(`[${JSON.stringify(ev.event)}, ${result.handlerValue}, { ${optText} }]`);
+    }
+    events = plain;
+  }
+  const actionAttr =
+    actionEntries.length > 0 ? `use:rozieListeners={[${actionEntries.join(', ')}]}` : '';
+  if (actionAttr) ctx.runtimeImports.add('rozieListeners');
+
   // Group by the emitted Svelte attribute name. For a child-component custom
   // event this strips hyphens via svelteCallbackPropName so the consumer prop
   // name agrees with the producer's `$emit` lowering; for native DOM events it
@@ -460,7 +495,28 @@ function emitEvents(events: Listener[], ctx: EmitNodeCtx, isComponent: boolean):
     out.push(merged);
   }
 
+  if (actionAttr) out.push(actionAttr);
   return out.join(' ');
+}
+
+/**
+ * True when the listener's pipeline carries a `.capture` / `.passive` /
+ * `.once` native listener option (a listenerOption entry, or a modifier whose
+ * Svelte descriptor is `kind: 'native'`).
+ */
+function hasNativeListenerOption(ev: Listener, registry: ModifierRegistry): boolean {
+  for (const entry of ev.modifierPipeline) {
+    if (entry.kind === 'listenerOption') return true;
+    const impl = registry.get(entry.modifier);
+    if (!impl || !isEventModifier(impl) || !impl.svelte) continue;
+    const d = impl.svelte(entry.args, {
+      source: 'template-event',
+      event: ev.event,
+      sourceLoc: entry.sourceLoc,
+    });
+    if (d.kind === 'native') return true;
+  }
+  return false;
 }
 
 /**

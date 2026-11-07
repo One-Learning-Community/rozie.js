@@ -11,7 +11,9 @@
  *     @event modifiers).
  *   - `diagnostics` — collected diagnostics (D-08). For example, ROZ620 when
  *     r-html coexists with template children, ROZ621 when a template @event
- *     modifier returns a 'native' Svelte descriptor (Pitfall 4).
+ *     uses a listenerOnly modifier (`.outside`) or a native listener option
+ *     (`.capture`/`.passive`/`.once`) on a COMPONENT tag. On a DOM element the
+ *     native options attach through `use:rozieListeners` (Pitfall 4).
  *
  * Empty template (ir.template === null) returns the literal string
  * `<!-- empty template -->` so the SFC envelope still produces valid surface.

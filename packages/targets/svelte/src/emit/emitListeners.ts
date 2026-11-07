@@ -21,8 +21,9 @@
  *
  * Native modifier passthrough (`.capture`/`.passive`/`.once` listenerOption
  * tokens) IS valid in <listeners> context — they map to the addEventListener
- * options object as `{ capture: true, passive: true, once: true }`. Unlike
- * template-event context where they're ROZ621 (Pitfall 4).
+ * options object as `{ capture: true, passive: true, once: true }`. In
+ * template-event context they attach through the `rozieListeners` action
+ * instead (Svelte 5's `on<event>` attribute takes no options — Pitfall 4).
  *
  * Per RESEARCH lines 484-487: Svelte's $effect auto-tracks signal reads. The
  * Phase 2 ReactiveDepGraph is NOT consumed — listener.deps is ignored on the

@@ -35,6 +35,12 @@
  *     OWN rendered subtree OUT to a container via native DOM
  *     appendChild/insertBefore (Svelte has no `<Teleport>`-equivalent
  *     framework component). See `roziePortal.ts`'s module doc comment.
+ *
+ *   - `rozieListeners` — the Svelte 5 action for template `@event` bindings
+ *     that carry native listener options (`.capture` / `.passive` / `.once`),
+ *     which Svelte's `on<event>={...}` attributes cannot express. Emitted as
+ *     `use:rozieListeners={[[type, handler, options], ...]}`. See
+ *     `rozieListeners.ts`'s module doc comment.
  */
 
 export { applyListeners } from './applyListeners.js';
@@ -44,3 +50,4 @@ export { rozieClass } from './rozieClass.js';
 export { rozieStyle } from './rozieStyle.js';
 export { keynav, type KeynavActionOpts } from './keynav.js';
 export { roziePortal } from './roziePortal.js';
+export { rozieListeners, type RozieListener } from './rozieListeners.js';

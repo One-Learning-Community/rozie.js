@@ -46,9 +46,8 @@ export const capture: ModifierImpl = {
     return { kind: 'native', token: 'capture' };
   },
   svelte() {
-    // Phase 5 native: addEventListener({ capture: true }) option flag — valid
-    // ONLY for <listeners>-block context. Template @event context with
-    // ctx.source === 'template-event' is rejected via ROZ621.
+    // Phase 5 native: addEventListener({ capture: true }) option flag.
+    // Applies on <listeners> AND template @event bindings.
     return { kind: 'native', token: 'capture' };
   },
   angular() {
@@ -62,8 +61,8 @@ export const capture: ModifierImpl = {
     return { kind: 'native', token: 'capture' };
   },
   lit() {
-    // Phase 07.1 native: addEventListener({ capture: true }) option flag —
-    // valid ONLY for <listeners>-block context.
+    // Phase 07.1 native: addEventListener({ capture: true }) option flag.
+    // Applies on <listeners> AND template @event bindings. Lit binds `{ handleEvent, capture: true }`.
     return { kind: 'native', token: 'capture' };
   },
 };

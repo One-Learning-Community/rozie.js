@@ -51,10 +51,8 @@ export const once: ModifierImpl = {
     return { kind: 'native', token: 'once' };
   },
   svelte() {
-    // Phase 5 native: addEventListener({ once: true }) option flag — valid
-    // ONLY for <listeners>-block context where addEventListener option flags
-    // make sense. Svelte 5 template @event context will have
-    // ctx.source === 'template-event' — emitter rejects via ROZ621.
+    // Phase 5 native: addEventListener({ once: true }) option flag.
+    // Applies on <listeners> AND template @event bindings.
     return { kind: 'native', token: 'once' };
   },
   angular() {
@@ -69,9 +67,8 @@ export const once: ModifierImpl = {
     return { kind: 'native', token: 'once' };
   },
   lit() {
-    // Phase 07.1 native: addEventListener({ once: true }) option flag — valid
-    // ONLY for <listeners>-block context where addEventListener option flags
-    // make sense.
+    // Phase 07.1 native: addEventListener({ once: true }) option flag.
+    // Applies on <listeners> AND template @event bindings. Lit binds `{ handleEvent, once: true }`.
     return { kind: 'native', token: 'once' };
   },
 };

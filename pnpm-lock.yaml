@@ -1114,6 +1114,9 @@ importers:
       '@angular/core':
         specifier: ^19
         version: 19.2.22(rxjs@7.8.2)(zone.js@0.15.1)
+      happy-dom:
+        specifier: ^15.0.0
+        version: 15.11.7
       ng-packagr:
         specifier: ^19
         version: 19.2.2(@angular/compiler-cli@19.2.22(@angular/compiler@19.2.22)(typescript@5.6.3))(tslib@2.8.1)(typescript@5.6.3)

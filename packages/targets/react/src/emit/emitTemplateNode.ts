@@ -70,6 +70,7 @@ import {
   emitListenerSpread,
   emitListenerSpreadAsMergePartial,
 } from './emitTemplateAttribute.js';
+import { domElementType } from './domElementTypes.js';
 import { emitTemplateEvent, resolveJsxEventPropName } from './emitTemplateEvent.js';
 import { stripBalancedMustache } from './unwrapMustache.js';
 
@@ -557,14 +558,16 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
   // Build a working set of attributes — start with element's own.
   let workingAttrs: AttributeBinding[] = [...node.attributes];
 
-  // `@change` on a text control is the DOM `change` event, which JSX
-  // `onChange` is not (React fires it per keystroke). Those listeners leave
-  // `node.events` here — before the r-model same-event merge, which would
-  // otherwise fold them into the model's per-keystroke handler — and are
-  // attached through the element's ref (`nativeListenerRefJsx` below). The
+  // Listeners JSX can't express as a prop — `@change` on a text control (the
+  // DOM `change` event, which JSX `onChange` is not: React fires it per
+  // keystroke) and any listener carrying `.passive` / `.once` (JSX props take
+  // no listener options) — leave `node.events` here, before the r-model
+  // same-event merge, which would otherwise fold them into the model's
+  // per-keystroke handler. They are attached with `addEventListener` through
+  // the element's ref (`nativeListenerRefJsx` below), all in ONE call. The
   // author's own `ref` is forwarded through the same callback, since an
   // element takes a single `ref`.
-  const nativeEvents = node.events.filter((ev) => isNativeChangeListener(ev, node));
+  const nativeEvents = node.events.filter((ev) => isNativeListener(ev, node));
   let nativeForwardRef: string | null = null;
   if (nativeEvents.length > 0) {
     node = { ...node, events: node.events.filter((ev) => !nativeEvents.includes(ev)) };
@@ -762,6 +765,7 @@ function emitElementInner(origNode: TemplateElementIR, ctx: EmitNodeCtx): string
             registry: ctx.registry,
             collectors: ctx.collectors,
             injectionCounter: ctx.injectionCounter,
+            isComponent: node.tagKind !== 'html',
           });
           if (result.scriptInjection !== null) {
             ctx.scriptInjections.push(result.scriptInjection);
@@ -1109,6 +1113,7 @@ function emitElementListeners(
       registry: ctx.registry,
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
+      isComponent: node.tagKind !== 'html',
     });
     if (result.scriptInjection !== null) {
       ctx.scriptInjections.push(result.scriptInjection);
@@ -1201,11 +1206,29 @@ function isNativeChangeListener(ev: Listener, node: TemplateElementIR): boolean 
 }
 
 /**
- * `ref={rozieNativeListeners<El>([["change", handler, capture?], …], forward)}`
- * for the listeners `isNativeChangeListener` routed off JSX. Each handler is
- * the same arrow `emitTemplateEvent` builds for the JSX prop, so modifiers
- * (`.stop`, `.prevent`, key filters, debounce wraps) behave as before;
- * `.capture`, `.passive` and `.once` become listener options.
+ * True for a listener on a DOM element that JSX can't bind as a prop: a
+ * native `@change` (above), or one carrying `.passive` / `.once`. `.capture`
+ * alone has a JSX form (`on<Event>Capture`) and stays a prop. A component
+ * tag's `@event` is a Rozie event, not a DOM listener, so it never goes here.
+ */
+function isNativeListener(ev: Listener, node: TemplateElementIR): boolean {
+  if (node.tagKind !== 'html') return false;
+  if (isNativeChangeListener(ev, node)) return true;
+  return ev.modifierPipeline.some(
+    (entry) =>
+      entry.kind === 'listenerOption' && (entry.option === 'passive' || entry.option === 'once'),
+  );
+}
+
+/**
+ * `ref={rozieNativeListeners<El, ["change", …]>([["change", handler, options?], …], forward)}`
+ * for the listeners `isNativeListener` routed off JSX. Each handler is the
+ * same expression `emitTemplateEvent` builds for the JSX prop, so modifiers
+ * (`.stop`, `.prevent`, `.self`, key filters, debounce/throttle wraps) behave
+ * as on a prop; `.capture`, `.passive` and `.once` become listener options.
+ * The event names (DOM names, `keydown` — not JSX's `onKeyDown`) are repeated
+ * as the second type argument so each handler's event is typed from
+ * `HTMLElementEventMap`; `El` is the tag's DOM interface (`domElementType`).
  */
 function nativeListenerRefJsx(
   node: TemplateElementIR,
@@ -1237,9 +1260,10 @@ function nativeListenerRefJsx(
     entries.push(`[${JSON.stringify(ev.event)}, ${body}${options}]`);
   }
   ctx.collectors.runtime.add('rozieNativeListeners');
-  const elType = node.tagName.toLowerCase() === 'textarea' ? 'HTMLTextAreaElement' : 'HTMLInputElement';
+  const elType = domElementType(node.tagName);
+  const names = listeners.map((ev) => JSON.stringify(ev.event)).join(', ');
   const forward = forwardRef !== null ? `, ${forwardRef}` : '';
-  return `ref={rozieNativeListeners<${elType}>([${entries.join(', ')}]${forward})}`;
+  return `ref={rozieNativeListeners<${elType}, [${names}]>([${entries.join(', ')}]${forward})}`;
 }
 
 /**
@@ -1278,6 +1302,7 @@ function emitElementEvents(node: TemplateElementIR, ctx: EmitNodeCtx): string {
       registry: ctx.registry,
       collectors: ctx.collectors,
       injectionCounter: ctx.injectionCounter,
+      isComponent: node.tagKind !== 'html',
     });
     if (result.scriptInjection !== null) {
       ctx.scriptInjections.push(result.scriptInjection);

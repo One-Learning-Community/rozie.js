@@ -148,7 +148,7 @@ export default function EditorDate(_props: EditorDateProps): JSX.Element {
 
   return (
     <>
-    <input className={"rdt-cell-editor"} type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} ref={rozieNativeListeners<HTMLInputElement>([["change", ($event) => { onChange($event); }]], inputEl)} data-rozie-s-7abe1a56="" />
+    <input className={"rdt-cell-editor"} type="date" data-editing-cell="" aria-label={rozieAttr(a11yLabel())} value={draftValue()} onInput={($event) => { onInput($event); }} onKeyDown={($event) => { onKeydown($event); }} onBlur={($event) => { onBlur(); }} ref={rozieNativeListeners<HTMLInputElement, ["change"]>([["change", ($event) => { onChange($event); }]], inputEl)} data-rozie-s-7abe1a56="" />
     </>
   );
 }

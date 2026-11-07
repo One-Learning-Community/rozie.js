@@ -71,6 +71,7 @@ import {
 import {
   type AngularScriptInjection,
   emitTemplateEvent,
+  ROZIE_LISTEN_SLOTS,
   resolveEventBindingName,
 } from './emitTemplateEvent.js';
 
@@ -421,6 +422,70 @@ function emitEvents(
 ): string {
   if (events.length === 0) return '';
 
+  const out: string[] = [];
+
+  // `.capture` / `.passive` / `.once` on a plain DOM element. Angular `(event)`
+  // bindings cannot carry addEventListener options, so each such listener gets
+  // its own numbered `RozieListen` slot (`@rozie/runtime-angular`):
+  //   [rozieOn<N>]="'<event>'" [rozieOn<N>Options]="{ capture: true }"
+  //   (rozieOn<N>Fire)="<statement>"
+  // The directive attaches natively with the options and re-emits the DOM
+  // event through the slot's output, so `<statement>` is EXACTLY what the
+  // `(event)` binding would carry (same guards / wrappers / `$event` / loop
+  // scope). Never merged with same-event listeners: options differ per slot.
+  // Component tags keep the old path (their `@event` is an Angular output;
+  // emitTemplateEvent rejects the options there with ROZ722).
+  const plainEvents: Listener[] = [];
+  let listenSlot = 0;
+  for (const ev of events) {
+    const hasNativeOption =
+      tagKind === 'html' && ev.modifierPipeline.some((e) => e.kind === 'listenerOption');
+    if (!hasNativeOption) {
+      plainEvents.push(ev);
+      continue;
+    }
+    const result = emitTemplateEvent(ev, {
+      ir: ctx.ir,
+      registry: ctx.registry,
+      injectionCounter: ctx.injectionCounter,
+      collisionRenames: ctx.collisionRenames,
+      loopBindings: ctx.loopBindings,
+      handlerArity: ctx.handlerArity,
+      cvaModelProp: ctx.cvaModelProp,
+      cvaMergeDisabled: ctx.cvaMergeDisabled,
+      nonNullReads: ctx.nonNullReads,
+      elementTagKind: tagKind,
+      producerEmits,
+      allowNativeOptions: true,
+    });
+    if (result.scriptInjection) ctx.scriptInjections.push(result.scriptInjection);
+    for (const d of result.diagnostics) ctx.diagnostics.push(d);
+    if (!result.nativeOptions) {
+      // Defensive: a listenerOption entry whose impl did not yield a native
+      // descriptor (third-party override) — bind as a plain (event).
+      out.push(result.eventAttr);
+      continue;
+    }
+    if (listenSlot >= ROZIE_LISTEN_SLOTS) {
+      ctx.diagnostics.push({
+        code: RozieErrorCode.TARGET_ANGULAR_RESERVED, // ROZ722
+        severity: 'error',
+        message: `Too many '.capture'/'.passive'/'.once' listeners on one element for the Angular target (max ${ROZIE_LISTEN_SLOTS}).`,
+        loc: ev.sourceLoc,
+      });
+      continue;
+    }
+    const n = listenSlot++;
+    const opts = (['capture', 'passive', 'once'] as const)
+      .filter((k) => result.nativeOptions![k] === true)
+      .map((k) => `${k}: true`)
+      .join(', ');
+    out.push(
+      `[rozieOn${n}]="'${ev.event.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'" [rozieOn${n}Options]="{ ${opts} }" (rozieOn${n}Fire)="${result.handlerValue}"`,
+    );
+  }
+  events = plainEvents;
+
   // Group by the LOWERED bound event-BINDING name (quick task 260811-r2m /
   // D-01, resolution superseded by 260811-trz / D-05 — the grouping key must
   // be derived from the SAME name the emitted binding will use, not the raw
@@ -443,8 +508,6 @@ function emitEvents(
       groups.set(key, { boundName, listeners: [ev] });
     }
   }
-
-  const out: string[] = [];
 
   for (const { boundName: eventName, listeners: group } of groups.values()) {
     if (group.length === 1) {

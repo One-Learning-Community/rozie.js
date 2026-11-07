@@ -677,6 +677,11 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
   if (tmplResult.usesNgClass) {
     imports.addCommon('NgClass');
   }
+  // Template `@event.capture`/`.passive`/`.once` on a plain element is attached
+  // by the RozieListen directive (Angular `(event)` cannot carry options).
+  if (tmplResult.usesRozieListen) {
+    imports.addRuntime('RozieListen');
+  }
   if (tmplResult.usesNgStyle) {
     imports.addCommon('NgStyle');
   }
@@ -762,6 +767,7 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
     hasDynamicSlotFiller: tmplResult.hasDynamicSlotFiller,
     usesNgClass: tmplResult.usesNgClass,
     usesNgStyle: tmplResult.usesNgStyle,
+    usesRozieListen: tmplResult.usesRozieListen,
     componentDecls: components,
     selfReferenced,
     // Phase 23 — gate providers: NG_VALUE_ACCESSOR + host: (focusout) on the

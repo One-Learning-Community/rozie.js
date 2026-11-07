@@ -37,4 +37,9 @@ export { mergeListeners } from './mergeListeners.js';
 export { pickListeners } from './pickListeners.js';
 export { rozieContext } from './rozieContext.js';
 export { rozieNativeListeners } from './rozieNativeListeners.js';
-export type { RozieNativeListener, RozieForwardRef } from './rozieNativeListeners.js';
+export type {
+  RozieNativeEvent,
+  RozieNativeListener,
+  RozieNativeListeners,
+  RozieForwardRef,
+} from './rozieNativeListeners.js';

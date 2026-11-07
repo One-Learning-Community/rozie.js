@@ -7,10 +7,12 @@
  * Modifier resolution per D-65 ReactEmissionDescriptor:
  *   - 'inlineGuard' kind — prepend code into a synthetic arrow handler before
  *     calling the user handler. e.g., `$event.stopPropagation();` from .stop.
- *   - 'native' kind — capture-only is supported via the JSX onClickCapture
- *     suffix. .passive / .once on JSX events have no native form (addEventListener
- *     options) and are a compile error, except on the addEventListener path
- *     (`<input @change>`), where they become listener options.
+ *   - 'native' kind — capture-only maps to the JSX onClickCapture suffix.
+ *     .passive / .once are addEventListener options JSX props can't carry: a
+ *     DOM element's listener carrying them is routed to the addEventListener
+ *     path (`rozieNativeListeners`, see emitTemplateNode's `isNativeListener`),
+ *     where all three become listener options. Only a component tag's event
+ *     reaches the JSX-prop path with them, and that is a compile error.
  *   - 'helper' kind — debounce/throttle wraps require a hook call at component-body
  *     top; emit a script-injection `const debouncedX = useDebouncedCallback(...)`
  *     and reference the wrap name in the JSX attribute. .outside is listenerOnly
@@ -49,9 +51,11 @@ export interface EmitEventCtx {
   injectionCounter: { next: number };
   /**
    * The listener is attached with `addEventListener` (`rozieNativeListeners`),
-   * so `.passive` / `.once` become listener options instead of a warning.
+   * so `.capture` / `.passive` / `.once` become listener options.
    */
   addEventListener?: boolean;
+  /** The listener is on a component tag: its event is a callback prop, not a DOM listener. */
+  isComponent?: boolean;
 }
 
 export interface EmitTemplateEventResult {
@@ -368,19 +372,30 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (desc.kind === 'native') {
-      if (desc.token === 'capture') {
+      if (ctx.isComponent) {
+        // A Rozie component event is a callback prop, not a DOM listener, so it has
+        // no capture phase or listener options. `onPingCapture` would never be called.
+        diagnostics.push({
+          code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
+          severity: 'error',
+          message: `Modifier '.${desc.token}' is a DOM listener option; '@${eventName}' here is a component event, which has no listener options. Use it on a DOM element.`,
+          loc: entry.sourceLoc,
+        });
+      } else if (desc.token === 'capture') {
         // Append Capture suffix to JSX prop name: onClick → onClickCapture.
         jsxName = jsxName + 'Capture';
       } else if (ctx.addEventListener) {
         listenerOptions.push(desc.token);
       } else {
-        // .passive / .once have no JSX-prop form. Binding the prop without the
-        // option would run the handler wrongly (a .once handler firing every
-        // time), so this is an error, as on Solid, Svelte and Angular.
+        // DOM elements take `.passive` / `.once` on the addEventListener path,
+        // so only a component tag's event gets here: a Rozie component event
+        // is a callback prop, not a DOM listener, and has no listener options.
+        // Binding the prop without the option would run the handler wrongly
+        // (a .once handler firing every time), so this is an error.
         diagnostics.push({
           code: RozieErrorCode.TARGET_REACT_RHTML_WITH_CHILDREN,
           severity: 'error',
-          message: `Modifier '.${desc.token}' has no JSX-prop equivalent in React (addEventListener-only). Move handler to <listeners> block to use this modifier.`,
+          message: `Modifier '.${desc.token}' is a DOM listener option; '@${eventName}' here is a component event, which has no listener options. Use it on a DOM element.`,
           loc: entry.sourceLoc,
         });
       }

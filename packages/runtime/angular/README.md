@@ -12,6 +12,26 @@ section below for the emission condition that gates it.
 - `createRozieAttrApplier` / `createRozieHostAttrsReader` — the `r-bind` /
   `$attrs` spread attribute applier and host-attribute reader factories
   (Tier 2, Quick task 260819-sg9). See "Attribute spread factories" below.
+- `RozieListen` — attaches a template `@event.capture` / `.passive` / `.once`
+  listener natively (Angular `(event)` bindings cannot carry
+  addEventListener options). See "`RozieListen`" below.
+
+## `RozieListen`
+
+Emitted when a template `@event` on a plain element carries `.capture`,
+`.passive` or `.once`. Each such listener gets a numbered slot (0–7) on its
+element:
+
+```html
+<div [rozieOn0]="'keydown'" [rozieOn0Options]="{ capture: true, once: true }"
+     (rozieOn0Fire)="onKey($event)"></div>
+```
+
+The directive adds the native listener with those options and re-emits the
+DOM event through `rozieOn<N>Fire`, so the handler stays an ordinary template
+statement (`$event` is the DOM event; `@for` variables are in scope). `.once`
+fires once per element and is never re-armed; listeners are removed on
+destroy. The DOM logic lives in the framework-free `RozieListenController`.
 
 ## `RozieSlot`
 

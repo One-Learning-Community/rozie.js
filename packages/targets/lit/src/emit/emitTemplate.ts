@@ -178,6 +178,8 @@ export interface EmitTemplateOpts {
      * `styleMapUsed` plumbing).
      */
     rozieListenersUsed: boolean;
+    /** `${rozieOptionListeners([...])}` was emitted (same plumbing as `rozieListenersUsed`). */
+    rozieOptionListenersUsed: boolean;
     /**
      * True when at least one consumer-side property-fill (function-prop
      * scoped destructured or portal fill) was emitted onto a producer
@@ -306,6 +308,8 @@ export interface EmitTemplateResult {
    * (same plumbing as `rozieSpreadUsed`).
    */
   rozieListenersUsed: boolean;
+  /** `${rozieOptionListeners([...])}` was emitted (same plumbing as `rozieListenersUsed`). */
+  rozieOptionListenersUsed: boolean;
   /**
    * True when at least one consumer-side property-fill was emitted onto a
    * producer component's open tag. emitLit conditionally wires
@@ -1594,15 +1598,24 @@ function emitElementOpenTag(
     parts.push(`@${name}=\${${merged}}`);
   }
 
-  // Option-bearing listeners emit individually — each carries its own
-  // `{ handleEvent, capture, passive, once }` object. If the user authored
-  // two same-name option-bearing listeners that's a separate (rare) edge
-  // case we surface as an emitted duplicate today; Lit will throw at
-  // runtime and the user can deduplicate at source. (No reasonable merge
-  // semantic exists because their option flags may differ.)
+  // Option-bearing listeners keep Lit's own `@evt=${{ handleEvent, …options }}` form when
+  // their event has no other binding on this element. Lit forbids two bindings with the same
+  // attribute name (a second `@click=` shifts every later part), so an option listener whose
+  // event is already bound goes through the `rozieOptionListeners` element directive.
+  const boundEvents = new Set(groupOrder);
+  const directiveEntries: string[] = [];
   for (const ev of optionEvents) {
     const optsText = ev.optionParts.join(', ');
+    if (boundEvents.has(ev.eventName)) {
+      directiveEntries.push(`[${JSON.stringify(ev.eventName)}, ${ev.handlerBody}, { ${optsText} }]`);
+      continue;
+    }
+    boundEvents.add(ev.eventName);
     parts.push(`@${ev.eventName}=\${{ handleEvent: ${ev.handlerBody}, ${optsText} }}`);
+  }
+  if (directiveEntries.length > 0) {
+    parts.push(`\${rozieOptionListeners([${directiveEntries.join(', ')}])}`);
+    if (opts._state) opts._state.rozieOptionListenersUsed = true;
   }
 
   // Phase 15 — dynamic `ListenerSpreadIR` entries emit as element-position
@@ -2454,6 +2467,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
     styleMapUsed: false,
     rozieSpreadUsed: false,
     rozieListenersUsed: false,
+    rozieOptionListenersUsed: false,
     refUsed: false,
     keyedUsed: false,
     reconcileSeqUsed: false,
@@ -2496,6 +2510,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
       styleMapUsed: state.styleMapUsed,
       rozieSpreadUsed: state.rozieSpreadUsed,
       rozieListenersUsed: state.rozieListenersUsed,
+      rozieOptionListenersUsed: state.rozieOptionListenersUsed,
       refUsed: state.refUsed,
       keyedUsed: state.keyedUsed,
       reconcileSeqUsed: state.reconcileSeqUsed,
@@ -2524,6 +2539,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
     styleMapUsed: state.styleMapUsed,
     rozieSpreadUsed: state.rozieSpreadUsed,
     rozieListenersUsed: state.rozieListenersUsed,
+    rozieOptionListenersUsed: state.rozieOptionListenersUsed,
     refUsed: state.refUsed,
     keyedUsed: state.keyedUsed,
     reconcileSeqUsed: state.reconcileSeqUsed,

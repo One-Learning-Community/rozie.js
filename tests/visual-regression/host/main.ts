@@ -922,6 +922,7 @@ export const EXAMPLES = [
   'DataTableSticky',
   'DataTableBorders',
   'DataTableRangeFill',
+  'EventOptions',
   // Phase 49 (data-table grid interaction mode) WAVE-0 FOCUS PROBE — the
   // standalone, chrome-free cross-target focus() de-risk cell (loader →
   // examples/demos/DataTableGridProbeDemo.rozie, self-contained: NO DataTable /
@@ -1847,6 +1848,7 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableSticky: 'rozie-data-table-sticky',
   DataTableBorders: 'rozie-data-table-borders',
   DataTableRangeFill: 'rozie-data-table-range-fill',
+  EventOptions: 'rozie-event-options',
   // Phase 49 grid-probe — '-demo' appended on Lit → 'rozie-data-table-grid-probe-demo'
   // = kebab of DataTableGridProbeDemo (the component is name="DataTableGridProbeDemo").
   DataTableGridProbe: 'rozie-data-table-grid-probe',
@@ -2442,6 +2444,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableSticky: {},
   DataTableBorders: {},
   DataTableRangeFill: {},
+  EventOptions: {},
   // Phase 49 grid-probe — self-contained ($data only: interactionMode='grid' +
   // the active-cell index pair). No parent-supplied props.
   DataTableGridProbe: {},

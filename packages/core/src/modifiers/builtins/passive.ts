@@ -46,8 +46,8 @@ export const passive: ModifierImpl = {
     return { kind: 'native', token: 'passive' };
   },
   svelte() {
-    // Phase 5 native: addEventListener({ passive: true }) option flag — valid
-    // ONLY for <listeners>-block context.
+    // Phase 5 native: addEventListener({ passive: true }) option flag.
+    // Applies on <listeners> AND template @event bindings.
     return { kind: 'native', token: 'passive' };
   },
   angular() {
@@ -60,8 +60,8 @@ export const passive: ModifierImpl = {
     return { kind: 'native', token: 'passive' };
   },
   lit() {
-    // Phase 07.1 native: addEventListener({ passive: true }) option flag —
-    // valid ONLY for <listeners>-block context.
+    // Phase 07.1 native: addEventListener({ passive: true }) option flag.
+    // Applies on <listeners> AND template @event bindings. Lit binds `{ handleEvent, passive: true }`.
     return { kind: 'native', token: 'passive' };
   },
 };

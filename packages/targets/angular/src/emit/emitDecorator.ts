@@ -72,6 +72,8 @@ export interface EmitDecoratorOpts {
    * `usesNgClass`.
    */
   usesNgStyle?: boolean;
+  /** Template uses a `RozieListen` slot — drives `RozieListen` in `imports: [...]`. */
+  usesRozieListen?: boolean;
   /**
    * Phase 06.2 P2 (D-115/D-118): IR components table — non-self entries
    * are appended to `imports: [...]` as bare class names (e.g., `CardHeader`).
@@ -156,6 +158,7 @@ function buildDecoratorImportsList(opts: {
   hasDynamicSlotFiller?: boolean;
   usesNgClass?: boolean;
   usesNgStyle?: boolean;
+  usesRozieListen?: boolean;
   componentDecls: readonly ComponentDecl[];
   selfReferenced: boolean;
   componentName: string;
@@ -178,6 +181,7 @@ function buildDecoratorImportsList(opts: {
   // before FormsModule (stable, deterministic order).
   if (opts.usesNgClass) items.push('NgClass');
   if (opts.usesNgStyle) items.push('NgStyle');
+  if (opts.usesRozieListen) items.push('RozieListen');
   if (opts.hasNgModel) items.push('FormsModule');
   for (const decl of opts.componentDecls) {
     if (decl.localName === opts.componentName) continue; // self handled below
@@ -233,6 +237,7 @@ export function emitDecorator(
     hasDynamicSlotFiller: opts.hasDynamicSlotFiller ?? false,
     usesNgClass: opts.usesNgClass ?? false,
     usesNgStyle: opts.usesNgStyle ?? false,
+    usesRozieListen: opts.usesRozieListen ?? false,
     componentDecls: opts.componentDecls ?? [],
     selfReferenced: opts.selfReferenced ?? false,
     componentName: opts.componentName,

@@ -13,6 +13,7 @@ export {
 export { observeRozieSlotCtx } from './observeRozieSlotCtx.js';
 export { rozieSpread } from './rozieSpread.js';
 export { rozieListeners } from './rozieListeners.js';
+export { rozieOptionListeners, type RozieOptionListener } from './rozieOptionListeners.js';
 export { attachOutsideClickListener } from './attachOutsideClickListener.js';
 export {
   KeynavController,

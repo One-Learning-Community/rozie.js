@@ -39,7 +39,7 @@ The grammar is a small dedicated PEG (`packages/core/src/modifier-grammar/modifi
 | `.outside($refs.a, ...)` | Fire only when the event target is outside every listed ref |
 | `.enter` / `.escape` / `.tab` / `.space` / `.arrow{Up,Down,Left,Right}` / `.delete` | Key filters; the handler short-circuits unless the key matches |
 
-`.capture`, `.passive` and `.once` are [`<listener>`](#listeners-block-—-declarative-listener-elements)-only. On a template `@event` all three compile on Vue and Lit, and React supports `.capture` (as `on<Event>Capture`). Everywhere else, including `.passive` and `.once` on React, they are a compile error, because the target has no template-binding form that carries the option. Put the handler in a `<listener>` (with no `:target` it attaches to the component's root element) to use them on all six.
+`.capture`, `.passive` and `.once` work on template `@event` bindings and on `<listener>` elements alike, on all six targets. Where a target's template syntax has no form for the option (React, Svelte, Angular and Solid for some or all of the three), the binding is attached with `addEventListener` instead, so the handler, its guards and `$event` stay the same.
 
 Each one compiles to the per-target idiom: Vue's `@keydown.enter`/`watchEffect`-with-cleanup, React's `useEffect`-with-removeEventListener, Svelte's `$effect` teardown, Angular's `Renderer2.listen` + `DestroyRef`, Solid's `createEffect` + `onCleanup`, Lit's `firstUpdated` wiring + `disconnectedCallback` cleanup (with `.debounce`/`.throttle` hoisted to stable class fields). **You write the modifier; Rozie writes the rest.**
 

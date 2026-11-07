@@ -6,7 +6,8 @@
 //  2. TodoList r-for + :key → {#each items as item (item.id)}
 //  3. Modal slot with defaultContent → A1 RESOLVED verbose form ({:else} fallback)
 //  4. @click.stop → onclick={(e) => { $event.stopPropagation(); handler(e); }}
-//  5. ROZ621 raised on template @click.once (native descriptor in template ctx)
+//  5. ROZ621 NOT raised on template key filters (template @click.once is covered
+//     by template-native-modifier-options.test.ts — it attaches via use:rozieListeners)
 //  6. Mustache-in-attribute → template literal: class={`card card--${variant}`}
 //  7. r-html → {@html expr}; ROZ620 if same element has children
 //  8. Slot WITHOUT defaultContent → bare {@render trigger?.(...)} shorthand

@@ -12,9 +12,15 @@
  *     bind the wrapped name as the event handler.
  *   - `kind: 'helper'` with `listenerOnly: true` (.outside) — ROZ722 (only
  *     valid in <listeners> blocks).
- *   - `kind: 'native'` (capture/passive/once) — REJECTED in template-event
- *     context with ROZ722. Native event-listener options are valid only in
- *     <listeners> blocks where they map onto Renderer2.listen options.
+ *   - `kind: 'native'` (capture/passive/once) — Angular `(event)` bindings
+ *     cannot carry addEventListener options, so when the caller sets
+ *     `allowNativeOptions` (plain DOM elements) the flags are collected into
+ *     `result.nativeOptions` and the caller re-routes the binding through the
+ *     `RozieListen` directive (`@rozie/runtime-angular`) — see `emitEvents`
+ *     in emitTemplateNode.ts. Guard/handler lowering is unchanged; only the
+ *     attach mechanism differs. Without `allowNativeOptions` (component tags,
+ *     whose `@event` is an Angular `output()`, not a DOM listener) they are
+ *     still rejected with ROZ722.
  *
  * Per CONTEXT D-08 collected-not-thrown: never throws; pushes diagnostics.
  *
@@ -84,6 +90,26 @@ export interface EmitEventCtx {
    * branch; threaded into the handler `rewriteTemplateExpression` calls.
    */
   nonNullReads?: ReadonlySet<string> | undefined;
+  /**
+   * When true, `.capture` / `.passive` / `.once` (`kind: 'native'`
+   * descriptors) are collected into `result.nativeOptions` instead of being
+   * rejected with ROZ722. Set by `emitEvents` for plain DOM elements only.
+   */
+  allowNativeOptions?: boolean | undefined;
+}
+
+/**
+ * Number of numbered `RozieListen` slots (`[rozieOn0]` .. `[rozieOn7]`) one
+ * element can carry. MUST match `ROZIE_LISTEN_SLOTS` in
+ * `@rozie/runtime-angular`'s `rozie-listen.directive.ts`.
+ */
+export const ROZIE_LISTEN_SLOTS = 8;
+
+/** addEventListener option flags collected from `.capture`/`.passive`/`.once`. */
+export interface NativeListenerOptions {
+  capture?: true;
+  passive?: true;
+  once?: true;
 }
 
 export interface EmitTemplateEventResult {
@@ -91,6 +117,17 @@ export interface EmitTemplateEventResult {
   eventAttr: string;
   /** Optional class-body field injection (debounce/throttle IIFE wrap). */
   scriptInjection?: AngularScriptInjection;
+  /**
+   * The bare template statement bound inside `eventAttr` (e.g.
+   * `onKey($event)`), so a caller can re-bind it to a different output.
+   */
+  handlerValue: string;
+  /**
+   * Present only when `ctx.allowNativeOptions` was set AND the pipeline held
+   * at least one `.capture`/`.passive`/`.once`. The caller must then bind
+   * `handlerValue` through the `RozieListen` directive instead of `eventAttr`.
+   */
+  nativeOptions?: NativeListenerOptions;
   diagnostics: Diagnostic[];
 }
 
@@ -310,6 +347,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const eventName = listener.event;
 
   const inlineGuards: string[] = [];
+  let nativeOptions: NativeListenerOptions | undefined;
   let scriptInjection: AngularScriptInjection | undefined;
   let handlerKind = classifyHandler(listener.handler);
   let handlerRef: string = rewriteTemplateExpression(listener.handler, ctx.ir, {
@@ -352,11 +390,17 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (descriptor.kind === 'native') {
-      // Native option flags are valid only in <listeners>-block context.
+      // Plain DOM element: collect the flag; the caller attaches the listener
+      // through the RozieListen directive with these options.
+      if (ctx.allowNativeOptions === true) {
+        nativeOptions = { ...(nativeOptions ?? {}), [descriptor.token]: true };
+        continue;
+      }
+      // Component tag (an Angular output, not a DOM listener): no options.
       diagnostics.push({
         code: RozieErrorCode.TARGET_ANGULAR_RESERVED, // ROZ722
         severity: 'error',
-        message: `Modifier '.${modifierName}' emits a native '${descriptor.token}' option, which Angular does NOT support on template @event bindings. Move this modifier to a <listeners> block.`,
+        message: `Modifier '.${modifierName}' emits a native '${descriptor.token}' option, which Angular does NOT support on a component's @event (an Angular output, not a DOM listener). Use it on a plain element or in a <listeners> block.`,
         loc: entry.sourceLoc,
       });
       continue;
@@ -587,9 +631,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const boundEventName = resolveEventBindingName(eventName, ctx.elementTagKind, ctx.producerEmits);
   const eventAttr = `(${boundEventName})="${attrValue}"`;
 
-  const result: EmitTemplateEventResult = { eventAttr, diagnostics };
+  const result: EmitTemplateEventResult = { eventAttr, handlerValue: attrValue, diagnostics };
   if (scriptInjection) {
     result.scriptInjection = scriptInjection;
+  }
+  if (nativeOptions) {
+    result.nativeOptions = nativeOptions;
   }
   return result;
 }

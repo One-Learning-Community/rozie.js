@@ -10,9 +10,11 @@
  *
  * Modifier handling:
  *   - 'inlineGuard' kind → prepend guard code into a synthetic arrow handler
- *   - 'native' kind (capture) → Solid supports `on:click` lowercase for native
- *     addEventListener; for template @event, we use the JSX prop form and
- *     capture/passive/once are an ERROR (<listeners>-only, as on Svelte/Angular/Lit)
+ *   - 'native' kind (capture/passive/once) → a JSX event prop takes no listener
+ *     options, so on a DOM element the listener is returned as a
+ *     `nativeListener` tuple instead of a JSX attr; `emitTemplateNode.ts` attaches
+ *     it in the element's ref via `rozieNativeListeners(el, [...])`. On a
+ *     COMPONENT tag (a component event, no DOM listener) they are an error.
  *   - 'helper' kind (debounce/throttle) → emit `const _rozieDebounced... = createDebouncedHandler(...)`
  *     script injection; reference wrapper name in JSX attribute
  *   - 'helper' .outside → listenerOnly; emit diagnostic
@@ -93,7 +95,14 @@ export interface EmitEventCtx {
 }
 
 export interface EmitTemplateEventResult {
+  /** `onKeyDown={…}` — empty when the listener is returned as `nativeListener`. */
   jsxAttr: string;
+  /**
+   * Set when the listener carries `.capture`/`.passive`/`.once` on a DOM element:
+   * the `[type, handler, options]` tuple source for `rozieNativeListeners(el, [...])`
+   * in the element's ref (JSX event props take no listener options).
+   */
+  nativeListener?: string;
   /** Top-of-component-body line (e.g., `const _rozieDebounced... = createDebouncedHandler(...)`). */
   scriptInjection: string | null;
   diagnostics: Diagnostic[];
@@ -377,6 +386,7 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
   const eventParam = solidEventParam(eventName, ctx.elementTag);
 
   const inlineGuards: string[] = [];
+  const nativeOptions: string[] = [];
   let scriptInjection: string | null = null;
   let handlerRef: string | null = null;
 
@@ -421,15 +431,19 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (desc.kind === 'native') {
-      // Capture/passive/once are <listeners>-only. An ERROR, as on Svelte (ROZ621), Angular
-      // (ROZ722) and Lit: as a warning the handler was still bound without the option, so a
-      // `.capture` handler silently ran in the bubble phase.
-      diagnostics.push({
-        code: RozieErrorCode.TARGET_SOLID_RESERVED,
-        severity: 'error',
-        message: `Modifier '.${desc.token}' has no JSX-prop equivalent in Solid. Move handler to <listeners> block to use this modifier.`,
-        loc: entry.sourceLoc,
-      });
+      // capture/passive/once: a JSX event prop takes no options, so on a DOM element the
+      // listener is attached in the element's ref (`rozieNativeListeners`). A component tag's
+      // event is a component event, not a DOM listener — no options to give it.
+      if (ctx.elementTag === undefined) {
+        diagnostics.push({
+          code: RozieErrorCode.TARGET_SOLID_RESERVED,
+          severity: 'error',
+          message: `Modifier '.${desc.token}' has no JSX-prop equivalent in Solid on a component event. Use it on a DOM element's @event or in a <listeners> block.`,
+          loc: entry.sourceLoc,
+        });
+        continue;
+      }
+      if (!nativeOptions.includes(desc.token)) nativeOptions.push(desc.token);
       continue;
     }
 
@@ -550,6 +564,16 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
       );
     }
     handlerExpr = `(${eventParam}) => { ${guardLines} ${handlerInvocation}; }`;
+  }
+
+  if (nativeOptions.length > 0) {
+    const options = nativeOptions.map((o) => `${o}: true`).join(', ');
+    return {
+      jsxAttr: '',
+      nativeListener: `[${JSON.stringify(eventName)}, ${handlerExpr}, { ${options} }]`,
+      scriptInjection,
+      diagnostics,
+    };
   }
 
   return {
