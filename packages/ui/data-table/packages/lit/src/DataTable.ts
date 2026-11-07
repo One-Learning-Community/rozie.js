@@ -847,7 +847,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'sticky-header' }) stickyHeader: boolean = false;
   /**
-   * Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set.
+   * Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set. Each line takes 1px inside the cell, so outside column windowing a column renders 1px wider than without lines; pinned and windowed columns keep their declared width.
    */
   @property({ type: Boolean, reflect: true, attribute: 'column-lines' }) columnLines: boolean = false;
   /**
@@ -871,7 +871,7 @@ export default class DataTable extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'hold-view' }) holdView: boolean = false;
   /**
-   * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
+   * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`. Choose it when the table mounts: changing `virtual` afterwards is not supported (remount the table instead).
    */
   @property({ converter: { fromAttribute: (v: string | null) => (v === null ? false : v === 'true' ? true : v === 'false' ? false : v === '' ? true : v) } }) virtual: boolean | string = false;
   /**

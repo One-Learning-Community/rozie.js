@@ -81,6 +81,8 @@ For a long server-side list (a mail folder, an audit log), let the table own the
 
 ## Known limitations
 
+**Choose `virtual` when the table mounts.** The windowing setup (the row and column virtualizers and the scroll container) is built once, when the table mounts. Changing `virtual` afterwards — turning windowing on or off, or switching axes — is not supported: the table re-renders, but grid-mode focus and keyboard handling stop working. If a table needs to switch, remount it, for example with a `:key` that changes alongside `virtual`.
+
 None currently open for column windowing. Two limitations documented here previously — the Svelte
 horizontal-spacer `scrollWidth` under-report, and grouped-header width divergence under
 `table-layout: fixed` on Solid/Svelte/React — were both root-caused and closed, and every case in

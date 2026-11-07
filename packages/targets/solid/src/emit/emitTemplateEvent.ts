@@ -12,7 +12,7 @@
  *   - 'inlineGuard' kind → prepend guard code into a synthetic arrow handler
  *   - 'native' kind (capture) → Solid supports `on:click` lowercase for native
  *     addEventListener; for template @event, we use the JSX prop form and
- *     ignore capture/passive (no JSX-level equivalent)
+ *     capture/passive/once are an ERROR (<listeners>-only, as on Svelte/Angular/Lit)
  *   - 'helper' kind (debounce/throttle) → emit `const _rozieDebounced... = createDebouncedHandler(...)`
  *     script injection; reference wrapper name in JSX attribute
  *   - 'helper' .outside → listenerOnly; emit diagnostic
@@ -421,10 +421,12 @@ export function emitTemplateEvent(listener: Listener, ctx: EmitEventCtx): EmitTe
     });
 
     if (desc.kind === 'native') {
-      // Capture/passive/once — no JSX-level equivalent for Solid template @event.
+      // Capture/passive/once are <listeners>-only. An ERROR, as on Svelte (ROZ621), Angular
+      // (ROZ722) and Lit: as a warning the handler was still bound without the option, so a
+      // `.capture` handler silently ran in the bubble phase.
       diagnostics.push({
         code: RozieErrorCode.TARGET_SOLID_RESERVED,
-        severity: 'warning',
+        severity: 'error',
         message: `Modifier '.${desc.token}' has no JSX-prop equivalent in Solid. Move handler to <listeners> block to use this modifier.`,
         loc: entry.sourceLoc,
       });

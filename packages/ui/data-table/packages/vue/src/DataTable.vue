@@ -448,7 +448,7 @@ const props = withDefaults(
      */
     stickyHeader?: boolean;
     /**
-     * Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set.
+     * Draw a line between columns, plus an outer line at the start of each row and above the header row. The colour follows `--rozie-data-table-border-color` unless `--rozie-data-table-column-border-color` is set. Each line takes 1px inside the cell, so outside column windowing a column renders 1px wider than without lines; pinned and windowed columns keep their declared width.
      */
     columnLines?: boolean;
     /**
@@ -472,7 +472,7 @@ const props = withDefaults(
      */
     holdView?: boolean;
     /**
-     * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`.
+     * Opt-in windowing grammar: `false` (default, off — byte-identical to a non-virtual table) | `true` or `'rows'` (vertical row windowing; `true` is byte-behavior-identical to every existing consumer, zero churn) | `'columns'` (horizontal column windowing) | `'both'` (both axes windowed). Row windowing renders only the visible slice of rows inside a bounded `rdt-scroll` container (with leading/trailing spacer rows preserving total scroll height), windowing over the full filtered + sorted (pre-pagination) model and suppressing the client pagination chrome. Column windowing renders only the visible slice of leaf columns inside the same `rdt-scroll` container. An unrecognised string behaves as `false`. Choose it when the table mounts: changing `virtual` afterwards is not supported (remount the table instead).
      */
     virtual?: boolean | string;
     /**
