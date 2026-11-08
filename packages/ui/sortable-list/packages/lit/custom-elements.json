@@ -517,7 +517,7 @@
           ],
           "events": [
             {
-              "name": "change",
+              "name": "reorder",
               "type": {
                 "text": "CustomEvent"
               },

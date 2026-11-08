@@ -17,7 +17,7 @@ If your code changes a list's items so the lifted row is gone (removed, replaced
 
 Changed: only one keyboard lift can exist on a page. Pressing Space or Enter on a row of another list, even one in the same group, drops the active lift and lifts that row.
 
-Changed: SortableJS's own native DOM events (`choose`, `start`, `sort`, `filter`, `change` and the rest) no longer bubble out of the list element, on every framework. Listen to the component's documented events (`start`, `end`, `change`, `add`, `remove`) instead.
+Changed: SortableJS's own native DOM events (`choose`, `start`, `sort`, `filter`, `change` and the rest) no longer bubble out of the list element, on every framework. Listen to the component's documented events (`start`, `end`, `reorder`, `add`, `remove`) instead.
 
 Known limitation on Lit: a plain-HTML consumer cannot point a handle's `aria-describedby` at the `instructionsId` slot prop, because an id reference does not cross the shadow root. Give the handle its own `aria-label` or description instead. Rozie consumers are not affected.
 

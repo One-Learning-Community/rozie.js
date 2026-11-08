@@ -661,7 +661,7 @@ const moveLiftTo = (toIndex) => {
   // holder's own `labelFor`.
   speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1))
   h.focusRow(moved, to)
-  h.emit('change', { oldIndex: from, newIndex: to, item: moved, interaction: 'keyboard' })
+  h.emit('reorder', { oldIndex: from, newIndex: to, item: moved, interaction: 'keyboard' })
 }
 
 // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
@@ -805,7 +805,7 @@ const endLift = (kind) => {
       lift.key = h.keyOf(item, to)
       h.write(next)
       h.focusRow(item, to)
-      h.emit('change', { oldIndex: at, newIndex: to, item, interaction: 'keyboard' })
+      h.emit('reorder', { oldIndex: at, newIndex: to, item, interaction: 'keyboard' })
     }
     speak(h, lift.hopped
       ? 'Cancelled. ' + h.labelOf(item, to) + ' returned to ' + name(h) + ', position ' + (to + 1)
@@ -1018,7 +1018,7 @@ $onMount(() => {
     // on Lit (real call) and `void 0` on the other 5 targets (no-op).
     afterCommit: () => $reconcileAfterDomMutation(),
     onChange: ({ kind, oldIndex, newIndex, item }) => {
-      if (kind === 'reorder') $emit('change', { oldIndex, newIndex, item, interaction: 'pointer' })
+      if (kind === 'reorder') $emit('reorder', { oldIndex, newIndex, item, interaction: 'pointer' })
       else if (kind === 'add') $emit('add', { newIndex, item, interaction: 'pointer' })
       else if (kind === 'remove') $emit('remove', { oldIndex, item, interaction: 'pointer' })
     },
@@ -1068,7 +1068,7 @@ $onMount(() => {
     emit: (name, payload) => {
       if (name === 'add') $emit('add', payload)
       else if (name === 'remove') $emit('remove', payload)
-      else if (name === 'change') $emit('change', payload)
+      else if (name === 'reorder') $emit('reorder', payload)
       else if (name === 'start') $emit('start', payload)
       else if (name === 'end') $emit('end', payload)
     },

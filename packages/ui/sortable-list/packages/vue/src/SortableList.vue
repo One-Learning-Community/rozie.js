@@ -139,7 +139,7 @@ const items = computed<any[]>({
 });
 
 const emit = defineEmits<{
-  change: [...args: any[]];
+  reorder: [...args: any[]];
   add: [...args: any[]];
   remove: [...args: any[]];
   start: [...args: any[]];
@@ -504,7 +504,7 @@ const moveLiftTo = (toIndex: any) => {
   // holder's own `labelFor`.
   speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
-  h.emit('change', {
+  h.emit('reorder', {
     oldIndex: from,
     newIndex: to,
     item: moved,
@@ -673,7 +673,7 @@ const endLift = (kind: any) => {
       lift.key = h.keyOf(item, to);
       h.write(next);
       h.focusRow(item, to);
-      h.emit('change', {
+      h.emit('reorder', {
         oldIndex: at,
         newIndex: to,
         item,
@@ -923,7 +923,7 @@ onMounted(() => {
       newIndex,
       item
     }: any) => {
-      if (kind === 'reorder') emit('change', {
+      if (kind === 'reorder') emit('reorder', {
         oldIndex,
         newIndex,
         item,
@@ -989,7 +989,7 @@ onMounted(() => {
       return rowByKey(listEl, String(keyFor(list[i], i)));
     },
     emit: (name: any, payload: any) => {
-      if (name === 'add') emit('add', payload);else if (name === 'remove') emit('remove', payload);else if (name === 'change') emit('change', payload);else if (name === 'start') emit('start', payload);else if (name === 'end') emit('end', payload);
+      if (name === 'add') emit('add', payload);else if (name === 'remove') emit('remove', payload);else if (name === 'reorder') emit('reorder', payload);else if (name === 'start') emit('start', payload);else if (name === 'end') emit('end', payload);
     }
   };
   unregisterEntry = registry.register(entry);

@@ -4,7 +4,7 @@ import { applyListeners, rozieAttr, rozieClass, rozieDisplay, rozieStyle } from 
 import type { Snippet } from 'svelte';
 import { onMount, untrack } from 'svelte';
 
-interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'header' | 'children' | 'footer' | 'snippets' | 'onchange' | 'onadd' | 'onremove' | 'onstart' | 'onend'> {
+interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div'], 'items' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'header' | 'children' | 'footer' | 'snippets' | 'onreorder' | 'onadd' | 'onremove' | 'onstart' | 'onend'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -111,7 +111,7 @@ interface Props extends Omit<import('svelte/elements').SvelteHTMLElements['div']
   children?: Snippet<[{ item: any; index: any; instructionsId: any }]>;
   footer?: Snippet;
   snippets?: Record<string, any>;
-  onchange?: (...args: any[]) => void;
+  onreorder?: (...args: any[]) => void;
   onadd?: (...args: any[]) => void;
   onremove?: (...args: any[]) => void;
   onstart?: (...args: any[]) => void;
@@ -150,7 +150,7 @@ let {
   children: __childrenProp,
   footer: __footerProp,
   snippets,
-  onchange,
+  onreorder,
   onadd,
   onremove,
   onstart,
@@ -514,7 +514,7 @@ const moveLiftTo = (toIndex: any) => {
   // holder's own `labelFor`.
   speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
-  h.emit('change', {
+  h.emit('reorder', {
     oldIndex: from,
     newIndex: to,
     item: moved,
@@ -683,7 +683,7 @@ const endLift = (kind: any) => {
       lift.key = h.keyOf(item, to);
       h.write(next);
       h.focusRow(item, to);
-      h.emit('change', {
+      h.emit('reorder', {
         oldIndex: at,
         newIndex: to,
         item,
@@ -965,7 +965,7 @@ onMount(() => {
       newIndex,
       item
     }: any) => {
-      if (kind === 'reorder') onchange?.({
+      if (kind === 'reorder') onreorder?.({
         oldIndex,
         newIndex,
         item,
@@ -1031,7 +1031,7 @@ onMount(() => {
       return rowByKey(listEl$local, String(keyFor(list[i], i)));
     },
     emit: (name: any, payload: any) => {
-      if (name === 'add') onadd?.(payload);else if (name === 'remove') onremove?.(payload);else if (name === 'change') onchange?.(payload);else if (name === 'start') onstart?.(payload);else if (name === 'end') onend?.(payload);
+      if (name === 'add') onadd?.(payload);else if (name === 'remove') onremove?.(payload);else if (name === 'reorder') onreorder?.(payload);else if (name === 'start') onstart?.(payload);else if (name === 'end') onend?.(payload);
     }
   };
   unregisterEntry = registry.register(entry);

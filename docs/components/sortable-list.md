@@ -98,7 +98,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
-| `change` | `{ oldIndex, newIndex, item, interaction }` | Same-list reorder commit (each keyboard move, too) |
+| `reorder` | `{ oldIndex, newIndex, item, interaction }` | Same-list reorder commit (each keyboard move, too) |
 | `add` | `{ newIndex, item, interaction }` | Cross-list destination commit (item arrives) |
 | `remove` | `{ oldIndex, item, interaction }` | Cross-list source commit (item leaves; NOT fired in clone mode) |
 | `start` | `SortableEvent` (pointer) / keyboard payload | Drag starts, or a row is lifted by keyboard |

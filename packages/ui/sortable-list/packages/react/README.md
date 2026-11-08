@@ -65,7 +65,7 @@ export function Demo() {
 
 | Event | Description |
 | --- | --- |
-| `change` | Fired after the list order changes (same-list reorder commit). |
+| `reorder` | Fired after the list order changes (same-list reorder commit). |
 | `add` | Fired when an item is added from another list (cross-list destination commit). |
 | `remove` | Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode). |
 | `start` | Fired when dragging starts. |

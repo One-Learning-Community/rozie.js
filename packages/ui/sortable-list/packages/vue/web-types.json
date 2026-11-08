@@ -253,7 +253,7 @@
           "js": {
             "events": [
               {
-                "name": "change",
+                "name": "reorder",
                 "description": "Fired after the list order changes (same-list reorder commit).",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },

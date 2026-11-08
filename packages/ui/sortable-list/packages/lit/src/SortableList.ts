@@ -276,7 +276,7 @@ private __rozieFirstUpdateDone = false;
         newIndex,
         item
       }: any) => {
-        if (kind === 'reorder') this.dispatchEvent(new CustomEvent("change", {
+        if (kind === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
           detail: {
             oldIndex,
             newIndex,
@@ -370,7 +370,7 @@ private __rozieFirstUpdateDone = false;
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (name === 'change') this.dispatchEvent(new CustomEvent("change", {
+        }));else if (name === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
           detail: payload,
           bubbles: true,
           composed: true
@@ -827,7 +827,7 @@ private __rozieFirstUpdateDone = false;
   // holder's own `labelFor`.
   this.speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
-  h.emit('change', {
+  h.emit('reorder', {
     oldIndex: from,
     newIndex: to,
     item: moved,
@@ -998,7 +998,7 @@ private __rozieFirstUpdateDone = false;
       lift.key = h.keyOf(item, to);
       h.write(next);
       h.focusRow(item, to);
-      h.emit('change', {
+      h.emit('reorder', {
         oldIndex: at,
         newIndex: to,
         item,

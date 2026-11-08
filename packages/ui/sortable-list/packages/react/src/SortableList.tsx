@@ -8,7 +8,7 @@ import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId } from '.
 
 interface ChildrenCtx { item: any; index: any; instructionsId: any; }
 
-interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onReorder' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -113,7 +113,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, any> | ((...args: any[]) => any)) | null;
-  onChange?: (...args: any[]) => void;
+  onReorder?: (...args: any[]) => void;
   onAdd?: (...args: any[]) => void;
   onRemove?: (...args: any[]) => void;
   onStart?: (...args: any[]) => void;
@@ -161,8 +161,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     itemStyle: _props.itemStyle ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, itemKey, handle, group, animation, disabled, disableKeyboard, keyboardTrigger, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, listLabel, orientation, pageStep, keyboardInstructions, itemStyle, defaultValue, onItemsChange, defaultItems, onChange, onAdd, onRemove, onStart, onEnd, renderHeader, children, renderFooter, slots, ...rest } = _props as SortableListProps & Record<string, unknown>;
-    void items; void itemKey; void handle; void group; void animation; void disabled; void disableKeyboard; void keyboardTrigger; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void listLabel; void orientation; void pageStep; void keyboardInstructions; void itemStyle; void defaultValue; void onItemsChange; void defaultItems; void onChange; void onAdd; void onRemove; void onStart; void onEnd; void renderHeader; void children; void renderFooter; void slots;
+    const { items, itemKey, handle, group, animation, disabled, disableKeyboard, keyboardTrigger, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, listLabel, orientation, pageStep, keyboardInstructions, itemStyle, defaultValue, onItemsChange, defaultItems, onReorder, onAdd, onRemove, onStart, onEnd, renderHeader, children, renderFooter, slots, ...rest } = _props as SortableListProps & Record<string, unknown>;
+    void items; void itemKey; void handle; void group; void animation; void disabled; void disableKeyboard; void keyboardTrigger; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void listLabel; void orientation; void pageStep; void keyboardInstructions; void itemStyle; void defaultValue; void onItemsChange; void defaultItems; void onReorder; void onAdd; void onRemove; void onStart; void onEnd; void renderHeader; void children; void renderFooter; void slots;
     return rest;
   })();
   const instance = useRef<any>(null);
@@ -198,12 +198,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _listLabelRef.current = props.listLabel;
   const _onAddRef = useRef(props.onAdd);
   _onAddRef.current = props.onAdd;
-  const _onChangeRef = useRef(props.onChange);
-  _onChangeRef.current = props.onChange;
   const _onEndRef = useRef(props.onEnd);
   _onEndRef.current = props.onEnd;
   const _onRemoveRef = useRef(props.onRemove);
   _onRemoveRef.current = props.onRemove;
+  const _onReorderRef = useRef(props.onReorder);
+  _onReorderRef.current = props.onReorder;
   const _onStartRef = useRef(props.onStart);
   _onStartRef.current = props.onStart;
   const _optionsRef = useRef(props.options);
@@ -578,7 +578,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // holder's own `labelFor`.
     speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
     h.focusRow(moved, to);
-    h.emit('change', {
+    h.emit('reorder', {
       oldIndex: from,
       newIndex: to,
       item: moved,
@@ -749,7 +749,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         lift.key = h.keyOf(item, to);
         h.write(next);
         h.focusRow(item, to);
-        h.emit('change', {
+        h.emit('reorder', {
           oldIndex: at,
           newIndex: to,
           item,
@@ -1026,7 +1026,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         newIndex,
         item
       }: any) => {
-        if (kind === 'reorder') _onChangeRef.current && _onChangeRef.current({
+        if (kind === 'reorder') _onReorderRef.current && _onReorderRef.current({
           oldIndex,
           newIndex,
           item,
@@ -1092,7 +1092,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         return rowByKey(listEl$local, String(_keyForRef.current(list[i], i)));
       },
       emit: (name: any, payload: any) => {
-        if (name === 'add') _onAddRef.current && _onAddRef.current(payload);else if (name === 'remove') _onRemoveRef.current && _onRemoveRef.current(payload);else if (name === 'change') _onChangeRef.current && _onChangeRef.current(payload);else if (name === 'start') _onStartRef.current && _onStartRef.current(payload);else if (name === 'end') _onEndRef.current && _onEndRef.current(payload);
+        if (name === 'add') _onAddRef.current && _onAddRef.current(payload);else if (name === 'remove') _onRemoveRef.current && _onRemoveRef.current(payload);else if (name === 'reorder') _onReorderRef.current && _onReorderRef.current(payload);else if (name === 'start') _onStartRef.current && _onStartRef.current(payload);else if (name === 'end') _onEndRef.current && _onEndRef.current(payload);
       }
     };
     unregisterEntry.current = registry.register(entry.current);

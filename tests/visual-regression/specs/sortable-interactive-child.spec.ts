@@ -138,3 +138,38 @@ for (const target of TARGETS) {
     },
   );
 }
+
+// A native `change` event from a control inside a row (a checkbox) must not
+// reach the list's `reorder` listener. Angular's `(change)` output and a Lit
+// `change` listener both catch the bubbling native event when the component's
+// event is named `change`; the event is named `reorder`, which no native
+// control fires.
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  runner(
+    `sortable-interactive-child [${target}]: toggling a checkbox inside a row does not fire the list's reorder handler`,
+    async ({ page }) => {
+      await page.goto(`/?example=SortableListInteractive&target=${target}`);
+      const mount = page.getByTestId('rozie-mount');
+      const items = mount.locator(ITEM);
+      await expect(items).toHaveCount(SEED_ITEM_COUNT);
+      const count = mount.locator('[data-testid="reorder-count"]');
+      await expect(count).toHaveText('0');
+      const check = items.first().locator('[data-testid="row-check"]');
+      await check.check();
+      await expect(check).toBeChecked();
+      await page.waitForTimeout(150);
+      await expect(count).toHaveText('0');
+      // A real keyboard reorder still fires it exactly once.
+      await items.nth(1).focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Space');
+      await expect(count).toHaveText('1');
+    },
+  );
+}

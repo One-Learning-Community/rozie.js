@@ -730,6 +730,36 @@ for (const target of TARGETS) {
     },
   );
 
+  // KNOWN GAP on Lit (emitter behaviour, not this component): the Lit emitter
+  // lowers every `$emit(name, x)` to
+  // `this.dispatchEvent(new CustomEvent(name, { detail: x, bubbles: true, composed: true }))`
+  // (packages/targets/lit/src/rewrite/rewriteScript.ts and
+  // rewriteTemplateExpression.ts), so an inner list's events bubble out of the
+  // inner host and an ancestor list's listeners on the same event name catch
+  // them. The other five targets deliver `$emit` to the direct consumer only.
+  // Fixing it belongs in the emitter; this stays fixme on Lit until then.
+  const nestedRunner = target === 'lit' ? test.fixme : runner;
+  nestedRunner(
+    `sortable-keyboard-cross-list [${target}]: a nested inner list's events do not reach the outer list's listeners`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      // Grid column 1 holds one row; hop it to column 2 by keyboard, then
+      // reorder inside column 2 and drop. Only the grid lists may log anything.
+      await grip(mount, 'Left card').focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Shift+ArrowDown');
+      await expect.poll(() => state(mount, 'grid2')).toEqual(['Left card', 'Right card']);
+      await page.keyboard.press('ArrowDown');
+      await expect.poll(() => state(mount, 'grid2')).toEqual(['Right card', 'Left card']);
+      await page.keyboard.press('Space');
+      await page.waitForTimeout(150);
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log.length).toBeGreaterThan(0);
+      expect(log.filter((e) => !e.startsWith('grid1:') && !e.startsWith('grid2:'))).toEqual([]);
+      expect(errors).toEqual([]);
+    },
+  );
+
   runner(
     `sortable-keyboard-cross-list [${target}]: custom instructions are used`,
     async ({ page }) => {
@@ -757,7 +787,7 @@ for (const target of TARGETS) {
       await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Newsletter at position 3']);
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
-        .toEqual(['top:start:keyboard', 'top:change:keyboard', 'top:end:keyboard']);
+        .toEqual(['top:start:keyboard', 'top:reorder:keyboard', 'top:end:keyboard']);
       await assertNothingDisappeared(mount);
       expect(errors).toEqual([]);
     },

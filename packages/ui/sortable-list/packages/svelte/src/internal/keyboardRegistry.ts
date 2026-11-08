@@ -38,7 +38,7 @@ export interface ListEntry {
    */
   focusNear(index: number): void;
   rowEl(index: number): HTMLElement | null;
-  emit(name: 'add' | 'remove' | 'change' | 'start' | 'end', payload: object): void;
+  emit(name: 'add' | 'remove' | 'reorder' | 'start' | 'end', payload: object): void;
 }
 
 export interface Lift {

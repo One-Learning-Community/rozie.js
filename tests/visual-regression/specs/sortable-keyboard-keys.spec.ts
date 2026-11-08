@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 /**
  * sortable-keyboard-keys — SortableList within-list keyboard keys on every
  * target cell: Home / End / PageUp / PageDown while lifted, Escape reverting a
- * single-list move, keyboard `start`/`change`/`end` events carrying
+ * single-list move, keyboard `start`/`reorder`/`end` events carrying
  * `interaction: 'keyboard'`, the list container's role, and the
  * spoken instructions referenced by `aria-describedby`.
  *
@@ -189,7 +189,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
-        .toEqual(['start:keyboard', 'change:keyboard', 'end:keyboard']);
+        .toEqual(['start:keyboard', 'reorder:keyboard', 'end:keyboard']);
     },
   );
 

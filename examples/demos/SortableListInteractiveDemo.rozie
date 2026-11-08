@@ -35,6 +35,7 @@
 <data>
 {
   items: [],
+  reorders: 0,
 }
 </data>
 
@@ -53,14 +54,16 @@ $onMount(() => {
 <template>
 <div class="interactive-demo">
   <h4>Slotted interactive child (input) inside a sortable row</h4>
-  <SortableList r-model:items="$data.items" itemKey="id">
+  <SortableList r-model:items="$data.items" itemKey="id" @reorder="$data.reorders = $data.reorders + 1">
     <template #default="{ item }">
       <span class="row">
         <span class="label">{{ item.label }}</span>
         <input class="row-input" data-testid="row-input" placeholder="type here" />
+        <input type="checkbox" class="row-check" data-testid="row-check" aria-label="done" />
       </span>
     </template>
   </SortableList>
+  <p class="reorder-count">reorders: <span data-testid="reorder-count">{{ $data.reorders }}</span></p>
 </div>
 </template>
 

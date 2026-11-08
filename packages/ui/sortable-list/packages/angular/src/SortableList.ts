@@ -177,12 +177,11 @@ export class SortableList {
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
-  change = output<unknown>();
+  reorder = output<unknown>();
   add = output<unknown>();
   remove = output<unknown>();
   start = output<unknown>();
   end = output<unknown>();
-  private __rozieNativeEventGuard = ((host: HTMLElement, renderer: Renderer2) => ['change'].map((type) => renderer.listen(host, type, (e: Event) => { if (e.target !== host) e.stopImmediatePropagation(); })))(inject(ElementRef).nativeElement, inject(Renderer2));
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
@@ -271,7 +270,7 @@ export class SortableList {
         newIndex,
         item
       }: any) => {
-        if (kind === 'reorder') this.change.emit({
+        if (kind === 'reorder') this.reorder.emit({
           oldIndex,
           newIndex,
           item,
@@ -339,7 +338,7 @@ export class SortableList {
         return this.rowByKey(listEl, String(this.keyFor(list[i], i)));
       },
       emit: (name: any, payload: any) => {
-        if (name === 'add') this.add.emit(payload);else if (name === 'remove') this.remove.emit(payload);else if (name === 'change') this.change.emit(payload);else if (name === 'start') this.start.emit(payload);else if (name === 'end') this.end.emit(payload);
+        if (name === 'add') this.add.emit(payload);else if (name === 'remove') this.remove.emit(payload);else if (name === 'reorder') this.reorder.emit(payload);else if (name === 'start') this.start.emit(payload);else if (name === 'end') this.end.emit(payload);
       }
     };
     this.unregisterEntry = this.registry.register(this.entry);
@@ -724,7 +723,7 @@ export class SortableList {
     // holder's own `labelFor`.
     this.speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
     h.focusRow(moved, to);
-    h.emit('change', {
+    h.emit('reorder', {
       oldIndex: from,
       newIndex: to,
       item: moved,
@@ -893,7 +892,7 @@ export class SortableList {
         lift.key = h.keyOf(item, to);
         h.write(next);
         h.focusRow(item, to);
-        h.emit('change', {
+        h.emit('reorder', {
           oldIndex: at,
           newIndex: to,
           item,

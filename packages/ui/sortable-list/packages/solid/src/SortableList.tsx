@@ -26,7 +26,7 @@ __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0
 
 interface DefaultSlotCtx { item: any; index: any; instructionsId: any; }
 
-interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'headerSlot' | 'children' | 'footerSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
+interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onReorder' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'headerSlot' | 'children' | 'footerSlot' | 'slots' | 'ref' | 'innerHTML' | 'innerText' | 'textContent'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -131,7 +131,7 @@ interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, any> | ((...args: any[]) => any)) | null;
-  onChange?: (...args: any[]) => void;
+  onReorder?: (...args: any[]) => void;
   onAdd?: (...args: any[]) => void;
   onRemove?: (...args: any[]) => void;
   onStart?: (...args: any[]) => void;
@@ -153,7 +153,7 @@ export interface SortableListHandle {
 
 export default function SortableList(_props: SortableListProps): JSX.Element {
   const _merged = mergeProps({ itemKey: null, handle: null, group: null, animation: 150, disabled: false, disableKeyboard: false, keyboardTrigger: 'row', options: (() => ({}))() as Record<string, any>, labelFor: null, ghostClass: null, chosenClass: null, dragClass: null, filter: null, easing: null, forceFallback: false, swapThreshold: 1, cloneable: false, listClass: '', itemClass: '', listLabel: null, orientation: 'vertical', pageStep: 5, keyboardInstructions: null, itemStyle: null }, _props);
-  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'disableKeyboard', 'keyboardTrigger', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'listLabel', 'orientation', 'pageStep', 'keyboardInstructions', 'itemStyle', 'children', 'ref', 'onChange', 'onAdd', 'onRemove', 'onStart', 'onEnd', 'headerSlot', 'footerSlot', 'slots']);
+  const [local, attrs] = splitProps(_merged, ['items', 'itemKey', 'handle', 'group', 'animation', 'disabled', 'disableKeyboard', 'keyboardTrigger', 'options', 'labelFor', 'ghostClass', 'chosenClass', 'dragClass', 'filter', 'easing', 'forceFallback', 'swapThreshold', 'cloneable', 'listClass', 'itemClass', 'listLabel', 'orientation', 'pageStep', 'keyboardInstructions', 'itemStyle', 'children', 'ref', 'onReorder', 'onAdd', 'onRemove', 'onStart', 'onEnd', 'headerSlot', 'footerSlot', 'slots']);
   const resolved = children(() => local.children as JSX.Element);
   onMount(() => { local.ref?.({ getInstance, toArray, sort, option }); });
 
@@ -215,7 +215,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
         newIndex,
         item
       }: any) => {
-        if (kind === 'reorder') _props.onChange?.({
+        if (kind === 'reorder') _props.onReorder?.({
           oldIndex,
           newIndex,
           item,
@@ -281,7 +281,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
         return rowByKey(listEl, String(keyFor(list[i], i)));
       },
       emit: (name: any, payload: any) => {
-        if (name === 'add') _props.onAdd?.(payload);else if (name === 'remove') _props.onRemove?.(payload);else if (name === 'change') _props.onChange?.(payload);else if (name === 'start') _props.onStart?.(payload);else if (name === 'end') _props.onEnd?.(payload);
+        if (name === 'add') _props.onAdd?.(payload);else if (name === 'remove') _props.onRemove?.(payload);else if (name === 'reorder') _props.onReorder?.(payload);else if (name === 'start') _props.onStart?.(payload);else if (name === 'end') _props.onEnd?.(payload);
       }
     };
     unregisterEntry = registry.register(entry);
@@ -693,7 +693,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     // holder's own `labelFor`.
     speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
     h.focusRow(moved, to);
-    h.emit('change', {
+    h.emit('reorder', {
       oldIndex: from,
       newIndex: to,
       item: moved,
@@ -864,7 +864,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
         lift.key = h.keyOf(item, to);
         h.write(next);
         h.focusRow(item, to);
-        h.emit('change', {
+        h.emit('reorder', {
           oldIndex: at,
           newIndex: to,
           item,
