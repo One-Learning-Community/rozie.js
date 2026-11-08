@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { synthesizeDrag } from '../host/dragEvent';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -33,6 +34,7 @@ const ARIA_LIVE = '[data-rozie-sortable-aria-live]';
 const STATE_LI = '[class*="state-list"] li';
 const LOG_LI = '[class*="event-log"] li';
 const GRIP = '[class*="grip"]';
+const LIFTED = '[class*="rozie-sortable-item-lifted"]';
 
 const SEED = ['Apple', 'Banana', 'Cherry', 'Date', 'Elderberry'];
 const INSTRUCTIONS =
@@ -189,6 +191,68 @@ for (const target of TARGETS) {
       await expect(section.locator(GRIP).first()).toHaveAccessibleDescription(
         /^Press Space or Enter to pick up\./,
       );
+    },
+  );
+
+  // No-wait bursts whose result depends on End / PageDown actually moving.
+  runner(
+    `sortable-keyboard-keys [${target}]: back-to-back Space, End, ArrowUp, Space (no waits)`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(0).focus();
+      for (const key of ['Space', 'End', 'ArrowUp', 'Space']) await page.keyboard.press(key);
+      await expect(aria).toHaveText('Dropped Apple at position 4');
+      await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Apple', 'Elderberry']);
+      await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
+    },
+  );
+
+  runner(
+    `sortable-keyboard-keys [${target}]: back-to-back Space, PageDown, Home, PageDown, Space (no waits)`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(0).focus();
+      // 5 rows, pageStep 5: PageDown clamps 0 → 4, Home → 0, PageDown → 4.
+      for (const key of ['Space', 'PageDown', 'Home', 'PageDown', 'Space']) await page.keyboard.press(key);
+      await expect(aria).toHaveText('Dropped Apple at position 5');
+      await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Elderberry', 'Apple']);
+      await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
+    },
+  );
+
+  runner(
+    `sortable-keyboard-keys [${target}]: Escape with nothing lifted does nothing`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(1).focus();
+      await page.keyboard.press('Escape');
+      await page.keyboard.press('Escape');
+      // Give any (wrong) async write a chance to land before asserting.
+      await page.waitForTimeout(100);
+      await expectOrder(mount, items, SEED);
+      await expect(mount.locator(LOG_LI)).toHaveCount(0);
+      await expect(aria).toHaveText('');
+    },
+  );
+
+  runner(
+    `sortable-keyboard-keys [${target}]: a pointer drag ends an active keyboard lift`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(0).focus();
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText('Lifted Apple');
+      await expect(mount.locator(LIFTED)).toHaveCount(1);
+      // Drag Banana below Date with the pointer.
+      await synthesizeDrag(page, {
+        sourceHandle: items.nth(1).locator('[class*="label"]'),
+        target: items.nth(3),
+      });
+      await expect(mount.locator(LIFTED)).toHaveCount(0);
+      await expect
+        .poll(async () => (await texts(mount.locator(LOG_LI))).slice(0, 3))
+        .toEqual(['start:keyboard', 'end:keyboard', 'start:pointer']);
+      await expect.poll(() => texts(mount.locator(LOG_LI))).toContain('end:pointer');
     },
   );
 

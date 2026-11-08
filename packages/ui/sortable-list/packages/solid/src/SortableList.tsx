@@ -236,10 +236,17 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       }
     });
     instance = sortable.instance;
+    const listEl = listElRef;
+    const stopNative = (ev: any) => {
+      if (ev.target === listEl) ev.stopPropagation();
+    };
+    for (const name of SORTABLE_DOM_EVENTS as any) listEl?.addEventListener(name, stopNative);
+    unhookNativeEvents = () => {
+      for (const name of SORTABLE_DOM_EVENTS as any) listEl?.removeEventListener(name, stopNative);
+    };
 
     // Register with the keyboard registry. Other instances call these methods
     // when a keyboard lift hands a row between lists.
-    const listEl = listElRef;
     entry = {
       el: listEl,
       instructionsId,
@@ -278,6 +285,8 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     instance?.destroy();
     unregisterEntry?.();
     unregisterEntry = null;
+    unhookNativeEvents?.();
+    unhookNativeEvents = null;
   });
   });
   let listElRef: HTMLElement | null = null;
@@ -287,10 +296,25 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
+  // (The row :class adds that class as a plain string entry, not a nested
+  // `{ cls: cond }` object: Angular's [class] binding drops objects nested in an
+  // array, so the lifted class never applied there.)
   const registry = getKeyboardRegistry();
   // This list's registry entry (a ListEntry), built and registered in $onMount.
   let entry: any = null;
   let unregisterEntry: any = null;
+  // Removes the listeners that keep SortableJS's own DOM events inside the list.
+  let unhookNativeEvents: any = null;
+
+  // SortableJS also dispatches its events as BUBBLING native DOM events
+  // (`start`, `end`, `change`, `add`, …) on the list element, before it calls
+  // the option callbacks. Angular's `(start)` / `(change)` output bindings on the
+  // component host also catch native DOM events of the same name, so an Angular
+  // consumer got the raw SortableJS event as an extra `start`, plus a native
+  // `change` on every mid-drag position change. The component re-emits the
+  // committed events itself, so stop the raw ones at the list element (only
+  // events dispatched ON the list — an `<input>`'s own `change` is untouched).
+  const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
 
   // Per-instance id of the hidden spoken-instructions element. Assigned once
   // per instance: it is also read in $onMount (the registry entry), which makes
@@ -668,7 +692,8 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     const prevKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
     const nextKey = horizontal ? 'ArrowRight' : 'ArrowDown';
     const from = registry.indexOfLift();
-    const step = local.pageStep > 0 ? Math.floor(local.pageStep) : 5;
+    // pageStep below 1 (or not a number) still moves by at least one position.
+    const step = Math.max(1, Math.floor(Number(local.pageStep) || 1));
     let to: any = null;
     if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = items().length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
     if (to === null) return;
@@ -717,7 +742,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     <div {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
       <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" role="list" aria-label={rozieAttr(local.listLabel)} aria-orientation={rozieAttr(local.orientation === 'horizontal' ? 'horizontal' : 'vertical')} data-rozie-s-0af24eae="">
         {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), { 'rozie-sortable-item-lifted': liftedIndex() === index() }])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), liftedIndex() === index() ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, get index() { return index(); }, instructionsId }) : resolved()}
         </div>}</For>
         {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}

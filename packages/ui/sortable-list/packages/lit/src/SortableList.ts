@@ -226,6 +226,8 @@ private __rozieFirstUpdateDone = false;
       this.instance?.destroy();
       this.unregisterEntry?.();
       this.unregisterEntry = null;
+      this.unhookNativeEvents?.();
+      this.unhookNativeEvents = null;
     }));
 
     this.warnIfHandleMissing();
@@ -308,10 +310,17 @@ private __rozieFirstUpdateDone = false;
       }
     });
     this.instance = sortable.instance;
+    const listEl = this._refListEl;
+    const stopNative = (ev: any) => {
+      if (ev.target === listEl) ev.stopPropagation();
+    };
+    for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.addEventListener(name, stopNative);
+    this.unhookNativeEvents = () => {
+      for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.removeEventListener(name, stopNative);
+    };
 
     // Register with the keyboard registry. Other instances call these methods
     // when a keyboard lift hands a row between lists.
-    const listEl = this._refListEl;
     this.entry = {
       el: listEl,
       instructionsId: this.instructionsId,
@@ -404,7 +413,7 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-0af24eae>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" role="list" aria-label=${rozieAttr(this.listLabel)} aria-orientation=${rozieAttr(this.orientation === 'horizontal' ? 'horizontal' : 'vertical')} data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this.instructionsId : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this.instructionsId : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index, instructionsId: this.instructionsId}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index, instructionsId: this.instructionsId}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>
@@ -420,12 +429,28 @@ private __rozieFirstUpdateDone = false;
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
+  // (The row :class adds that class as a plain string entry, not a nested
+  // `{ cls: cond }` object: Angular's [class] binding drops objects nested in an
+  // array, so the lifted class never applied there.)
   registry = getKeyboardRegistry();
 
   // This list's registry entry (a ListEntry), built and registered in $onMount.
   entry: any = null;
 
   unregisterEntry: any = null;
+
+  // Removes the listeners that keep SortableJS's own DOM events inside the list.
+  unhookNativeEvents: any = null;
+
+  // SortableJS also dispatches its events as BUBBLING native DOM events
+  // (`start`, `end`, `change`, `add`, …) on the list element, before it calls
+  // the option callbacks. Angular's `(start)` / `(change)` output bindings on the
+  // component host also catch native DOM events of the same name, so an Angular
+  // consumer got the raw SortableJS event as an extra `start`, plus a native
+  // `change` on every mid-drag position change. The component re-emits the
+  // committed events itself, so stop the raw ones at the list element (only
+  // events dispatched ON the list — an `<input>`'s own `change` is untouched).
+  SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
 
   // Per-instance id of the hidden spoken-instructions element. Assigned once
   // per instance: it is also read in $onMount (the registry entry), which makes
@@ -801,7 +826,8 @@ private __rozieFirstUpdateDone = false;
   const prevKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
   const nextKey = horizontal ? 'ArrowRight' : 'ArrowDown';
   const from = this.registry.indexOfLift();
-  const step = this.pageStep > 0 ? Math.floor(this.pageStep) : 5;
+  // pageStep below 1 (or not a number) still moves by at least one position.
+  const step = Math.max(1, Math.floor(Number(this.pageStep) || 1));
   let to: any = null;
   if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = this.items.length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
   if (to === null) return;
