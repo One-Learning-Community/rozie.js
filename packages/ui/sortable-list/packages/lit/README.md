@@ -54,6 +54,10 @@ el.addEventListener('items-change', (e) => {
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `listLabel` | `String` | `null` |  |  |
+| `orientation` | `String` | `"vertical"` |  |  |
+| `pageStep` | `Number` | `5` |  |  |
+| `keyboardInstructions` | `String` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
@@ -90,5 +94,5 @@ el.option('disabled', true);
 | Slot | Params |
 | --- | --- |
 | header |  |
-| (default) | item, index |
+| (default) | item, index, instructionsId |
 | footer |  |

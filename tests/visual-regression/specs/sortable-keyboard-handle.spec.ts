@@ -142,7 +142,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await expect(aria).toHaveText(`Lifted ${HERO}`);
       await page.keyboard.press('Escape');
-      await expect(aria).toHaveText(`Cancelled lift of ${HERO}`);
+      await expect(aria).toHaveText(`Cancelled. ${HERO} returned to position 3`);
     },
   );
 

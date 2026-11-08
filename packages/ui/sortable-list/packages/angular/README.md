@@ -97,6 +97,10 @@ The accessor contract: only real user interaction dirties the control — progra
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `listLabel` | `String` | `null` |  |  |
+| `orientation` | `String` | `"vertical"` |  |  |
+| `pageStep` | `Number` | `5` |  |  |
+| `keyboardInstructions` | `String` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
@@ -134,5 +138,5 @@ export class DemoComponent {
 | Slot | Params |
 | --- | --- |
 | header |  |
-| (default) | item, index |
+| (default) | item, index, instructionsId |
 | footer |  |

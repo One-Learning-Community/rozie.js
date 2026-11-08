@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
-export interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
+export interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onChange' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -88,6 +88,22 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    */
   itemClass?: string | unknown[] | Record<string, unknown> | ((...args: any[]) => any);
   /**
+   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`.
+   */
+  listLabel?: (string) | null;
+  /**
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container.
+   */
+  orientation?: string;
+  /**
+   * How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.
+   */
+  pageStep?: number;
+  /**
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
+   */
+  keyboardInstructions?: (string) | null;
+  /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, unknown> | ((...args: any[]) => any)) | null;
@@ -97,7 +113,7 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
   onStart?: (...args: any[]) => void;
   onEnd?: (...args: any[]) => void;
   renderHeader?: () => ReactNode;
-  children?: ReactNode | ((params: { item: unknown; index: unknown }) => ReactNode);
+  children?: ReactNode | ((params: { item: unknown; index: unknown; instructionsId: unknown }) => ReactNode);
   renderFooter?: () => ReactNode;
   slots?: Record<string, () => ReactNode>;
 }

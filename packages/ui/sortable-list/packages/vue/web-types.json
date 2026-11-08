@@ -203,6 +203,42 @@
               "default": "\"\""
             },
             {
+              "name": "list-label",
+              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
+              "name": "orientation",
+              "description": "Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"vertical\""
+            },
+            {
+              "name": "page-step",
+              "description": "How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "number"
+              ],
+              "default": "5"
+            },
+            {
+              "name": "keyboard-instructions",
+              "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.\" When `group` is set the default adds \"Hold Shift with an arrow key to move to another list.\"",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "null"
+            },
+            {
               "name": "item-style",
               "description": "Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
@@ -256,7 +292,7 @@
             {
               "name": "default",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
-              "type": "{ item: any; index: number }"
+              "type": "{ item: any; index: number; instructionsId: any }"
             },
             {
               "name": "footer",

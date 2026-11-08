@@ -134,6 +134,9 @@ export const EXAMPLES = [
   // keyboardTrigger="handle" fixture (loader → examples/demos/
   // SortableListHandleDemo.rozie). NOT a screenshot cell.
   'SortableListHandle',
+  // SortableListKeys is the BEHAVIORAL-only within-list keyboard keys fixture
+  // (loader → examples/demos/SortableListKeysDemo.rozie). NOT a screenshot cell.
+  'SortableListKeys',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -1575,6 +1578,7 @@ export const LIT_TAGS: Record<Example, string> = {
   SortableListKeying: 'rozie-sortable-list-keying',
   SortableListInteractive: 'rozie-sortable-list-interactive',
   SortableListHandle: 'rozie-sortable-list-handle',
+  SortableListKeys: 'rozie-sortable-list-keys',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -2122,6 +2126,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick 261107-s4a — SortableListHandle is self-contained: both lists are
   // seeded in the demo's $onMount.
   SortableListHandle: {},
+  // SortableListKeys is self-contained: the list is seeded in its $onMount.
+  SortableListKeys: {},
   SortableListShowcase: {},
   Flatpickr: {},
   LeafletMap: {},

@@ -72,9 +72,9 @@ $onMount(() => {
       :handle="$classSelector('grip')"
       :disableKeyboard="$data.disableKeyboard"
     >
-      <template #default="{ item }">
+      <template #default="{ item, instructionsId }">
         <span class="row">
-          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" @click="onHandleClick">⋮⋮</button>
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId" @click="onHandleClick">⋮⋮</button>
           <span class="label">{{ item.label }}</span>
           <input class="row-input" data-testid="row-input" placeholder="note" />
         </span>

@@ -55,6 +55,10 @@ export function Demo() {
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `listLabel` | `String` | `null` |  |  |
+| `orientation` | `String` | `"vertical"` |  |  |
+| `pageStep` | `Number` | `5` |  |  |
+| `keyboardInstructions` | `String` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
@@ -92,5 +96,5 @@ const order = handle?.toArray();
 | Slot | Params |
 | --- | --- |
 | header |  |
-| (default) | item, index |
+| (default) | item, index, instructionsId |
 | footer |  |

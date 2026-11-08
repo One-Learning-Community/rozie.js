@@ -88,17 +88,23 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
 | `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, an object (Vue-style class binding), or a `(item, index) => class` function for per-row classes, normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
+| `listLabel` | `String` | `null` | yes | The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. |
+| `orientation` | `String` | `"vertical"` | yes | Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container. |
+| `pageStep` | `Number` | `5` | yes | How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain. |
+| `keyboardInstructions` | `String` | `null` | yes | Replaces the spoken keyboard instructions, read via `aria-describedby` when a row (row mode) or handle (handle mode, through the `instructionsId` slot prop) gets focus. See [Keyboard accessibility](#keyboard-accessibility). |
 | `itemStyle` | `String \| Object \| Function` | `null` | yes | Per-row inline style on the item wrapper. Accepts a CSS string, a flat style object (`Record<string, string \| number>`), or a `(item, index) => string \| object` function. Lands on the `.rozie-sortable-item` wrapper — the direct child of the list container — so it can drive CSS-grid placement (`grid-column` / `align-self`) when `listClass` sets `display: grid`. Normalized per target (React/Solid `parseInlineStyle`, Lit/Svelte `rozieStyle`, Vue/Angular native); `null` / empty drops the attribute. |
 
 ### Events
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
-| `change` | `{ oldIndex, newIndex, item }` | Same-list reorder commit |
-| `add` | `{ newIndex, item }` | Cross-list destination commit (item arrives) |
-| `remove` | `{ oldIndex, item }` | Cross-list source commit (item leaves; NOT fired in clone mode) |
-| `start` | `SortableEvent` | Drag starts |
-| `end` | `SortableEvent` | Drag ends (source side) |
+| `change` | `{ oldIndex, newIndex, item, interaction }` | Same-list reorder commit (each keyboard move, too) |
+| `add` | `{ newIndex, item, interaction }` | Cross-list destination commit (item arrives) |
+| `remove` | `{ oldIndex, item, interaction }` | Cross-list source commit (item leaves; NOT fired in clone mode) |
+| `start` | `SortableEvent` (pointer) / keyboard payload | Drag starts, or a row is lifted by keyboard |
+| `end` | `SortableEvent` (pointer) / keyboard payload | Drag ends (source side), or a keyboard lift is dropped or cancelled |
+
+Every payload carries `interaction: 'pointer' | 'keyboard'`. Pointer `start` / `end` hand over SortableJS's own event object with `interaction` added to it. Keyboard `start` / `end` hand over `{ interaction: 'keyboard', item, data, from, to, oldIndex, newIndex }`, where `item` is the row element (as in SortableJS), `data` is the item value, and `from` / `to` are the list elements. Keyboard `start` fires once on lift; `end` fires once on drop or cancel.
 
 ### Slots
 
@@ -222,9 +228,19 @@ The canonical example is [`SortableListNestedDemo`](https://github.com/One-Learn
 
 ### Keyboard accessibility
 
-`SortableList` ships with keyboard-driven reorder out of the box. Tab to a row, Space to lift, ArrowUp/ArrowDown to move, Space (or Enter) to drop, Escape to cancel. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", "Cancelled lift of X".
+`SortableList` ships with keyboard-driven reorder out of the box. Tab to a row and press Space (or Enter) to lift it. While it is lifted:
 
-The cross-target focus-restoration after a keyed reorder is handled via Rozie's [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders) sigil — Svelte / Solid / Lit re-create row DOM on reorder (focus drops to `<body>` natively); the sigil restores it. Vue / React / Angular preserve identity natively and the sigil is a no-op. In handle mode the component re-focuses the handle itself, because the handle selector is a prop.
+- ArrowUp / ArrowDown move it one position (ArrowLeft / ArrowRight with `orientation="horizontal"`).
+- Home / End move it to the first / last position.
+- Page Up / Page Down move it by `pageStep` positions (default 5), stopping at the ends.
+- Space (or Enter) drops it.
+- Escape cancels: the row goes back to the position it was lifted from.
+
+These keys act only while a row is lifted, so they never take keys away from fields inside a row. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", and "Cancelled. X returned to position N".
+
+The list container carries `role="list"`, `aria-orientation`, and `aria-label` from `listLabel`. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby`: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
+
+After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
 
 To customize the aria-live label per row, pass `:labelFor="(item) => item.title"` — by default the announcer reads `item.label` (or `String(item)` if no `label` field).
 
@@ -239,9 +255,9 @@ Rows that contain inputs or other interactive content are awkward as keyboard ta
   keyboardTrigger="handle"
   :handle="$classSelector('grip')"
 >
-  <template #default="{ item }">
+  <template #default="{ item, instructionsId }">
     <div class="row">
-      <button type="button" class="grip" :aria-label="'Reorder ' + item.label">⋮⋮</button>
+      <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
       <input placeholder="note" />
     </div>
   </template>
@@ -255,6 +271,7 @@ The rules:
 - Handled keys call `preventDefault`, so the handle button's own click does not fire.
 - Focus returns to the moved row's handle after each move, on every framework.
 - You own the handle markup and its accessible name. The component adds no `tabindex` or `role` to slot content.
+- The default slot receives `instructionsId`, the id of the hidden instructions element. Bind it as the handle's `aria-describedby` so screen readers read the keys on focus. On Lit this works for Rozie consumers, whose slot content renders inside the list's shadow root; plain-HTML consumers of the Lit element can't reference an id across the shadow boundary.
 - Without a `handle` selector, keyboard reordering is off and a console warning is logged. There is no silent fallback to row mode.
 - `disabled` and `disableKeyboard` still turn keyboard reordering off.
 

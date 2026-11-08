@@ -1,0 +1,100 @@
+<!--
+  SortableListKeysDemo.rozie — behavioral-only fixture for SortableList's
+  within-list keyboard keys (Home / End / PageUp / PageDown, Escape revert)
+  and the `interaction` field on emitted events.
+
+  One vertical row-mode list, no `group`. The page exposes:
+    - the `<ol class="state-list">` sidecar showing the bound array order,
+    - an `<ol class="event-log">` with one `li` per emitted event, text
+      `${name}:${interaction}`.
+
+  NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
+-->
+
+<rozie name="SortableListKeysDemo">
+
+<components>
+{
+  SortableList: '../../packages/ui/sortable-list/src/SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+  log: [],
+}
+</data>
+
+<script>
+const SEED = () => [
+  { id: 'a', label: 'Apple' },
+  { id: 'b', label: 'Banana' },
+  { id: 'c', label: 'Cherry' },
+  { id: 'd', label: 'Date' },
+  { id: 'e', label: 'Elderberry' },
+]
+
+// Lit delivers a child $emit as a CustomEvent with the payload in `detail`;
+// the other targets hand over the payload itself.
+const interactionOf = (e) => {
+  if (e != null && e.interaction != null) return e.interaction
+  if (e != null && e.detail != null && e.detail.interaction != null) return e.detail.interaction
+  return '?'
+}
+
+const record = (name, e) => {
+  $data.log = [...$data.log, name + ':' + interactionOf(e)]
+}
+
+$onMount(() => {
+  $data.items = SEED()
+})
+</script>
+
+<template>
+<div class="keys-demo">
+  <h4>Keyboard keys</h4>
+  <SortableList
+    r-model:items="$data.items"
+    itemKey="id"
+    @start="record('start', $event)"
+    @change="record('change', $event)"
+    @end="record('end', $event)"
+    @add="record('add', $event)"
+    @remove="record('remove', $event)"
+  >
+    <template #default="{ item }">
+      <span class="row"><span class="label">{{ item.label }}</span></span>
+    </template>
+  </SortableList>
+
+  <ol class="state-list">
+    <li r-for="item, index in $data.items" :key="item.id">
+      <span>{{ item.label }}</span>
+    </li>
+  </ol>
+
+  <ol class="event-log">
+    <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
+  </ol>
+</div>
+</template>
+
+<style>
+.keys-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  padding: 1rem;
+  max-width: 480px;
+}
+.row {
+  display: block;
+  padding: 0.4rem 0.6rem;
+  background: #f5f5f7;
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.state-list, .event-log { font-size: 0.8rem; }
+</style>
+
+</rozie>

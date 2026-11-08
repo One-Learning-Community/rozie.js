@@ -4,13 +4,15 @@ import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { useSortableJS } from './internal/useSortableJS';
+import { getKeyboardRegistry, nextInstructionsId } from './internal/keyboardRegistry';
 
 interface HeaderCtx {}
 
 interface DefaultCtx {
-  $implicit: { item: any; index: any };
+  $implicit: { item: any; index: any; instructionsId: any };
   item: any;
   index: any;
+  instructionsId: any;
 }
 
 interface FooterCtx {}
@@ -21,17 +23,18 @@ interface FooterCtx {}
   imports: [NgTemplateOutlet],
   template: `
 
-    <div class="rozie-sortable-wrap" #__rozieRoot #rozieSpread_0 #rozieListenersTarget_1>
-      <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list">
+    <div class="rozie-sortable-wrap" #rozieSpread_0 #rozieListenersTarget_1>
+      <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list" role="list" [attr.aria-label]="rozieAttr(listLabel())" [attr.aria-orientation]="rozieAttr(orientation() === 'horizontal' ? 'horizontal' : 'vertical')">
         <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" (keydown)="onRowKeyDown($event, index)">
-          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index }, item: item, index: index }" />
+    <div [class]="['rozie-sortable-item', itemClassFor(item, index), { 'rozie-sortable-item-lifted': liftedIndex() === index }]" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId : null)" (keydown)="onRowKeyDown($event, index)">
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index, instructionsId: instructionsId }, item: item, index: index, instructionsId: instructionsId }" />
         </div>
     }
         <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />
       </div>
       <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText() }}</div>
+      <span hidden="" [attr.id]="rozieAttr(instructionsId)">{{ rozieDisplay(instructionsText()) }}</span>
     </div>
 
   `,
@@ -152,13 +155,28 @@ export class SortableList {
    */
   itemClass = input<string | any[] | Record<string, any> | ((...args: any[]) => any)>('');
   /**
+   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`.
+   */
+  listLabel = input<(string) | null>(null);
+  /**
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container.
+   */
+  orientation = input<string>('vertical');
+  /**
+   * How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.
+   */
+  pageStep = input<number>(5);
+  /**
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
+   */
+  keyboardInstructions = input<(string) | null>(null);
+  /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle = input<(string | Record<string, any> | ((...args: any[]) => any)) | null>(null);
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
-  __rozieRoot = viewChild<ElementRef<HTMLDivElement>>('__rozieRoot');
   change = output<unknown>();
   add = output<unknown>();
   remove = output<unknown>();
@@ -249,27 +267,95 @@ export class SortableList {
         if (kind === 'reorder') this.change.emit({
           oldIndex,
           newIndex,
-          item
+          item,
+          interaction: 'pointer'
         });else if (kind === 'add') this.add.emit({
           newIndex,
-          item
+          item,
+          interaction: 'pointer'
         });else if (kind === 'remove') this.remove.emit({
           oldIndex,
-          item
+          item,
+          interaction: 'pointer'
         });
       },
-      onStart: (e: any) => this.start.emit(e),
-      onEnd: (e: any) => this.end.emit(e)
+      onStart: (e: any) => {
+        // A pointer drag ends any active keyboard lift first.
+        if (this.registry.lift != null) this.endLift('drop');
+        (e as any).interaction = 'pointer';
+        this.start.emit(e);
+      },
+      onEnd: (e: any) => {
+        (e as any).interaction = 'pointer';
+        this.end.emit(e);
+      }
     });
     this.instance = sortable.instance;
+
+    // Register with the keyboard registry. Other instances call these methods
+    // when a keyboard lift hands a row between lists.
+    // Register with the keyboard registry. Other instances call these methods
+    // when a keyboard lift hands a row between lists.
+    const listEl = this.listEl()?.nativeElement;
+    this.entry = {
+      el: listEl,
+      instructionsId: this.instructionsId,
+      group: () => this.resolveGroup(),
+      label: () => this.listLabel(),
+      keyboardEnabled: () => this.keyboardEnabled(),
+      items: () => this.items(),
+      keyOf: (item: any, i: any) => String(this.keyFor(item, i)),
+      write: (next: any) => {
+        this.items.set(next), this.__rozieCvaOnChange(next);
+      },
+      setLifted: (i: any) => {
+        this.liftedIndex.set(i);
+      },
+      announce: (text: any) => {
+        this.ariaLiveText.set(text);
+      },
+      focusRow: (item: any, i: any) => this.refocusRow(item, i),
+      rowEl: (i: any) => {
+        const list = this.items();
+        if (i < 0 || i >= list.length) return null;
+        return this.rowByKey(listEl, String(this.keyFor(list[i], i)));
+      },
+      emit: (name: any, payload: any) => {
+        if (name === 'add') this.add.emit(payload);else if (name === 'remove') this.remove.emit(payload);else if (name === 'change') this.change.emit(payload);else if (name === 'start') this.start.emit(payload);else if (name === 'end') this.end.emit(payload);
+      }
+    };
+    this.unregisterEntry = this.registry.register(this.entry);
     // $onMount's cleanup-return: closing over a setup-local (`sortable`) does
     // not survive the Solid emitter's setup/cleanup split — it scopes cleanup
-    // outside the setup IIFE. Closing over `instance` (a module-scope `let`)
-    // works on every target.
-    this.__rozieDestroyRef.onDestroy(() => this.instance?.destroy());
+    // outside the setup IIFE. Closing over `instance` / `unregisterEntry`
+    // (module-scope `let`s) works on every target.
+    this.__rozieDestroyRef.onDestroy(() => {
+      this.instance?.destroy();
+      this.unregisterEntry?.();
+      this.unregisterEntry = null;
+    });
   }
 
   instance: any = null;
+  // Keyboard lift state lives in the shared registry (one active keyboard lift
+  // per page, so a later task can hand a lifted row between lists).
+  // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
+  registry = getKeyboardRegistry();
+  // This list's registry entry (a ListEntry), built and registered in $onMount.
+  entry: any = null;
+  unregisterEntry: any = null;
+  // Per-instance id of the hidden spoken-instructions element. Assigned once
+  // per instance: it is also read in $onMount (the registry entry), which makes
+  // the React emitter keep it across renders instead of minting a new id each
+  // render.
+  instructionsId = nextInstructionsId();
+  DEFAULT_INSTRUCTIONS = 'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.';
+  GROUP_INSTRUCTIONS = ' Hold Shift with an arrow key to move to another list.';
+  instructionsText = () => {
+    const __keyboardInstructions = this.keyboardInstructions();
+    if (__keyboardInstructions != null) return __keyboardInstructions;
+    return this.group() != null ? this.DEFAULT_INSTRUCTIONS + this.GROUP_INSTRUCTIONS : this.DEFAULT_INSTRUCTIONS;
+  };
   // Instance-scoped synthetic-id store for id-less object items. Keyed by object
   // IDENTITY, so the same object keeps its synthetic id across a reorder (the
   // framework reconciler then rebinds the row component instance to its ORIGINAL
@@ -344,13 +430,12 @@ export class SortableList {
     if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
     return String(item);
   };
-  getLabel = (idx: any) => this.labelOf(this.items()[idx], idx);
-  // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
-  // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
-  // any array-reorder write, $restoreFocus('[role="listitem"]', newIdx) keeps
-  // focus on the moved row across the React/Vue/Angular vs Svelte/Solid/Lit
-  // keyed-reconciler divide (Plan 16-03 sigil — no-op on the first three;
-  // queueMicrotask + querySelectorAll + .focus() on the latter three).
+  // Keyboard handler (Phase 16 R7): Space/Enter lift and drop; while lifted,
+  // ArrowUp/ArrowDown (ArrowLeft/ArrowRight when horizontal), Home/End and
+  // PageUp/PageDown move the row, and Escape returns it to where it was lifted
+  // from. The lift itself lives in the shared keyboard registry. After
+  // any array-reorder write, refocusRow() keeps focus on the moved row (or its
+  // handle) on all six targets.
   //
   // Note: `index` is passed directly as a number. Plan 16-02 (Solid call-arg
   // accessor unwrap) ensures Solid's <For> alias unwraps to `index()` at the
@@ -406,33 +491,38 @@ export class SortableList {
     }
     return false;
   };
-  // Handle mode: put focus back on the MOVED row's handle after a reorder write.
-  // Looks the row up by KEY (data-id), not by index, so it finds the moved row
-  // whether this runs before the framework commit (the row element is the same
-  // one) or after it (Svelte/Solid/Lit re-create the DOM) — and it is correct for
-  // index-keyed primitive lists too. Direct children of the list container only:
-  // that skips nested-list rows and the header/footer slot content.
+  // Put focus back on the MOVED row (row mode) or its handle (handle mode) after
+  // a reorder write. Looks the row up by KEY (data-id), not by index, so it finds
+  // the moved row whether this runs before the framework commit (the row element
+  // is the same one) or after it (Svelte/Solid/Lit re-create the DOM) — and it is
+  // correct for index-keyed primitive lists too. Direct children of the list
+  // container only: that skips nested-list rows and the header/footer slot
+  // content.
   //
-  // Two passes. (1) A microtask — the same timing as the svelte/solid/lit
-  // $restoreFocus lowering — covers targets that commit synchronously. (2) A
-  // timer + rAF "heal" pass covers targets whose DOM commit is scheduled AFTER the
-  // key handler returns (Angular): the commit can MOVE the focused row, and moving
-  // a focused node blurs it, so a rapid Space/Arrow/Arrow/Space burst would
-  // otherwise end with focus on <body>. The heal pass never steals: it acts only
-  // when focus has been lost to <body>. No per-target branching (the handle
-  // selector is a prop, and $restoreFocus takes a string literal only). The $refs
-  // read happens here, synchronously, inside an event handler — which is safe.
-  refocusHandle = (item: any, idx: any) => {
+  // Two passes. (1) A microtask covers targets that commit synchronously or in an
+  // earlier microtask (Vue's scheduler flush is queued by the model write, before
+  // this one). (2) A timer + rAF "heal" pass covers targets whose DOM commit is
+  // scheduled AFTER the key handler returns (Angular): the commit can MOVE the
+  // focused row, and moving a focused node blurs it, so a Home/End/Escape jump or
+  // a rapid Space/Arrow/Arrow/Space burst would otherwise end with focus on
+  // <body>. The heal pass never steals: it acts only when focus has been lost to
+  // <body>. (`$restoreFocus(selector, index)` is not enough here: it is a no-op on
+  // Vue/Angular, where a long jump moves the focused row itself, and it looks the
+  // row up by index, which can land on a neighbour on Lit.) The $refs read
+  // happens here, synchronously, inside an event handler — which is safe.
+  refocusRow = (item: any, idx: any) => {
     const listEl = this.listEl()?.nativeElement;
     const sel = this.handle();
+    const useHandle = this.handleMode();
     const key = String(this.keyFor(item, idx));
     const focusIt = (onlyIfLost: any) => {
-      if (!listEl || sel == null) return;
+      if (!listEl) return;
+      if (useHandle && sel == null) return;
       if (onlyIfLost && document.activeElement && document.activeElement !== document.body) return;
       for (const row of Array.from(listEl.children) as any[]) {
         if (row.getAttribute('data-id') === key) {
-          const h = row.querySelector(sel);
-          if (h && typeof h.focus === 'function') h.focus();
+          const target = useHandle ? row.querySelector(sel) : row;
+          if (target && typeof target.focus === 'function') target.focus();
           return;
         }
       }
@@ -441,7 +531,130 @@ export class SortableList {
     setTimeout(() => focusIt(true), 0);
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusIt(true));
   };
+  // The row element carrying `data-id === key` among a list element's direct
+  // children (skips nested-list rows and header/footer slot content).
+  rowByKey = (listEl: any, key: any) => {
+    if (!listEl || key == null) return null;
+    for (const row of Array.from(listEl.children) as any[]) {
+      if (row.getAttribute('data-id') === key) return row;
+    }
+    return null;
+  };
+  // Keyboard `start` / `end` payload, shaped like SortableJS's pointer event:
+  // `item` is the row element, `data` the item value. `start` fires from the
+  // origin list (`from`), `end` from the list the row ends up in (`to`). Reads
+  // the lift, so call it while `registry.lift` is still set.
+  keyboardStartEnd = (name: any, from: any, to: any, oldIndex: any, newIndex: any) => {
+    const lift = this.registry.lift;
+    const host = name === 'start' ? from : to;
+    const payload = {
+      interaction: 'keyboard',
+      item: lift ? this.rowByKey(host.el, lift.key) : null,
+      data: lift ? lift.data : null,
+      from: from.el,
+      to: to.el,
+      oldIndex,
+      newIndex
+    };
+    host.emit(name, payload);
+  };
+  // Move the lifted row to `toIndex` (clamped) within the list holding it.
+  // Works through the registry entry, so it acts on the current holder.
+  moveLiftTo = (toIndex: any) => {
+    const lift = this.registry.lift;
+    if (!lift) return;
+    const h = lift.holder;
+    const from = this.registry.indexOfLift();
+    if (from < 0) {
+      // The lifted item is no longer in its list (the consumer changed the
+      // items). End the lift without writing anything.
+      this.registry.lift = null;
+      h.setLifted(null);
+      return;
+    }
+    const items = h.items();
+    const to = Math.max(0, Math.min(items.length - 1, toIndex));
+    if (to === from) return;
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    h.write(next);
+    // Index keys (primitive items without itemKey) change with the position.
+    lift.key = h.keyOf(moved, to);
+    h.setLifted(to);
+    // Name the row that MOVED from the local `moved` item: on React/Vue/Lit the
+    // items prop still holds the pre-write array here.
+    h.announce('Moved ' + this.labelOf(moved, to) + ' to position ' + (to + 1));
+    h.focusRow(moved, to);
+    h.emit('change', {
+      oldIndex: from,
+      newIndex: to,
+      item: moved,
+      interaction: 'keyboard'
+    });
+  };
+  // End the active keyboard lift. 'drop' leaves the row where it is; 'cancel'
+  // returns it to the position it was lifted from. Emits `end` once.
+  endLift = (kind: any) => {
+    const lift = this.registry.lift;
+    if (!lift) return;
+    const h = lift.holder;
+    const origin = lift.origin;
+    const at = this.registry.indexOfLift();
+    if (at < 0) {
+      this.registry.lift = null;
+      h.setLifted(null);
+      return;
+    }
+    const items = h.items();
+    const item = items[at];
+    let finalIndex = at;
+    if (kind === 'drop') {
+      h.announce('Dropped ' + this.labelOf(item, at) + ' at position ' + (at + 1));
+    } else if (h === origin.list) {
+      const to = Math.max(0, Math.min(items.length - 1, origin.index));
+      if (to !== at) {
+        const next = [...items];
+        next.splice(at, 1);
+        next.splice(to, 0, item);
+        h.write(next);
+        lift.key = h.keyOf(item, to);
+        h.focusRow(item, to);
+        h.emit('change', {
+          oldIndex: at,
+          newIndex: to,
+          item,
+          interaction: 'keyboard'
+        });
+      }
+      finalIndex = to;
+      h.announce('Cancelled. ' + this.labelOf(item, to) + ' returned to position ' + (to + 1));
+    }
+    h.setLifted(null);
+    this.keyboardStartEnd('end', origin.list, h, origin.index, finalIndex);
+    this.registry.lift = null;
+  };
+  // Lift the row at `index` of this list.
+  startLift = (index: any) => {
+    if (!this.entry) return;
+    const item = this.items()[index];
+    this.registry.lift = {
+      holder: this.entry,
+      key: this.entry.keyOf(item, index),
+      data: item,
+      copy: false,
+      origin: {
+        list: this.entry,
+        index
+      },
+      liftedRowEl: this.entry.rowEl(index)
+    };
+    this.liftedIndex.set(index);
+    this.ariaLiveText.set('Lifted ' + this.labelOf(item, index));
+    this.keyboardStartEnd('start', this.entry, this.entry, index, index);
+  };
   onRowKeyDown = ($event: any, index: any) => {
+    const __pageStep = this.pageStep();
     // Origin guard — must run FIRST, before the keyboardEnabled() check.
     //  - handle mode (keyboardTrigger='handle'): reorder keys apply ONLY when the
     //    keydown came from inside this row's `handle` element. A missing `handle`
@@ -462,58 +675,38 @@ export class SortableList {
     // programmatic .focus()) must still no-op here rather than reorder.
     if (!this.keyboardEnabled()) return;
     const key = $event.key;
+    const lift = this.registry.lift;
+    const liftedHere = lift != null && lift.holder === this.entry;
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
       $event.preventDefault();
-      if (this.liftedIndex() === null) {
-        // LIFT
-        this.liftedIndex.set(index);
-        this.ariaLiveText.set('Lifted ' + this.getLabel(index));
+      if (liftedHere) {
+        this.endLift('drop');
         return;
       }
-      // DROP
-      const dropped = this.getLabel(this.liftedIndex());
-      const at = this.liftedIndex();
-      this.liftedIndex.set(null);
-      this.ariaLiveText.set('Dropped ' + dropped + ' at position ' + (at + 1));
+      // A lift still active in another list ends (as a drop) before this one.
+      if (lift != null) this.endLift('drop');
+      this.startLift(index);
       return;
     }
+    // Every other key acts only while a row of this list is lifted, so it never
+    // steals keys from fields inside a row.
+    if (!liftedHere) return;
     if (key === 'Escape') {
-      if (this.liftedIndex() === null) return;
       $event.preventDefault();
-      const cancelled = this.getLabel(this.liftedIndex());
-      this.liftedIndex.set(null);
-      this.ariaLiveText.set('Cancelled lift of ' + cancelled);
+      this.endLift('cancel');
       return;
     }
-    if (key === 'ArrowDown' || key === 'ArrowUp') {
-      if (this.liftedIndex() === null) return;
-      $event.preventDefault();
-      const dir = key === 'ArrowDown' ? 1 : -1;
-      const from = this.liftedIndex();
-      const to = from + dir;
-      if (to < 0 || to >= this.items().length) return;
-      const next = [...this.items()];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      this.items.set(next), this.__rozieCvaOnChange(next);
-      this.liftedIndex.set(to);
-      // Name the row that MOVED from the local `moved` item, not getLabel(to):
-      // on React/Vue/Lit `$props.items` still holds the pre-write array here, so
-      // getLabel(to) would announce the neighbour that was displaced.
-      this.ariaLiveText.set('Moved ' + this.labelOf(moved, to) + ' to position ' + (to + 1));
-      // After the keyed reorder write, restore focus to the moved row. No-op
-      // on React/Vue/Angular (DOM identity preserved); queueMicrotask +
-      // querySelectorAll + .focus() on Svelte/Solid/Lit (DOM re-created).
-      // Handle mode re-focuses the handle itself (the selector is a prop, and
-      // $restoreFocus accepts a string literal only).
-      if (this.handleMode()) this.refocusHandle(moved, to);else void 0;
-      this.change.emit({
-        oldIndex: from,
-        newIndex: to,
-        item: moved
-      });
-    }
+    const horizontal = this.orientation() === 'horizontal';
+    const prevKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
+    const nextKey = horizontal ? 'ArrowRight' : 'ArrowDown';
+    const from = this.registry.indexOfLift();
+    const step = __pageStep > 0 ? Math.floor(__pageStep) : 5;
+    let to: any = null;
+    if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = this.items().length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
+    if (to === null) return;
+    $event.preventDefault();
+    this.moveLiftTo(to);
   };
   // SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).
   // The helper owns the SortableJS-vs-reconciler dance — DOM-restore hardening

@@ -55,6 +55,10 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 | `cloneable` | `Boolean` | `false` |  |  |
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
+| `listLabel` | `String` | `null` |  |  |
+| `orientation` | `String` | `"vertical"` |  |  |
+| `pageStep` | `Number` | `5` |  |  |
+| `keyboardInstructions` | `String` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
@@ -92,5 +96,5 @@ Beyond props, the component exposes imperative methods (declared once in the Roz
 | Slot | Params |
 | --- | --- |
 | header |  |
-| (default) | item, index |
+| (default) | item, index, instructionsId |
 | footer |  |
