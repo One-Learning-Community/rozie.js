@@ -104,7 +104,19 @@ function readExample(name: string): string {
 
 /**
  * The byte-identity baseline for every tracked Angular fixture (prohibition
- * 4b). Advanced to `e9e18bb108a2ca0770bf4d5c9fd0ee538b1ac930`
+ * 4b). Advanced to `54962c575f76892ff927803ed3f2ad23d192ca8a`
+ * (54962c575): a `:class` value that may hold an object or nested array inside
+ * a list is flattened through `rozieClass(...)` (`[class]="rozieClass(x)"` /
+ * `[ngClass]="rozieClass(x)"`, plus the `rozieClass as __rozieClass` runtime
+ * import and the delegating `rozieClass` class method); provable strings,
+ * plain object literals and arrays of provable strings stay unwrapped. The
+ * owed prohibition-5 hand-diff (performed, not deferred): `git diff e9e18bb10
+ * 54962c575` over the three tracked globs changed 5 fixtures (the four
+ * ThemedButton* dist-parity fixtures, `[ngClass]="variant()"`, and
+ * regressions/class-normalizer-shapes); every unchanged tracked fixture's
+ * `[class]`/`[ngClass]` value is an object literal, a string concat, a
+ * template literal or an array of string literals.
+ * Previously advanced to `e9e18bb108a2ca0770bf4d5c9fd0ee538b1ac930`
  * (e9e18bb10): the class fields Angular templates call — guarded (`_guarded*`),
  * `debounced*` / `throttled*` and same-event `_merged_*` wrappers — are
  * `protected` instead of `private` (strict template type-checking rejects a
@@ -185,7 +197,7 @@ function readExample(name: string): string {
 // contain this object, and every gate below then fails with
 // "Command failed: git show …" (134 of 144 tests, one root cause). The
 // angular-matrix workflow sets it explicitly; keep them in sync.
-const BASELINE_COMMIT = 'e9e18bb10';
+const BASELINE_COMMIT = '54962c575';
 
 /** `git show <commit>:<path>` — throws if the path did not exist at that commit. */
 function readAtBaseline(relPath: string): string {
