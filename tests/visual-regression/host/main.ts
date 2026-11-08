@@ -130,6 +130,10 @@ export const EXAMPLES = [
   // SortableListInteractiveDemo.rozie, which imports ../../packages/ui/
   // sortable-list/src/SortableList.rozie). NOT a screenshot cell.
   'SortableListInteractive',
+  // Quick 261107-s4a — SortableListHandle is the BEHAVIORAL-only
+  // keyboardTrigger="handle" fixture (loader → examples/demos/
+  // SortableListHandleDemo.rozie). NOT a screenshot cell.
+  'SortableListHandle',
   'Flatpickr',
   'LeafletMap',
   'TipTap',
@@ -1570,6 +1574,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // 'rozie-sortable-list-keying-demo' = kebab of SortableListKeyingDemo.
   SortableListKeying: 'rozie-sortable-list-keying',
   SortableListInteractive: 'rozie-sortable-list-interactive',
+  SortableListHandle: 'rozie-sortable-list-handle',
   Flatpickr: 'rozie-flatpickr',
   LeafletMap: 'rozie-leaflet-map',
   TipTap: 'rozie-tip-tap',
@@ -2114,6 +2119,9 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Quick 260716-ggq — SortableListInteractive is self-contained: the seeded
   // 3-item array lives in the demo's <data>, seeded in $onMount.
   SortableListInteractive: {},
+  // Quick 261107-s4a — SortableListHandle is self-contained: both lists are
+  // seeded in the demo's $onMount.
+  SortableListHandle: {},
   SortableListShowcase: {},
   Flatpickr: {},
   LeafletMap: {},

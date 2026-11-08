@@ -1,0 +1,160 @@
+<!--
+  SortableListHandleDemo.rozie — behavioral-only fixture for quick 261107-s4a
+  (SortableList `keyboardTrigger="handle"`).
+
+  In handle mode the rows are NOT tab stops. The consumer owns a handle
+  <button> inside each row (here `.grip`, with its own aria-label); only keys
+  pressed inside that handle drive Space/Enter lift-drop, Arrow move and
+  Escape cancel. Each row also carries a plain <input> so the spec can prove
+  that typing Space/Enter into slotted row content is left alone.
+
+  The page exposes:
+    - `handle-clicks`           counts click events on the handle buttons (the
+                                component must preventDefault handled keys, so
+                                keyboard reordering never fires a click),
+    - `toggle-disable-keyboard` flips the SortableList `disableKeyboard` prop,
+    - the `<ol class="state-list">` sidecar showing the bound array order,
+    - a second, deliberately misconfigured list (`handle-missing-list`) that
+      sets keyboardTrigger="handle" WITHOUT a `handle` selector: keyboard
+      reordering must be off and a console warning logged.
+
+  NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
+-->
+
+<rozie name="SortableListHandleDemo">
+
+<components>
+{
+  SortableList: '../../packages/ui/sortable-list/src/SortableList.rozie',
+}
+</components>
+
+<data>
+{
+  items: [],
+  other: [],
+  handleClicks: 0,
+  disableKeyboard: false,
+}
+</data>
+
+<script>
+const SEED = () => [
+  { id: 'h1', label: 'Hero banner' },
+  { id: 'h2', label: 'Pricing' },
+  { id: 'h3', label: 'Testimonials' },
+  { id: 'h4', label: 'Footer' },
+]
+
+const SEED_OTHER = () => [
+  { id: 'm1', label: 'Misconfigured one' },
+  { id: 'm2', label: 'Misconfigured two' },
+]
+
+const onHandleClick = () => {
+  $data.handleClicks = $data.handleClicks + 1
+}
+
+$onMount(() => {
+  $data.items = SEED()
+  $data.other = SEED_OTHER()
+})
+</script>
+
+<template>
+<div class="handle-demo">
+  <h4>Handle-only keyboard reordering</h4>
+  <section data-testid="handle-list">
+    <SortableList
+      r-model:items="$data.items"
+      itemKey="id"
+      keyboardTrigger="handle"
+      :handle="$classSelector('grip')"
+      :disableKeyboard="$data.disableKeyboard"
+    >
+      <template #default="{ item }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" @click="onHandleClick">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+          <input class="row-input" data-testid="row-input" placeholder="note" />
+        </span>
+      </template>
+    </SortableList>
+
+    <output data-testid="handle-clicks">{{ $data.handleClicks }}</output>
+    <label class="toggle">
+      <input type="checkbox" data-testid="toggle-disable-keyboard" r-model="$data.disableKeyboard" />
+      Disable keyboard
+    </label>
+
+    <ol class="state-list">
+      <li r-for="item, index in $data.items" :key="item.id">
+        <span class="state-index">{{ index + 1 }}.</span>
+        <code>{{ item.id }}</code>
+        <span>{{ item.label }}</span>
+      </li>
+    </ol>
+  </section>
+
+  <h4>Misconfigured: handle mode without a handle selector</h4>
+  <section data-testid="handle-missing-list">
+    <SortableList r-model:items="$data.other" itemKey="id" keyboardTrigger="handle">
+      <template #default="{ item }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+        </span>
+      </template>
+    </SortableList>
+  </section>
+</div>
+</template>
+
+<style>
+.handle-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  max-width: 480px;
+}
+.handle-demo h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.55);
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: #f5f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+  margin: 0.25rem 0;
+}
+.grip {
+  color: rgba(0, 0, 0, 0.45);
+  cursor: grab;
+  user-select: none;
+  font-family: monospace;
+  background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+.label { flex: 1; }
+.row-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+  font: inherit;
+}
+.toggle { display: block; margin-top: 0.5rem; font-size: 0.875rem; }
+.state-list { margin: 0.5rem 0 1rem; padding-left: 1.25rem; font-size: 0.8rem; }
+</style>
+
+</rozie>
