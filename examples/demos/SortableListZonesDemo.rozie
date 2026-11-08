@@ -144,6 +144,11 @@ const moveTopFirstToBottom = () => {
   $data.bottom = [...$data.bottom, first]
 }
 
+const emptyTop = () => {
+  $data.bottom = [...$data.bottom, ...$data.top]
+  $data.top = []
+}
+
 const toggleTop = () => {
   $data.topMounted = !$data.topMounted
 }
@@ -176,6 +181,7 @@ $onMount(() => seed())
   <div class="controls">
     <button type="button" data-testid="add-to-content" @click="addToContent">Add to content</button>
     <button type="button" data-testid="move-top-first-to-bottom" @click="moveTopFirstToBottom">Move top first to bottom</button>
+    <button type="button" data-testid="empty-top" @click="emptyTop">Move all of top to bottom</button>
     <button type="button" data-testid="toggle-top" @click="toggleTop">Toggle top sidebar</button>
     <button type="button" data-testid="toggle-palette" @click="togglePalette">Toggle palette</button>
     <button type="button" data-testid="hide-top" @click="toggleTopHidden">Hide top sidebar</button>

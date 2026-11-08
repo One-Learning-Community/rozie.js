@@ -530,6 +530,28 @@ for (const target of TARGETS) {
   );
 
   runner(
+    `sortable-keyboard-cross-list [${target}]: emptying the list holding a lift moves focus to that list`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await grip(mount, 'Newsletter').focus();
+      await page.keyboard.press('Space');
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await clickKeepingFocus(mount, 'empty-top');
+      await expect.poll(() => state(mount, 'top')).toEqual([]);
+      await expect.poll(() => state(mount, 'bottom')).toEqual([...SEED.bottom, ...SEED.top]);
+      await expect(mount.locator(LIFTED)).toHaveCount(0);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lift ended']);
+      // No row is left in Top sidebar: focus goes to the list, never <body>.
+      await expect.poll(() => active(page), { timeout: 5000 }).toBe('Top sidebar');
+      await expect
+        .poll(async () => (await texts(mount.locator(LOG_LI))).slice(-2))
+        .toEqual(['top:start:keyboard', 'top:end:keyboard']);
+      await assertNothingDisappeared(mount);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  runner(
     `sortable-keyboard-cross-list [${target}]: Escape after the origin list unmounts keeps the row where it is`,
     async ({ page }) => {
       const { mount, errors } = await open(page);

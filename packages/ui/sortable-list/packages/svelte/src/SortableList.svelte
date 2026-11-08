@@ -406,7 +406,7 @@ const rowByKey = (listEl: any, key: any) => {
 };
 // After the consumer changed the items of the list holding a lift, put focus
 // on the row (or its handle) whose key is `key`, else the row nearest `index`
-// — but only once focus has fallen to <body> (the focused row's element went
+// (or the list itself when it has no rows left) — but only once focus has fallen to <body> (the focused row's element went
 // away: the lift was lost, or a framework that keys rows by object identity
 // re-created the lifted row). Never steals focus from anywhere else. Same
 // three passes as refocusRow, for targets that commit late.
@@ -419,7 +419,13 @@ const focusNearRow = (index: number, key: string | null = null) => {
     if (useHandle && sel == null) return;
     if (document.activeElement && document.activeElement !== document.body) return;
     const rows = Array.from(listEl$local.children).filter((r: any) => r.hasAttribute('data-id') && r.classList.contains('rozie-sortable-item')) as any[];
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      // The list is now empty: focus the list itself (out of the tab order)
+      // so keyboard and screen-reader users stay where they were.
+      if (!listEl$local.hasAttribute('tabindex')) listEl$local.setAttribute('tabindex', '-1');
+      listEl$local.focus();
+      return;
+    }
     const row = rows.find((r: any) => key != null && r.getAttribute('data-id') === key) ?? rows[Math.max(0, Math.min(rows.length - 1, index))];
     const target = useHandle ? row.querySelector(sel) : row;
     if (target && typeof target.focus === 'function') target.focus();

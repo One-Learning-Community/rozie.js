@@ -232,11 +232,15 @@ for (const target of TARGETS) {
       await expect(items).toHaveCount(4);
       const aria = section.locator(ARIA_LIVE);
       await section.getByTestId('toggle-disable-keyboard').check();
+      // Wait for the re-render that passes the new value down (Angular runs it
+      // a task later) before pressing keys.
+      await expect(section.getByTestId('keyboard-state')).toHaveText('off');
       await items.first().locator(GRIP).focus();
       await page.keyboard.press('Space');
       await expect(aria).toHaveText('');
       await expect(section.locator(LIFTED)).toHaveCount(0);
       await section.getByTestId('toggle-disable-keyboard').uncheck();
+      await expect(section.getByTestId('keyboard-state')).toHaveText('on');
       await items.first().locator(GRIP).focus();
       await page.keyboard.press('Space');
       await expect(aria).toHaveText(`Lifted ${HERO}`);

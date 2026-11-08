@@ -13,6 +13,8 @@ Fixed: Escape now cancels a lift and returns the row to where it was lifted, in 
 
 Changed: Shift with an arrow key used to move a lifted row within its list, exactly like the plain arrow key. Now, in a list with a `group`, Shift+arrow hops the row to the previous or next list, and in a list without a `group` it does nothing.
 
+If your code changes a list's items so the lifted row is gone (removed, replaced with a new key, or the whole list emptied), the lift ends: the list says "Lift ended", fires `end` with `item: null`, and, if focus was lost with the row, moves focus to the nearest row, or to the list itself when no rows are left.
+
 Changed: only one keyboard lift can exist on a page. Pressing Space or Enter on a row of another list, even one in the same group, drops the active lift and lifts that row.
 
 Changed: SortableJS's own native DOM events (`choose`, `start`, `sort`, `filter`, `change` and the rest) no longer bubble out of the list element, on every framework. Listen to the component's documented events (`start`, `end`, `change`, `add`, `remove`) instead.

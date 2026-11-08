@@ -13,6 +13,7 @@
                                 component must preventDefault handled keys, so
                                 keyboard reordering never fires a click),
     - `toggle-disable-keyboard` flips the SortableList `disableKeyboard` prop,
+    - `keyboard-state`          reads 'on' / 'off' once that change has rendered,
     - the `<ol class="state-list">` sidecar showing the bound array order,
     - a second, deliberately misconfigured list (`handle-missing-list`) that
       sets keyboardTrigger="handle" WITHOUT a `handle` selector: keyboard
@@ -86,6 +87,7 @@ $onMount(() => {
       <input type="checkbox" data-testid="toggle-disable-keyboard" r-model="$data.disableKeyboard" />
       Disable keyboard
     </label>
+    <output data-testid="keyboard-state">{{ $data.disableKeyboard ? 'off' : 'on' }}</output>
 
     <ol class="state-list">
       <li r-for="item, index in $data.items" :key="item.id">
