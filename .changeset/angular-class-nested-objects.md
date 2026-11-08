@@ -1,6 +1,5 @@
 ---
 "@rozie/runtime-angular": patch
-"@rozie/target-angular": patch
 "@rozie/core": patch
 "@rozie-ui/sortable-list-angular": patch
 ---
