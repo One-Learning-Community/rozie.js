@@ -1,5 +1,5 @@
 ---
-surface_hash: 0d118503598e
+surface_hash: ab5d37aa4c48
 ---
 
 # Sortable libraries comparison
@@ -46,7 +46,7 @@ Per-framework column = the de-facto leader for that framework (React = `@dnd-kit
 
 ² **The React story is split three ways.** `@dnd-kit` (~22.8M/wk) is the modern React leader (own engine: sensors, virtualization-friendly, accessible); `react-beautiful-dnd` (~2.22M/wk) is deprecated and archived, with no React 19; and `react-sortablejs` (~337k/wk, ~4 yr since last publish) is the same-SortableJS-engine binding Rozie is the direct peer of. Rozie's React leaf is current and wraps SortableJS like react-sortablejs, but ships the keyboard / a11y / two-way contract react-sortablejs lacks.
 
-³ **Keyboard drag is a feature of Rozie's `SortableList` source**, not of SortableJS: Space lifts / drops, ArrowUp / ArrowDown move, Escape cancels, Enter is an alternate drop, with `aria-live` announcements. The cross-target focus-restoration leak (Svelte / Solid / Lit keyed reconcilers re-create row DOM on reorder, dropping focus to `<body>`) is closed by Rozie's [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders) sigil. `react-sortablejs` and `vuedraggable` ship no keyboard contract. A `keyboardTrigger: 'handle'` mode restricts keyboard reordering to a consumer-owned handle button, so rows that hold inputs are not tab stops and keep their own typing.
+³ **Keyboard drag is a feature of Rozie's `SortableList` source**, not of SortableJS: Space lifts / drops, ArrowUp / ArrowDown move, Escape cancels, Enter is an alternate drop, Shift+arrows hop a row between lists of the same group, with `aria-live` announcements. The cross-target focus-restoration leak (Svelte / Solid / Lit keyed reconcilers re-create row DOM on reorder, dropping focus to `<body>`) is closed by Rozie's [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders) sigil. `react-sortablejs` and `vuedraggable` ship no keyboard contract. A `keyboardTrigger: 'handle'` mode restricts keyboard reordering to a consumer-owned handle button, so rows that hold inputs are not tab stops and keep their own typing.
 
 ⁴ Nested + cross-list flows are shown by the `SortableListNested` / `KanbanColumn` and `SortableListPair` siblings: cross-column card drag with reorderable columns, and atomic A→B transfer across two bound arrays via SortableJS's `group` / clone modes and the `onAdd` / `onRemove` callbacks.
 

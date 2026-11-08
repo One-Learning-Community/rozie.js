@@ -71,7 +71,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `items` | `Array` | `[]` | yes (via `r-model`) | The bound items array. `model: true` — reorders write back through the two-way path. |
 | `itemKey` | `String \| Function` | `null` | yes | Property name OR a `(item, index) => key` function for the per-row key. With neither, id-less object items get a stable synthetic key via an internal WeakMap; primitive items fall back to index — pass a function for reorderable duplicate primitives. Improves keyed-reconciler behavior on Vue / Svelte / React. |
 | `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
-| `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. |
+| `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. Lists sharing a group also exchange rows by keyboard (Shift+arrow while lifted) — see [Moving between lists by keyboard](#moving-between-lists-by-keyboard). |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. |
 | `disableKeyboard` | `Boolean` | `false` | yes | Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no tabindex) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. |
@@ -104,7 +104,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `start` | `SortableEvent` (pointer) / keyboard payload | Drag starts, or a row is lifted by keyboard |
 | `end` | `SortableEvent` (pointer) / keyboard payload | Drag ends (source side), or a keyboard lift is dropped or cancelled |
 
-Every payload carries `interaction: 'pointer' | 'keyboard'`. Pointer `start` / `end` hand over SortableJS's own event object with `interaction` added to it. Keyboard `start` / `end` hand over `{ interaction: 'keyboard', item, data, from, to, oldIndex, newIndex }`, where `item` is the row element (as in SortableJS), `data` is the item value, and `from` / `to` are the list elements. Keyboard `start` fires once on lift; `end` fires once on drop or cancel.
+Every payload carries `interaction: 'pointer' | 'keyboard'`. Pointer `start` / `end` hand over SortableJS's own event object with `interaction` added to it. Keyboard `start` / `end` hand over `{ interaction: 'keyboard', item, data, from, to, oldIndex, newIndex }`, where `item` is the row element (as in SortableJS), `data` is the item value, and `from` / `to` are the list elements. Keyboard `start` fires once on lift; `end` fires once on drop or cancel, from the list the row ends up in. Hops between lists emit only `remove` (source) and `add` (destination). `end` also fires, with `item: null`, when a lift is lost because the consumer removed the lifted item from the bound array mid-lift.
 
 ### Slots
 
@@ -233,8 +233,9 @@ The canonical example is [`SortableListNestedDemo`](https://github.com/One-Learn
 - ArrowUp / ArrowDown move it one position (ArrowLeft / ArrowRight with `orientation="horizontal"`).
 - Home / End move it to the first / last position.
 - Page Up / Page Down move it by `pageStep` positions (default 5), stopping at the ends.
+- Shift plus the same arrow keys hop it to the previous or next list in the same `group` (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)).
 - Space (or Enter) drops it.
-- Escape cancels: the row goes back to the position it was lifted from.
+- Escape cancels: the row goes back to the list and position it was lifted from. A clone copy is removed.
 
 These keys act only while a row is lifted, so they never take keys away from fields inside a row. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", and "Cancelled. X returned to position N".
 
@@ -243,6 +244,52 @@ The list container carries `role="list"`, `aria-orientation`, and `aria-label` f
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
 
 To customize the aria-live label per row, pass `:labelFor="(item) => item.title"` — by default the announcer reads `item.label` (or `String(item)` if no `label` field).
+
+#### Moving between lists by keyboard
+
+Where lists share a `group`, a lifted row can hop between them. Hopping is on automatically wherever `group` is set; there is no opt-in prop. Give each list a `listLabel` that matches the visible heading of its zone, and set `itemKey` on every grouped list.
+
+```rozie
+<h3>Top sidebar</h3>
+<SortableList r-model:items="$data.top" group="layout" itemKey="id" listLabel="Top sidebar" />
+
+<h3>Main content</h3>
+<SortableList r-model:items="$data.main" group="layout" itemKey="id" listLabel="Main content" />
+
+<h3>Footer</h3>
+<SortableList r-model:items="$data.footer" group="layout" itemKey="id" listLabel="Footer" />
+```
+
+| Key (row lifted) | Action |
+| --- | --- |
+| Arrow Up / Down (Left / Right when `orientation="horizontal"`) | Move one position within the list |
+| Shift + the same arrows | Hop to the previous / next list |
+| Home / End | First / last position |
+| Page Up / Page Down | Move by `pageStep` (default 5, minimum 1), stopping at the ends |
+| Space or Enter | Drop |
+| Escape | Cancel: return to the origin list and position (a clone copy is removed) |
+
+The keys work the same in row mode and handle mode. A forward hop lands at the top of the next list; a backward hop lands at the bottom of the previous one. An empty list takes the row at position 1.
+
+A list is a hop target only when all of these hold:
+
+- It has the same group name. Lists of a different group, or ungrouped lists, are never reached. `options.group` takes precedence over the `group` prop, exactly as for mouse drags.
+- The source's `pull` is not `false`, and the target's `put` accepts the source group (`true`, a group name, or an array that includes it).
+- Its keyboard is enabled (not `disabled`, not `disableKeyboard`).
+- It is not inside the lifted row, and it is rendered: it has a layout box and no ancestor is `inert`, `hidden` or `aria-hidden="true"`. Other lists are skipped.
+- Its `pull`/`put` are not functions. A function can only be evaluated against a live drag, so a pair with a function-valued `pull` or `put` is unreachable by keyboard. Use `false`, `true`, a name or an array if you need keyboard access.
+
+"Next" and "previous" follow source order in the composed tree (across shadow roots on Lit), not visual position. When there is nowhere to go, the announcer says `No list after {list}` or `No list before {list}`.
+
+Pressing Space or Enter in a list of a different group (or an ungrouped list) does not act on another group's lift: it drops that lift and lifts its own row. If a re-render drops focus to `<body>` mid-lift, the next keys still reach the lifted row; if you click somewhere else, keys are left alone.
+
+Announcements: `Moved {label} to {list}, position {n}`, `Dropped {label} in {list} at position {n}` (when the row ended in a list other than its origin), and `Cancelled. {label} returned to {list}, position {n}` (`Cancelled. {label} returned to position {n}` when the row never left its list). If the origin list has gone, the cancel reads `Cancelled. {label} stays in {list}, position {n}`; if a clone copy is cancelled after its palette unmounted, `Cancelled. {label} removed from {list}`. `{list}` is `listLabel`, or else `list {i} of {n}`, counting the lists of the same group in hop order. Pass the zone's visible heading text as `listLabel` so spoken names match what sighted users see.
+
+With a clone palette (`cloneable: true`), repeated deposits of the same palette item share that item's key. Mint a fresh id in the destination's `add` handler.
+
+#### Instructions
+
+The hidden instructions text defaults to "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." and, when `group` is set, adds " Hold Shift with an arrow key to move to another list." Pass `keyboardInstructions` to replace it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit, plain-HTML consumers cannot do this: an id reference does not cross a shadow root, so give the handle its own `aria-label` or description instead.
 
 #### Handle-only keyboard reordering
 
