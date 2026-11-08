@@ -98,6 +98,26 @@ for (const target of TARGETS) {
     await expect.poll(() => texts(mount.locator(STATE_LI))).toEqual(order);
   }
 
+  // An object `itemClass` and an array-with-object `listClass` land on the rows
+  // and the list (Angular's native [class] dropped objects nested in a class
+  // list; the falsy key must still be left off).
+  runner(`sortable-keyboard-keys [${target}]: object itemClass / listClass apply`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    const list = mount.locator(LIST).first();
+    await expect(list).toHaveClass(/(^|\s)demo-list(\s|$)/);
+    await expect(list).toHaveClass(/(^|\s)demo-list-flag(\s|$)/);
+    for (let i = 0; i < SEED.length; i++) {
+      await expect(items.nth(i)).toHaveClass(/(^|\s)demo-item-flag(\s|$)/);
+      await expect(items.nth(i)).not.toHaveClass(/demo-item-off/);
+    }
+    // The lifted-row class still joins the row's other classes.
+    await items.nth(1).focus();
+    await page.keyboard.press('Space');
+    await expect(items.nth(1)).toHaveClass(/rozie-sortable-item-lifted/);
+    await expect(items.nth(1)).toHaveClass(/(^|\s)demo-item-flag(\s|$)/);
+    await page.keyboard.press('Escape');
+  });
+
   runner(`sortable-keyboard-keys [${target}]: End moves the lifted row last`, async ({ page }) => {
     const { mount, items, aria } = await open(page);
     await items.nth(0).focus();

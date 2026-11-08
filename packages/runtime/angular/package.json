@@ -5,7 +5,7 @@
   "private": false,
   "sideEffects": false,
   "license": "MIT",
-  "description": "Runtime helpers shared by Rozie-emitted Angular components: the RozieSlot marker directive for keyed slot fills, display/attr interpolation helpers, the $provide/$inject context token registry, the r-bind/$attrs spread attribute applier + host-attribute reader factories, and the RozieListen directive for template @event.capture/.passive/.once.",
+  "description": "Runtime helpers shared by Rozie-emitted Angular components: the RozieSlot marker directive for keyed slot fills, display/attr interpolation helpers, the :class value flattener, the $provide/$inject context token registry, the r-bind/$attrs spread attribute applier + host-attribute reader factories, and the RozieListen directive for template @event.capture/.passive/.once.",
   "author": "One Learning Community (https://github.com/One-Learning-Community)",
   "homepage": "https://github.com/One-Learning-Community/rozie.js#readme",
   "repository": {

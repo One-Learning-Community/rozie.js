@@ -8,6 +8,9 @@ section below for the emission condition that gates it.
   `contentChildren`, to resolve record-path slot fills.
 - `rozieDisplay` / `rozieAttr` — interpolation / whole-value-attribute
   display helpers.
+- `rozieClass` — flattens a `:class` value (string, `{ name: truthy }`
+  object, or an array of these, nested) into one class string, for the
+  values Angular's own `[class]` / `[ngClass]` would drop.
 - `rozieToken` — the `$provide`/`$inject` context `InjectionToken` registry.
 - `createRozieAttrApplier` / `createRozieHostAttrsReader` — the `r-bind` /
   `$attrs` spread attribute applier and host-attribute reader factories
@@ -155,6 +158,7 @@ You do not import either factory by hand — `@rozie/target-angular` emits the
   `templateRef: TemplateRef<unknown>` (the captured template).
 - `rozieDisplay(v: unknown): string` — interpolation display helper.
 - `rozieAttr(v: unknown): string | null` — whole-value attribute display helper.
+- `rozieClass(...args: unknown[]): string` — `:class` value flattener.
 - `rozieToken(key: string): InjectionToken<unknown>` — context token registry.
 - `createRozieAttrApplier(renderer: RozieAttrRenderer): (el, obj) => void`
 - `createRozieHostAttrsReader(host: RozieHostRef): () => Record<string, unknown>`

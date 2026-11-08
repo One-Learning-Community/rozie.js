@@ -458,9 +458,6 @@ private __rozieFirstUpdateDone = false;
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
-  // (The row :class adds that class as a plain string entry, not a nested
-  // `{ cls: cond }` object: Angular's [class] binding drops objects nested in an
-  // array, so the lifted class never applied there.)
   registry = getKeyboardRegistry();
 
   // This list's registry entry (a ListEntry), built and registered in $onMount.

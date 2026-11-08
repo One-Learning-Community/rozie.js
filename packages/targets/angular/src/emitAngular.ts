@@ -400,6 +400,15 @@ const DISPLAY_CLASS_METHOD = 'rozieDisplay(v: unknown): string { return __rozieD
 const ATTR_CLASS_METHOD = 'rozieAttr(v: unknown): string | null { return __rozieAttr(v); }';
 
 /**
+ * The delegating class method for a flattened `:class` value (same mechanism as
+ * `DISPLAY_CLASS_METHOD`). The template calls `rozieClass(expr)` against `this`;
+ * this forwards to the imported `rozieClass` (aliased `__rozieClass`,
+ * `@rozie/runtime-angular`). Gated on `tmplResult.usesRozieClass`.
+ */
+const CLASS_CLASS_METHOD =
+  'rozieClass(...args: unknown[]): string { return __rozieClass(...args); }';
+
+/**
  * Quick task 260717-uvk — self-contained class method for an array-form
  * `:style="[a, b]"` binding. `@rozie/runtime-angular` exists (unlike when
  * this comment was first written) but `__rozieMergeStyle` still inlines —
@@ -886,6 +895,9 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
     // `:style` binding (detected via the `__rozieMergeStyle(` template
     // sentinel). Non-array-style components stay byte-identical.
     ...(tmplResult.usesMergeStyle ? [MERGE_STYLE_CLASS_METHOD] : []),
+    // A `:class` value flattened through `rozieClass(...)` — the delegating
+    // method, ONLY when the template uses it (other components unchanged).
+    ...(tmplResult.usesRozieClass ? [CLASS_CLASS_METHOD] : []),
   ];
 
   // Find the constructor block and splice the listener effects + renderer
@@ -973,6 +985,12 @@ export function emitAngular(ir: IRComponent, opts: EmitAngularOptions = {}): Emi
   // import-free (R12).
   if (scriptResult.needsRozieTokenHelper) {
     imports.addRuntime('rozieToken');
+  }
+  // A flattened `:class` value — import `rozieClass` (aliased `__rozieClass`)
+  // for the delegating class method above. Gated so other components stay
+  // import-free.
+  if (tmplResult.usesRozieClass) {
+    imports.addRuntime('rozieClass');
   }
   const moduleDecls = scriptResult.interfaceDecls;
 

@@ -1,6 +1,6 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieClass as __rozieClass } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-themed-button-manual',
@@ -8,7 +8,7 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
   imports: [NgClass],
   template: `
 
-    <button class="btn" [ngClass]="variant()" [style]="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }" #rozieSpread_0 #rozieListenersTarget_1>
+    <button class="btn" [ngClass]="rozieClass(variant())" [style]="{ '--btn-bg': '#3b82f6', '--btn-fg': '#ffffff' }" #rozieSpread_0 #rozieListenersTarget_1>
       {{ label() }}
     </button>
 
@@ -80,6 +80,8 @@ export class ThemedButtonManual {
       });
     }
   });
+
+  rozieClass(...args: unknown[]): string { return __rozieClass(...args); }
 }
 
 export default ThemedButtonManual;

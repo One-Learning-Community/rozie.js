@@ -110,15 +110,17 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
       }
 
       // The emitted SortableList SFC imports the relative
-      // `./internal/useSortableJS` helper. The harness writes emitted files flat
-      // into tmpDir, so stage the helper under tmpDir/internal/ for vue-tsc to
+      // `./internal/useSortableJS` and `./internal/keyboardRegistry` helpers. The harness writes emitted files flat
+      // into tmpDir, so stage the helpers under tmpDir/internal/ for vue-tsc to
       // resolve it. Only needed when SortableList is in the EXAMPLES set.
       if (EXAMPLES.includes('SortableList')) {
         mkdirSync(join(tmpDir, 'internal'), { recursive: true });
-        copyFileSync(
-          resolve(ROOT, 'packages/ui/sortable-list/src/internal/useSortableJS.ts'),
-          join(tmpDir, 'internal', 'useSortableJS.ts'),
-        );
+        for (const helper of ['useSortableJS.ts', 'keyboardRegistry.ts']) {
+          copyFileSync(
+            resolve(ROOT, 'packages/ui/sortable-list/src/internal', helper),
+            join(tmpDir, 'internal', helper),
+          );
+        }
         copyFileSync(
           resolve(ROOT, 'packages/ui/sortable-list/src/internal/keyboardRegistry.ts'),
           join(tmpDir, 'internal', 'keyboardRegistry.ts'),

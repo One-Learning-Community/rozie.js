@@ -1,6 +1,6 @@
 import { Component, DestroyRef, ElementRef, Renderer2, ViewEncapsulation, afterRenderEffect, effect, inject, input, signal, viewChild } from '@angular/core';
 import { NgClass } from '@angular/common';
-import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runtime-angular';
+import { createRozieAttrApplier, createRozieHostAttrsReader, rozieClass as __rozieClass } from '@rozie/runtime-angular';
 
 @Component({
   selector: 'rozie-class-norm-shapes',
@@ -10,12 +10,12 @@ import { createRozieAttrApplier, createRozieHostAttrsReader } from '@rozie/runti
 
       <div #rozieSpread_0 #rozieListenersTarget_1>
         <span class="static-a static-b" [ngClass]="'lit-a lit-b'">string literal</span>
-        <span [class]="variant()">string-typed prop</span>
-        <span [class]="['arr-a', variant()]">array literal</span>
+        <span [class]="rozieClass(variant())">string-typed prop</span>
+        <span [class]="rozieClass(['arr-a', variant()])">array literal</span>
         <span [class]="{ active: cond() }">object literal</span>
-        <span [class]="arr()">array via prop</span>
-        <span [class]="flags()">object via prop</span>
-        <span class="base" [ngClass]="arr()">static + dynamic merge</span>
+        <span [class]="rozieClass(arr())">array via prop</span>
+        <span [class]="rozieClass(flags())">object via prop</span>
+        <span class="base" [ngClass]="rozieClass(arr())">static + dynamic merge</span>
       </div>
 
   `,
@@ -72,6 +72,8 @@ export class ClassNormShapes {
       });
     }
   });
+
+  rozieClass(...args: unknown[]): string { return __rozieClass(...args); }
 }
 
 export default ClassNormShapes;

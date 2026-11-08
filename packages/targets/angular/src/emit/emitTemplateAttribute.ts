@@ -624,6 +624,10 @@ function shouldWrapAttrBinding(
   // already natively array/object-capable. Mirrors the `style` exclusion above.
   // (annotateDisplayWrap skip-:class was rejected to keep the change off
   // packages/core/* and off the active-core-session file set.)
+  // Array ENTRIES must be strings for both `[class]` and `[ngClass]`, though:
+  // an object or nested array inside a list is dropped/rejected, so a value
+  // that may hold one is flattened through `rozieClass(...)` instead — see
+  // `isNativeClassValue` + the class branches in emitSingleAttr/emitAttributes.
   if (name === 'class') return false;
   if (t.isObjectExpression(expr)) return false;
   return true;
@@ -673,6 +677,52 @@ function isProvablyStringStyleExpression(expr: t.Expression): boolean {
     );
   }
   return false;
+}
+
+/**
+ * A `:class` value Angular's native `[class]` / `[ngClass]` already applies
+ * the way the other five targets do (Vue `:class` semantics), so it can bind
+ * as-is: a provable string (literal, template literal, string concat, both-
+ * string conditional), a plain object literal (`{ name: cond }` — Angular reads
+ * each value truthily), or an array literal whose entries are ALL provable
+ * strings.
+ *
+ * Anything else may, at runtime, be (or contain) an array holding an object or
+ * a nested array — `:class="['a', { b: cond }]"`, `:class="['a',
+ * $props.listClass]"`, `:class="$props.listClass"` — and Angular's array form
+ * takes string entries only: `[class]` drops the rest, `[ngClass]` throws on
+ * them. Those values are flattened by `rozieClass(...)` (`@rozie/runtime-angular`,
+ * same algorithm as the Lit/Solid/Svelte helper of that name and React's clsx)
+ * into one space-joined class string.
+ *
+ * Conservative: a false NEGATIVE only adds a harmless `rozieClass(...)` wrap;
+ * every branch that returns true is a shape Angular provably handles.
+ */
+function isNativeClassValue(expr: t.Expression): boolean {
+  if (isProvablyStringStyleExpression(expr)) return true;
+  if (t.isObjectExpression(expr)) return true;
+  if (t.isArrayExpression(expr)) {
+    return expr.elements.every(
+      (el) => el !== null && t.isExpression(el) && isProvablyStringStyleExpression(el),
+    );
+  }
+  return false;
+}
+
+/**
+ * The AST a class merge source contributes, or `'string'` when the source is
+ * provably a string (a static `class="…"` or a multi-segment interpolation,
+ * which renders as a template literal).
+ */
+function classSourceExpression(attr: AttributeBinding): t.Expression | 'string' {
+  if (attr.kind === 'binding') return attr.expression;
+  if (attr.kind === 'interpolated') {
+    if (attr.segments.length === 1 && attr.segments[0]!.kind === 'binding') {
+      return (attr.segments[0] as { expression: t.Expression }).expression;
+    }
+    return 'string';
+  }
+  return 'string';
 }
 
 /**
@@ -1595,6 +1645,15 @@ export function emitSingleAttr(
     if (attr.name === 'style' && isProvablyStringStyleExpression(attr.expression)) {
       return `[attr.style]="${expr}"`;
     }
+    // A `:class` whose value may be (or hold) an object/nested array inside a
+    // list — which native `[class]` drops — is flattened through the
+    // synthesized `rozieClass` class method (delegating to the
+    // `@rozie/runtime-angular` export; emitAngular adds both when the template
+    // contains the `rozieClass(` sentinel). Shapes Angular already handles
+    // bind unwrapped, unchanged. See isNativeClassValue.
+    if (bindingName === 'class' && !isNativeClassValue(attr.expression)) {
+      return `[class]="rozieClass(${expr})"`;
+    }
     return `[${bindingName}]="${expr}"`;
   }
 
@@ -1789,11 +1848,13 @@ export function emitAttributes(
       // Static classes stay as `class="..."`; dynamic merges to `[ngClass]`.
       const staticParts: string[] = [];
       const dynamicParts: string[] = [];
+      const dynamicSources: AttributeBinding[] = [];
       for (const x of sameName) {
         if (x.kind === 'static') {
           staticParts.push(x.value);
         } else {
           dynamicParts.push(attrToArraySegment(x, ctx));
+          dynamicSources.push(x);
         }
       }
       if (staticParts.length > 0) {
@@ -1815,7 +1876,20 @@ export function emitAttributes(
         // `{ \'is-readonly\': … }` → Angular template parse error → the
         // component fell back to a runtime `@Component` decorator (no AOT
         // `ɵcmp`) → "JIT compiler unavailable" at runtime (TipTap/Uppy·angular).
-        if (dynamicParts.length === 1) {
+        //
+        // NgClass takes string array entries only (an object entry throws), so
+        // unless every source is a shape it already handles — one plain object
+        // or provable string, or several provable strings — the sources are
+        // flattened by `rozieClass(...)` into one class string (see
+        // isNativeClassValue / the matching emitSingleAttr branch).
+        const sources = dynamicSources.map(classSourceExpression);
+        const native =
+          sources.length === 1
+            ? sources[0] === 'string' || isNativeClassValue(sources[0]!)
+            : sources.every((src) => src === 'string' || isProvablyStringStyleExpression(src));
+        if (!native) {
+          out.push(`[ngClass]="rozieClass(${dynamicParts.join(', ')})"`);
+        } else if (dynamicParts.length === 1) {
           out.push(`[ngClass]="${dynamicParts[0]!}"`);
         } else {
           out.push(`[ngClass]="[${dynamicParts.join(', ')}]"`);

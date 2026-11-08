@@ -1,7 +1,7 @@
 import { Component, ContentChild, DestroyRef, ElementRef, Renderer2, TemplateRef, ViewEncapsulation, afterRenderEffect, computed, contentChildren, effect, forwardRef, inject, input, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
-import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
+import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieClass as __rozieClass, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
 import { useSortableJS } from './internal/useSortableJS';
 import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId } from './internal/keyboardRegistry';
@@ -24,10 +24,10 @@ interface FooterCtx {}
   template: `
 
     <div class="rozie-sortable-wrap" #rozieSpread_0 #rozieListenersTarget_1>
-      <div [class]="['rozie-sortable-list', listClass()]" #listEl part="list" role="list" [attr.aria-label]="rozieAttr(listLabel())">
+      <div [class]="rozieClass(['rozie-sortable-list', listClass()])" #listEl part="list" role="list" [attr.aria-label]="rozieAttr(listLabel())">
         <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="['rozie-sortable-item', itemClassFor(item, index), liftedIndex() === index ? 'rozie-sortable-item-lifted' : '']" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId : null)" (keydown)="onRowKeyDown($event, index)">
+    <div [class]="rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''])" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId : null)" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index, instructionsId: instructionsId }, item: item, index: index, instructionsId: instructionsId }" />
         </div>
     }
@@ -379,9 +379,6 @@ export class SortableList {
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
-  // (The row :class adds that class as a plain string entry, not a nested
-  // `{ cls: cond }` object: Angular's [class] binding drops objects nested in an
-  // array, so the lifted class never applied there.)
   registry = getKeyboardRegistry();
   // This list's registry entry (a ListEntry), built and registered in $onMount.
   entry: any = null;
@@ -1182,6 +1179,8 @@ export class SortableList {
   rozieDisplay(v: unknown): string { return __rozieDisplay(v); }
 
   rozieAttr(v: unknown): string | null { return __rozieAttr(v); }
+
+  rozieClass(...args: unknown[]): string { return __rozieClass(...args); }
 }
 
 export default SortableList;

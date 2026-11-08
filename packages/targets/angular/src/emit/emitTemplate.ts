@@ -149,6 +149,16 @@ export interface EmitTemplateResult {
    */
   usesMergeStyle: boolean;
   /**
+   * True when a `:class` value that may hold an object/nested array inside a
+   * list was flattened as `[class]="rozieClass(...)"` / `[ngClass]="rozieClass(...)"`
+   * (see `isNativeClassValue`, emitTemplateAttribute.ts). emitAngular then
+   * imports `rozieClass` (aliased `__rozieClass`) from `@rozie/runtime-angular`
+   * and synthesizes the delegating `rozieClass` class method. Same
+   * emitted-template scan as `usesNgClass` — the emitter only writes that exact
+   * `="rozieClass(` attribute-value prefix for this lowering.
+   */
+  usesRozieClass: boolean;
+  /**
    * True when the template routed at least one `.capture`/`.passive`/`.once`
    * listener through a `RozieListen` slot (`(rozieOn<N>Fire)=`). emitAngular
    * adds `RozieListen` to the `@rozie/runtime-angular` import AND the
@@ -271,6 +281,7 @@ export function emitTemplate(
       usesNgClass: false,
       usesNgStyle: false,
       usesMergeStyle: false,
+      usesRozieClass: false,
       usesRozieListen: false,
       usesRozieOnce: false,
       diagnostics,
@@ -312,6 +323,7 @@ export function emitTemplate(
     usedGlobals: detectUsedGlobals(template),
     ...detectNgDirectives(template),
     usesMergeStyle: detectMergeStyleUsage(template),
+    usesRozieClass: /\[(?:class|ngClass)\]="rozieClass\(/.test(template),
     usesRozieListen: /\(rozieOn\d+Fire\)="/.test(template),
     usesRozieOnce: /\brozieOnce #__rozieOnce\d+="rozieOnce"/.test(template),
     diagnostics,

@@ -395,6 +395,7 @@ export const ANGULAR_RUNTIME_IMPORTS = [
   'RozieOnce',
   'rozieDisplay',
   'rozieAttr',
+  'rozieClass',
   'rozieToken',
   'createRozieAttrApplier',
   'createRozieHostAttrsReader',
@@ -404,7 +405,7 @@ export const ANGULAR_RUNTIME_IMPORTS = [
 /**
  * Local aliases for runtime-import specifiers whose exported name collides
  * with a same-named delegating class method the emitter synthesizes
- * elsewhere (`DISPLAY_CLASS_METHOD` / `ATTR_CLASS_METHOD` in
+ * elsewhere (`DISPLAY_CLASS_METHOD` / `ATTR_CLASS_METHOD` / `CLASS_CLASS_METHOD` in
  * `emitAngular.ts`). Rendered as `` `${name} as ${alias}` `` in the import
  * specifier list; omitted members render as the bare exported name. The
  * ALIAS is the module-scope binding (what ROZ025 reserves).
@@ -414,6 +415,7 @@ export const ANGULAR_RUNTIME_LOCAL_ALIAS: Partial<
 > = {
   rozieDisplay: '__rozieDisplay',
   rozieAttr: '__rozieAttr',
+  rozieClass: '__rozieClass',
 };
 
 /** `r-keynav` (Phase 71/77) — `import { … } from '@rozie/runtime-keynav-core'`. */

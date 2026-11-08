@@ -7,6 +7,9 @@
     - the `<ol class="state-list">` sidecar showing the bound array order,
     - an `<ol class="event-log">` with one `li` per emitted event, text
       `${name}:${interaction}`.
+  The list also passes an object `itemClass` and an array-with-object
+  `listClass`, so the spec can check those classes land on every target
+  (Angular's native [class] used to drop objects nested in a class list).
 
   NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
 -->
@@ -58,6 +61,8 @@ $onMount(() => {
   <SortableList
     r-model:items="$data.items"
     itemKey="id"
+    :itemClass="{ 'demo-item-flag': true, 'demo-item-off': false }"
+    :listClass="['demo-list', { 'demo-list-flag': true }]"
     @start="record('start', $event)"
     @change="record('change', $event)"
     @end="record('end', $event)"
