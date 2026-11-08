@@ -41,6 +41,7 @@ el.addEventListener('items-change', (e) => {
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableKeyboard` | `Boolean` | `false` |  |  |
+| `keyboardTrigger` | `String` | `"row"` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |

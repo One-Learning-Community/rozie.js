@@ -70,6 +70,10 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: Boolean, reflect: true, attribute: 'disable-keyboard' }) disableKeyboard: boolean = false;
   /**
+   * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.
+   */
+  @property({ type: String, reflect: true, attribute: 'keyboard-trigger' }) keyboardTrigger: string = 'row';
+  /**
    * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.
    */
   @property({ type: Object }) options: any = {};
@@ -203,6 +207,7 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push((() => this.instance?.destroy()));
 
+    this.warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
     const sortable = useSortableJS(this._refListEl, {
@@ -282,7 +287,11 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('swapThreshold'))) { const __watchVal = (() => this.swapThreshold)(); ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => this.instance?.option('handle', v))(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => {
+      this.instance?.option('handle', v);
+      this.warnIfHandleMissing();
+    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('keyboardTrigger'))) { const __watchVal = (() => this.keyboardTrigger)(); (() => this.warnIfHandleMissing())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('ghostClass'))) { const __watchVal = (() => this.ghostClass)(); ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('chosenClass'))) { const __watchVal = (() => this.chosenClass)(); ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('dragClass'))) { const __watchVal = (() => this.dragClass)(); ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }
@@ -311,7 +320,7 @@ private __rozieFirstUpdateDone = false;
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-ref="__rozieRoot" data-rozie-s-0af24eae>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.keyboardEnabled() ? 0 : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), { 'rozie-sortable-item-lifted': this._liftedIndex.value === index }]))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
     <slot name="footer"></slot>
@@ -395,12 +404,13 @@ private __rozieFirstUpdateDone = false;
   // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
   // the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
   // a plain null compare — NO runtime callable-type coercion.
-  getLabel = (idx: any) => {
-  const item = this.items[idx];
+  labelOf = (item: any, idx: any) => {
   if (this.labelFor !== null) return this.labelFor(item, idx);
   if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
   return String(item);
 };
+
+  getLabel = (idx: any) => this.labelOf(this.items[idx], idx);
 
   // Keyboard handler (Phase 16 R7): Space lifts/drops, ArrowDown/ArrowUp move
   // the lifted row, Escape cancels, Enter is an alternate drop trigger. After
@@ -419,14 +429,107 @@ private __rozieFirstUpdateDone = false;
   // `disabled`/`disableKeyboard` toggle at runtime.
   keyboardEnabled = () => !this.disabled && !this.disableKeyboard;
 
+  // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
+  // from the consumer's handle element instead. Any other value is 'row' mode.
+  handleMode = () => this.keyboardTrigger === 'handle';
+
+  // Rows are tab stops only in row mode (and only while keyboard is enabled).
+  rowTabbable = () => this.keyboardEnabled() && !this.handleMode();
+
+  // One-time-per-change dev warning: handle mode needs a handle selector. Without
+  // one the keyboard is OFF (see the onRowKeyDown gate) — never a silent fallback
+  // to row mode, which would re-introduce the tab stops the consumer opted out of.
+  warnIfHandleMissing = () => {
+  if (this.handleMode() && this.handle == null) {
+    console.warn('[rozie-sortable-list] keyboardTrigger is "handle" but no handle selector is set, so keyboard reordering is off. Pass a handle selector (e.g. handle=".grip") or use keyboardTrigger "row".');
+  }
+};
+
+  // True only when a keydown originated inside a `handle` element that belongs to
+  // THIS row. Walks the COMPOSED ancestor chain from the event target up to (but
+  // excluding) the row (currentTarget): assignedSlot -> parentNode -> shadow host.
+  // Plain closest()/contains() stop at a shadow boundary, and Lit renders a Rozie
+  // consumer's slot content inside the SortableList shadow root while plain-HTML
+  // consumers project light-DOM nodes through a <slot>. composedPath() is not
+  // used because React's synthetic event does not expose it. Another
+  // .rozie-sortable-item met first means the key came from a NESTED list's row,
+  // which must not reorder this (outer) list.
+  isHandleKeyOrigin = ($event: any) => {
+  const sel = this.handle;
+  if (sel == null) return false;
+  const row = $event.currentTarget;
+  let n: any = $event.target;
+  while (n && n !== row) {
+    if (n.nodeType === 1) {
+      if (n.matches(sel)) {
+        // Matched a handle: it counts only if this row is reachable from here
+        // without crossing a different sortable item.
+        let m: any = n.assignedSlot ?? n.parentNode ?? n.host;
+        while (m && m !== row) {
+          if (m.nodeType === 1 && m.classList.contains('rozie-sortable-item')) return false;
+          m = m.assignedSlot ?? m.parentNode ?? m.host;
+        }
+        return m === row;
+      }
+      if (n.classList.contains('rozie-sortable-item')) return false;
+    }
+    n = n.assignedSlot ?? n.parentNode ?? n.host;
+  }
+  return false;
+};
+
+  // Handle mode: put focus back on the MOVED row's handle after a reorder write.
+  // Looks the row up by KEY (data-id), not by index, so it finds the moved row
+  // whether this runs before the framework commit (the row element is the same
+  // one) or after it (Svelte/Solid/Lit re-create the DOM) — and it is correct for
+  // index-keyed primitive lists too. Direct children of the list container only:
+  // that skips nested-list rows and the header/footer slot content.
+  //
+  // Two passes. (1) A microtask — the same timing as the svelte/solid/lit
+  // $restoreFocus lowering — covers targets that commit synchronously. (2) A
+  // timer + rAF "heal" pass covers targets whose DOM commit is scheduled AFTER the
+  // key handler returns (Angular): the commit can MOVE the focused row, and moving
+  // a focused node blurs it, so a rapid Space/Arrow/Arrow/Space burst would
+  // otherwise end with focus on <body>. The heal pass never steals: it acts only
+  // when focus has been lost to <body>. No per-target branching (the handle
+  // selector is a prop, and $restoreFocus takes a string literal only). The $refs
+  // read happens here, synchronously, inside an event handler — which is safe.
+  refocusHandle = (item: any, idx: any) => {
+  const listEl = this._refListEl;
+  const sel = this.handle;
+  const key = String(this.keyFor(item, idx));
+  const focusIt = (onlyIfLost: any) => {
+    if (!listEl || sel == null) return;
+    if (onlyIfLost && document.activeElement && document.activeElement !== document.body) return;
+    for (const row of Array.from(listEl.children) as any[]) {
+      if (row.getAttribute('data-id') === key) {
+        const h = row.querySelector(sel);
+        if (h && typeof h.focus === 'function') h.focus();
+        return;
+      }
+    }
+  };
+  queueMicrotask(() => focusIt(false));
+  setTimeout(() => focusIt(true), 0);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusIt(true));
+};
+
   onRowKeyDown = ($event: any, index: any) => {
-  // Origin guard (quick 260716-ggq): reorder keys apply ONLY when the row
-  // element ITSELF is focused. A slotted interactive child (an <input>,
-  // <button>, etc. rendered into the row's default slot) bubbles its own
-  // keydown up to this handler — without this guard, Space/Enter typed into
-  // that child would be hijacked for lift/drop instead of reaching the
-  // child. Must run FIRST, before the keyboardEnabled() check.
-  if ($event.target !== $event.currentTarget) return;
+  // Origin guard — must run FIRST, before the keyboardEnabled() check.
+  //  - handle mode (keyboardTrigger='handle'): reorder keys apply ONLY when the
+  //    keydown came from inside this row's `handle` element. A missing `handle`
+  //    selector means keyboard is OFF (warned in warnIfHandleMissing).
+  //  - row mode (quick 260716-ggq): reorder keys apply ONLY when the row
+  //    element ITSELF is focused. A slotted interactive child (an <input>,
+  //    <button>, etc. rendered into the row's default slot) bubbles its own
+  //    keydown up to this handler — without this guard, Space/Enter typed into
+  //    that child would be hijacked for lift/drop instead of reaching the
+  //    child.
+  if (this.handleMode()) {
+    if (this.handle == null || !this.isHandleKeyOrigin($event)) return;
+  } else if ($event.target !== $event.currentTarget) {
+    return;
+  }
   // Defense-in-depth: when keyboard reordering is off the rows carry no
   // tabindex and can't receive focus, but a consumer-focused row (or a
   // programmatic .focus()) must still no-op here rather than reorder.
@@ -468,11 +571,16 @@ private __rozieFirstUpdateDone = false;
     next.splice(to, 0, moved);
     this._itemsControllable.write(next);
     this._liftedIndex.value = to;
-    this._ariaLiveText.value = 'Moved ' + this.getLabel(to) + ' to position ' + (to + 1);
+    // Name the row that MOVED from the local `moved` item, not getLabel(to):
+    // on React/Vue/Lit `$props.items` still holds the pre-write array here, so
+    // getLabel(to) would announce the neighbour that was displaced.
+    this._ariaLiveText.value = 'Moved ' + this.labelOf(moved, to) + ' to position ' + (to + 1);
     // After the keyed reorder write, restore focus to the moved row. No-op
     // on React/Vue/Angular (DOM identity preserved); queueMicrotask +
     // querySelectorAll + .focus() on Svelte/Solid/Lit (DOM re-created).
-    queueMicrotask(() => (this.renderRoot.querySelectorAll('[role="listitem"]')?.[to] as HTMLElement | undefined)?.focus?.());
+    // Handle mode re-focuses the handle itself (the selector is a prop, and
+    // $restoreFocus accepts a string literal only).
+    if (this.handleMode()) this.refocusHandle(moved, to);else queueMicrotask(() => (this.renderRoot.querySelectorAll('[role="listitem"]')?.[to] as HTMLElement | undefined)?.focus?.());
     this.dispatchEvent(new CustomEvent("change", {
       detail: {
         oldIndex: from,
@@ -545,7 +653,7 @@ private __rozieFirstUpdateDone = false;
    * internal `data-rozie-ref` ref markers via fallthrough re-application.
    */
   private get $attrs(): Record<string, string> {
-    const __skip = new Set<string>(['data-rozie-ref', 'items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'disable-keyboard', 'disablekeyboard', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass', 'item-style', 'itemstyle']);
+    const __skip = new Set<string>(['data-rozie-ref', 'items', 'item-key', 'itemkey', 'handle', 'group', 'animation', 'disabled', 'disable-keyboard', 'disablekeyboard', 'keyboard-trigger', 'keyboardtrigger', 'options', 'label-for', 'labelfor', 'ghost-class', 'ghostclass', 'chosen-class', 'chosenclass', 'drag-class', 'dragclass', 'filter', 'easing', 'force-fallback', 'forcefallback', 'swap-threshold', 'swapthreshold', 'cloneable', 'list-class', 'listclass', 'item-class', 'itemclass', 'item-style', 'itemstyle']);
     const out: Record<string, string> = {};
     for (const a of Array.from(this.attributes)) {
       if (__skip.has(a.name)) continue;

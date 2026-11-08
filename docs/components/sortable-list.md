@@ -75,6 +75,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. |
 | `disableKeyboard` | `Boolean` | `false` | yes | Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no tabindex) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. |
+| `keyboardTrigger` | `String` | `"row"` | yes | Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`. See [Handle-only keyboard reordering](#handle-only-keyboard-reordering). |
 | `ghostClass` | `String` | `null` | yes | Class name applied to the drop-placeholder element. See [Custom ghost / chosen / drag styling](#custom-ghost-chosen-drag-styling). |
 | `chosenClass` | `String` | `null` | yes | Class name applied to the currently-chosen item. |
 | `dragClass` | `String` | `null` | yes | Class name applied to the dragging element. |
@@ -223,9 +224,39 @@ The canonical example is [`SortableListNestedDemo`](https://github.com/One-Learn
 
 `SortableList` ships with keyboard-driven reorder out of the box. Tab to a row, Space to lift, ArrowUp/ArrowDown to move, Space (or Enter) to drop, Escape to cancel. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", "Cancelled lift of X".
 
-The cross-target focus-restoration after a keyed reorder is handled via Rozie's [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders) sigil — Svelte / Solid / Lit re-create row DOM on reorder (focus drops to `<body>` natively); the sigil restores it. Vue / React / Angular preserve identity natively and the sigil is a no-op.
+The cross-target focus-restoration after a keyed reorder is handled via Rozie's [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders) sigil — Svelte / Solid / Lit re-create row DOM on reorder (focus drops to `<body>` natively); the sigil restores it. Vue / React / Angular preserve identity natively and the sigil is a no-op. In handle mode the component re-focuses the handle itself, because the handle selector is a prop.
 
 To customize the aria-live label per row, pass `:labelFor="(item) => item.title"` — by default the announcer reads `item.label` (or `String(item)` if no `label` field).
+
+#### Handle-only keyboard reordering
+
+Rows that contain inputs or other interactive content are awkward as keyboard targets: every row becomes a tab stop, and Space or Enter typed into a row's input is a conflict. Set `keyboardTrigger="handle"` to move keyboard reordering onto a handle button that you render inside each row.
+
+```rozie
+<SortableList
+  r-model:items="$data.items"
+  itemKey="id"
+  keyboardTrigger="handle"
+  :handle="$classSelector('grip')"
+>
+  <template #default="{ item }">
+    <div class="row">
+      <button type="button" class="grip" :aria-label="'Reorder ' + item.label">⋮⋮</button>
+      <input placeholder="note" />
+    </div>
+  </template>
+</SortableList>
+```
+
+The rules:
+
+- Rows are not tab stops. Tab moves handle, then the row's input, then the next row's handle.
+- Only keys pressed inside the handle count. It is the same Space/Enter lift and drop, ArrowUp/ArrowDown move and Escape cancel flow, with the same aria-live announcements. Typing into the row's input is left alone.
+- Handled keys call `preventDefault`, so the handle button's own click does not fire.
+- Focus returns to the moved row's handle after each move, on every framework.
+- You own the handle markup and its accessible name. The component adds no `tabindex` or `role` to slot content.
+- Without a `handle` selector, keyboard reordering is off and a console warning is logged. There is no silent fallback to row mode.
+- `disabled` and `disableKeyboard` still turn keyboard reordering off.
 
 ### Clone mode
 

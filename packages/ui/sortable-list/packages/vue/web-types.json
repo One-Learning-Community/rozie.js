@@ -81,6 +81,15 @@
               "default": "false"
             },
             {
+              "name": "keyboard-trigger",
+              "description": "Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as \"Reorder Hero banner\") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.",
+              "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
+              "type": [
+                "string"
+              ],
+              "default": "\"row\""
+            },
+            {
               "name": "options",
               "description": "Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",

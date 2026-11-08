@@ -42,6 +42,7 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableKeyboard` | `Boolean` | `false` |  |  |
+| `keyboardTrigger` | `String` | `"row"` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |
