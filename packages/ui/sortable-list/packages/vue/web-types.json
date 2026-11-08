@@ -269,12 +269,12 @@
               },
               {
                 "name": "start",
-                "description": "Fired when dragging starts.",
+                "description": "Fired when a drag starts or a row is lifted by keyboard, from the origin list.",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {
                 "name": "end",
-                "description": "Fired when dragging ends (source side).",
+                "description": "Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written.",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {

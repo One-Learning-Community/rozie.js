@@ -33,8 +33,8 @@
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
   `{slug}:{event}:{interaction}`. The last keyboard `end` payload is shown in
-  `<output data-testid="last-end">` as JSON ({ item, data, interaction }, with
-  `item` reported as "element" or null and `data` as the item's label).
+  `<output data-testid="last-end">` as JSON ({ item, el, interaction }, with
+  `item` reported as the item's label and `el` as "element" or null).
 
   NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
 -->
@@ -124,8 +124,8 @@ const record = (slug, name, e) => {
   const p = payloadOf(e)
   if (name === 'end' && p != null && p.interaction === 'keyboard') {
     $data.lastEnd = JSON.stringify({
-      item: p.item == null ? null : 'element',
-      data: p.data != null && p.data.label != null ? p.data.label : null,
+      item: p.item != null && p.item.label != null ? p.item.label : null,
+      el: p.el == null ? null : 'element',
       interaction: p.interaction,
     })
   }

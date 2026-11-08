@@ -270,56 +270,69 @@ private __rozieFirstUpdateDone = false;
       // that cache. The sigil lowers to `__rozieReconcileAfterDomMutation(this)`
       // on Lit (real call) and `void 0` on the other 5 targets (no-op).
       afterCommit: () => __rozieReconcileAfterDomMutation(this),
-      onChange: ({
-        kind,
-        oldIndex,
-        newIndex,
-        item
-      }: any) => {
-        if (kind === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
-          detail: {
-            oldIndex,
-            newIndex,
-            item,
-            interaction: 'pointer'
-          },
+      // Every pointer event carries the same payload as the keyboard ones, with
+      // item-row indices and the raw SortableJS event as `originalEvent`.
+      onChange: (c: any) => {
+        const payload = {
+          interaction: 'pointer',
+          item: c.item,
+          el: c.el,
+          from: c.from,
+          to: c.to,
+          oldIndex: c.oldIndex,
+          newIndex: c.newIndex,
+          originalEvent: c.event
+        };
+        if (c.kind === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
+          detail: payload,
           bubbles: true,
           composed: true
-        }));else if (kind === 'add') this.dispatchEvent(new CustomEvent("add", {
-          detail: {
-            newIndex,
-            item,
-            interaction: 'pointer'
-          },
+        }));else if (c.kind === 'add') this.dispatchEvent(new CustomEvent("add", {
+          detail: payload,
           bubbles: true,
           composed: true
-        }));else if (kind === 'remove') this.dispatchEvent(new CustomEvent("remove", {
-          detail: {
-            oldIndex,
-            item,
-            interaction: 'pointer'
-          },
+        }));else if (c.kind === 'remove') this.dispatchEvent(new CustomEvent("remove", {
+          detail: payload,
           bubbles: true,
           composed: true
         }));
       },
-      onStart: (e: any) => {
+      onStart: (d: any) => {
         // A pointer drag ends any active keyboard lift first.
         if (this.registry.lift != null) this.endLift('drop');
-        (e as any).interaction = 'pointer';
         this.dispatchEvent(new CustomEvent("start", {
-          detail: e,
+          detail: {
+            interaction: 'pointer',
+            item: d.item,
+            el: d.el,
+            from: d.from,
+            to: d.to,
+            oldIndex: d.oldIndex,
+            newIndex: d.newIndex,
+            originalEvent: d.event
+          },
           bubbles: true,
           composed: true
         }));
       },
-      onEnd: (e: any) => {
-        (e as any).interaction = 'pointer';
-        this.dispatchEvent(new CustomEvent("end", {
-          detail: e,
-          bubbles: true,
-          composed: true
-        }));
+      // Runs once per drag, after every list involved has written its items.
+      // `end` comes from the list the row ended up in: the destination when it
+      // is a SortableList, else (dropped outside, or into a SortableJS list
+      // that isn't one of ours) this source list.
+      onEnd: (d: any) => {
+        const dest = this.registry.entryFor(d.to) ?? this.entry;
+        if (dest == null) return;
+        const row = d.item === undefined ? null : this.rowByKey(d.to, dest.keyOf(d.item, d.newIndex));
+        dest.emit('end', {
+          interaction: 'pointer',
+          item: d.item,
+          el: row ?? d.el,
+          from: d.from,
+          to: d.to,
+          oldIndex: d.oldIndex,
+          newIndex: d.newIndex,
+          originalEvent: d.event
+        });
       }
     });
     this.instance = sortable.instance;
@@ -754,8 +767,8 @@ private __rozieFirstUpdateDone = false;
   // The lifted item is no longer in the list holding it: the consumer changed
   // that list's items (or re-keyed the item), or the list is unmounting. End the
   // lift without writing anything (the item is wherever the consumer's data put
-  // it). `end` still fires once, with `item: null` and `data` = the lifted value,
-  // so keyboard `start` / `end` always pair. Lost to a consumer change (not an
+  // it). `end` still fires once, with `item` = the lifted value and `el: null`
+  // (there is no row), so keyboard `start` / `end` always pair. Lost to a consumer change (not an
   // unmount), the holder says `Lift ended` and, if focus fell to <body> with the
   // row, focuses its row nearest where the lifted row was.
   loseLift = (unmounting = false) => {
@@ -770,8 +783,8 @@ private __rozieFirstUpdateDone = false;
   }
   h.emit('end', {
     interaction: 'keyboard',
-    item: null,
-    data: lift.data,
+    item: lift.item,
+    el: null,
     from: lift.origin.list.el,
     to: h.el,
     oldIndex: lift.origin.index,
@@ -779,23 +792,24 @@ private __rozieFirstUpdateDone = false;
   });
 };
 
-  // Keyboard `start` / `end` payload, shaped like SortableJS's pointer event:
-  // `item` is the row element, `data` the item value. `start` fires from the
-  // origin list (`from`), `end` from the list the row ends up in (`to`). Reads
-  // the lift, so call it while `registry.lift` is still set.
-  keyboardStartEnd = (name: any, from: any, to: any, oldIndex: any, newIndex: any) => {
-  const lift = this.registry.lift;
+  // Keyboard `start` / `end` (the same payload as every other event): `item` is
+  // the item value, `el` its row element. `start` fires from the origin list
+  // (`from`), `end` from the list the row ends up in (`to`). `el` is the row in
+  // that list when it is rendered, else `fallbackEl` (the row element the move
+  // started from, before a target re-rendered). `end` is emitted after
+  // `registry.lift` is cleared, so a consumer `end` handler that writes the
+  // items (re-keying a clone copy) is not mistaken for a lost lift.
+  keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl = null) => {
   const host = name === 'start' ? from : to;
-  const payload = {
+  host.emit(name, {
     interaction: 'keyboard',
-    item: lift ? this.rowByKey(host.el, lift.key) : null,
-    data: lift ? lift.data : null,
+    item: lift ? lift.item : null,
+    el: (lift ? this.rowByKey(host.el, lift.key) : null) ?? fallbackEl,
     from: from.el,
     to: to.el,
     oldIndex,
     newIndex
-  };
-  host.emit(name, payload);
+  });
 };
 
   // Move the lifted row to `toIndex` (clamped) within the list holding it.
@@ -812,6 +826,8 @@ private __rozieFirstUpdateDone = false;
   const items = h.items();
   const to = Math.max(0, Math.min(items.length - 1, toIndex));
   if (to === from) return;
+  // The moved row's element, read before the write (an index key changes).
+  const el = h.rowEl(from);
   const next = [...items];
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
@@ -828,10 +844,13 @@ private __rozieFirstUpdateDone = false;
   this.speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
   h.emit('reorder', {
-    oldIndex: from,
-    newIndex: to,
+    interaction: 'keyboard',
     item: moved,
-    interaction: 'keyboard'
+    el,
+    from: h.el,
+    to: h.el,
+    oldIndex: from,
+    newIndex: to
   });
 };
 
@@ -851,10 +870,11 @@ private __rozieFirstUpdateDone = false;
   }
   const fromItems = from.items();
   const data = fromItems[i];
+  const el = from.rowEl(i);
   // Keep the lifted row element current: lists nested inside it (a grid
   // widget's columns) are never hop targets. Before a target re-renders the
   // row may not exist yet, so keep the last known element then.
-  lift.liftedRowEl = from.rowEl(i) ?? lift.liftedRowEl;
+  lift.liftedRowEl = el ?? lift.liftedRowEl;
   const to = this.registry.findHopTarget(from, dir);
   if (to == null) {
     this.speak(from, (dir === 1 ? 'No list after ' : 'No list before ') + this.registry.listName(from));
@@ -871,15 +891,19 @@ private __rozieFirstUpdateDone = false;
     lift.holder = to;
     lift.copy = false;
     lift.key = to.keyOf(toItems[home], home);
-    lift.data = toItems[home];
+    lift.item = toItems[home];
     lift.index = home;
     const rest = [...fromItems];
     rest.splice(i, 1);
     from.write(rest);
     from.emit('remove', {
-      oldIndex: i,
+      interaction: 'keyboard',
       item: data,
-      interaction: 'keyboard'
+      el,
+      from: from.el,
+      to: to.el,
+      oldIndex: i,
+      newIndex: -1
     });
     from.setLifted(null);
     to.setLifted(home);
@@ -905,18 +929,28 @@ private __rozieFirstUpdateDone = false;
     rest.splice(i, 1);
     from.write(rest);
     from.emit('remove', {
-      oldIndex: i,
+      interaction: 'keyboard',
       item: data,
-      interaction: 'keyboard'
+      el,
+      from: from.el,
+      to: to.el,
+      oldIndex: i,
+      newIndex: -1
     });
   }
   const next = [...toItems];
   next.splice(at, 0, data);
   to.write(next);
+  // The destination has not rendered its new row yet: `el` is the row the
+  // move started from.
   to.emit('add', {
-    newIndex: at,
+    interaction: 'keyboard',
     item: data,
-    interaction: 'keyboard'
+    el,
+    from: from.el,
+    to: to.el,
+    oldIndex: -1,
+    newIndex: at
   });
   from.setLifted(null);
   to.setLifted(at);
@@ -940,13 +974,15 @@ private __rozieFirstUpdateDone = false;
   }
   const items = h.items();
   const item = items[at];
+  // The lifted row's element, read before any write below.
+  const el = h.rowEl(at);
   const name = (e: any) => this.registry.listName(e);
   if (kind === 'drop') {
     // A row that hopped always names its list, even back in its origin.
     this.speak(h, !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
     h.setLifted(null);
-    this.keyboardStartEnd('end', origin.list, h, origin.index, at);
     this.registry.lift = null;
+    this.keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
     return;
   }
   if (h !== origin.list && !this.registry.has(origin.list) && lift.copy) {
@@ -957,9 +993,13 @@ private __rozieFirstUpdateDone = false;
     rest.splice(at, 1);
     h.write(rest);
     h.emit('remove', {
-      oldIndex: at,
+      interaction: 'keyboard',
       item,
-      interaction: 'keyboard'
+      el,
+      from: h.el,
+      to: h.el,
+      oldIndex: at,
+      newIndex: -1
     });
     h.setLifted(null);
     this.speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' removed from ' + name(h));
@@ -967,16 +1007,17 @@ private __rozieFirstUpdateDone = false;
       const k = Math.min(at, rest.length - 1);
       h.focusRow(rest[k], k);
     }
+    // The copy is gone, so there is no row: `el: null`.
+    this.registry.lift = null;
     h.emit('end', {
       interaction: 'keyboard',
-      item: null,
-      data: item,
+      item,
+      el: null,
       from: origin.list.el,
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
     });
-    this.registry.lift = null;
     return;
   }
   if (h !== origin.list && (!this.registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -985,8 +1026,8 @@ private __rozieFirstUpdateDone = false;
     // stays where it is (the lift ends as a drop at its position).
     this.speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
     h.setLifted(null);
-    this.keyboardStartEnd('end', origin.list, h, origin.index, at);
     this.registry.lift = null;
+    this.keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
     return;
   }
   if (h === origin.list) {
@@ -999,16 +1040,19 @@ private __rozieFirstUpdateDone = false;
       h.write(next);
       h.focusRow(item, to);
       h.emit('reorder', {
-        oldIndex: at,
-        newIndex: to,
+        interaction: 'keyboard',
         item,
-        interaction: 'keyboard'
+        el,
+        from: h.el,
+        to: h.el,
+        oldIndex: at,
+        newIndex: to
       });
     }
     this.speak(h, lift.hopped ? 'Cancelled. ' + h.labelOf(item, to) + ' returned to ' + name(h) + ', position ' + (to + 1) : 'Cancelled. ' + h.labelOf(item, to) + ' returned to position ' + (to + 1));
     h.setLifted(null);
-    this.keyboardStartEnd('end', origin.list, h, origin.index, to);
     this.registry.lift = null;
+    this.keyboardStartEnd('end', lift, origin.list, h, origin.index, to, el);
     return;
   }
   // Reverse hand-off from the current holder back to the origin list.
@@ -1029,25 +1073,33 @@ private __rozieFirstUpdateDone = false;
   rest.splice(at, 1);
   h.write(rest);
   h.emit('remove', {
-    oldIndex: at,
+    interaction: 'keyboard',
     item,
-    interaction: 'keyboard'
+    el,
+    from: h.el,
+    to: home.el,
+    oldIndex: at,
+    newIndex: -1
   });
   if (!lift.copy) {
     const next = [...homeItems];
     next.splice(back, 0, item);
     home.write(next);
     home.emit('add', {
-      newIndex: back,
+      interaction: 'keyboard',
       item,
-      interaction: 'keyboard'
+      el,
+      from: h.el,
+      to: home.el,
+      oldIndex: -1,
+      newIndex: back
     });
   }
   h.setLifted(null);
   this.speak(home, 'Cancelled. ' + home.labelOf(item, back) + ' returned to ' + name(home) + ', position ' + (back + 1));
   home.focusRow(lift.copy ? homeItems[back] : item, back);
-  this.keyboardStartEnd('end', home, home, origin.index, back);
   this.registry.lift = null;
+  this.keyboardStartEnd('end', lift, home, home, origin.index, back, lift.copy ? home.rowEl(back) : el);
 };
 
   // Lift the row at `index` of this list.
@@ -1057,7 +1109,7 @@ private __rozieFirstUpdateDone = false;
   this.registry.lift = {
     holder: this.entry,
     key: this.entry.keyOf(item, index),
-    data: item,
+    item,
     copy: false,
     hopped: false,
     origin: {
@@ -1069,7 +1121,7 @@ private __rozieFirstUpdateDone = false;
   };
   this._liftedIndex.value = index;
   this.speak(this.entry, 'Lifted ' + this.labelOf(item, index));
-  this.keyboardStartEnd('start', this.entry, this.entry, index, index);
+  this.keyboardStartEnd('start', this.registry.lift, this.entry, this.entry, index, index);
 };
 
   onRowKeyDown = ($event: any, index: any) => {
@@ -1175,12 +1227,12 @@ private __rozieFirstUpdateDone = false;
   if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const t = ev.target;
   if (t !== document.body && t !== document.documentElement) return;
-  const data = lift.data;
+  const item = lift.item;
   const at = this.registry.indexOfLift();
   if (!this.holderKey(ev.key, !!ev.shiftKey)) return;
   ev.preventDefault();
   const now = this.registry.lift;
-  if (now != null) now.holder.focusRow(now.data, this.registry.indexOfLift());else if (at >= 0) this.entry.focusRow(data, at);
+  if (now != null) now.holder.focusRow(now.item, this.registry.indexOfLift());else if (at >= 0) this.entry.focusRow(item, at);
 };
 
   // SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).

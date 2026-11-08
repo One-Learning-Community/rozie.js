@@ -7,6 +7,13 @@
     - the `<ol class="state-list">` sidecar showing the bound array order,
     - an `<ol class="event-log">` with one `li` per emitted event, text
       `${name}:${interaction}`.
+  The list has both a `#header` and a `#footer`, so the spec can check that
+  every event's `oldIndex` / `newIndex` counts item rows only (on Lit the
+  header / footer `<slot>`s are children of the list element too). The last
+  `end` payload is shown in `<output data-testid="last-end">` as JSON
+  ({ item, el, from, to, oldIndex, newIndex, interaction }, with `item` as
+  the item's label, `el` as "element" or null and `from` / `to` as the list's
+  aria-label).
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -26,6 +33,7 @@
 {
   items: [],
   log: [],
+  lastEnd: '',
 }
 </data>
 
@@ -46,8 +54,25 @@ const interactionOf = (e) => {
   return '?'
 }
 
+const payloadOf = (e) => {
+  if (e != null && e.interaction == null && e.detail != null && e.detail.interaction != null) return e.detail
+  return e
+}
+
 const record = (name, e) => {
   $data.log = [...$data.log, name + ':' + interactionOf(e)]
+  const p = payloadOf(e)
+  if (name === 'end' && p != null) {
+    $data.lastEnd = JSON.stringify({
+      item: p.item != null && p.item.label != null ? p.item.label : null,
+      el: p.el == null ? null : 'element',
+      from: p.from == null ? null : p.from.getAttribute('aria-label'),
+      to: p.to == null ? null : p.to.getAttribute('aria-label'),
+      oldIndex: p.oldIndex,
+      newIndex: p.newIndex,
+      interaction: p.interaction,
+    })
+  }
 }
 
 $onMount(() => {
@@ -63,14 +88,21 @@ $onMount(() => {
     itemKey="id"
     :itemClass="{ 'demo-item-flag': true, 'demo-item-off': false }"
     :listClass="['demo-list', { 'demo-list-flag': true }]"
+    listLabel="Fruit"
     @start="record('start', $event)"
     @reorder="record('reorder', $event)"
     @end="record('end', $event)"
     @add="record('add', $event)"
     @remove="record('remove', $event)"
   >
+    <template #header>
+      <div class="list-header">Fruit ({{ $data.items.length }})</div>
+    </template>
     <template #default="{ item }">
       <span class="row"><span class="label">{{ item.label }}</span></span>
+    </template>
+    <template #footer>
+      <div class="list-footer">End of list</div>
     </template>
   </SortableList>
 
@@ -83,6 +115,7 @@ $onMount(() => {
   <ol class="event-log">
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
   </ol>
+  <output data-testid="last-end">{{ $data.lastEnd }}</output>
 </div>
 </template>
 

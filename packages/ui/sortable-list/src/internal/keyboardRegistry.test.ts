@@ -182,7 +182,7 @@ describe('registry', () => {
     const ec = fakeEntry(el(), 'z');
     reg(ea); reg(en); reg(ec);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: '0', data: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: row };
+    r.lift = { holder: ea, key: '0', item: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: row };
     expect(r.findHopTarget(ea, 1)).toBe(ec);
   });
 
@@ -202,11 +202,26 @@ describe('registry', () => {
     const ea = fakeEntry(el(), 'z');
     const un = reg(ea);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: '0', data: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: null };
+    r.lift = { holder: ea, key: '0', item: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: null };
     un();
     expect(r.lift).toBeNull();
   });
 
+  it('entryFor returns the registered entry for its element and null otherwise', () => {
+    const a = el();
+    const b = el();
+    const stray = el();
+    const ea = fakeEntry(a, 'g');
+    const eb = fakeEntry(b, 'g');
+    const r = getKeyboardRegistry();
+    const unA = reg(ea);
+    reg(eb);
+    expect(r.entryFor(a)).toBe(ea);
+    expect(r.entryFor(b)).toBe(eb);
+    expect(r.entryFor(stray)).toBeNull();
+    unA();
+    expect(r.entryFor(a)).toBeNull();
+  });
   it('has() tracks registration; unregister clears the speaker', () => {
     const ea = fakeEntry(el(), 'z');
     const r = getKeyboardRegistry();
@@ -225,10 +240,10 @@ describe('registry', () => {
     ea.keyOf = (it) => String(it);
     reg(ea);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: 'q', data: 'q', copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
+    r.lift = { holder: ea, key: 'q', item: 'q', copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
     expect(r.indexOfLift()).toBe(1);
     r.lift.key = 'gone';
-    r.lift.data = 'gone';
+    r.lift.item = 'gone';
     expect(r.indexOfLift()).toBe(-1);
   });
 });
@@ -243,16 +258,16 @@ describe('indexOfLift re-syncs the lift', () => {
     ea.keyOf = (it: any) => String(it.id);
     reg(ea);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: 'b', data: b, copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
+    r.lift = { holder: ea, key: 'b', item: b, copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
     // The consumer re-keyed the lifted object in place.
     b.id = 'b2';
     expect(r.indexOfLift()).toBe(1);
     expect(r.lift!.key).toBe('b2');
-    // A new object with the same key: found by key, and `data` follows it.
+    // A new object with the same key: found by key, and `item` follows it.
     const b3 = { id: 'b2' };
     items = [a, b3];
     expect(r.indexOfLift()).toBe(1);
-    expect(r.lift!.data).toBe(b3);
+    expect(r.lift!.item).toBe(b3);
     // A new object with a new key: the lift is lost.
     items = [a, { id: 'fresh' }];
     expect(r.indexOfLift()).toBe(-1);

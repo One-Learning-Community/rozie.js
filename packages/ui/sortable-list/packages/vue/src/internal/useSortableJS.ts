@@ -76,13 +76,44 @@ export type SortableEventKind = 'reorder' | 'add' | 'remove';
 /** Argument shape for the disambiguated onChange callback. */
 export interface SortableChange<T> {
   kind: SortableEventKind;
-  /** Source index. `-1` if it could not be determined (fragile-event path). */
+  /** Item-row index in `from`. `-1` for `add`, or when it could not be
+   * determined (fragile-event path). */
   oldIndex: number;
-  /** Destination index. `-1` if it could not be determined. */
+  /** Item-row index in `to`. `-1` for `remove`, or when it could not be
+   * determined. */
   newIndex: number;
   /** The moved item. May be `undefined` only when both the stash AND the
    * source list's snapshot lost track of it (extreme fallback path). */
   item: T | undefined;
+  /** The dragged row element (`e.item`). */
+  el: HTMLElement;
+  /** Source list element (`e.from`). */
+  from: HTMLElement;
+  /** Destination list element (`e.to`). */
+  to: HTMLElement;
+  /** The raw SortableJS event. */
+  event: SortableEvent;
+}
+
+/** Argument shape for the `onStart` / `onEnd` callbacks. Indices are
+ * item-row indices (SortableJS's draggable-relative ones), never counting
+ * the `#header` / `#footer` children of the list. */
+export interface SortableDrag<T> {
+  /** The dragged item's data value (from the stash). */
+  item: T | undefined;
+  /** The dragged row element (`e.item`). */
+  el: HTMLElement;
+  /** Source list element (`e.from`). */
+  from: HTMLElement;
+  /** Destination list element (`e.to`; the source when dropped outside). */
+  to: HTMLElement;
+  /** Item-row index in `from`. */
+  oldIndex: number;
+  /** Item-row index in `to` (equal to `oldIndex` for `onStart` and for a
+   * drop back in place). */
+  newIndex: number;
+  /** The raw SortableJS event. */
+  event: SortableEvent;
 }
 
 export interface UseSortableJSOptions<T> {
@@ -95,11 +126,14 @@ export interface UseSortableJSOptions<T> {
    * are silently ignored — the helper owns the event-handling path. Use
    * `onStart` / `onEnd` / `onChange` on this options object instead. */
   options?: SortableOptions;
-  /** Optional: fires on drag start. The dragged item DATA has already been
-   * stashed on `e.item.__rozieItem` by the time this fires. */
-  onStart?: (e: SortableEvent) => void;
-  /** Optional: fires on drag end after `onCommit` + `afterCommit`. */
-  onEnd?: (e: SortableEvent) => void;
+  /** Optional: fires on drag start, from the source list. */
+  onStart?: (info: SortableDrag<T>) => void;
+  /** Optional: fires once per drag, from the source list's helper, AFTER
+   * every list involved has run its `onCommit` / `afterCommit` / `onChange`
+   * (a microtask queued after the source's commit; the destination's commit
+   * was queued earlier, from its `onAdd`). The caller decides which list
+   * reports it (the one `info.to` belongs to). */
+  onEnd?: (info: SortableDrag<T>) => void;
   /** Optional: fires once per commit with the disambiguated event kind. */
   onChange?: (info: SortableChange<T>) => void;
   /** Optional: called immediately after `onCommit`. Used on Lit to invoke
@@ -121,6 +155,14 @@ export interface UseSortableJSResult {
 function readStash<T>(item: unknown): T | undefined {
   if (item === null || typeof item !== 'object') return undefined;
   return (item as Record<string, unknown>)[ROZIE_ITEM_STASH_KEY] as T | undefined;
+}
+
+/** SortableJS's draggable-relative index (item rows only), falling back to
+ * the plain child index, else `-1`. */
+function draggableIndex(draggable: number | undefined, plain: number | undefined): number {
+  if (typeof draggable === 'number') return draggable;
+  if (typeof plain === 'number') return plain;
+  return -1;
 }
 
 /** Try-catch wrapper for DOM operations that may throw on fragile event
@@ -182,19 +224,24 @@ export function useSortableJS<T>(
     // the WRONG item (the row after the one actually grabbed), and the
     // identity-based commit lookup would then faithfully move that wrong item.
     // `oldDraggableIndex` counts only the `.rozie-sortable-item` rows.
-    const fromIdx =
-      typeof e.oldDraggableIndex === 'number'
-        ? e.oldDraggableIndex
-        : typeof e.oldIndex === 'number'
-          ? e.oldIndex
-          : -1;
+    const fromIdx = draggableIndex(e.oldDraggableIndex, e.oldIndex);
+    let data: T | undefined;
     if (fromIdx >= 0 && fromIdx < current.length) {
+      data = current[fromIdx] as T;
       const item = e.item as unknown as Record<string, unknown> | null;
       if (item !== null && typeof item === 'object') {
-        item[ROZIE_ITEM_STASH_KEY] = current[fromIdx];
+        item[ROZIE_ITEM_STASH_KEY] = data;
       }
     }
-    opts.onStart?.(e);
+    opts.onStart?.({
+      item: data,
+      el: e.item,
+      from: e.from,
+      to: e.from,
+      oldIndex: fromIdx,
+      newIndex: fromIdx,
+      event: e,
+    });
   };
 
   /** The single point of truth for committed drags. Disambiguates via
@@ -214,6 +261,12 @@ export function useSortableJS<T>(
    * inline-handlers design DID register onAdd; collapsing to onEnd-only
    * would lose the destination-side commit entirely. */
   const handleCommit = (e: SortableEvent): void => {
+    // What the `end` callback reports (source side only). Filled in below as
+    // the commit is worked out; the hints cover the early-return paths.
+    const stashAtEntry = readStash<T>(e.item);
+    let endOld = draggableIndex(e.oldDraggableIndex, e.oldIndex);
+    let endNew = draggableIndex(e.newDraggableIndex, e.newIndex);
+    let endItem: T | undefined = stashAtEntry;
     try {
       const fromUs = e.from === listEl;
       const toUs = e.to === listEl;
@@ -248,18 +301,8 @@ export function useSortableJS<T>(
       // writeback dropped items one slot too far. The draggable indices stay
       // item-relative everywhere; when no non-draggable children exist the two
       // coincide, so the 5 light-DOM targets are unchanged.
-      const oldIndexHint =
-        typeof e.oldDraggableIndex === 'number'
-          ? e.oldDraggableIndex
-          : typeof e.oldIndex === 'number'
-            ? e.oldIndex
-            : -1;
-      const newIndexHint =
-        typeof e.newDraggableIndex === 'number'
-          ? e.newDraggableIndex
-          : typeof e.newIndex === 'number'
-            ? e.newIndex
-            : -1;
+      const oldIndexHint = endOld;
+      const newIndexHint = endNew;
 
       let next: T[];
       let oldIndex: number;
@@ -278,6 +321,19 @@ export function useSortableJS<T>(
           return;
         }
         moved = current[movedFromIdx] as T;
+        const targetIdx =
+          newIndexHint >= 0 && newIndexHint < current.length
+            ? newIndexHint
+            : current.length - 1;
+        endOld = movedFromIdx;
+        endItem = moved;
+        endNew = targetIdx;
+        if (targetIdx === movedFromIdx) {
+          // Dropped back where it started (or outside any list, which
+          // SortableJS reverts): nothing moved, so nothing is written and no
+          // `reorder` fires. `end` still does (from the `finally`).
+          return;
+        }
         // Restore the moved DOM node back to its original position so the
         // framework reconciler sees a clean model-vs-DOM shift. If the
         // restore throws (fragile event), proceed to the model writeback —
@@ -290,10 +346,6 @@ export function useSortableJS<T>(
         });
         next = [...current];
         next.splice(movedFromIdx, 1);
-        const targetIdx =
-          newIndexHint >= 0 && newIndexHint <= next.length
-            ? newIndexHint
-            : next.length;
         next.splice(targetIdx, 0, moved);
         oldIndex = movedFromIdx;
         newIndex = targetIdx;
@@ -309,6 +361,9 @@ export function useSortableJS<T>(
         // `onEnd` callback still fires from the finally — the drag did
         // end on the source side.
         if (e.pullMode === 'clone') {
+          if (stashAtEntry !== undefined && current.indexOf(stashAtEntry) !== -1) {
+            endOld = current.indexOf(stashAtEntry);
+          }
           return;
         }
         // SOURCE SIDE of cross-list move — splice out of our items.
@@ -322,6 +377,8 @@ export function useSortableJS<T>(
           return;
         }
         moved = current[movedFromIdx] as T;
+        endOld = movedFromIdx;
+        endItem = moved;
         // Put the dragged DOM node back so our framework's re-render off
         // the new (shorter) model removes it cleanly. If restore throws
         // (fragile event — common path here when destination's onAdd
@@ -384,7 +441,16 @@ export function useSortableJS<T>(
       queueMicrotask(() => {
         opts.onCommit(next);
         opts.afterCommit?.();
-        opts.onChange?.({ kind, oldIndex, newIndex, item: moved });
+        opts.onChange?.({
+          kind,
+          oldIndex,
+          newIndex,
+          item: moved,
+          el: e.item,
+          from: e.from,
+          to: e.to,
+          event: e,
+        });
       });
     } finally {
       // The user's `onEnd` callback only fires from a true `onEnd` event
@@ -397,13 +463,35 @@ export function useSortableJS<T>(
       // the SortableJS lifecycle for any drag. Cross-list `onAdd` runs
       // BEFORE source `onEnd`, so the stash must remain readable on
       // `e.item` until the source side completes.
+      //
+      // `onEnd` is chained AFTER this list's commit microtask (queued above,
+      // in the `try`). On a cross-list drag the destination's commit was
+      // queued even earlier, from its `onAdd`, so by the time `onEnd` runs
+      // every list involved has written its items and reported `reorder` /
+      // `add` / `remove`. It is queued from a microtask of its own (two hops),
+      // so the microtasks those commits queued run first too: a framework that
+      // flushes its update in a microtask (Vue, Svelte, React for an update
+      // made during a discrete event such as `drop`) has re-rendered, and a
+      // consumer `end` handler reads the new state.
       const fromUs = e.from === listEl;
       if (fromUs) {
         const item = e.item as unknown as Record<string, unknown> | null;
         if (item !== null && typeof item === 'object') {
           delete item[ROZIE_ITEM_STASH_KEY];
         }
-        opts.onEnd?.(e);
+        const info: SortableDrag<T> = {
+          item: endItem,
+          el: e.item,
+          from: e.from,
+          to: e.to,
+          oldIndex: endOld,
+          newIndex: endNew,
+          event: e,
+        };
+        if (opts.onEnd) {
+          const onEnd = opts.onEnd;
+          queueMicrotask(() => queueMicrotask(() => onEnd(info)));
+        }
       }
     }
   };

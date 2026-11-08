@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { synthesizeDrag } from '../host/dragEvent';
+import { nativeDrag, synthesizeDrag } from '../host/dragEvent';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -168,4 +168,35 @@ for (const target of TARGETS) {
       expect(stateLabels).toEqual(after);
     },
   );
+}
+
+// `end` fires after the bound array is written (audit E1): the demo's `end`
+// handler copies the ids of its bound `items` into a hidden readout, which must
+// already show the new order. Driven with a real mouse drag (`nativeDrag`): a
+// script-dispatched drop makes React render the write only after `end` (see
+// host/dragEvent.ts), which is not what a user's drop does.
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  runner(`sortable-drag [${target}]: end handler sees the new order`, async ({ page }) => {
+    await page.goto(`/?example=SortableList&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    const items = mount.locator(ITEM);
+    await expect(items).toHaveCount(SEED_ITEM_COUNT);
+    await nativeDrag(page, {
+      sourceHandle: items.nth(0).locator(GRIP).first(),
+      target: items.nth(2),
+    });
+    const ids = () => mount.locator(`${STATE_LI} code`).allTextContents();
+    // The drag moved Apple, and the bound state shows it.
+    await expect.poll(async () => (await ids()).join(',')).not.toBe('a,b,c,d,e');
+    const order = (await ids()).join(',');
+    expect([...order.split(',')].sort().join(',')).toBe('a,b,c,d,e');
+    // The `end` handler read that same new order.
+    await expect(mount.getByTestId('end-order')).toHaveText(order);
+  });
 }

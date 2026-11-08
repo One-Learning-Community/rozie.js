@@ -193,3 +193,24 @@ export async function synthesizeDrag(
   // Let the target framework flush the reorder back through `r-model:items`.
   await page.waitForTimeout(200);
 }
+
+/**
+ * Drag `sourceHandle`'s row onto `target` with Playwright's real mouse, so the
+ * browser fires TRUSTED drag events. Use it where the difference matters: a
+ * script-dispatched `drop` (`synthesizeDrag`) runs its microtasks only after
+ * the whole script returns, with no `window.event`, so React schedules the
+ * re-render for an `r-model` write in a later task — after the list's `end`.
+ * A real drop is a discrete event: React flushes that write in a microtask,
+ * before `end`, and a consumer `end` handler reads the new state.
+ */
+export async function nativeDrag(page: Page, args: SyntheticDragArgs): Promise<void> {
+  const { sourceHandle, target } = args;
+  const b = await target.boundingBox();
+  if (!b) throw new Error('nativeDrag: target has no bounding box');
+  await sourceHandle.hover();
+  await page.mouse.down();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+  await page.mouse.move(b.x + b.width / 2, b.y + Math.max(1, b.height - 2), { steps: 10 });
+  await page.mouse.up();
+  await page.waitForTimeout(200);
+}

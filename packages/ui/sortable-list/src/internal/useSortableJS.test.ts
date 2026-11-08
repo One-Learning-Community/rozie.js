@@ -65,7 +65,7 @@ vi.mock('sortablejs', () => {
 });
 
 // Late import so the mock is in place.
-import { useSortableJS, type SortableChange } from './useSortableJS.js';
+import { useSortableJS, type SortableChange, type SortableDrag } from './useSortableJS.js';
 // Late import of the mock helpers for inspection.
 import * as SortableJSMock from 'sortablejs';
 
@@ -116,8 +116,8 @@ beforeEach(() => {
  * sequencing — see useSortableJS.ts for the cross-instance
  * `Sortable.active` nulling hazard. */
 async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  // `onEnd` is chained two microtask hops after the commit.
+  for (let i = 0; i < 6; i++) await Promise.resolve();
 }
 
 describe('useSortableJS', () => {
@@ -623,10 +623,12 @@ describe('useSortableJS', () => {
 
     // The user's onEnd callback still fires from the finally block —
     // the drag DID end on the source side, even if no commit happened.
-    expect(endCalls).toEqual([endEv]);
+    // It carries the destination as `to`, for the caller to route.
+    expect(endCalls.length).toBe(1);
+    expect(endCalls[0]).toMatchObject({ item: sourceItems[0], el: dragged, from: sourceListEl, to: destListEl, oldIndex: 0, event: endEv });
   });
 
-  it('onStart and onEnd user callbacks fire on the right events', () => {
+  it('onStart and onEnd user callbacks fire on the right events', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }];
     const listEl = buildList(items);
     const startCalls: unknown[] = [];
@@ -654,8 +656,209 @@ describe('useSortableJS', () => {
       to: listEl,
     };
     rec.options.onEnd?.(endEv);
+    await flushMicrotasks();
 
-    expect(startCalls).toEqual([startEv]);
-    expect(endCalls).toEqual([endEv]);
+    expect(startCalls).toEqual([
+      { item: items[0], el: dragged, from: listEl, to: listEl, oldIndex: 0, newIndex: 0, event: startEv },
+    ]);
+    expect(endCalls).toEqual([
+      { item: items[0], el: dragged, from: listEl, to: listEl, oldIndex: 0, newIndex: 1, event: endEv },
+    ]);
+  });
+});
+
+describe('end: after the write, once per drag', () => {
+  it('end fires after onCommit and onChange', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const listEl = buildList(items);
+    const order: string[] = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => order.push('commit'),
+      onChange: () => order.push('change'),
+      onEnd: (info) => {
+        order.push('end');
+        ends.push(info);
+      },
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[0] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 0, oldDraggableIndex: 0, from: listEl, to: listEl });
+    listEl.appendChild(dragged);
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 0,
+      newIndex: 2,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      from: listEl,
+      to: listEl,
+    });
+    // Nothing reaches the consumer synchronously: `end` waits for the write.
+    expect(order).toEqual([]);
+    await flushMicrotasks();
+    expect(order).toEqual(['commit', 'change', 'end']);
+    expect(ends.length).toBe(1);
+    expect(ends[0]!.item?.id).toBe('a');
+    expect(ends[0]!.el).toBe(dragged);
+    expect(ends[0]!.oldIndex).toBe(0);
+    expect(ends[0]!.newIndex).toBe(2);
+  });
+
+  it('cross-list: end fires once, after both commits', async () => {
+    const srcItems: Item[] = [{ id: 'a' }, { id: 'b' }];
+    const dstItems: Item[] = [{ id: 'x' }, { id: 'y' }];
+    const srcEl = buildList(srcItems);
+    const dstEl = buildList(dstItems);
+    const order: string[] = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(srcEl, {
+      items: () => srcItems,
+      onCommit: () => order.push('src:commit'),
+      onChange: (c) => order.push('src:' + c.kind),
+      onEnd: (info) => {
+        order.push('src:end');
+        ends.push(info);
+      },
+    });
+    const src = getLastConstructed();
+    useSortableJS<Item>(dstEl, {
+      items: () => dstItems,
+      onCommit: () => order.push('dst:commit'),
+      onChange: (c) => order.push('dst:' + c.kind),
+      onEnd: (info) => {
+        order.push('dst:end');
+        ends.push(info);
+      },
+    });
+    const dst = getLastConstructed();
+    const dragged = srcEl.children[0] as HTMLElement;
+    src.options.onStart?.({ item: dragged, oldIndex: 0, oldDraggableIndex: 0, from: srcEl, to: srcEl });
+    dstEl.insertBefore(dragged, dstEl.children[1] ?? null);
+    const ev = {
+      item: dragged,
+      oldIndex: 0,
+      newIndex: 1,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 1,
+      from: srcEl,
+      to: dstEl,
+    };
+    // SortableJS order: the destination's onAdd, then the source's onEnd.
+    (dst.options as { onAdd?: (e: unknown) => void }).onAdd?.(ev);
+    src.options.onEnd?.(ev);
+    await flushMicrotasks();
+    expect(order).toEqual(['dst:commit', 'dst:add', 'src:commit', 'src:remove', 'src:end']);
+    expect(ends.length).toBe(1);
+    expect(ends[0]!.item?.id).toBe('a');
+    expect(ends[0]!.from).toBe(srcEl);
+    expect(ends[0]!.to).toBe(dstEl);
+    expect(ends[0]!.oldIndex).toBe(0);
+    expect(ends[0]!.newIndex).toBe(1);
+  });
+
+  it('drop in place writes nothing and emits no change', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const listEl = buildList(items);
+    const order: string[] = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => order.push('commit'),
+      onChange: () => order.push('change'),
+      onEnd: (info) => {
+        order.push('end');
+        ends.push(info);
+      },
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[1] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 1, oldDraggableIndex: 1, from: listEl, to: listEl });
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 1,
+      newIndex: 1,
+      oldDraggableIndex: 1,
+      newDraggableIndex: 1,
+      from: listEl,
+      to: listEl,
+    });
+    await flushMicrotasks();
+    expect(order).toEqual(['end']);
+    expect(ends[0]!.oldIndex).toBe(1);
+    expect(ends[0]!.newIndex).toBe(1);
+    expect(ends[0]!.item?.id).toBe('b');
+  });
+
+  it('foreign destination falls back to source end', async () => {
+    // The row went to a SortableJS list that is not one of ours: nothing
+    // emits `add`, and the source still ends the drag, once, after its write.
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }];
+    const listEl = buildList(items);
+    const foreign = buildList([]);
+    const order: string[] = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => order.push('commit'),
+      onChange: (c) => order.push(c.kind),
+      onEnd: (info) => {
+        order.push('end');
+        ends.push(info);
+      },
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[1] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 1, oldDraggableIndex: 1, from: listEl, to: listEl });
+    foreign.appendChild(dragged);
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 1,
+      newIndex: 0,
+      oldDraggableIndex: 1,
+      newDraggableIndex: 0,
+      from: listEl,
+      to: foreign,
+    });
+    await flushMicrotasks();
+    expect(order).toEqual(['commit', 'remove', 'end']);
+    expect(ends.length).toBe(1);
+    expect(ends[0]!.from).toBe(listEl);
+    expect(ends[0]!.to).toBe(foreign);
+    expect(ends[0]!.item?.id).toBe('b');
+  });
+
+  it('start and end indices are item-row indices (non-draggable header child)', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const listEl = buildList(items);
+    // A header element before the rows shifts SortableJS's plain indices by one.
+    listEl.insertBefore(document.createElement('slot'), listEl.firstChild);
+    const starts: Array<SortableDrag<Item>> = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => {},
+      onStart: (info) => starts.push(info),
+      onEnd: (info) => ends.push(info),
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[1] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 1, oldDraggableIndex: 0, from: listEl, to: listEl });
+    listEl.appendChild(dragged);
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 1,
+      newIndex: 3,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      from: listEl,
+      to: listEl,
+    });
+    await flushMicrotasks();
+    expect(starts[0]!.oldIndex).toBe(0);
+    expect(starts[0]!.item?.id).toBe('a');
+    expect(ends[0]!.oldIndex).toBe(0);
+    expect(ends[0]!.newIndex).toBe(2);
   });
 });

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { synthesizeDrag } from '../host/dragEvent';
+import { nativeDrag, synthesizeDrag } from '../host/dragEvent';
 
 // tests/visual-regression/package.json sets "type": "module".
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -140,6 +140,202 @@ for (const target of TARGETS) {
       expect(todoAfter.length + doingAfter.length).toBe(
         SEED_TODO_COUNT + SEED_DOING_COUNT,
       );
+    },
+  );
+}
+
+// ── Pointer `end`: once, after the write, from the list the row ends up in ──
+// (audit E1 / E2 / B2). Driven on the behavioural Zones and Clone demos, whose
+// event logs record every event as `{list}:{event}:{interaction}`.
+
+const LOG_LI = '[class*="event-log"] li';
+
+type Mount = ReturnType<import('@playwright/test').Page['getByTestId']>;
+
+function texts(locator: ReturnType<import('@playwright/test').Page['locator']>) {
+  return locator.evaluateAll((els) => els.map((el) => (el.textContent ?? '').trim()));
+}
+
+function zoneState(mount: Mount, slug: string) {
+  return texts(mount.locator(`[class*="state-${slug}"] li`));
+}
+
+/** Rendered row labels of the list named `name` (its own rows only). */
+function zoneRows(mount: Mount, name: string) {
+  return mount.locator(`[role="list"][aria-label="${name}"]`).evaluate((list) =>
+    Array.from(list.children)
+      .filter((row) => (row.getAttribute('class') ?? '').includes('rozie-sortable-item'))
+      .map((row) => ((row.querySelector('[class*="label"]') ?? row).textContent ?? '').trim()),
+  );
+}
+
+function zoneGrip(mount: Mount, label: string) {
+  return mount.getByRole('button', { name: 'Reorder ' + label, exact: true });
+}
+
+function zoneRow(mount: Mount, name: string, label: string) {
+  return mount
+    .locator(`[role="list"][aria-label="${name}"] > ${ITEM}`)
+    .filter({ hasText: label });
+}
+
+/** Every row exists exactly once, in state and in the rendered list. */
+async function expectZones(mount: Mount, want: Record<string, { name: string; labels: string[] }>) {
+  for (const [slug, { name, labels }] of Object.entries(want)) {
+    await expect.poll(async () => [...(await zoneState(mount, slug))].sort(), `${slug} state`).toEqual(
+      [...labels].sort(),
+    );
+    await expect.poll(async () => [...(await zoneRows(mount, name))].sort(), `${name} rows`).toEqual(
+      [...labels].sort(),
+    );
+  }
+}
+
+for (const target of TARGETS) {
+  const built = existsSync(
+    resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
+  );
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+
+  async function openZones(page: import('@playwright/test').Page) {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    page.on('console', (m) => {
+      if (m.type() === 'error') errors.push(m.text());
+    });
+    await page.goto(`/?example=SortableListZones&target=${target}`);
+    const mount = page.getByTestId('rozie-mount');
+    await expect(mount).toBeVisible();
+    await expect(zoneGrip(mount, 'Search')).toBeVisible();
+    return { mount, errors };
+  }
+
+  runner(
+    `sortable-drag-cross [${target}]: end fires from the destination, once`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await synthesizeDrag(page, {
+        sourceHandle: zoneGrip(mount, 'Search'),
+        target: zoneRow(mount, 'Bottom sidebar', 'Recent posts'),
+      });
+      await expectZones(mount, {
+        top: { name: 'Top sidebar', labels: ['Newsletter', 'Tag cloud'] },
+        bottom: { name: 'Bottom sidebar', labels: ['Recent posts', 'Search', 'Contact'] },
+      });
+      // Both lists wrote (`add` / `remove`) before `end`, and `end` came once,
+      // from the list the row ended up in.
+      await expect
+        .poll(() => texts(mount.locator(LOG_LI)))
+        .toEqual(['top:start:pointer', 'bottom:add:pointer', 'top:remove:pointer', 'bottom:end:pointer']);
+      await page.waitForTimeout(150);
+      expect((await texts(mount.locator(LOG_LI))).filter((e) => e.includes(':end:'))).toEqual([
+        'bottom:end:pointer',
+      ]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  runner(
+    `sortable-drag-cross [${target}]: nested pointer drop emits one end`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await synthesizeDrag(page, {
+        sourceHandle: zoneGrip(mount, 'Left card'),
+        target: zoneRow(mount, 'Grid column 2', 'Right card'),
+      });
+      await expectZones(mount, {
+        grid1: { name: 'Grid column 1', labels: [] },
+        grid2: { name: 'Grid column 2', labels: ['Right card', 'Left card'] },
+        content: { name: 'Content', labels: ['Hero banner', 'Intro text', 'Grid', 'Gallery'] },
+      });
+      await page.waitForTimeout(150);
+      // The grid columns' own events: one `end`, from the destination column.
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log.filter((e) => e.startsWith('grid1:') || e.startsWith('grid2:'))).toEqual([
+        'grid1:start:pointer',
+        'grid2:add:pointer',
+        'grid1:remove:pointer',
+        'grid2:end:pointer',
+      ]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // KNOWN GAP on Lit (emitter behaviour, not this component): the Lit emitter
+  // lowers every `$emit(name, x)` to
+  // `this.dispatchEvent(new CustomEvent(name, { detail: x, bubbles: true, composed: true }))`
+  // (packages/targets/lit/src/rewrite/rewriteScript.ts and
+  // rewriteTemplateExpression.ts), so an inner list's events bubble out of the
+  // inner host and an ancestor list's listeners on the same event name catch
+  // them. The other five targets deliver `$emit` to the direct consumer only.
+  // Fixing it belongs in the emitter; this stays fixme on Lit until then.
+  const nestedRunner = target === 'lit' ? test.fixme : runner;
+  nestedRunner(
+    `sortable-drag-cross [${target}]: nested pointer drop: the outer list emits nothing`,
+    async ({ page }) => {
+      const { mount } = await openZones(page);
+      await synthesizeDrag(page, {
+        sourceHandle: zoneGrip(mount, 'Left card'),
+        target: zoneRow(mount, 'Grid column 2', 'Right card'),
+      });
+      await expect.poll(() => zoneState(mount, 'grid2')).toContain('Left card');
+      await page.waitForTimeout(150);
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log.length).toBeGreaterThan(0);
+      expect(log.filter((e) => !e.startsWith('grid1:') && !e.startsWith('grid2:'))).toEqual([]);
+    },
+  );
+
+  runner(
+    `sortable-drag-cross [${target}]: clone twice with re-key in end`,
+    async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      page.on('console', (m) => {
+        if (m.type() === 'error' || /each_key_duplicate|duplicate key/i.test(m.text())) errors.push(m.text());
+      });
+      await page.goto(`/?example=SortableListClone&target=${target}`);
+      const mount = page.getByTestId('rozie-mount');
+      await expect(mount).toBeVisible();
+      const palette = mount.locator('[class*="palette-pane"]').locator(ITEM);
+      const canvasList = mount.locator('[class*="canvas-pane"] [role="list"]');
+      const canvas = canvasList.locator(`:scope > ${ITEM}`);
+      await expect(palette).toHaveCount(4);
+      await expect(canvas).toHaveCount(0);
+      const canvasIds = () => texts(mount.locator('[class*="state-canvas"] li'));
+      const rowKeys = () =>
+        canvas.evaluateAll((rows) => rows.map((r) => r.getAttribute('data-id') ?? ''));
+
+      // React drags with a real mouse: after a script-dispatched drop React
+      // renders the canvas write only after `end`, so the handler would read
+      // the previous render's canvas (see host/dragEvent.ts). A real drop
+      // renders first. The other targets read fresh state either way.
+      const drag = target === 'react' ? nativeDrag : synthesizeDrag;
+      // First copy onto the empty canvas, then a second copy of the same
+      // widget onto it.
+      await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
+      await expect(canvas).toHaveCount(1);
+      await expect.poll(canvasIds).toEqual(['button-1']);
+      await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvas.nth(0) });
+      await expect(canvas).toHaveCount(2);
+      await expect.poll(async () => [...(await canvasIds())].sort()).toEqual(['button-1', 'button-2']);
+      await expect.poll(async () => [...(await rowKeys())].sort()).toEqual(['button-1', 'button-2']);
+      await expect.poll(() => paneLabels(canvas)).toEqual(['Button', 'Button']);
+      // The palette never shrinks.
+      await expect(palette).toHaveCount(4);
+      expect(await paneLabels(palette)).toEqual(['Button', 'Input', 'Card', 'Heading']);
+      // Each drop: the canvas adds the copy, then ends the drag; the palette
+      // only starts it.
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log).toEqual([
+        'palette:start:pointer',
+        'canvas:add:pointer',
+        'canvas:end:pointer',
+        'palette:start:pointer',
+        'canvas:add:pointer',
+        'canvas:end:pointer',
+      ]);
+      expect(errors).toEqual([]);
     },
   );
 }

@@ -302,4 +302,90 @@ for (const target of TARGETS) {
       await assertInvariant(mount);
     },
   );
+
+  // The list has a `#header` and a `#footer` (on Lit both render `<slot>`
+  // children of the list element). Every payload's indices count item rows
+  // only, and pointer and keyboard payloads have the same shape.
+  const lastEnd = async (mount: ReturnType<Page['getByTestId']>) =>
+    JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null');
+
+  runner(`sortable-keyboard-keys [${target}]: indices ignore header and footer`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    await expect(mount.locator('[class*="list-header"]')).toHaveText('Fruit (5)');
+    await expect(mount.locator('[class*="list-footer"]')).toHaveText('End of list');
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(0).locator('[class*="label"]'),
+      target: items.nth(2),
+    });
+    await expectOrder(mount, items, ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry']);
+    await expect
+      .poll(() => texts(mount.locator(LOG_LI)))
+      .toEqual(['start:pointer', 'reorder:pointer', 'end:pointer']);
+    await expect.poll(() => lastEnd(mount)).toEqual({
+      item: 'Apple',
+      el: 'element',
+      from: 'Fruit',
+      to: 'Fruit',
+      oldIndex: 0,
+      newIndex: 2,
+      interaction: 'pointer',
+    });
+    await assertInvariant(mount);
+  });
+
+  runner(`sortable-keyboard-keys [${target}]: pointer drop in place writes nothing`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    // Released on its own row: `start` / `end` only, same index.
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(1).locator('[class*="label"]'),
+      target: items.nth(1),
+    });
+    await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:pointer', 'end:pointer']);
+    await expect.poll(() => lastEnd(mount)).toMatchObject({ item: 'Banana', oldIndex: 1, newIndex: 1 });
+    await expectOrder(mount, items, SEED);
+  });
+
+  runner(`sortable-keyboard-keys [${target}]: keyboard end payload matches pointer`, async ({ page }) => {
+    const { mount, items, aria } = await open(page);
+    await items.nth(0).focus();
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ArrowDown');
+    await expect(aria).toHaveText('Moved Apple to position 2');
+    await page.keyboard.press('ArrowDown');
+    await expect(aria).toHaveText('Moved Apple to position 3');
+    await page.keyboard.press('Space');
+    await expect(aria).toHaveText('Dropped Apple at position 3');
+    await expect.poll(() => lastEnd(mount)).toEqual({
+      item: 'Apple',
+      el: 'element',
+      from: 'Fruit',
+      to: 'Fruit',
+      oldIndex: 0,
+      newIndex: 2,
+      interaction: 'keyboard',
+    });
+    await assertInvariant(mount);
+  });
+
+  // A real user does not wait between presses.
+  runner(
+    `sortable-keyboard-keys [${target}]: keyboard end payload, back-to-back (no waits)`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(0).focus();
+      for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      await expect(aria).toHaveText('Dropped Apple at position 3');
+      await expectOrder(mount, items, ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry']);
+      await expect.poll(() => lastEnd(mount)).toEqual({
+        item: 'Apple',
+        el: 'element',
+        from: 'Fruit',
+        to: 'Fruit',
+        oldIndex: 0,
+        newIndex: 2,
+        interaction: 'keyboard',
+      });
+      await assertInvariant(mount);
+    },
+  );
 }

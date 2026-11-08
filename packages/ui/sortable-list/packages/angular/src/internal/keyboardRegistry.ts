@@ -6,6 +6,28 @@
  */
 
 export type Interaction = 'pointer' | 'keyboard';
+
+/**
+ * The one payload every `start` / `end` / `reorder` / `add` / `remove` event
+ * carries, for pointer and keyboard alike.
+ */
+export interface SortablePayload {
+  interaction: Interaction;
+  /** The item's data value (never an element). */
+  item: unknown;
+  /** The row element; null when there is none (a lost lift). */
+  el: HTMLElement | null;
+  /** The list element the row came from. */
+  from: HTMLElement;
+  /** The list element the row went to. */
+  to: HTMLElement;
+  /** Item-row index in `from`; -1 for `add`. */
+  oldIndex: number;
+  /** Item-row index in `to`; -1 for `remove` and a lost lift. */
+  newIndex: number;
+  /** Pointer only: the raw SortableJS event. */
+  originalEvent?: unknown;
+}
 export type GroupOption =
   | string
   | { name: string; pull?: unknown; put?: unknown }
@@ -38,13 +60,14 @@ export interface ListEntry {
    */
   focusNear(index: number): void;
   rowEl(index: number): HTMLElement | null;
-  emit(name: 'add' | 'remove' | 'reorder' | 'start' | 'end', payload: object): void;
+  emit(name: 'add' | 'remove' | 'reorder' | 'start' | 'end', payload: SortablePayload): void;
 }
 
 export interface Lift {
   holder: ListEntry;
   key: string;
-  data: unknown;
+  /** The lifted item's data value. */
+  item: unknown;
   copy: boolean;
   /** True once the row has hopped out of its origin list. */
   hopped: boolean;
@@ -62,6 +85,8 @@ export interface Lift {
 export interface KeyboardRegistry {
   register(entry: ListEntry): () => void;
   has(entry: ListEntry): boolean;
+  /** The registered entry whose list element is `el`, else null. */
+  entryFor(el: HTMLElement): ListEntry | null;
   lift: Lift | null;
   /** The list whose aria-live region spoke last (cleared when another speaks). */
   speaker: ListEntry | null;
@@ -223,6 +248,10 @@ function createState(): Singleton {
     has(entry) {
       return entries.has(entry);
     },
+    entryFor(el) {
+      for (const e of entries) if (e.el === el) return e;
+      return null;
+    },
     orderedLists() {
       return [...entries].sort((x, y) => composedCompare(x.el, y.el));
     },
@@ -258,11 +287,11 @@ function createState(): Singleton {
       if (i >= 0) {
         // Found by key: the consumer may have swapped in a new object with
         // the same key, so follow it.
-        l.data = items[i];
+        l.item = items[i];
       } else {
         // Not by key: the consumer may have re-keyed the lifted object
         // itself. Find it by reference and adopt its new key.
-        i = items.indexOf(l.data);
+        i = items.indexOf(l.item);
         if (i < 0) return -1;
         l.key = l.holder.keyOf(items[i], i);
       }

@@ -243,6 +243,11 @@ for (const target of TARGETS) {
         .toEqual(['Dropped Tag cloud in Content at position 1']);
       await expect(mount.locator(LIFTED)).toHaveCount(0);
       await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('content:end:keyboard');
+      // Keyboard `end` carries the same payload as pointer: the item value
+      // and its row element.
+      await expect
+        .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
+        .toEqual({ item: 'Tag cloud', el: 'element', interaction: 'keyboard' });
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Tag cloud');
       await assertNothingDisappeared(mount);
     },
@@ -515,7 +520,7 @@ for (const target of TARGETS) {
         .toEqual(['top:start:keyboard', 'top:end:keyboard']);
       await expect
         .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
-        .toEqual({ item: null, data: 'Newsletter', interaction: 'keyboard' });
+        .toEqual({ item: 'Newsletter', el: null, interaction: 'keyboard' });
       await assertNothingDisappeared(mount, ['New widget 1']);
       // No lift any more: Shift+↓ moves nothing.
       await page.keyboard.press('Shift+ArrowDown');
@@ -810,7 +815,7 @@ for (const target of TARGETS) {
         .toEqual(['content:end:keyboard']);
       await expect
         .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
-        .toEqual({ item: null, data: 'Newsletter', interaction: 'keyboard' });
+        .toEqual({ item: 'Newsletter', el: null, interaction: 'keyboard' });
       await assertNothingDisappeared(mount);
       // No lift any more: arrows move nothing.
       await page.keyboard.press('ArrowDown');

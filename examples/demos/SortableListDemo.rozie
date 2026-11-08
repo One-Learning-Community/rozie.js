@@ -32,6 +32,7 @@
   newLabel: '',
   disabled: false,
   nextId: 6,
+  endOrder: '',
 }
 </data>
 
@@ -56,6 +57,12 @@ const removeItem = (id) => {
   $data.items = $data.items.filter(i => i.id !== id)
 }
 
+// `end` fires after the bound array is written, so the order read here is the
+// new one (sortable-drag.spec.ts reads it from the hidden readout below).
+const onEnd = () => {
+  $data.endOrder = $data.items.map((i) => i.id).join(',')
+}
+
 const reset = () => {
   $data.items = INITIAL_DATA
 }
@@ -72,7 +79,7 @@ $onMount(() => reset());
 
   <div class="grid">
     <section class="list-pane">
-      <SortableList r-model:items="$data.items" itemKey="id" :handle="$classSelector('grip')" :disabled="$data.disabled">
+      <SortableList r-model:items="$data.items" itemKey="id" :handle="$classSelector('grip')" :disabled="$data.disabled" @end="onEnd">
         <template #default="{ item }">
           <div class="row">
             <span class="grip" aria-label="Drag handle">⋮⋮</span>
@@ -103,6 +110,7 @@ $onMount(() => reset());
         </li>
       </ol>
       <p r-else class="empty">Empty.</p>
+      <output hidden data-testid="end-order">{{ $data.endOrder }}</output>
     </aside>
   </div>
 </div>

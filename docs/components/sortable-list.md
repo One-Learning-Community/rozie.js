@@ -98,13 +98,37 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 
 | Event | Payload | Fires when |
 | --- | --- | --- |
-| `reorder` | `{ oldIndex, newIndex, item, interaction }` | Same-list reorder commit (each keyboard move, too) |
-| `add` | `{ newIndex, item, interaction }` | Cross-list destination commit (item arrives) |
-| `remove` | `{ oldIndex, item, interaction }` | Cross-list source commit (item leaves; NOT fired in clone mode) |
-| `start` | `SortableEvent` (pointer) / keyboard payload | Drag starts, or a row is lifted by keyboard |
-| `end` | `SortableEvent` (pointer) / keyboard payload | Drag ends (source side), or a keyboard lift is dropped or cancelled |
+| `reorder` | `SortablePayload` | Same-list reorder commit (each keyboard move, too). Not fired for a drop back in place. |
+| `add` | `SortablePayload` (`oldIndex: -1`) | Cross-list destination commit (item arrives) |
+| `remove` | `SortablePayload` (`newIndex: -1`) | Cross-list source commit (item leaves; not fired by a mouse clone drag) |
+| `start` | `SortablePayload` | A drag starts, or a row is lifted by keyboard. From the origin list. |
+| `end` | `SortablePayload` | A drag or keyboard lift ends. Once, from the list the row ends up in, after every list has written its items. |
 
-Every payload carries `interaction: 'pointer' | 'keyboard'`. Pointer `start` / `end` hand over SortableJS's own event object with `interaction` added to it. Keyboard `start` / `end` hand over `{ interaction: 'keyboard', item, data, from, to, oldIndex, newIndex }`, where `item` is the row element (as in SortableJS), `data` is the item value, and `from` / `to` are the list elements. Keyboard `start` fires once on lift; `end` fires once on drop or cancel, from the list the row ends up in. Hops between lists emit only `remove` (source) and `add` (destination). `end` also fires, with `item: null`, when a lift is lost because the consumer removed the lifted item from the bound array mid-lift.
+Every event, mouse or keyboard, carries the same payload:
+
+```ts
+interface SortablePayload {
+  interaction: 'pointer' | 'keyboard';
+  item: unknown;              // the item's data value (never an element)
+  el: HTMLElement | null;     // the row element; null when there is none
+  from: HTMLElement;          // the list element the row came from
+  to: HTMLElement;            // the list element the row went to
+  oldIndex: number;           // index in `from`; -1 for `add`
+  newIndex: number;           // index in `to`; -1 for `remove` and a lost lift
+  originalEvent?: unknown;    // mouse only: SortableJS's raw event
+}
+```
+
+Indices count item rows only: `#header` / `#footer` content (and, on Lit, their `<slot>` elements) never shifts them. `el` is the row element when it exists; after a move into another list it can be the element that was moved, which that list replaces with its own row when it re-renders.
+
+Order and source:
+
+- `start` fires from the origin list.
+- `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists emits `add` from the destination and then `remove` from the source.
+- `end` fires once per drag or lift, after those writes and events, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. So an `end` handler sees the new order in the bound array: `save(items)` works there, for mouse and keyboard alike.
+- A mouse drop back where the row started writes nothing and fires no `reorder`; `start` and `end` still fire, with `oldIndex === newIndex`.
+- Keyboard `start` fires once on lift and `end` once on drop or cancel. Each keyboard move emits its own `reorder` (within a list) or `remove` + `add` (a hop between lists).
+- When a lift is lost because the consumer took the lifted item out of the bound array mid-lift, `end` still fires, with `item` set to the lifted value and `el: null`.
 
 ### Slots
 
@@ -296,7 +320,7 @@ A `cloneable` palette resolves to `put: true`, so with keyboard hops it accepts 
 
 Announcements: `Moved {label} to {list}, position {n}`, `Dropped {label} in {list} at position {n}` (whenever the row hopped, even if it hopped back into its origin), and `Cancelled. {label} returned to {list}, position {n}` (`Cancelled. {label} returned to position {n}` when the row never left its list). If the origin list has gone, is hidden, or has its keyboard turned off, the cancel reads `Cancelled. {label} stays in {list}, position {n}` and the row stays where it is; if a clone copy is cancelled after its palette unmounted, `Cancelled. {label} removed from {list}`. `{list}` is `listLabel`, or else `list {i} of {n}`, counting the lists of the same group in hop order. Pass the zone's visible heading text as `listLabel` so spoken names match what sighted users see.
 
-With a clone palette, repeated deposits of the same palette item share that item's key. Give the copy a fresh id in the destination's `end` handler, after the drop. Don't do it in `add`: a keyboard hop fires `add` while the row is still lifted, and re-keying an item while it is lifted ends the lift. (Swapping the lifted item for a new object with the same key is fine, and so is changing its key in place on the same object; the lift follows it.) When a lift ends because the consumer changed its data, the list says `Lift ended`, fires `end` with `item: null`, and moves focus to the nearest row if focus was lost (or to the list itself if it has no rows left).
+With a clone palette, repeated deposits of the same palette item share that item's key. Give the copy a fresh id in the destination's `end` handler (see [Clone mode](#clone-mode)); that works for mouse and keyboard drops alike. Don't do it in `add`: a keyboard hop fires `add` while the row is still lifted, and re-keying an item while it is lifted ends the lift. (Swapping the lifted item for a new object with the same key is fine, and so is changing its key in place on the same object; the lift follows it.) When a lift ends because the consumer changed its data, the list says `Lift ended`, fires `end` with the lifted value as `item` and `el: null`, and moves focus to the nearest row if focus was lost (or to the list itself if it has no rows left).
 
 #### Instructions
 
@@ -353,17 +377,33 @@ A `cloneable: true` source list deposits a COPY of the dragged item onto the des
 <SortableList
   r-model:items="$data.canvas"
   group="palette-canvas"
+  @end="onCanvasEnd"
 >
   <template #default="{ item }">{{ item.label }}</template>
 </SortableList>
 ```
+
+Every copy of a palette item is the same value, so two drops of one widget would give the canvas two rows with one key. Give the copy a fresh id in the canvas's `end` handler. `end` fires from the list the row lands in, after both lists have written their arrays, for mouse and keyboard drops, so the copy is already in `$data.canvas`:
+
+```js
+const onCanvasEnd = (e) => {
+  if (e.from === e.to) return // a reorder within the canvas
+  const i = $data.canvas.indexOf(e.item)
+  if (i < 0) return
+  const next = [...$data.canvas]
+  next[i] = { ...e.item, id: e.item.id + '-' + $data.nextId++ }
+  $data.canvas = next
+}
+```
+
+Don't re-key in `add` (a keyboard hop fires `add` while the row is still lifted; see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)).
 
 Under the hood:
 
 1. `cloneable: true` + a string `group` lowers to SortableJS's `{ name: 'palette-canvas', pull: 'clone', put: true }` object form.
 2. The helper's `onClone` hook bridges the `__rozieItem` stash from the original DOM node to its clone so the destination's `onAdd` can recover the dragged item DATA.
 3. `handleCommit`'s source-side branch short-circuits on `e.pullMode === 'clone'` — no splice, no DOM-restore, no `remove` change. The palette's items array is unchanged.
-4. The destination's `onAdd` fires normally with `kind: 'add'` and the cloned item.
+4. The destination's `onAdd` fires normally with `kind: 'add'` and the cloned item, and the destination then emits `end`.
 
 The canonical example is [`SortableListCloneDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListCloneDemo.rozie).
 

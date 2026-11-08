@@ -433,8 +433,8 @@ const speak = (target: any, text: any) => {
 // The lifted item is no longer in the list holding it: the consumer changed
 // that list's items (or re-keyed the item), or the list is unmounting. End the
 // lift without writing anything (the item is wherever the consumer's data put
-// it). `end` still fires once, with `item: null` and `data` = the lifted value,
-// so keyboard `start` / `end` always pair. Lost to a consumer change (not an
+// it). `end` still fires once, with `item` = the lifted value and `el: null`
+// (there is no row), so keyboard `start` / `end` always pair. Lost to a consumer change (not an
 // unmount), the holder says `Lift ended` and, if focus fell to <body> with the
 // row, focuses its row nearest where the lifted row was.
 const loseLift = (unmounting = false) => {
@@ -449,31 +449,32 @@ const loseLift = (unmounting = false) => {
   }
   h.emit('end', {
     interaction: 'keyboard',
-    item: null,
-    data: lift.data,
+    item: lift.item,
+    el: null,
     from: lift.origin.list.el,
     to: h.el,
     oldIndex: lift.origin.index,
     newIndex: -1
   });
 };
-// Keyboard `start` / `end` payload, shaped like SortableJS's pointer event:
-// `item` is the row element, `data` the item value. `start` fires from the
-// origin list (`from`), `end` from the list the row ends up in (`to`). Reads
-// the lift, so call it while `registry.lift` is still set.
-const keyboardStartEnd = (name: any, from: any, to: any, oldIndex: any, newIndex: any) => {
-  const lift = registry.lift;
+// Keyboard `start` / `end` (the same payload as every other event): `item` is
+// the item value, `el` its row element. `start` fires from the origin list
+// (`from`), `end` from the list the row ends up in (`to`). `el` is the row in
+// that list when it is rendered, else `fallbackEl` (the row element the move
+// started from, before a target re-rendered). `end` is emitted after
+// `registry.lift` is cleared, so a consumer `end` handler that writes the
+// items (re-keying a clone copy) is not mistaken for a lost lift.
+const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl = null) => {
   const host = name === 'start' ? from : to;
-  const payload = {
+  host.emit(name, {
     interaction: 'keyboard',
-    item: lift ? rowByKey(host.el, lift.key) : null,
-    data: lift ? lift.data : null,
+    item: lift ? lift.item : null,
+    el: (lift ? rowByKey(host.el, lift.key) : null) ?? fallbackEl,
     from: from.el,
     to: to.el,
     oldIndex,
     newIndex
-  };
-  host.emit(name, payload);
+  });
 };
 // Move the lifted row to `toIndex` (clamped) within the list holding it.
 // Works through the registry entry, so it acts on the current holder.
@@ -489,6 +490,8 @@ const moveLiftTo = (toIndex: any) => {
   const items = h.items();
   const to = Math.max(0, Math.min(items.length - 1, toIndex));
   if (to === from) return;
+  // The moved row's element, read before the write (an index key changes).
+  const el = h.rowEl(from);
   const next = [...items];
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
@@ -505,10 +508,13 @@ const moveLiftTo = (toIndex: any) => {
   speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
   h.emit('reorder', {
-    oldIndex: from,
-    newIndex: to,
+    interaction: 'keyboard',
     item: moved,
-    interaction: 'keyboard'
+    el,
+    from: h.el,
+    to: h.el,
+    oldIndex: from,
+    newIndex: to
   });
 };
 // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
@@ -527,10 +533,11 @@ const hop = (dir: any) => {
   }
   const fromItems = from.items();
   const data = fromItems[i];
+  const el = from.rowEl(i);
   // Keep the lifted row element current: lists nested inside it (a grid
   // widget's columns) are never hop targets. Before a target re-renders the
   // row may not exist yet, so keep the last known element then.
-  lift.liftedRowEl = from.rowEl(i) ?? lift.liftedRowEl;
+  lift.liftedRowEl = el ?? lift.liftedRowEl;
   const to = registry.findHopTarget(from, dir);
   if (to == null) {
     speak(from, (dir === 1 ? 'No list after ' : 'No list before ') + registry.listName(from));
@@ -547,15 +554,19 @@ const hop = (dir: any) => {
     lift.holder = to;
     lift.copy = false;
     lift.key = to.keyOf(toItems[home], home);
-    lift.data = toItems[home];
+    lift.item = toItems[home];
     lift.index = home;
     const rest = [...fromItems];
     rest.splice(i, 1);
     from.write(rest);
     from.emit('remove', {
-      oldIndex: i,
+      interaction: 'keyboard',
       item: data,
-      interaction: 'keyboard'
+      el,
+      from: from.el,
+      to: to.el,
+      oldIndex: i,
+      newIndex: -1
     });
     from.setLifted(null);
     to.setLifted(home);
@@ -581,18 +592,28 @@ const hop = (dir: any) => {
     rest.splice(i, 1);
     from.write(rest);
     from.emit('remove', {
-      oldIndex: i,
+      interaction: 'keyboard',
       item: data,
-      interaction: 'keyboard'
+      el,
+      from: from.el,
+      to: to.el,
+      oldIndex: i,
+      newIndex: -1
     });
   }
   const next = [...toItems];
   next.splice(at, 0, data);
   to.write(next);
+  // The destination has not rendered its new row yet: `el` is the row the
+  // move started from.
   to.emit('add', {
-    newIndex: at,
+    interaction: 'keyboard',
     item: data,
-    interaction: 'keyboard'
+    el,
+    from: from.el,
+    to: to.el,
+    oldIndex: -1,
+    newIndex: at
   });
   from.setLifted(null);
   to.setLifted(at);
@@ -615,13 +636,15 @@ const endLift = (kind: any) => {
   }
   const items = h.items();
   const item = items[at];
+  // The lifted row's element, read before any write below.
+  const el = h.rowEl(at);
   const name = (e: any) => registry.listName(e);
   if (kind === 'drop') {
     // A row that hopped always names its list, even back in its origin.
     speak(h, !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
     h.setLifted(null);
-    keyboardStartEnd('end', origin.list, h, origin.index, at);
     registry.lift = null;
+    keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
     return;
   }
   if (h !== origin.list && !registry.has(origin.list) && lift.copy) {
@@ -632,9 +655,13 @@ const endLift = (kind: any) => {
     rest.splice(at, 1);
     h.write(rest);
     h.emit('remove', {
-      oldIndex: at,
+      interaction: 'keyboard',
       item,
-      interaction: 'keyboard'
+      el,
+      from: h.el,
+      to: h.el,
+      oldIndex: at,
+      newIndex: -1
     });
     h.setLifted(null);
     speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' removed from ' + name(h));
@@ -642,16 +669,17 @@ const endLift = (kind: any) => {
       const k = Math.min(at, rest.length - 1);
       h.focusRow(rest[k], k);
     }
+    // The copy is gone, so there is no row: `el: null`.
+    registry.lift = null;
     h.emit('end', {
       interaction: 'keyboard',
-      item: null,
-      data: item,
+      item,
+      el: null,
       from: origin.list.el,
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
     });
-    registry.lift = null;
     return;
   }
   if (h !== origin.list && (!registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -660,8 +688,8 @@ const endLift = (kind: any) => {
     // stays where it is (the lift ends as a drop at its position).
     speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
     h.setLifted(null);
-    keyboardStartEnd('end', origin.list, h, origin.index, at);
     registry.lift = null;
+    keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
     return;
   }
   if (h === origin.list) {
@@ -674,16 +702,19 @@ const endLift = (kind: any) => {
       h.write(next);
       h.focusRow(item, to);
       h.emit('reorder', {
-        oldIndex: at,
-        newIndex: to,
+        interaction: 'keyboard',
         item,
-        interaction: 'keyboard'
+        el,
+        from: h.el,
+        to: h.el,
+        oldIndex: at,
+        newIndex: to
       });
     }
     speak(h, lift.hopped ? 'Cancelled. ' + h.labelOf(item, to) + ' returned to ' + name(h) + ', position ' + (to + 1) : 'Cancelled. ' + h.labelOf(item, to) + ' returned to position ' + (to + 1));
     h.setLifted(null);
-    keyboardStartEnd('end', origin.list, h, origin.index, to);
     registry.lift = null;
+    keyboardStartEnd('end', lift, origin.list, h, origin.index, to, el);
     return;
   }
   // Reverse hand-off from the current holder back to the origin list.
@@ -704,25 +735,33 @@ const endLift = (kind: any) => {
   rest.splice(at, 1);
   h.write(rest);
   h.emit('remove', {
-    oldIndex: at,
+    interaction: 'keyboard',
     item,
-    interaction: 'keyboard'
+    el,
+    from: h.el,
+    to: home.el,
+    oldIndex: at,
+    newIndex: -1
   });
   if (!lift.copy) {
     const next = [...homeItems];
     next.splice(back, 0, item);
     home.write(next);
     home.emit('add', {
-      newIndex: back,
+      interaction: 'keyboard',
       item,
-      interaction: 'keyboard'
+      el,
+      from: h.el,
+      to: home.el,
+      oldIndex: -1,
+      newIndex: back
     });
   }
   h.setLifted(null);
   speak(home, 'Cancelled. ' + home.labelOf(item, back) + ' returned to ' + name(home) + ', position ' + (back + 1));
   home.focusRow(lift.copy ? homeItems[back] : item, back);
-  keyboardStartEnd('end', home, home, origin.index, back);
   registry.lift = null;
+  keyboardStartEnd('end', lift, home, home, origin.index, back, lift.copy ? home.rowEl(back) : el);
 };
 // Lift the row at `index` of this list.
 const startLift = (index: any) => {
@@ -731,7 +770,7 @@ const startLift = (index: any) => {
   registry.lift = {
     holder: entry,
     key: entry.keyOf(item, index),
-    data: item,
+    item,
     copy: false,
     hopped: false,
     origin: {
@@ -743,7 +782,7 @@ const startLift = (index: any) => {
   };
   liftedIndex.value = index;
   speak(entry, 'Lifted ' + labelOf(item, index));
-  keyboardStartEnd('start', entry, entry, index, index);
+  keyboardStartEnd('start', registry.lift, entry, entry, index, index);
 };
 const onRowKeyDown = ($event: any, index: any) => {
   // Origin guard — must run FIRST, before the keyboardEnabled() check.
@@ -845,12 +884,12 @@ const onStrayKey = (ev: any) => {
   if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.altKey) return;
   const t = ev.target;
   if (t !== document.body && t !== document.documentElement) return;
-  const data = lift.data;
+  const item = lift.item;
   const at = registry.indexOfLift();
   if (!holderKey(ev.key, !!ev.shiftKey)) return;
   ev.preventDefault();
   const now = registry.lift;
-  if (now != null) now.holder.focusRow(now.data, registry.indexOfLift());else if (at >= 0) entry.focusRow(data, at);
+  if (now != null) now.holder.focusRow(now.item, registry.indexOfLift());else if (at >= 0) entry.focusRow(item, at);
 };
 
 // SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).
@@ -917,36 +956,53 @@ onMounted(() => {
     // that cache. The sigil lowers to `__rozieReconcileAfterDomMutation(this)`
     // on Lit (real call) and `void 0` on the other 5 targets (no-op).
     afterCommit: () => void 0,
-    onChange: ({
-      kind,
-      oldIndex,
-      newIndex,
-      item
-    }: any) => {
-      if (kind === 'reorder') emit('reorder', {
-        oldIndex,
-        newIndex,
-        item,
-        interaction: 'pointer'
-      });else if (kind === 'add') emit('add', {
-        newIndex,
-        item,
-        interaction: 'pointer'
-      });else if (kind === 'remove') emit('remove', {
-        oldIndex,
-        item,
-        interaction: 'pointer'
-      });
+    // Every pointer event carries the same payload as the keyboard ones, with
+    // item-row indices and the raw SortableJS event as `originalEvent`.
+    onChange: (c: any) => {
+      const payload = {
+        interaction: 'pointer',
+        item: c.item,
+        el: c.el,
+        from: c.from,
+        to: c.to,
+        oldIndex: c.oldIndex,
+        newIndex: c.newIndex,
+        originalEvent: c.event
+      };
+      if (c.kind === 'reorder') emit('reorder', payload);else if (c.kind === 'add') emit('add', payload);else if (c.kind === 'remove') emit('remove', payload);
     },
-    onStart: (e: any) => {
+    onStart: (d: any) => {
       // A pointer drag ends any active keyboard lift first.
       if (registry.lift != null) endLift('drop');
-      (e as any).interaction = 'pointer';
-      emit('start', e);
+      emit('start', {
+        interaction: 'pointer',
+        item: d.item,
+        el: d.el,
+        from: d.from,
+        to: d.to,
+        oldIndex: d.oldIndex,
+        newIndex: d.newIndex,
+        originalEvent: d.event
+      });
     },
-    onEnd: (e: any) => {
-      (e as any).interaction = 'pointer';
-      emit('end', e);
+    // Runs once per drag, after every list involved has written its items.
+    // `end` comes from the list the row ended up in: the destination when it
+    // is a SortableList, else (dropped outside, or into a SortableJS list
+    // that isn't one of ours) this source list.
+    onEnd: (d: any) => {
+      const dest = registry.entryFor(d.to) ?? entry;
+      if (dest == null) return;
+      const row = d.item === undefined ? null : rowByKey(d.to, dest.keyOf(d.item, d.newIndex));
+      dest.emit('end', {
+        interaction: 'pointer',
+        item: d.item,
+        el: row ?? d.el,
+        from: d.from,
+        to: d.to,
+        oldIndex: d.oldIndex,
+        newIndex: d.newIndex,
+        originalEvent: d.event
+      });
     }
   });
   instance = sortable.instance;

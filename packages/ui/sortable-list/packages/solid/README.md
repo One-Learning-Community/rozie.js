@@ -68,8 +68,8 @@ export function Demo() {
 | `reorder` | Fired after the list order changes (same-list reorder commit). |
 | `add` | Fired when an item is added from another list (cross-list destination commit). |
 | `remove` | Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode). |
-| `start` | Fired when dragging starts. |
-| `end` | Fired when dragging ends (source side). |
+| `start` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
+| `end` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
 
 ## Imperative handle
 

@@ -11,6 +11,13 @@
     - Canvas  → group is the plain string `'palette-canvas'` (no clone)
     - Both share the group name so cross-list drag works in both directions
 
+  Every drop gives the copy a fresh id in the canvas's `end` handler (the
+  documented clone recipe): `end` fires from the list the row ends up in,
+  after both lists wrote their items, for mouse and keyboard alike. Without
+  it, two drops of the same widget would put two rows with one key on the
+  canvas. A hidden `<ol class="event-log">` records every event as
+  `{palette|canvas}:{event}:{interaction}`.
+
   Helper machinery (in ./internal/useSortableJS, colocated in the
   @rozie-ui/sortable-list package):
     - onClone bridges `__rozieItem` from original DOM node → cloned node
@@ -34,6 +41,7 @@
   palette: [],
   canvas: [],
   nextDropId: 1,
+  log: [],
 }
 </data>
 
@@ -51,6 +59,33 @@ const seedPalette = () => {
   // Deep-clone so reseeding restores the original templates even after
   // SortableJS's clone-mode `e.item` properties have been written to.
   $data.palette = PALETTE_TEMPLATES.map((t) => ({ ...t }))
+}
+
+const TEMPLATE_IDS = PALETTE_TEMPLATES.map((t) => t.id)
+
+// Lit delivers a child $emit as a CustomEvent with the payload in `detail`;
+// the other targets hand over the payload itself.
+const payloadOf = (e) => {
+  if (e != null && e.interaction == null && e.detail != null && e.detail.interaction != null) return e.detail
+  return e
+}
+
+const record = (slug, name, e) => {
+  const p = payloadOf(e)
+  $data.log = [...$data.log, slug + ':' + name + ':' + (p != null && p.interaction != null ? p.interaction : '?')]
+}
+
+// The canvas's `end`: a copy that just arrived from the palette still has
+// its template id; give it a fresh one so every canvas row has its own key.
+const onCanvasEnd = (e) => {
+  record('canvas', 'end', e)
+  const i = $data.canvas.findIndex((w) => TEMPLATE_IDS.includes(w.id))
+  if (i < 0) return
+  const n = $data.nextDropId
+  $data.nextDropId = n + 1
+  const next = [...$data.canvas]
+  next[i] = { ...next[i], id: next[i].id + '-' + n }
+  $data.canvas = next
 }
 
 const clearCanvas = () => {
@@ -76,6 +111,11 @@ $onMount(() => seedPalette());
         group="palette-canvas"
         :cloneable="true"
         :handle="$classSelector('grip')"
+        @start="record('palette', 'start', $event)"
+        @reorder="record('palette', 'reorder', $event)"
+        @end="record('palette', 'end', $event)"
+        @add="record('palette', 'add', $event)"
+        @remove="record('palette', 'remove', $event)"
       >
         <template #default="{ item }">
           <div class="row palette-row">
@@ -98,6 +138,11 @@ $onMount(() => seedPalette());
         itemKey="id"
         group="palette-canvas"
         :handle="$classSelector('grip')"
+        @start="record('canvas', 'start', $event)"
+        @reorder="record('canvas', 'reorder', $event)"
+        @end="onCanvasEnd($event)"
+        @add="record('canvas', 'add', $event)"
+        @remove="record('canvas', 'remove', $event)"
       >
         <template #default="{ item }">
           <div class="row canvas-row">
@@ -108,8 +153,14 @@ $onMount(() => seedPalette());
         </template>
       </SortableList>
       <p r-if="$data.canvas.length === 0" class="empty">Drop widgets here.</p>
+      <ol hidden class="state-list state-canvas">
+        <li r-for="w in $data.canvas" :key="w.id">{{ w.id }}</li>
+      </ol>
     </section>
   </div>
+  <ol hidden class="event-log">
+    <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
+  </ol>
 </div>
 </template>
 
