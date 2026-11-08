@@ -137,9 +137,9 @@ for (const target of TARGETS) {
       // completes (and the moved row's tabindex/role re-applies on the
       // DOM that was either reused (track) or re-created (other engines)).
       await page.keyboard.press('ArrowDown');
-      await expect(mount.locator(ARIA_LIVE)).toContainText(/moved/i);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 2`);
       await page.keyboard.press('ArrowDown');
-      await expect(mount.locator(ARIA_LIVE)).toContainText(/position 3/i);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 3`);
 
       // Space DROPS the lift (committing the move).
       await page.keyboard.press('Space');

@@ -407,20 +407,27 @@ const isHandleKeyOrigin = ($event) => {
 
 // Handle mode: put focus back on the MOVED row's handle after a reorder write.
 // Looks the row up by KEY (data-id), not by index, so it finds the moved row
-// whether this microtask runs before the framework commit (Angular's zone CD
-// runs after microtasks drain and keeps the same row element) or after it
-// (Svelte/Solid/Lit re-create the DOM) — and it is correct for index-keyed
-// primitive lists too. Direct children of the list container only: that skips
-// nested-list rows and the header/footer slot content. Same queueMicrotask
-// timing as the svelte/solid/lit $restoreFocus lowering, with no per-target
-// branching (the handle selector is a prop, and $restoreFocus takes a string
-// literal only). $refs read here is safe: this runs from an event handler.
+// whether this runs before the framework commit (the row element is the same
+// one) or after it (Svelte/Solid/Lit re-create the DOM) — and it is correct for
+// index-keyed primitive lists too. Direct children of the list container only:
+// that skips nested-list rows and the header/footer slot content.
+//
+// Two passes. (1) A microtask — the same timing as the svelte/solid/lit
+// $restoreFocus lowering — covers targets that commit synchronously. (2) A
+// timer + rAF "heal" pass covers targets whose DOM commit is scheduled AFTER the
+// key handler returns (Angular): the commit can MOVE the focused row, and moving
+// a focused node blurs it, so a rapid Space/Arrow/Arrow/Space burst would
+// otherwise end with focus on <body>. The heal pass never steals: it acts only
+// when focus has been lost to <body>. No per-target branching (the handle
+// selector is a prop, and $restoreFocus takes a string literal only). The $refs
+// read happens here, synchronously, inside an event handler — which is safe.
 const refocusHandle = (item, idx) => {
   const listEl = $refs.listEl
   const sel = $props.handle
   const key = String(keyFor(item, idx))
-  queueMicrotask(() => {
+  const focusIt = (onlyIfLost) => {
     if (!listEl || sel == null) return
+    if (onlyIfLost && document.activeElement && document.activeElement !== document.body) return
     for (const row of Array.from(listEl.children) as any[]) {
       if (row.getAttribute('data-id') === key) {
         const h = row.querySelector(sel)
@@ -428,7 +435,10 @@ const refocusHandle = (item, idx) => {
         return
       }
     }
-  })
+  }
+  queueMicrotask(() => focusIt(false))
+  setTimeout(() => focusIt(true), 0)
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusIt(true))
 }
 
 const onRowKeyDown = ($event, index) => {
