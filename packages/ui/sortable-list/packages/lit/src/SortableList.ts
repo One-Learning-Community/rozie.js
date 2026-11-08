@@ -5,7 +5,7 @@ import { RozieSlotDistributor, __rozieReconcileAfterDomMutation, createLitContro
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, nextInstructionsId } from './internal/keyboardRegistry';
+import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId } from './internal/keyboardRegistry';
 
 interface RozieDefaultSlotCtx {
   item: any;
@@ -128,7 +128,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'list-label' }) listLabel: string | null = null;
   /**
-   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container.
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`).
    */
   @property({ type: String, reflect: true }) orientation: string = 'vertical';
   /**
@@ -136,7 +136,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true, attribute: 'page-step' }) pageStep: number = 5;
   /**
-   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." (with `orientation: 'horizontal'`, "Use the left and right arrow keys to move"). When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
    */
   @property({ type: String, reflect: true, attribute: 'keyboard-instructions' }) keyboardInstructions: string | null = null;
   /**
@@ -227,7 +227,7 @@ private __rozieFirstUpdateDone = false;
       this.instance?.destroy();
       // Unmounting while holding a keyboard lift ends it (with its `end` event,
       // which some targets may no longer deliver during unmount).
-      if (this.registry.lift != null && this.registry.lift.holder === this.entry) this.loseLift();
+      if (this.registry.lift != null && this.registry.lift.holder === this.entry) this.loseLift(true);
       this.unregisterEntry?.();
       this.unregisterEntry = null;
       this.unhookNativeEvents?.();
@@ -238,7 +238,9 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.items)(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
       const lift = this.registry.lift;
-      if (lift != null && lift.holder === this.entry && this.registry.indexOfLift() < 0) this.loseLift();
+      if (lift == null || lift.holder !== this.entry) return;
+      const i = this.registry.indexOfLift();
+      if (i < 0) this.loseLift();else this.focusNearRow(i, lift.key);
     })(); }); }));
 
     this.warnIfHandleMissing();
@@ -337,7 +339,8 @@ private __rozieFirstUpdateDone = false;
       instructionsId: this.instructionsId,
       group: () => this.effectiveGroup(),
       label: () => this.listLabel,
-      keyboardEnabled: () => this.keyboardEnabled(),
+      // A handle-mode list without a handle selector has its keyboard off.
+      keyboardEnabled: () => this.keyboardEnabled() && !(this.handleMode() && this.handle == null),
       items: () => this.items,
       keyOf: (item: any, i: any) => String(this.keyFor(item, i)),
       labelOf: (item: any, i: any) => String(this.labelOf(item, i)),
@@ -352,6 +355,7 @@ private __rozieFirstUpdateDone = false;
         this._ariaLiveText.value = text;
       },
       focusRow: (item: any, i: any) => this.refocusRow(item, i),
+      focusNear: (i: any) => this.focusNearRow(i),
       rowEl: (i: any) => {
         const list = this.items;
         if (i < 0 || i >= list.length) return null;
@@ -436,7 +440,7 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-0af24eae>
-  <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" role="list" aria-label=${rozieAttr(this.listLabel)} aria-orientation=${rozieAttr(this.orientation === 'horizontal' ? 'horizontal' : 'vertical')} data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
+  <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" role="list" aria-label=${rozieAttr(this.listLabel)} data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
     <slot name="header"></slot>
     ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this.instructionsId : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index, instructionsId: this.instructionsId}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index, instructionsId: this.instructionsId}); } catch { return '{}'; } })()}></slot>`}
@@ -486,13 +490,15 @@ private __rozieFirstUpdateDone = false;
   // render.
   instructionsId = nextInstructionsId();
 
-  DEFAULT_INSTRUCTIONS = 'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.';
-
+  // role="list" takes no aria-orientation, so a horizontal list says which
+  // arrow keys move in its instructions instead.
   GROUP_INSTRUCTIONS = ' Hold Shift with an arrow key to move to another list.';
 
   instructionsText = () => {
   if (this.keyboardInstructions != null) return this.keyboardInstructions;
-  return this.group != null ? this.DEFAULT_INSTRUCTIONS + this.GROUP_INSTRUCTIONS : this.DEFAULT_INSTRUCTIONS;
+  const arrows = this.orientation === 'horizontal' ? 'Use the left and right arrow keys to move' : 'Use the arrow keys to move';
+  const text = 'Press Space or Enter to pick up. ' + arrows + ', Home and End to jump, and Escape to cancel.';
+  return this.group != null ? text + this.GROUP_INSTRUCTIONS : text;
 };
 
   // Instance-scoped synthetic-id store for id-less object items. Keyed by object
@@ -707,6 +713,31 @@ private __rozieFirstUpdateDone = false;
   return null;
 };
 
+  // After the consumer changed the items of the list holding a lift, put focus
+  // on the row (or its handle) whose key is `key`, else the row nearest `index`
+  // — but only once focus has fallen to <body> (the focused row's element went
+  // away: the lift was lost, or a framework that keys rows by object identity
+  // re-created the lifted row). Never steals focus from anywhere else. Same
+  // three passes as refocusRow, for targets that commit late.
+  focusNearRow = (index: number, key: string | null = null) => {
+  const listEl = this._refListEl;
+  const sel = this.handle;
+  const useHandle = this.handleMode();
+  const focusIt = () => {
+    if (!listEl) return;
+    if (useHandle && sel == null) return;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const rows = Array.from(listEl.children).filter((r: any) => r.hasAttribute('data-id') && r.classList.contains('rozie-sortable-item')) as any[];
+    if (rows.length === 0) return;
+    const row = rows.find((r: any) => key != null && r.getAttribute('data-id') === key) ?? rows[Math.max(0, Math.min(rows.length - 1, index))];
+    const target = useHandle ? row.querySelector(sel) : row;
+    if (target && typeof target.focus === 'function') target.focus();
+  };
+  queueMicrotask(focusIt);
+  setTimeout(focusIt, 0);
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusIt);
+};
+
   // Speak `text` from `target`'s aria-live region. The region that spoke last
   // is cleared when it belongs to another list, so a message is heard once, from
   // the list the row is in now, and never from a list that just lost it.
@@ -718,16 +749,22 @@ private __rozieFirstUpdateDone = false;
 };
 
   // The lifted item is no longer in the list holding it: the consumer changed
-  // that list's items, or the list is unmounting. End the lift without writing
-  // anything (the item is wherever the consumer's data put it). `end` still
-  // fires once, with `item: null` and `data` = the lifted value, so keyboard
-  // `start` / `end` always pair.
-  loseLift = () => {
+  // that list's items (or re-keyed the item), or the list is unmounting. End the
+  // lift without writing anything (the item is wherever the consumer's data put
+  // it). `end` still fires once, with `item: null` and `data` = the lifted value,
+  // so keyboard `start` / `end` always pair. Lost to a consumer change (not an
+  // unmount), the holder says `Lift ended` and, if focus fell to <body> with the
+  // row, focuses its row nearest where the lifted row was.
+  loseLift = (unmounting = false) => {
   const lift = this.registry.lift;
   if (!lift) return;
   const h = lift.holder;
   this.registry.lift = null;
   h.setLifted(null);
+  if (!unmounting) {
+    this.speak(h, 'Lift ended');
+    h.focusNear(lift.index ?? lift.origin.index);
+  }
   h.emit('end', {
     interaction: 'keyboard',
     item: null,
@@ -779,6 +816,7 @@ private __rozieFirstUpdateDone = false;
   // Update the lift BEFORE writing: a target whose watchers run synchronously
   // on the write must already see where the row is going.
   lift.key = h.keyOf(moved, to);
+  lift.index = to;
   h.write(next);
   h.setLifted(to);
   // Name the row that MOVED from the local `moved` item: on React/Vue/Lit the
@@ -830,6 +868,8 @@ private __rozieFirstUpdateDone = false;
     lift.holder = to;
     lift.copy = false;
     lift.key = to.keyOf(toItems[home], home);
+    lift.data = toItems[home];
+    lift.index = home;
     const rest = [...fromItems];
     rest.splice(i, 1);
     from.write(rest);
@@ -853,6 +893,7 @@ private __rozieFirstUpdateDone = false;
   // synchronously on a write already sees the new holder.
   lift.holder = to;
   lift.key = to.keyOf(data, at);
+  lift.index = at;
   lift.hopped = true;
   if (cloneOut) {
     lift.copy = true;
@@ -898,7 +939,8 @@ private __rozieFirstUpdateDone = false;
   const item = items[at];
   const name = (e: any) => this.registry.listName(e);
   if (kind === 'drop') {
-    this.speak(h, h === origin.list ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
+    // A row that hopped always names its list, even back in its origin.
+    this.speak(h, !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
     h.setLifted(null);
     this.keyboardStartEnd('end', origin.list, h, origin.index, at);
     this.registry.lift = null;
@@ -934,9 +976,10 @@ private __rozieFirstUpdateDone = false;
     this.registry.lift = null;
     return;
   }
-  if (h !== origin.list && !this.registry.has(origin.list)) {
-    // The origin list has unmounted: there is nowhere to return to, so the
-    // row stays where it is (the lift ends as a drop at its position).
+  if (h !== origin.list && (!this.registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
+    // The origin list has unmounted, is hidden, or has its keyboard off:
+    // there is nowhere to return to (focus would be stranded), so the row
+    // stays where it is (the lift ends as a drop at its position).
     this.speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
     h.setLifted(null);
     this.keyboardStartEnd('end', origin.list, h, origin.index, at);
@@ -1018,7 +1061,8 @@ private __rozieFirstUpdateDone = false;
       list: this.entry,
       index
     },
-    liftedRowEl: this.entry.rowEl(index)
+    liftedRowEl: this.entry.rowEl(index),
+    index
   };
   this._liftedIndex.value = index;
   this.speak(this.entry, 'Lifted ' + this.labelOf(item, index));
@@ -1045,20 +1089,23 @@ private __rozieFirstUpdateDone = false;
   // tabindex and can't receive focus, but a consumer-focused row (or a
   // programmatic .focus()) must still no-op here rather than reorder.
   if (!this.keyboardEnabled()) return;
-  // While a lift exists, every reorder key in ANY list acts on the list that
-  // holds it. That covers a key landing on the old row before the frameworks
-  // re-render after a hop, and Space/Enter in another list (it drops the
-  // active lift rather than starting a second one).
-  //
-  // Only lists of the holder's group take part: an unrelated list (another
-  // group, or none) keeps single-list behaviour — Space/Enter there drops
-  // the foreign lift and lifts its own row, other keys do nothing.
+  // While a lift exists, reorder keys in the list holding it act on it. A key
+  // from ANOTHER list of the holder's group is routed to the holder only when
+  // it comes from the lifted row itself (its old row, still there before the
+  // frameworks re-render after a hop) or while a refocus after a move is
+  // outstanding (a fast burst). Any other row — and every row of an unrelated
+  // list (another group, or none) — keeps single-list behaviour: Space/Enter
+  // there drops the foreign lift and lifts its own row, other keys do nothing.
   const lift = this.registry.lift;
   const key = $event.key;
-  const mine = this.groupNameOf(this.effectiveGroup());
-  if (lift != null && (lift.holder === this.entry || mine != null && mine === this.groupNameOf(lift.holder.group()))) {
-    if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
-    return;
+  if (lift != null) {
+    const mine = this.groupNameOf(this.effectiveGroup());
+    const sameGroup = mine != null && mine === this.groupNameOf(lift.holder.group());
+    const fromLiftedRow = String(this.keyFor(this.items[index], index)) === lift.key;
+    if (lift.holder === this.entry || sameGroup && (fromLiftedRow || lift.focusPending === true)) {
+      if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
+      return;
+    }
   }
   // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift.
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {

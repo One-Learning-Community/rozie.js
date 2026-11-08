@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './SortableList.css';
 import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, nextInstructionsId } from './internal/keyboardRegistry';
+import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId } from './internal/keyboardRegistry';
 
 interface ChildrenCtx { item: any; index: any; instructionsId: any; }
 
@@ -98,7 +98,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   listLabel?: (string) | null;
   /**
-   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. Also sets `aria-orientation` on the list container.
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`).
    */
   orientation?: string;
   /**
@@ -106,7 +106,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   pageStep?: number;
   /**
-   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." (with `orientation: 'horizontal'`, "Use the left and right arrow keys to move"). When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
    */
   keyboardInstructions?: (string) | null;
   /**
@@ -252,11 +252,14 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // the React emitter keep it across renders instead of minting a new id each
   // render.
   const instructionsId = useMemo(() => nextInstructionsId(), []);
-  const DEFAULT_INSTRUCTIONS = 'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.';
+  // role="list" takes no aria-orientation, so a horizontal list says which
+  // arrow keys move in its instructions instead.
   const GROUP_INSTRUCTIONS = ' Hold Shift with an arrow key to move to another list.';
   function instructionsText() {
     if (props.keyboardInstructions != null) return props.keyboardInstructions;
-    return props.group != null ? DEFAULT_INSTRUCTIONS + GROUP_INSTRUCTIONS : DEFAULT_INSTRUCTIONS;
+    const arrows = props.orientation === 'horizontal' ? 'Use the left and right arrow keys to move' : 'Use the arrow keys to move';
+    const text = 'Press Space or Enter to pick up. ' + arrows + ', Home and End to jump, and Escape to cancel.';
+    return props.group != null ? text + GROUP_INSTRUCTIONS : text;
   }
 
   // Instance-scoped synthetic-id store for id-less object items. Keyed by object
@@ -358,9 +361,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const keyboardEnabled = useCallback(() => !props.disabled && !props.disableKeyboard, [props.disableKeyboard, props.disabled]);
   // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
   // from the consumer's handle element instead. Any other value is 'row' mode.
-  function handleMode() {
-    return props.keyboardTrigger === 'handle';
-  }
+  const handleMode = useCallback(() => props.keyboardTrigger === 'handle', [props.keyboardTrigger]);
   // Rows are tab stops only in row mode (and only while keyboard is enabled).
   function rowTabbable() {
     return keyboardEnabled() && !handleMode();
@@ -465,6 +466,30 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     }
     return null;
   }, []);
+  // After the consumer changed the items of the list holding a lift, put focus
+  // on the row (or its handle) whose key is `key`, else the row nearest `index`
+  // — but only once focus has fallen to <body> (the focused row's element went
+  // away: the lift was lost, or a framework that keys rows by object identity
+  // re-created the lifted row). Never steals focus from anywhere else. Same
+  // three passes as refocusRow, for targets that commit late.
+  const focusNearRow = useCallback((index: number, key: string | null = null) => {
+    const listEl$local = listEl.current;
+    const sel = props.handle;
+    const useHandle = handleMode();
+    const focusIt = () => {
+      if (!listEl$local) return;
+      if (useHandle && sel == null) return;
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const rows = Array.from(listEl$local.children).filter((r: any) => r.hasAttribute('data-id') && r.classList.contains('rozie-sortable-item')) as any[];
+      if (rows.length === 0) return;
+      const row = rows.find((r: any) => key != null && r.getAttribute('data-id') === key) ?? rows[Math.max(0, Math.min(rows.length - 1, index))];
+      const target = useHandle ? row.querySelector(sel) : row;
+      if (target && typeof target.focus === 'function') target.focus();
+    };
+    queueMicrotask(focusIt);
+    setTimeout(focusIt, 0);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(focusIt);
+  }, [handleMode, props.handle]);
   // Speak `text` from `target`'s aria-live region. The region that spoke last
   // is cleared when it belongs to another list, so a message is heard once, from
   // the list the row is in now, and never from a list that just lost it.
@@ -476,16 +501,22 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }
 
   // The lifted item is no longer in the list holding it: the consumer changed
-  // that list's items, or the list is unmounting. End the lift without writing
-  // anything (the item is wherever the consumer's data put it). `end` still
-  // fires once, with `item: null` and `data` = the lifted value, so keyboard
-  // `start` / `end` always pair.
-  const loseLift = useCallback(() => {
+  // that list's items (or re-keyed the item), or the list is unmounting. End the
+  // lift without writing anything (the item is wherever the consumer's data put
+  // it). `end` still fires once, with `item: null` and `data` = the lifted value,
+  // so keyboard `start` / `end` always pair. Lost to a consumer change (not an
+  // unmount), the holder says `Lift ended` and, if focus fell to <body> with the
+  // row, focuses its row nearest where the lifted row was.
+  const loseLift = useCallback((unmounting = false) => {
     const lift = registry.lift;
     if (!lift) return;
     const h = lift.holder;
     registry.lift = null;
     h.setLifted(null);
+    if (!unmounting) {
+      speak(h, 'Lift ended');
+      h.focusNear(lift.index ?? lift.origin.index);
+    }
     h.emit('end', {
       interaction: 'keyboard',
       item: null,
@@ -495,7 +526,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       oldIndex: lift.origin.index,
       newIndex: -1
     });
-  }, []);
+  }, [speak]);
   // Keyboard `start` / `end` payload, shaped like SortableJS's pointer event:
   // `item` is the row element, `data` the item value. `start` fires from the
   // origin list (`from`), `end` from the list the row ends up in (`to`). Reads
@@ -536,6 +567,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // Update the lift BEFORE writing: a target whose watchers run synchronously
     // on the write must already see where the row is going.
     lift.key = h.keyOf(moved, to);
+    lift.index = to;
     h.write(next);
     h.setLifted(to);
     // Name the row that MOVED from the local `moved` item: on React/Vue/Lit the
@@ -587,6 +619,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       lift.holder = to;
       lift.copy = false;
       lift.key = to.keyOf(toItems[home], home);
+      lift.data = toItems[home];
+      lift.index = home;
       const rest = [...fromItems];
       rest.splice(i, 1);
       from.write(rest);
@@ -610,6 +644,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // synchronously on a write already sees the new holder.
     lift.holder = to;
     lift.key = to.keyOf(data, at);
+    lift.index = at;
     lift.hopped = true;
     if (cloneOut) {
       lift.copy = true;
@@ -655,7 +690,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     const item = items[at];
     const name = (e: any) => registry.listName(e);
     if (kind === 'drop') {
-      speak(h, h === origin.list ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
+      // A row that hopped always names its list, even back in its origin.
+      speak(h, !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
       h.setLifted(null);
       keyboardStartEnd('end', origin.list, h, origin.index, at);
       registry.lift = null;
@@ -691,9 +727,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       registry.lift = null;
       return;
     }
-    if (h !== origin.list && !registry.has(origin.list)) {
-      // The origin list has unmounted: there is nowhere to return to, so the
-      // row stays where it is (the lift ends as a drop at its position).
+    if (h !== origin.list && (!registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
+      // The origin list has unmounted, is hidden, or has its keyboard off:
+      // there is nowhere to return to (focus would be stranded), so the row
+      // stays where it is (the lift ends as a drop at its position).
       speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
       h.setLifted(null);
       keyboardStartEnd('end', origin.list, h, origin.index, at);
@@ -774,7 +811,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         list: entry.current,
         index
       },
-      liftedRowEl: entry.current.rowEl(index)
+      liftedRowEl: entry.current.rowEl(index),
+      index
     };
     setLiftedIndex(index);
     speak(entry.current, 'Lifted ' + labelOf(item, index));
@@ -800,20 +838,23 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // tabindex and can't receive focus, but a consumer-focused row (or a
     // programmatic .focus()) must still no-op here rather than reorder.
     if (!keyboardEnabled()) return;
-    // While a lift exists, every reorder key in ANY list acts on the list that
-    // holds it. That covers a key landing on the old row before the frameworks
-    // re-render after a hop, and Space/Enter in another list (it drops the
-    // active lift rather than starting a second one).
-    //
-    // Only lists of the holder's group take part: an unrelated list (another
-    // group, or none) keeps single-list behaviour — Space/Enter there drops
-    // the foreign lift and lifts its own row, other keys do nothing.
+    // While a lift exists, reorder keys in the list holding it act on it. A key
+    // from ANOTHER list of the holder's group is routed to the holder only when
+    // it comes from the lifted row itself (its old row, still there before the
+    // frameworks re-render after a hop) or while a refocus after a move is
+    // outstanding (a fast burst). Any other row — and every row of an unrelated
+    // list (another group, or none) — keeps single-list behaviour: Space/Enter
+    // there drops the foreign lift and lifts its own row, other keys do nothing.
     const lift = registry.lift;
     const key = $event.key;
-    const mine = groupNameOf(effectiveGroup());
-    if (lift != null && (lift.holder === entry.current || mine != null && mine === groupNameOf(lift.holder.group()))) {
-      if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
-      return;
+    if (lift != null) {
+      const mine = groupNameOf(effectiveGroup());
+      const sameGroup = mine != null && mine === groupNameOf(lift.holder.group());
+      const fromLiftedRow = String(keyFor(items[index], index)) === lift.key;
+      if (lift.holder === entry.current || sameGroup && (fromLiftedRow || lift.focusPending === true)) {
+        if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
+        return;
+      }
     }
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
@@ -821,7 +862,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       if (lift != null) endLift('drop');
       startLift(index);
     }
-  }, [effectiveGroup, endLift, groupNameOf, handleMode, isHandleKeyOrigin, keyboardEnabled, props.handle, startLift]);
+  }, [effectiveGroup, endLift, groupNameOf, handleMode, isHandleKeyOrigin, items, keyFor, keyboardEnabled, props.handle, startLift]);
   // The group NAME of a SortableJS group option (string or object form).
   function groupNameOf(g: any) {
     return g == null ? null : typeof g === 'string' ? g : g.name ?? null;
@@ -926,6 +967,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _effectiveGroupRef.current = effectiveGroup;
   const _endLiftRef = useRef(endLift);
   _endLiftRef.current = endLift;
+  const _focusNearRowRef = useRef(focusNearRow);
+  _focusNearRowRef.current = focusNearRow;
+  const _handleModeRef = useRef(handleMode);
+  _handleModeRef.current = handleMode;
   const _holderKeyRef = useRef(holderKey);
   _holderKeyRef.current = holderKey;
   const _keyForRef = useRef(keyFor);
@@ -934,6 +979,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _keyboardEnabledRef.current = keyboardEnabled;
   const _labelOfRef = useRef(labelOf);
   _labelOfRef.current = labelOf;
+  const _loseLiftRef = useRef(loseLift);
+  _loseLiftRef.current = loseLift;
   const _onStrayKeyRef = useRef(onStrayKey);
   _onStrayKeyRef.current = onStrayKey;
   const _refocusRowRef = useRef(refocusRow);
@@ -1019,7 +1066,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       instructionsId,
       group: () => _effectiveGroupRef.current(),
       label: () => _listLabelRef.current,
-      keyboardEnabled: () => _keyboardEnabledRef.current(),
+      // A handle-mode list without a handle selector has its keyboard off.
+      keyboardEnabled: () => _keyboardEnabledRef.current() && !(_handleModeRef.current() && _handleRef.current == null),
       items: () => _itemsRef.current,
       keyOf: (item: any, i: any) => String(_keyForRef.current(item, i)),
       labelOf: (item: any, i: any) => String(_labelOfRef.current(item, i)),
@@ -1034,6 +1082,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         setAriaLiveText(text);
       },
       focusRow: (item: any, i: any) => _refocusRowRef.current(item, i),
+      focusNear: (i: any) => _focusNearRowRef.current(i),
       rowEl: (i: any) => {
         const list = _itemsRef.current;
         if (i < 0 || i >= list.length) return null;
@@ -1064,7 +1113,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       instance.current?.destroy();
       // Unmounting while holding a keyboard lift ends it (with its `end` event,
       // which some targets may no longer deliver during unmount).
-      if (registry.lift != null && registry.lift.holder === entry.current) loseLift();
+      if (registry.lift != null && registry.lift.holder === entry.current) _loseLiftRef.current(true);
       unregisterEntry.current?.();
       unregisterEntry.current = null;
       unhookNativeEvents.current?.();
@@ -1129,7 +1178,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   useEffect(() => {
     if (_watch11First.current) { _watch11First.current = false; return; }
     const lift = registry.lift;
-    if (lift != null && lift.holder === entry.current && registry.indexOfLift() < 0) loseLift();
+    if (lift == null || lift.holder !== entry.current) return;
+    const i = registry.indexOfLift();
+    if (i < 0) loseLift();else focusNearRow(i, lift.key);
   }, [items]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const _rozieExposeRef = useRef({ getInstance, toArray, sort, option });
@@ -1139,7 +1190,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   return (
     <>
     <div {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
-      <div className={clsx(['rozie-sortable-list', props.listClass])} ref={listEl} part="list" role="list" aria-label={rozieAttr(props.listLabel)} aria-orientation={rozieAttr(props.orientation === 'horizontal' ? 'horizontal' : 'vertical')} data-rozie-s-0af24eae="">
+      <div className={clsx(['rozie-sortable-list', props.listClass])} ref={listEl} part="list" role="list" aria-label={rozieAttr(props.listLabel)} data-rozie-s-0af24eae="">
         {(props.renderHeader ?? props.slots?.['header'])?.()}
         {items.map((item, index) => <div key={keyFor(item, index)} className={clsx(['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={(rowTabbable() ? 0 : undefined) ?? undefined} aria-describedby={rozieAttr(rowTabbable() ? instructionsId : undefined)} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index, instructionsId }) : (props.children ?? props.slots?.[''])}

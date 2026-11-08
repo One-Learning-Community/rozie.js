@@ -11,7 +11,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  * sortable-keyboard-keys — SortableList within-list keyboard keys on every
  * target cell: Home / End / PageUp / PageDown while lifted, Escape reverting a
  * single-list move, keyboard `start`/`change`/`end` events carrying
- * `interaction: 'keyboard'`, the list container's role/orientation, and the
+ * `interaction: 'keyboard'`, the list container's role, and the
  * spoken instructions referenced by `aria-describedby`.
  *
  * Fixture: SortableListKeysDemo (one vertical row-mode list, no `group`,
@@ -77,6 +77,16 @@ for (const target of TARGETS) {
     await expect(items).toHaveCount(SEED.length);
     await expect(items.first()).toHaveAttribute('tabindex', '0');
     return { mount, items, aria: mount.locator(ARIA_LIVE) };
+  }
+
+  /**
+   * Nothing disappeared: the rendered rows, the state sidecar and the seed hold
+   * the same labels, with no row shown twice.
+   */
+  async function assertInvariant(mount: ReturnType<Page['getByTestId']>) {
+    const seed = [...SEED].sort();
+    await expect.poll(async () => (await displayedLabels(mount.locator(ITEM))).sort()).toEqual(seed);
+    await expect.poll(async () => (await texts(mount.locator(STATE_LI))).sort()).toEqual(seed);
   }
 
   async function expectOrder(
@@ -164,12 +174,13 @@ for (const target of TARGETS) {
   );
 
   runner(
-    `sortable-keyboard-keys [${target}]: list container has role list and aria-orientation vertical`,
+    `sortable-keyboard-keys [${target}]: list container has role list and no aria-orientation`,
     async ({ page }) => {
       const { mount } = await open(page);
       const list = mount.locator(LIST).first();
       await expect(list).toHaveAttribute('role', 'list');
-      await expect(list).toHaveAttribute('aria-orientation', 'vertical');
+      // aria-orientation is not an allowed attribute on role="list".
+      await expect(list).not.toHaveAttribute('aria-orientation', /.*/);
     },
   );
 
@@ -204,6 +215,7 @@ for (const target of TARGETS) {
       await expect(aria).toHaveText('Dropped Apple at position 4');
       await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Apple', 'Elderberry']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
+      await assertInvariant(mount);
     },
   );
 
@@ -217,6 +229,7 @@ for (const target of TARGETS) {
       await expect(aria).toHaveText('Dropped Apple at position 5');
       await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Elderberry', 'Apple']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
+      await assertInvariant(mount);
     },
   );
 
@@ -266,6 +279,7 @@ for (const target of TARGETS) {
       await expect(aria).toHaveText('Dropped Apple at position 2');
       await expectOrder(mount, items, ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
+      await assertInvariant(mount);
     },
   );
 }

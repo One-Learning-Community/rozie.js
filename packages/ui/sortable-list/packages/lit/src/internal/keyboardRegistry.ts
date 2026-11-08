@@ -31,6 +31,12 @@ export interface ListEntry {
   setLifted(index: number | null): void;
   announce(text: string): void;
   focusRow(item: unknown, index: number): void;
+  /**
+   * Focus this list's row (or its handle) nearest `index`, but only while
+   * focus has been lost to <body>. Used when a lift ends because the
+   * consumer took the lifted item away.
+   */
+  focusNear(index: number): void;
   rowEl(index: number): HTMLElement | null;
   emit(name: 'add' | 'remove' | 'change' | 'start' | 'end', payload: object): void;
 }
@@ -49,6 +55,8 @@ export interface Lift {
   focusPending?: boolean;
   origin: { list: ListEntry; index: number };
   liftedRowEl: HTMLElement | null;
+  /** The lifted row's last known index in its holder. */
+  index?: number;
 }
 
 export interface KeyboardRegistry {
@@ -68,7 +76,7 @@ interface Singleton {
   counter: number;
 }
 
-const KEY = Symbol.for('rozie.sortable-list.keyboard');
+const KEY = Symbol.for('rozie.sortable-list.keyboard.v1');
 
 // Composed-tree parent: slot assignment, then light/shadow parent, then host.
 function composedParent(n: any): any {
@@ -245,7 +253,21 @@ function createState(): Singleton {
     indexOfLift() {
       const l = registry.lift;
       if (!l) return -1;
-      return l.holder.items().findIndex((it, i) => l.holder.keyOf(it, i) === l.key);
+      const items = l.holder.items();
+      let i = items.findIndex((it, j) => l.holder.keyOf(it, j) === l.key);
+      if (i >= 0) {
+        // Found by key: the consumer may have swapped in a new object with
+        // the same key, so follow it.
+        l.data = items[i];
+      } else {
+        // Not by key: the consumer may have re-keyed the lifted object
+        // itself. Find it by reference and adopt its new key.
+        i = items.indexOf(l.data);
+        if (i < 0) return -1;
+        l.key = l.holder.keyOf(items[i], i);
+      }
+      l.index = i;
+      return i;
     },
   };
   return { registry, counter: 0 };

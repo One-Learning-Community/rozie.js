@@ -69,6 +69,8 @@ const TOP_INSTRUCTIONS =
   'Press Space to pick up this widget. Shift with an arrow key moves it to another zone.';
 const GROUP_INSTRUCTIONS =
   'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
+const HORIZONTAL_GROUP_INSTRUCTIONS =
+  'Press Space or Enter to pick up. Use the left and right arrow keys to move, Home and End to jump, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
 
 type Mount = ReturnType<Page['getByTestId']>;
 
@@ -103,6 +105,66 @@ async function assertNothingDisappeared(mount: Mount, extra: string[] = []) {
       now[slug].length,
     );
   }
+  // The rendered rows agree with the state: every mounted list renders once,
+  // with the same multiset of labels as its state, and no rendered list
+  // (other than the palette) shows a row twice. (An unmounted list renders
+  // nothing; its state is still covered above.)
+  await expect
+    .poll(async () => {
+      const st = await allStates(mount);
+      const lists = await renderedLists(mount);
+      const problems: string[] = [];
+      const seen = new Set<string>();
+      for (const l of lists) {
+        if (seen.has(l.name)) problems.push(`${l.name} rendered twice`);
+        seen.add(l.name);
+        const slug = SLUG_OF[l.name];
+        if (!slug) {
+          problems.push(`unknown list ${l.name}`);
+          continue;
+        }
+        const rows = [...l.rows].sort();
+        const want = [...st[slug]].sort();
+        if (JSON.stringify(rows) !== JSON.stringify(want)) {
+          problems.push(`${l.name} renders [${rows.join(', ')}] but holds [${want.join(', ')}]`);
+        }
+      }
+      return problems;
+    })
+    .toEqual([]);
+  for (const list of await renderedLists(mount)) {
+    if (list.name === 'Palette') continue;
+    expect(new Set(list.rows).size, `rendered duplicates in ${list.name}: ${list.rows.join(', ')}`).toBe(
+      list.rows.length,
+    );
+  }
+}
+
+/** listLabel → state slug. */
+const SLUG_OF: Record<string, Slug> = {
+  Locked: 'locked',
+  Palette: 'palette',
+  'Top sidebar': 'top',
+  Content: 'content',
+  'Grid column 1': 'grid1',
+  'Grid column 2': 'grid2',
+  'Bottom sidebar': 'bottom',
+  Archive: 'archive',
+  'Hidden zone': 'hidden',
+  'Toolbar A': 'toola',
+  'Toolbar B': 'toolb',
+};
+
+/** Every rendered list (pierces shadow roots) with the labels of its own rows. */
+function renderedLists(mount: Mount) {
+  return mount.locator('[role="list"]').evaluateAll((lists) =>
+    lists.map((list) => ({
+      name: list.getAttribute('aria-label') ?? '',
+      rows: Array.from(list.children)
+        .filter((row) => (row.getAttribute('class') ?? '').includes('rozie-sortable-item'))
+        .map((row) => ((row.querySelector('[class*="label"]') ?? row).textContent ?? '').trim()),
+    })),
+  );
 }
 
 /** Non-empty aria-live texts across every list (pierces shadow roots). */
@@ -445,6 +507,9 @@ for (const target of TARGETS) {
       await clickKeepingFocus(mount, 'move-top-first-to-bottom');
       await expect.poll(() => state(mount, 'bottom')).toEqual([...SEED.bottom, 'Newsletter']);
       await expect(mount.locator(LIFTED)).toHaveCount(0);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lift ended']);
+      // Focus lands on the nearest row left in Top sidebar, never on <body>.
+      await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Tag cloud');
       await expect
         .poll(async () => (await texts(mount.locator(LOG_LI))).slice(-2))
         .toEqual(['top:start:keyboard', 'top:end:keyboard']);
@@ -452,8 +517,9 @@ for (const target of TARGETS) {
         .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
         .toEqual({ item: null, data: 'Newsletter', interaction: 'keyboard' });
       await assertNothingDisappeared(mount, ['New widget 1']);
+      // No lift any more: Shift+↓ moves nothing.
       await page.keyboard.press('Shift+ArrowDown');
-      await page.keyboard.press('Space');
+      await page.waitForTimeout(100);
       await expect.poll(() => state(mount, 'top')).toEqual(['Tag cloud']);
       await expect
         .poll(() => state(mount, 'bottom'))
@@ -607,10 +673,12 @@ for (const target of TARGETS) {
     `sortable-keyboard-cross-list [${target}]: horizontal lists hop with Shift+←/→ and move with ←/→`,
     async ({ page }) => {
       const { mount } = await open(page);
-      await expect(mount.getByTestId('zone-toola').locator('[role="list"]').first()).toHaveAttribute(
+      // role="list" does not take aria-orientation; the instructions say it.
+      await expect(mount.getByTestId('zone-toola').locator('[role="list"]').first()).not.toHaveAttribute(
         'aria-orientation',
-        'horizontal',
+        /.*/,
       );
+      await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
       await grip(mount, 'Bold').focus();
       await page.keyboard.press('Space');
       await page.keyboard.press('ArrowRight');
@@ -633,8 +701,9 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline', 'Bold']);
       await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar A, position 3']);
       await assertNothingDisappeared(mount);
+      // It hopped out and back: the drop still names the list.
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Bold at position 3']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Bold in Toolbar A at position 3']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -645,6 +714,135 @@ for (const target of TARGETS) {
       const { mount } = await open(page);
       await expect(grip(mount, 'Search')).toHaveAccessibleDescription(TOP_INSTRUCTIONS);
       await expect(grip(mount, 'Hero banner')).toHaveAccessibleDescription(GROUP_INSTRUCTIONS);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: the consumer swapping the lifted item for a same-key object keeps the lift`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await grip(mount, 'Newsletter').focus();
+      await page.keyboard.press('Space');
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await clickKeepingFocus(mount, 'replace-newsletter');
+      await page.waitForTimeout(100);
+      await expect(mount.locator(LIFTED)).toHaveCount(1);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await page.keyboard.press('ArrowDown');
+      await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Tag cloud', 'Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Newsletter to position 3']);
+      await page.keyboard.press('Space');
+      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Newsletter at position 3']);
+      await expect
+        .poll(() => texts(mount.locator(LOG_LI)))
+        .toEqual(['top:start:keyboard', 'top:change:keyboard', 'top:end:keyboard']);
+      await assertNothingDisappeared(mount);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: re-keying the lifted item ends the lift without stranding focus`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await grip(mount, 'Newsletter').focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Shift+ArrowDown');
+      await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
+      await clickKeepingFocus(mount, 'rekey-newsletter');
+      await expect(mount.locator(LIFTED)).toHaveCount(0);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lift ended']);
+      await expect.poll(() => active(page), { timeout: 5000 }).not.toBe('<body>');
+      await expect
+        .poll(async () => (await texts(mount.locator(LOG_LI))).filter((e) => e.endsWith(':end:keyboard')))
+        .toEqual(['content:end:keyboard']);
+      await expect
+        .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
+        .toEqual({ item: null, data: 'Newsletter', interaction: 'keyboard' });
+      await assertNothingDisappeared(mount);
+      // No lift any more: arrows move nothing.
+      await page.keyboard.press('ArrowDown');
+      await page.waitForTimeout(100);
+      await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
+      await assertNothingDisappeared(mount);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: a put:false palette is never a hop target`,
+    async ({ page }) => {
+      const { mount } = await open(page);
+      // Source order before Top sidebar: Locked, then Palette. Palette takes
+      // nothing (put: false), so Shift+↑ reaches Locked.
+      await grip(mount, 'Search').focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Shift+ArrowUp');
+      await expect.poll(() => state(mount, 'locked')).toEqual([...SEED.locked, 'Search']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Locked, position 2']);
+      await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
+      await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Search');
+      await assertNothingDisappeared(mount);
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(() => liveTexts(mount))
+        .toEqual(['Cancelled. Search returned to Top sidebar, position 1']);
+      await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+      await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
+      await assertNothingDisappeared(mount);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: keys on another row of a same-group list leave the lift alone`,
+    async ({ page }) => {
+      const { mount } = await open(page);
+      await grip(mount, 'Search').focus();
+      await page.keyboard.press('Space');
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+      await grip(mount, 'Hero banner').focus();
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Shift+ArrowDown');
+      await page.waitForTimeout(100);
+      await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+      await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+      // Space there drops the Top lift and lifts its own row.
+      await page.keyboard.press('Space');
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Hero banner']);
+      await expect
+        .poll(() => texts(mount.locator(LOG_LI)))
+        .toEqual(['top:start:keyboard', 'top:end:keyboard', 'content:start:keyboard']);
+      await page.keyboard.press('ArrowDown');
+      await expect.poll(() => state(mount, 'content')).toEqual(['Intro text', 'Hero banner', 'Grid', 'Gallery']);
+      await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+      await page.keyboard.press('Space');
+      await assertNothingDisappeared(mount);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: Escape when the origin list is hidden keeps the row where it is`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await grip(mount, 'Newsletter').focus();
+      await page.keyboard.press('Space');
+      await page.keyboard.press('Shift+ArrowDown');
+      await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
+      await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Newsletter');
+      await clickKeepingFocus(mount, 'hide-top');
+      await expect(grip(mount, 'Search')).toBeHidden();
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(() => liveTexts(mount))
+        .toEqual(['Cancelled. Newsletter stays in Content, position 1']);
+      await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
+      await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Tag cloud']);
+      await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('content:end:keyboard');
+      await expect(mount.locator(LIFTED)).toHaveCount(0);
+      await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Newsletter');
+      await assertNothingDisappeared(mount);
+      expect(errors).toEqual([]);
     },
   );
 }

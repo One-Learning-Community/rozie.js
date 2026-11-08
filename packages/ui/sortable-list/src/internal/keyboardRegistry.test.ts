@@ -40,6 +40,7 @@ function fakeEntry(node: HTMLElement, group: GroupOption, opts: FakeOpts = {}): 
     setLifted: () => {},
     announce: () => {},
     focusRow: () => {},
+    focusNear: () => {},
     rowEl: () => null,
     emit: () => {},
   };
@@ -227,7 +228,42 @@ describe('registry', () => {
     r.lift = { holder: ea, key: 'q', data: 'q', copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
     expect(r.indexOfLift()).toBe(1);
     r.lift.key = 'gone';
+    r.lift.data = 'gone';
     expect(r.indexOfLift()).toBe(-1);
+  });
+});
+
+describe('indexOfLift re-syncs the lift', () => {
+  it('falls back to the lifted value by reference and re-syncs the key', () => {
+    const ea = fakeEntry(el(), 'z');
+    const a = { id: 'a' };
+    const b = { id: 'b' };
+    let items: unknown[] = [a, b];
+    ea.items = () => items;
+    ea.keyOf = (it: any) => String(it.id);
+    reg(ea);
+    const r = getKeyboardRegistry();
+    r.lift = { holder: ea, key: 'b', data: b, copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
+    // The consumer re-keyed the lifted object in place.
+    b.id = 'b2';
+    expect(r.indexOfLift()).toBe(1);
+    expect(r.lift!.key).toBe('b2');
+    // A new object with the same key: found by key, and `data` follows it.
+    const b3 = { id: 'b2' };
+    items = [a, b3];
+    expect(r.indexOfLift()).toBe(1);
+    expect(r.lift!.data).toBe(b3);
+    // A new object with a new key: the lift is lost.
+    items = [a, { id: 'fresh' }];
+    expect(r.indexOfLift()).toBe(-1);
+  });
+});
+
+describe('singleton key', () => {
+  it('lives on globalThis under the versioned Symbol.for key', () => {
+    const g = globalThis as any;
+    expect(g[Symbol.for('rozie.sortable-list.keyboard.v1')]?.registry).toBe(getKeyboardRegistry());
+    expect(g[Symbol.for('rozie.sortable-list.keyboard')]).toBeUndefined();
   });
 });
 

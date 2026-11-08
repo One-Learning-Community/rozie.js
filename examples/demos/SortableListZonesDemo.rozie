@@ -6,7 +6,8 @@
   The CMS shape: three zones in handle mode sharing `group: 'zones'` —
   Top sidebar, Content, Bottom sidebar — plus, in source order:
     - `Locked` (`pull: false`: nothing hops out of it) first,
-    - a clone palette (`cloneable`, `Palette`) before Top sidebar,
+    - a clone palette (`Palette`: `pull: 'clone'`, `put: false`, the
+      recommended palette shape — it takes nothing back) before Top sidebar,
     - a "Grid" widget in Content whose row renders two nested lists
       (`Grid column 1`, `Grid column 2`) in the same group,
     - a `put: false` list (`Archive`) after Bottom sidebar,
@@ -21,6 +22,12 @@
                                  of Bottom sidebar (a consumer-side change
                                  that takes a lifted row away from its list),
     - `toggle-top` / `toggle-palette` unmount / remount those lists,
+    - `hide-top`                 hides Top sidebar (display: none) without
+                                 unmounting it,
+    - `replace-newsletter`       swaps the Newsletter item (in Top sidebar or
+                                 Content) for a new object with the SAME id,
+    - `rekey-newsletter`         swaps it for a new object with a NEW id (what
+                                 a consumer minting ids in `add` would do),
     - `mode-row`                 switches every list to keyboardTrigger 'row'.
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
@@ -57,6 +64,7 @@
   lastEnd: '',
   trigger: 'handle',
   topMounted: true,
+  topHidden: false,
   paletteMounted: true,
   added: 0,
 }
@@ -140,6 +148,18 @@ const toggleTop = () => {
   $data.topMounted = !$data.topMounted
 }
 
+const toggleTopHidden = () => {
+  $data.topHidden = !$data.topHidden
+}
+
+// Replace the Newsletter item wherever it sits (Top sidebar or Content) with a
+// new object: same id (`rekey` false) or a fresh id (`rekey` true).
+const swapNewsletter = (rekey) => {
+  const fix = (list) => list.map((it) => (it.label === 'Newsletter' ? { ...it, id: rekey ? it.id + '-r' : it.id } : it))
+  $data.top = fix($data.top)
+  $data.content = fix($data.content)
+}
+
 const togglePalette = () => {
   $data.paletteMounted = !$data.paletteMounted
 }
@@ -158,6 +178,9 @@ $onMount(() => seed())
     <button type="button" data-testid="move-top-first-to-bottom" @click="moveTopFirstToBottom">Move top first to bottom</button>
     <button type="button" data-testid="toggle-top" @click="toggleTop">Toggle top sidebar</button>
     <button type="button" data-testid="toggle-palette" @click="togglePalette">Toggle palette</button>
+    <button type="button" data-testid="hide-top" @click="toggleTopHidden">Hide top sidebar</button>
+    <button type="button" data-testid="replace-newsletter" @click="swapNewsletter(false)">Replace Newsletter</button>
+    <button type="button" data-testid="rekey-newsletter" @click="swapNewsletter(true)">Re-key Newsletter</button>
     <button type="button" data-testid="mode-row" @click="setRowMode">Row mode</button>
   </div>
 
@@ -238,7 +261,7 @@ $onMount(() => seed())
       r-model:items="$data.palette"
       itemKey="id"
       group="zones"
-      :cloneable="true"
+      :options="{ group: { name: 'zones', pull: 'clone', put: false } }"
       listLabel="Palette"
       :keyboardTrigger="$data.trigger"
       :handle="$classSelector('grip')"
@@ -304,6 +327,7 @@ $onMount(() => seed())
   </section>
   <section data-testid="zone-top">
     <h4>Top sidebar</h4>
+    <div :style="$data.topHidden ? 'display: none' : ''">
     <SortableList
       r-if="$data.topMounted"
       r-model:items="$data.top"
@@ -369,6 +393,7 @@ $onMount(() => seed())
         </div>
       </template>
     </SortableList>
+    </div>
     <ol class="state-list state-top">
       <li r-for="item, index in $data.top" :key="item.id">{{ item.label }}</li>
     </ol>
