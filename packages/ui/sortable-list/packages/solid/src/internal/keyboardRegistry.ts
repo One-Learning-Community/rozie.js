@@ -42,6 +42,11 @@ export interface Lift {
   copy: boolean;
   /** True once the row has hopped out of its origin list. */
   hopped: boolean;
+  /**
+   * True while a refocus after a keyboard move is outstanding: a key that
+   * falls to <body> meanwhile belongs to this lift.
+   */
+  focusPending?: boolean;
   origin: { list: ListEntry; index: number };
   liftedRowEl: HTMLElement | null;
 }

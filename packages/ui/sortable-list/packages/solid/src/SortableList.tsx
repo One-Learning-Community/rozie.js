@@ -282,8 +282,17 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     };
     unregisterEntry = registry.register(entry);
     const strayKey = (ev: any) => onStrayKey(ev);
+    // A pointer press means the user moved on: keys lost to <body> after it
+    // are not routed to the lift.
+    const pointerPress = () => {
+      if (registry.lift != null) registry.lift.focusPending = false;
+    };
     document.addEventListener('keydown', strayKey);
-    unhookStrayKeys = () => document.removeEventListener('keydown', strayKey);
+    document.addEventListener('pointerdown', pointerPress, true);
+    unhookStrayKeys = () => {
+      document.removeEventListener('keydown', strayKey);
+      document.removeEventListener('pointerdown', pointerPress, true);
+    };
     // $onMount's cleanup-return: closing over a setup-local (`sortable`) does
     // not survive the Solid emitter's setup/cleanup split — it scopes cleanup
     // outside the setup IIFE. Closing over `instance` / `unregisterEntry`
@@ -526,6 +535,11 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     const sel = local.handle;
     const useHandle = handleMode();
     const key = String(keyFor(item, idx));
+    // While this refocus is outstanding, a key that falls to <body> belongs to
+    // the lift (see onStrayKey). Cleared once the row has focus again, or by a
+    // pointer press anywhere.
+    const pending = registry.lift;
+    if (pending != null) pending.focusPending = true;
     const focusIt = (onlyIfLost: any) => {
       if (!listEl) return;
       if (useHandle && sel == null) return;
@@ -533,7 +547,11 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       for (const row of Array.from(listEl.children) as any[]) {
         if (row.getAttribute('data-id') === key) {
           const target = useHandle ? row.querySelector(sel) : row;
-          if (target && typeof target.focus === 'function') target.focus();
+          if (target && typeof target.focus === 'function') {
+            target.focus();
+            const l = registry.lift;
+            if (l != null && l === pending && l.key === key) l.focusPending = false;
+          }
           return;
         }
       }
@@ -750,6 +768,36 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       registry.lift = null;
       return;
     }
+    if (h !== origin.list && !registry.has(origin.list) && lift.copy) {
+      // A clone copy is removed on cancel even when its source list has
+      // unmounted (the source never gave its item up). Focus moves to the
+      // neighbouring row, if any.
+      const rest = [...items];
+      rest.splice(at, 1);
+      h.write(rest);
+      h.emit('remove', {
+        oldIndex: at,
+        item,
+        interaction: 'keyboard'
+      });
+      h.setLifted(null);
+      speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' removed from ' + name(h));
+      if (rest.length > 0) {
+        const k = Math.min(at, rest.length - 1);
+        h.focusRow(rest[k], k);
+      }
+      h.emit('end', {
+        interaction: 'keyboard',
+        item: null,
+        data: item,
+        from: origin.list.el,
+        to: h.el,
+        oldIndex: origin.index,
+        newIndex: -1
+      });
+      registry.lift = null;
+      return;
+    }
     if (h !== origin.list && !registry.has(origin.list)) {
       // The origin list has unmounted: there is nowhere to return to, so the
       // row stays where it is (the lift ends as a drop at its position).
@@ -864,17 +912,28 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     // holds it. That covers a key landing on the old row before the frameworks
     // re-render after a hop, and Space/Enter in another list (it drops the
     // active lift rather than starting a second one).
+    //
+    // Only lists of the holder's group take part: an unrelated list (another
+    // group, or none) keeps single-list behaviour — Space/Enter there drops
+    // the foreign lift and lifts its own row, other keys do nothing.
     const lift = registry.lift;
-    if (lift != null) {
-      if (lift.holder.onKey($event.key, !!$event.shiftKey)) $event.preventDefault();
+    const key = $event.key;
+    const mine = groupNameOf(effectiveGroup());
+    if (lift != null && (lift.holder === entry || mine != null && mine === groupNameOf(lift.holder.group()))) {
+      if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
       return;
     }
-    const key = $event.key;
     // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift.
     if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
       $event.preventDefault();
+      if (lift != null) endLift('drop');
       startLift(index);
     }
+  }
+
+  // The group NAME of a SortableJS group option (string or object form).
+  function groupNameOf(g: any) {
+    return g == null ? null : typeof g === 'string' ? g : g.name ?? null;
   }
 
   // A reorder key for the lift THIS list holds (routed here from any list via
@@ -920,9 +979,15 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // focus) only after the handler returns (Angular), so the next key of a fast
   // burst can reach <body>. The list holding the lift handles it as if it had
   // landed on the lifted row, then puts focus back on that row.
+  //
+  // Only while a refocus of ours is outstanding (`focusPending`): focus that left
+  // the lifted row for any other reason (the user clicked elsewhere or tabbed
+  // away) keeps today's behaviour, and those keys are not ours. Modified keys
+  // and keys someone already handled are never taken.
   function onStrayKey(ev: any) {
     const lift = registry.lift;
-    if (lift == null || lift.holder !== entry) return;
+    if (lift == null || lift.holder !== entry || !lift.focusPending) return;
+    if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.altKey) return;
     const t = ev.target;
     if (t !== document.body && t !== document.documentElement) return;
     const data = lift.data;

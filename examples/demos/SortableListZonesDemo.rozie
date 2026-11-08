@@ -4,24 +4,30 @@
   next list of the same group).
 
   The CMS shape: three zones in handle mode sharing `group: 'zones'` —
-  Top sidebar, Content, Bottom sidebar — plus:
+  Top sidebar, Content, Bottom sidebar — plus, in source order:
+    - `Locked` (`pull: false`: nothing hops out of it) first,
     - a clone palette (`cloneable`, `Palette`) before Top sidebar,
     - a "Grid" widget in Content whose row renders two nested lists
       (`Grid column 1`, `Grid column 2`) in the same group,
     - a `put: false` list (`Archive`) after Bottom sidebar,
-    - a list inside a `hidden` div after Archive.
+    - a list inside a `hidden` div after Archive,
+    - two HORIZONTAL lists in another group (`tools`): Toolbar A, Toolbar B.
+  Every `zones` list renders the same row template, so a Grid row keeps its
+  columns wherever it lands.
 
   Controls:
-    - `add-to-content`         appends a new widget to Content,
+    - `add-to-content`           appends a new widget to Content,
     - `move-top-first-to-bottom` moves Top sidebar's first widget to the end
-                               of Bottom sidebar (a consumer-side change that
-                               takes a lifted row away from its list),
-    - `toggle-top`             unmounts / remounts the Top sidebar list,
-    - `mode-row`               switches every list to keyboardTrigger 'row'.
+                                 of Bottom sidebar (a consumer-side change
+                                 that takes a lifted row away from its list),
+    - `toggle-top` / `toggle-palette` unmount / remount those lists,
+    - `mode-row`                 switches every list to keyboardTrigger 'row'.
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
-  `{slug}:{event}:{interaction}`.
+  `{slug}:{event}:{interaction}`. The last keyboard `end` payload is shown in
+  `<output data-testid="last-end">` as JSON ({ item, data, interaction }, with
+  `item` reported as "element" or null and `data` as the item's label).
 
   NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
 -->
@@ -36,6 +42,7 @@
 
 <data>
 {
+  locked: [],
   palette: [],
   top: [],
   content: [],
@@ -44,15 +51,20 @@
   bottom: [],
   archive: [],
   stash: [],
+  toola: [],
+  toolb: [],
   log: [],
+  lastEnd: '',
   trigger: 'handle',
   topMounted: true,
+  paletteMounted: true,
   added: 0,
 }
 </data>
 
 <script>
 const seed = () => {
+  $data.locked = [{ id: 'l1', label: 'Pinned notice' }]
   $data.palette = [
     { id: 'p1', label: 'Text block' },
     { id: 'p2', label: 'Image' },
@@ -76,18 +88,39 @@ const seed = () => {
   ]
   $data.archive = [{ id: 'a1', label: 'Old promo' }]
   $data.stash = [{ id: 'x1', label: 'Hidden widget' }]
+  $data.toola = [
+    { id: 'ta1', label: 'Bold' },
+    { id: 'ta2', label: 'Italic' },
+    { id: 'ta3', label: 'Underline' },
+  ]
+  $data.toolb = [
+    { id: 'tb1', label: 'Link' },
+    { id: 'tb2', label: 'Quote' },
+  ]
 }
 
 // Lit delivers a child $emit as a CustomEvent with the payload in `detail`;
 // the other targets hand over the payload itself.
+const payloadOf = (e) => {
+  if (e != null && e.interaction == null && e.detail != null && e.detail.interaction != null) return e.detail
+  return e
+}
+
 const interactionOf = (e) => {
-  if (e != null && e.interaction != null) return e.interaction
-  if (e != null && e.detail != null && e.detail.interaction != null) return e.detail.interaction
-  return '?'
+  const p = payloadOf(e)
+  return p != null && p.interaction != null ? p.interaction : '?'
 }
 
 const record = (slug, name, e) => {
   $data.log = [...$data.log, slug + ':' + name + ':' + interactionOf(e)]
+  const p = payloadOf(e)
+  if (name === 'end' && p != null && p.interaction === 'keyboard') {
+    $data.lastEnd = JSON.stringify({
+      item: p.item == null ? null : 'element',
+      data: p.data != null && p.data.label != null ? p.data.label : null,
+      interaction: p.interaction,
+    })
+  }
 }
 
 const addToContent = () => {
@@ -107,6 +140,10 @@ const toggleTop = () => {
   $data.topMounted = !$data.topMounted
 }
 
+const togglePalette = () => {
+  $data.paletteMounted = !$data.paletteMounted
+}
+
 const setRowMode = () => {
   $data.trigger = 'row'
 }
@@ -120,12 +157,84 @@ $onMount(() => seed())
     <button type="button" data-testid="add-to-content" @click="addToContent">Add to content</button>
     <button type="button" data-testid="move-top-first-to-bottom" @click="moveTopFirstToBottom">Move top first to bottom</button>
     <button type="button" data-testid="toggle-top" @click="toggleTop">Toggle top sidebar</button>
+    <button type="button" data-testid="toggle-palette" @click="togglePalette">Toggle palette</button>
     <button type="button" data-testid="mode-row" @click="setRowMode">Row mode</button>
   </div>
 
+  <section data-testid="zone-locked">
+    <h4>Locked (pull: false)</h4>
+    <SortableList
+      r-model:items="$data.locked"
+      itemKey="id"
+      group="zones"
+      :options="{ group: { name: 'zones', pull: false } }"
+      listLabel="Locked"
+      :keyboardTrigger="$data.trigger"
+      :handle="$classSelector('grip')"
+      @start="record('locked', 'start', $event)"
+      @change="record('locked', 'change', $event)"
+      @end="record('locked', 'end', $event)"
+      @add="record('locked', 'add', $event)"
+      @remove="record('locked', 'remove', $event)"
+    >
+      <template #default="{ item, instructionsId }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+          <input class="row-input" placeholder="title" />
+        </span>
+        <div r-if="item.grid" class="grid-cols">
+          <SortableList
+            r-model:items="$data.grid1"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 1"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid1', 'start', $event)"
+            @change="record('grid1', 'change', $event)"
+            @end="record('grid1', 'end', $event)"
+            @add="record('grid1', 'add', $event)"
+            @remove="record('grid1', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+          <SortableList
+            r-model:items="$data.grid2"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 2"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid2', 'start', $event)"
+            @change="record('grid2', 'change', $event)"
+            @end="record('grid2', 'end', $event)"
+            @add="record('grid2', 'add', $event)"
+            @remove="record('grid2', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+        </div>
+      </template>
+    </SortableList>
+    <ol class="state-list state-locked">
+      <li r-for="item, index in $data.locked" :key="item.id">{{ item.label }}</li>
+    </ol>
+  </section>
   <section data-testid="zone-palette">
     <h4>Palette</h4>
     <SortableList
+      r-if="$data.paletteMounted"
       r-model:items="$data.palette"
       itemKey="id"
       group="zones"
@@ -143,14 +252,56 @@ $onMount(() => seed())
         <span class="row">
           <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
           <span class="label">{{ item.label }}</span>
+          <input class="row-input" placeholder="title" />
         </span>
+        <div r-if="item.grid" class="grid-cols">
+          <SortableList
+            r-model:items="$data.grid1"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 1"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid1', 'start', $event)"
+            @change="record('grid1', 'change', $event)"
+            @end="record('grid1', 'end', $event)"
+            @add="record('grid1', 'add', $event)"
+            @remove="record('grid1', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+          <SortableList
+            r-model:items="$data.grid2"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 2"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid2', 'start', $event)"
+            @change="record('grid2', 'change', $event)"
+            @end="record('grid2', 'end', $event)"
+            @add="record('grid2', 'add', $event)"
+            @remove="record('grid2', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+        </div>
       </template>
     </SortableList>
     <ol class="state-list state-palette">
       <li r-for="item, index in $data.palette" :key="item.id">{{ item.label }}</li>
     </ol>
   </section>
-
   <section data-testid="zone-top">
     <h4>Top sidebar</h4>
     <SortableList
@@ -158,8 +309,8 @@ $onMount(() => seed())
       r-model:items="$data.top"
       itemKey="id"
       group="zones"
-      listLabel="Top sidebar"
       keyboardInstructions="Press Space to pick up this widget. Shift with an arrow key moves it to another zone."
+      listLabel="Top sidebar"
       :keyboardTrigger="$data.trigger"
       :handle="$classSelector('grip')"
       @start="record('top', 'start', $event)"
@@ -222,7 +373,6 @@ $onMount(() => seed())
       <li r-for="item, index in $data.top" :key="item.id">{{ item.label }}</li>
     </ol>
   </section>
-
   <section data-testid="zone-content">
     <h4>Content</h4>
     <SortableList
@@ -298,7 +448,6 @@ $onMount(() => seed())
       <li r-for="item, index in $data.grid2" :key="item.id">{{ item.label }}</li>
     </ol>
   </section>
-
   <section data-testid="zone-bottom">
     <h4>Bottom sidebar</h4>
     <SortableList
@@ -368,7 +517,6 @@ $onMount(() => seed())
       <li r-for="item, index in $data.bottom" :key="item.id">{{ item.label }}</li>
     </ol>
   </section>
-
   <section data-testid="zone-archive">
     <h4>Archive (put: false)</h4>
     <SortableList
@@ -389,37 +537,179 @@ $onMount(() => seed())
         <span class="row">
           <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
           <span class="label">{{ item.label }}</span>
+          <input class="row-input" placeholder="title" />
         </span>
+        <div r-if="item.grid" class="grid-cols">
+          <SortableList
+            r-model:items="$data.grid1"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 1"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid1', 'start', $event)"
+            @change="record('grid1', 'change', $event)"
+            @end="record('grid1', 'end', $event)"
+            @add="record('grid1', 'add', $event)"
+            @remove="record('grid1', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+          <SortableList
+            r-model:items="$data.grid2"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 2"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid2', 'start', $event)"
+            @change="record('grid2', 'change', $event)"
+            @end="record('grid2', 'end', $event)"
+            @add="record('grid2', 'add', $event)"
+            @remove="record('grid2', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+        </div>
       </template>
     </SortableList>
     <ol class="state-list state-archive">
       <li r-for="item, index in $data.archive" :key="item.id">{{ item.label }}</li>
     </ol>
   </section>
-
   <div hidden>
-    <section data-testid="zone-hidden">
-      <SortableList
-        r-model:items="$data.stash"
-        itemKey="id"
-        group="zones"
-        listLabel="Hidden zone"
-        :keyboardTrigger="$data.trigger"
-        :handle="$classSelector('grip')"
-      >
-        <template #default="{ item, instructionsId }">
-          <span class="row">
-            <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
-            <span class="label">{{ item.label }}</span>
-          </span>
-        </template>
-      </SortableList>
-    </section>
+  <section data-testid="zone-hidden">
+    <h4>Hidden zone</h4>
+    <SortableList
+      r-model:items="$data.stash"
+      itemKey="id"
+      group="zones"
+      listLabel="Hidden zone"
+      :keyboardTrigger="$data.trigger"
+      :handle="$classSelector('grip')"
+    >
+      <template #default="{ item, instructionsId }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+          <input class="row-input" placeholder="title" />
+        </span>
+        <div r-if="item.grid" class="grid-cols">
+          <SortableList
+            r-model:items="$data.grid1"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 1"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid1', 'start', $event)"
+            @change="record('grid1', 'change', $event)"
+            @end="record('grid1', 'end', $event)"
+            @add="record('grid1', 'add', $event)"
+            @remove="record('grid1', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+          <SortableList
+            r-model:items="$data.grid2"
+            itemKey="id"
+            group="zones"
+            listLabel="Grid column 2"
+            :keyboardTrigger="$data.trigger"
+            :handle="$classSelector('grip')"
+            @start="record('grid2', 'start', $event)"
+            @change="record('grid2', 'change', $event)"
+            @end="record('grid2', 'end', $event)"
+            @add="record('grid2', 'add', $event)"
+            @remove="record('grid2', 'remove', $event)"
+          >
+            <template #default="{ item: cell, instructionsId: cellDesc }">
+              <span class="row">
+                <button type="button" class="grip" :aria-label="'Reorder ' + cell.label" :aria-describedby="cellDesc">⋮⋮</button>
+                <span class="label">{{ cell.label }}</span>
+              </span>
+            </template>
+          </SortableList>
+        </div>
+      </template>
+    </SortableList>
+  </section>
   </div>
-  <ol class="state-list state-hidden">
-    <li r-for="item, index in $data.stash" :key="item.id">{{ item.label }}</li>
-  </ol>
-
+    <ol class="state-list state-hidden">
+      <li r-for="item, index in $data.stash" :key="item.id">{{ item.label }}</li>
+    </ol>
+  <section data-testid="zone-toola">
+    <h4>Toolbar A</h4>
+    <SortableList
+      r-model:items="$data.toola"
+      itemKey="id"
+      group="tools"
+      orientation="horizontal"
+      listClass="toolbar"
+      listLabel="Toolbar A"
+      :keyboardTrigger="$data.trigger"
+      :handle="$classSelector('grip')"
+      @start="record('toola', 'start', $event)"
+      @change="record('toola', 'change', $event)"
+      @end="record('toola', 'end', $event)"
+      @add="record('toola', 'add', $event)"
+      @remove="record('toola', 'remove', $event)"
+    >
+      <template #default="{ item, instructionsId }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+        </span>
+      </template>
+    </SortableList>
+    <ol class="state-list state-toola">
+      <li r-for="item, index in $data.toola" :key="item.id">{{ item.label }}</li>
+    </ol>
+  </section>
+  <section data-testid="zone-toolb">
+    <h4>Toolbar B</h4>
+    <SortableList
+      r-model:items="$data.toolb"
+      itemKey="id"
+      group="tools"
+      orientation="horizontal"
+      listClass="toolbar"
+      listLabel="Toolbar B"
+      :keyboardTrigger="$data.trigger"
+      :handle="$classSelector('grip')"
+      @start="record('toolb', 'start', $event)"
+      @change="record('toolb', 'change', $event)"
+      @end="record('toolb', 'end', $event)"
+      @add="record('toolb', 'add', $event)"
+      @remove="record('toolb', 'remove', $event)"
+    >
+      <template #default="{ item, instructionsId }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+        </span>
+      </template>
+    </SortableList>
+    <ol class="state-list state-toolb">
+      <li r-for="item, index in $data.toolb" :key="item.id">{{ item.label }}</li>
+    </ol>
+  </section>
+  <output data-testid="last-end">{{ $data.lastEnd }}</output>
   <ol class="event-log">
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
   </ol>
@@ -468,6 +758,7 @@ $onMount(() => seed())
   gap: 0.5rem;
   padding: 0.25rem 0 0.25rem 1.5rem;
 }
+.zones-demo :deep(.toolbar) { display: flex; gap: 0.25rem; }
 .state-list, .event-log { font-size: 0.75rem; margin: 0.25rem 0; }
 </style>
 
