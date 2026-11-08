@@ -204,7 +204,7 @@
             },
             {
               "name": "list-label",
-              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`.",
+              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1`, `Dropped Hero banner in Top sidebar at position 3`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
               "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme",
               "type": [
                 "string"

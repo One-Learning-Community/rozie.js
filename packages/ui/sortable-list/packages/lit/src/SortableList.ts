@@ -1,11 +1,11 @@
 import { LitElement, css, html } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
-import { SignalWatcher, signal } from '@lit-labs/preact-signals';
+import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { useSortableJS } from './internal/useSortableJS';
-import { getKeyboardRegistry, nextInstructionsId } from './internal/keyboardRegistry';
+import { canHop, getKeyboardRegistry, nextInstructionsId } from './internal/keyboardRegistry';
 
 interface RozieDefaultSlotCtx {
   item: any;
@@ -124,7 +124,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: String, attribute: 'item-class' }) itemClass: string | any[] | any | (((...args: any[]) => any) | null) = '';
   /**
-   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`.
+   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1`, `Dropped Hero banner in Top sidebar at position 3`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.
    */
   @property({ type: String, reflect: true, attribute: 'list-label' }) listLabel: string | null = null;
   /**
@@ -146,6 +146,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   private _liftedIndex = signal<any>(null);
   private _ariaLiveText = signal('');
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
+private __rozieWatchInitial_11 = true;
 private __rozieFirstUpdateDone = false;
 
   private _rozieSlotDistributor = new RozieSlotDistributor(this);
@@ -224,11 +225,21 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push((() => {
       this.instance?.destroy();
+      // Unmounting while holding a keyboard lift ends it (with its `end` event,
+      // which some targets may no longer deliver during unmount).
+      if (this.registry.lift != null && this.registry.lift.holder === this.entry) this.loseLift();
       this.unregisterEntry?.();
       this.unregisterEntry = null;
       this.unhookNativeEvents?.();
       this.unhookNativeEvents = null;
+      this.unhookStrayKeys?.();
+      this.unhookStrayKeys = null;
     }));
+
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.items)(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } (() => {
+      const lift = this.registry.lift;
+      if (lift != null && lift.holder === this.entry && this.registry.indexOfLift() < 0) this.loseLift();
+    })(); }); }));
 
     this.warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
@@ -324,11 +335,13 @@ private __rozieFirstUpdateDone = false;
     this.entry = {
       el: listEl,
       instructionsId: this.instructionsId,
-      group: () => this.resolveGroup(),
+      group: () => this.effectiveGroup(),
       label: () => this.listLabel,
       keyboardEnabled: () => this.keyboardEnabled(),
       items: () => this.items,
       keyOf: (item: any, i: any) => String(this.keyFor(item, i)),
+      labelOf: (item: any, i: any) => String(this.labelOf(item, i)),
+      onKey: (key: any, shift: any) => this.holderKey(key, shift),
       write: (next: any) => {
         this._itemsControllable.write(next);
       },
@@ -369,6 +382,9 @@ private __rozieFirstUpdateDone = false;
       }
     };
     this.unregisterEntry = this.registry.register(this.entry);
+    const strayKey = (ev: any) => this.onStrayKey(ev);
+    document.addEventListener('keydown', strayKey);
+    this.unhookStrayKeys = () => document.removeEventListener('keydown', strayKey);
     // $onMount's cleanup-return: closing over a setup-local (`sortable`) does
     // not survive the Solid emitter's setup/cleanup split — it scopes cleanup
     // outside the setup IIFE. Closing over `instance` / `unregisterEntry`
@@ -441,6 +457,9 @@ private __rozieFirstUpdateDone = false;
 
   // Removes the listeners that keep SortableJS's own DOM events inside the list.
   unhookNativeEvents: any = null;
+
+  // Removes the document keydown listener that catches keys lost to <body>.
+  unhookStrayKeys: any = null;
 
   // SortableJS also dispatches its events as BUBBLING native DOM events
   // (`start`, `end`, `change`, `add`, …) on the list element, before it calls
@@ -518,6 +537,14 @@ private __rozieFirstUpdateDone = false;
   pull: 'clone' as const,
   put: true as const
 } : this.group ?? undefined;
+
+  // The group SortableJS actually runs with: `options.group` lands after the
+  // named props in the merge, so it wins. Keyboard hops follow the same rules
+  // as the mouse, so they read this one.
+  effectiveGroup = () => {
+  const o: any = this.options;
+  return o != null && o.group != null ? o.group : this.resolveGroup();
+};
 
   // Resolve itemClass for a row: a static value (string | array | object) OR a
   // per-row (item, index) => class function. The result is fed into the :class
@@ -662,6 +689,38 @@ private __rozieFirstUpdateDone = false;
   return null;
 };
 
+  // Speak `text` from `target`'s aria-live region. The region that spoke last
+  // is cleared when it belongs to another list, so a message is heard once, from
+  // the list the row is in now, and never from a list that just lost it.
+  speak = (target: any, text: any) => {
+  const prev = this.registry.speaker;
+  if (prev != null && prev !== target && this.registry.has(prev)) prev.announce('');
+  this.registry.speaker = target;
+  target.announce(text);
+};
+
+  // The lifted item is no longer in the list holding it: the consumer changed
+  // that list's items, or the list is unmounting. End the lift without writing
+  // anything (the item is wherever the consumer's data put it). `end` still
+  // fires once, with `item: null` and `data` = the lifted value, so keyboard
+  // `start` / `end` always pair.
+  loseLift = () => {
+  const lift = this.registry.lift;
+  if (!lift) return;
+  const h = lift.holder;
+  this.registry.lift = null;
+  h.setLifted(null);
+  h.emit('end', {
+    interaction: 'keyboard',
+    item: null,
+    data: lift.data,
+    from: lift.origin.list.el,
+    to: h.el,
+    oldIndex: lift.origin.index,
+    newIndex: -1
+  });
+};
+
   // Keyboard `start` / `end` payload, shaped like SortableJS's pointer event:
   // `item` is the row element, `data` the item value. `start` fires from the
   // origin list (`from`), `end` from the list the row ends up in (`to`). Reads
@@ -689,10 +748,7 @@ private __rozieFirstUpdateDone = false;
   const h = lift.holder;
   const from = this.registry.indexOfLift();
   if (from < 0) {
-    // The lifted item is no longer in its list (the consumer changed the
-    // items). End the lift without writing anything.
-    this.registry.lift = null;
-    h.setLifted(null);
+    this.loseLift();
     return;
   }
   const items = h.items();
@@ -701,13 +757,16 @@ private __rozieFirstUpdateDone = false;
   const next = [...items];
   const [moved] = next.splice(from, 1);
   next.splice(to, 0, moved);
-  h.write(next);
   // Index keys (primitive items without itemKey) change with the position.
+  // Update the lift BEFORE writing: a target whose watchers run synchronously
+  // on the write must already see where the row is going.
   lift.key = h.keyOf(moved, to);
+  h.write(next);
   h.setLifted(to);
   // Name the row that MOVED from the local `moved` item: on React/Vue/Lit the
-  // items prop still holds the pre-write array here.
-  h.announce('Moved ' + this.labelOf(moved, to) + ' to position ' + (to + 1));
+  // items prop still holds the pre-write array here. Labels come from the
+  // holder's own `labelFor`.
+  this.speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
   h.focusRow(moved, to);
   h.emit('change', {
     oldIndex: from,
@@ -717,8 +776,96 @@ private __rozieFirstUpdateDone = false;
   });
 };
 
+  // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
+  // also reach by mouse, in composed-tree source order. One hand-off: the source
+  // writes its items without the row and emits `remove`, the destination writes
+  // them with it and emits `add`, and the destination becomes the holder. A
+  // forward hop lands first, a backward hop lands last.
+  hop = (dir: any) => {
+  const lift = this.registry.lift;
+  if (!lift) return;
+  const from = lift.holder;
+  const i = this.registry.indexOfLift();
+  if (i < 0) {
+    this.loseLift();
+    return;
+  }
+  const fromItems = from.items();
+  const data = fromItems[i];
+  // Keep the lifted row element current: lists nested inside it (a grid
+  // widget's columns) are never hop targets. Before a target re-renders the
+  // row may not exist yet, so keep the last known element then.
+  lift.liftedRowEl = from.rowEl(i) ?? lift.liftedRowEl;
+  const to = this.registry.findHopTarget(from, dir);
+  if (to == null) {
+    this.speak(from, (dir === 1 ? 'No list after ' : 'No list before ') + this.registry.listName(from));
+    return;
+  }
+  const origin = lift.origin;
+  const toItems = to.items();
+  // A clone copy hopping back into the list it was cloned from merges with
+  // its original there (that list never gave it up), rather than adding a
+  // second row with the same key.
+  if (lift.copy && to === origin.list) {
+    let home = toItems.indexOf(data);
+    if (home < 0) home = Math.max(0, Math.min(toItems.length - 1, origin.index));
+    lift.holder = to;
+    lift.copy = false;
+    lift.key = to.keyOf(toItems[home], home);
+    const rest = [...fromItems];
+    rest.splice(i, 1);
+    from.write(rest);
+    from.emit('remove', {
+      oldIndex: i,
+      item: data,
+      interaction: 'keyboard'
+    });
+    from.setLifted(null);
+    to.setLifted(home);
+    this.speak(to, 'Moved ' + to.labelOf(data, home) + ' to ' + this.registry.listName(to) + ', position ' + (home + 1));
+    to.focusRow(toItems[home], home);
+    return;
+  }
+  // The first hop out of a clone source (`pull: 'clone'`) leaves the source
+  // untouched and carries a copy (the same item value the mouse path
+  // inserts); from then on the copy moves like any row.
+  const cloneOut = canHop(from.group(), to.group()).copy && from === origin.list && !lift.copy;
+  const at = dir === 1 ? 0 : toItems.length;
+  // Update the lift BEFORE writing, so a target whose watchers run
+  // synchronously on a write already sees the new holder.
+  lift.holder = to;
+  lift.key = to.keyOf(data, at);
+  lift.hopped = true;
+  if (cloneOut) {
+    lift.copy = true;
+  } else {
+    const rest = [...fromItems];
+    rest.splice(i, 1);
+    from.write(rest);
+    from.emit('remove', {
+      oldIndex: i,
+      item: data,
+      interaction: 'keyboard'
+    });
+  }
+  const next = [...toItems];
+  next.splice(at, 0, data);
+  to.write(next);
+  to.emit('add', {
+    newIndex: at,
+    item: data,
+    interaction: 'keyboard'
+  });
+  from.setLifted(null);
+  to.setLifted(at);
+  this.speak(to, 'Moved ' + to.labelOf(data, at) + ' to ' + this.registry.listName(to) + ', position ' + (at + 1));
+  to.focusRow(data, at);
+};
+
   // End the active keyboard lift. 'drop' leaves the row where it is; 'cancel'
-  // returns it to the position it was lifted from. Emits `end` once.
+  // returns it to the list and position it was lifted from (after hops, a
+  // reverse hand-off with its own `remove` / `add`; a clone copy is removed).
+  // Emits `end` once, from the list the row ends up in.
   endLift = (kind: any) => {
   const lift = this.registry.lift;
   if (!lift) return;
@@ -726,23 +873,36 @@ private __rozieFirstUpdateDone = false;
   const origin = lift.origin;
   const at = this.registry.indexOfLift();
   if (at < 0) {
-    this.registry.lift = null;
-    h.setLifted(null);
+    this.loseLift();
     return;
   }
   const items = h.items();
   const item = items[at];
-  let finalIndex = at;
+  const name = (e: any) => this.registry.listName(e);
   if (kind === 'drop') {
-    h.announce('Dropped ' + this.labelOf(item, at) + ' at position ' + (at + 1));
-  } else if (h === origin.list) {
+    this.speak(h, h === origin.list ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
+    h.setLifted(null);
+    this.keyboardStartEnd('end', origin.list, h, origin.index, at);
+    this.registry.lift = null;
+    return;
+  }
+  if (h !== origin.list && !this.registry.has(origin.list)) {
+    // The origin list has unmounted: there is nowhere to return to, so the
+    // row stays where it is (the lift ends as a drop at its position).
+    this.speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
+    h.setLifted(null);
+    this.keyboardStartEnd('end', origin.list, h, origin.index, at);
+    this.registry.lift = null;
+    return;
+  }
+  if (h === origin.list) {
     const to = Math.max(0, Math.min(items.length - 1, origin.index));
     if (to !== at) {
       const next = [...items];
       next.splice(at, 1);
       next.splice(to, 0, item);
-      h.write(next);
       lift.key = h.keyOf(item, to);
+      h.write(next);
       h.focusRow(item, to);
       h.emit('change', {
         oldIndex: at,
@@ -751,11 +911,48 @@ private __rozieFirstUpdateDone = false;
         interaction: 'keyboard'
       });
     }
-    finalIndex = to;
-    h.announce('Cancelled. ' + this.labelOf(item, to) + ' returned to position ' + (to + 1));
+    this.speak(h, lift.hopped ? 'Cancelled. ' + h.labelOf(item, to) + ' returned to ' + name(h) + ', position ' + (to + 1) : 'Cancelled. ' + h.labelOf(item, to) + ' returned to position ' + (to + 1));
+    h.setLifted(null);
+    this.keyboardStartEnd('end', origin.list, h, origin.index, to);
+    this.registry.lift = null;
+    return;
+  }
+  // Reverse hand-off from the current holder back to the origin list.
+  const home = origin.list;
+  const homeItems = home.items();
+  let back;
+  if (lift.copy) {
+    // The clone source never gave its item up: drop the copy, focus the
+    // original.
+    back = homeItems.indexOf(item);
+    if (back < 0) back = Math.max(0, Math.min(homeItems.length - 1, origin.index));
+  } else {
+    back = Math.min(origin.index, homeItems.length);
+  }
+  lift.holder = home;
+  lift.key = home.keyOf(item, back);
+  const rest = [...items];
+  rest.splice(at, 1);
+  h.write(rest);
+  h.emit('remove', {
+    oldIndex: at,
+    item,
+    interaction: 'keyboard'
+  });
+  if (!lift.copy) {
+    const next = [...homeItems];
+    next.splice(back, 0, item);
+    home.write(next);
+    home.emit('add', {
+      newIndex: back,
+      item,
+      interaction: 'keyboard'
+    });
   }
   h.setLifted(null);
-  this.keyboardStartEnd('end', origin.list, h, origin.index, finalIndex);
+  this.speak(home, 'Cancelled. ' + home.labelOf(item, back) + ' returned to ' + name(home) + ', position ' + (back + 1));
+  home.focusRow(lift.copy ? homeItems[back] : item, back);
+  this.keyboardStartEnd('end', home, home, origin.index, back);
   this.registry.lift = null;
 };
 
@@ -768,6 +965,7 @@ private __rozieFirstUpdateDone = false;
     key: this.entry.keyOf(item, index),
     data: item,
     copy: false,
+    hopped: false,
     origin: {
       list: this.entry,
       index
@@ -775,7 +973,7 @@ private __rozieFirstUpdateDone = false;
     liftedRowEl: this.entry.rowEl(index)
   };
   this._liftedIndex.value = index;
-  this._ariaLiveText.value = 'Lifted ' + this.labelOf(item, index);
+  this.speak(this.entry, 'Lifted ' + this.labelOf(item, index));
   this.keyboardStartEnd('start', this.entry, this.entry, index, index);
 };
 
@@ -799,40 +997,77 @@ private __rozieFirstUpdateDone = false;
   // tabindex and can't receive focus, but a consumer-focused row (or a
   // programmatic .focus()) must still no-op here rather than reorder.
   if (!this.keyboardEnabled()) return;
-  const key = $event.key;
+  // While a lift exists, every reorder key in ANY list acts on the list that
+  // holds it. That covers a key landing on the old row before the frameworks
+  // re-render after a hop, and Space/Enter in another list (it drops the
+  // active lift rather than starting a second one).
   const lift = this.registry.lift;
-  const liftedHere = lift != null && lift.holder === this.entry;
-  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift/drop.
-  if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
-    $event.preventDefault();
-    if (liftedHere) {
-      this.endLift('drop');
-      return;
-    }
-    // A lift still active in another list ends (as a drop) before this one.
-    if (lift != null) this.endLift('drop');
-    this.startLift(index);
+  if (lift != null) {
+    if (lift.holder.onKey($event.key, !!$event.shiftKey)) $event.preventDefault();
     return;
   }
-  // Every other key acts only while a row of this list is lifted, so it never
-  // steals keys from fields inside a row.
-  if (!liftedHere) return;
-  if (key === 'Escape') {
+  const key = $event.key;
+  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift.
+  if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
     $event.preventDefault();
+    this.startLift(index);
+  }
+};
+
+  // A reorder key for the lift THIS list holds (routed here from any list via
+  // the registry entry's onKey). Returns true when the key was handled. Every
+  // key except Space/Enter acts only while lifted, so it never steals keys from
+  // fields inside a row.
+  holderKey = (key: any, shift: any) => {
+  const lift = this.registry.lift;
+  if (lift == null || lift.holder !== this.entry) return false;
+  if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
+    this.endLift('drop');
+    return true;
+  }
+  if (key === 'Escape') {
     this.endLift('cancel');
-    return;
+    return true;
   }
   const horizontal = this.orientation === 'horizontal';
   const prevKey = horizontal ? 'ArrowLeft' : 'ArrowUp';
   const nextKey = horizontal ? 'ArrowRight' : 'ArrowDown';
+  if (shift && (key === nextKey || key === prevKey)) {
+    // Hopping is on wherever a group is set; an ungrouped list ignores it.
+    if (this.effectiveGroup() == null) return false;
+    this.hop(key === nextKey ? 1 : -1);
+    return true;
+  }
   const from = this.registry.indexOfLift();
+  if (from < 0) {
+    this.loseLift();
+    return false;
+  }
   // pageStep below 1 (or not a number) still moves by at least one position.
   const step = Math.max(1, Math.floor(Number(this.pageStep) || 1));
   let to: any = null;
-  if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = this.items.length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
-  if (to === null) return;
-  $event.preventDefault();
+  if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = this.entry.items().length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
+  if (to === null) return false;
   this.moveLiftTo(to);
+  return true;
+};
+
+  // A key pressed while focus has fallen to <body> during a lift. A hop removes
+  // the focused row from one list and the destination may render (and take
+  // focus) only after the handler returns (Angular), so the next key of a fast
+  // burst can reach <body>. The list holding the lift handles it as if it had
+  // landed on the lifted row, then puts focus back on that row.
+  onStrayKey = (ev: any) => {
+  const lift = this.registry.lift;
+  if (lift == null || lift.holder !== this.entry) return;
+  const t = ev.target;
+  if (t !== document.body && t !== document.documentElement) return;
+  const data = lift.data;
+  const at = this.registry.indexOfLift();
+  if (!this.holderKey(ev.key, !!ev.shiftKey)) return;
+  ev.preventDefault();
+  const now = this.registry.lift;
+  if (now != null) now.holder.focusRow(now.data, this.registry.indexOfLift());else if (at >= 0) this.entry.focusRow(data, at);
 };
 
   // SortableJS wiring lives in `useSortableJS()` (./internal/useSortableJS).

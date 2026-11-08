@@ -34,6 +34,8 @@ function fakeEntry(node: HTMLElement, group: GroupOption, opts: FakeOpts = {}): 
     keyboardEnabled: () => opts.enabled ?? true,
     items: () => [],
     keyOf: (_i, idx) => String(idx),
+    labelOf: (item) => String(item),
+    onKey: () => false,
     write: () => {},
     setLifted: () => {},
     announce: () => {},
@@ -179,7 +181,7 @@ describe('registry', () => {
     const ec = fakeEntry(el(), 'z');
     reg(ea); reg(en); reg(ec);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: '0', data: null, copy: false, origin: { list: ea, index: 0 }, liftedRowEl: row };
+    r.lift = { holder: ea, key: '0', data: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: row };
     expect(r.findHopTarget(ea, 1)).toBe(ec);
   });
 
@@ -199,9 +201,21 @@ describe('registry', () => {
     const ea = fakeEntry(el(), 'z');
     const un = reg(ea);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: '0', data: null, copy: false, origin: { list: ea, index: 0 }, liftedRowEl: null };
+    r.lift = { holder: ea, key: '0', data: null, copy: false, hopped: false, origin: { list: ea, index: 0 }, liftedRowEl: null };
     un();
     expect(r.lift).toBeNull();
+  });
+
+  it('has() tracks registration; unregister clears the speaker', () => {
+    const ea = fakeEntry(el(), 'z');
+    const r = getKeyboardRegistry();
+    expect(r.has(ea)).toBe(false);
+    const un = reg(ea);
+    expect(r.has(ea)).toBe(true);
+    r.speaker = ea;
+    un();
+    expect(r.has(ea)).toBe(false);
+    expect(r.speaker).toBeNull();
   });
 
   it('indexOfLift finds the key in holder items, -1 when gone', () => {
@@ -210,7 +224,7 @@ describe('registry', () => {
     ea.keyOf = (it) => String(it);
     reg(ea);
     const r = getKeyboardRegistry();
-    r.lift = { holder: ea, key: 'q', data: 'q', copy: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
+    r.lift = { holder: ea, key: 'q', data: 'q', copy: false, hopped: false, origin: { list: ea, index: 1 }, liftedRowEl: null };
     expect(r.indexOfLift()).toBe(1);
     r.lift.key = 'gone';
     expect(r.indexOfLift()).toBe(-1);

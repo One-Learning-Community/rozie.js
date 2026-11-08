@@ -19,6 +19,14 @@ export interface ListEntry {
   keyboardEnabled(): boolean;
   items(): readonly unknown[];
   keyOf(item: unknown, index: number): string;
+  /** The screen-reader label of one of this list's items (its `labelFor`). */
+  labelOf(item: unknown, index: number): string;
+  /**
+   * Handle a reorder key for the lift this list holds. Keys pressed in any
+   * list while a lift exists are routed here, to the holder. Returns true
+   * when the key was handled (the caller then calls preventDefault).
+   */
+  onKey(key: string, shift: boolean): boolean;
   write(next: unknown[]): void;
   setLifted(index: number | null): void;
   announce(text: string): void;
@@ -32,13 +40,18 @@ export interface Lift {
   key: string;
   data: unknown;
   copy: boolean;
+  /** True once the row has hopped out of its origin list. */
+  hopped: boolean;
   origin: { list: ListEntry; index: number };
   liftedRowEl: HTMLElement | null;
 }
 
 export interface KeyboardRegistry {
   register(entry: ListEntry): () => void;
+  has(entry: ListEntry): boolean;
   lift: Lift | null;
+  /** The list whose aria-live region spoke last (cleared when another speaks). */
+  speaker: ListEntry | null;
   orderedLists(): ListEntry[];
   findHopTarget(from: ListEntry, dir: 1 | -1): ListEntry | null;
   listName(entry: ListEntry): string;
@@ -185,12 +198,17 @@ function createState(): Singleton {
   const entries = new Set<ListEntry>();
   const registry: KeyboardRegistry = {
     lift: null,
+    speaker: null,
     register(entry) {
       entries.add(entry);
       return () => {
         entries.delete(entry);
         if (registry.lift && registry.lift.holder === entry) registry.lift = null;
+        if (registry.speaker === entry) registry.speaker = null;
       };
+    },
+    has(entry) {
+      return entries.has(entry);
     },
     orderedLists() {
       return [...entries].sort((x, y) => composedCompare(x.el, y.el));
