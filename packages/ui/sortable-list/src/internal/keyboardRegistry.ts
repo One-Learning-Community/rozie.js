@@ -145,15 +145,15 @@ function norm(g: GroupOption): NormGroup | null {
  * an absent `put` means same-group-name only; `put: true` accepts any group;
  * a string / array `put` lists accepted source group names; `pull` may be
  * `false`, `'clone'`, or a list of target group names. Function-valued
- * pull/put cannot be evaluated without a drag event, so those lists are
- * unreachable by keyboard.
+ * pull/put cannot be evaluated without a drag event, so such hops are
+ * unreachable by keyboard (a function on the source's put or target's pull is irrelevant to the hop).
  */
 export function canHop(from: GroupOption, to: GroupOption): { ok: boolean; copy: boolean } {
   const no = { ok: false, copy: false };
   const f = norm(from);
   const t = norm(to);
   if (!f || !t) return no;
-  for (const v of [f.pull, f.put, t.pull, t.put]) if (typeof v === 'function') return no;
+  for (const v of [f.pull, t.put]) if (typeof v === 'function') return no;
   const same = f.name != null && f.name === t.name;
 
   let copy = false;

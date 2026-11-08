@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import {
   canHop,
   composedCompare,
@@ -49,7 +49,6 @@ function reg(entry: ListEntry) {
   return un;
 }
 
-import { afterEach } from 'vitest';
 afterEach(() => {
   while (cleanups.length) cleanups.pop()!();
   getKeyboardRegistry().lift = null;
@@ -85,6 +84,10 @@ describe('canHop', () => {
   it('function pull or put is unreachable', () => {
     expect(canHop({ name: 'a', pull: () => true }, 'a').ok).toBe(false);
     expect(canHop('a', { name: 'a', put: () => true }).ok).toBe(false);
+  });
+  it('function on the irrelevant side still hops', () => {
+    expect(canHop('a', { name: 'a', pull: () => true }).ok).toBe(true);
+    expect(canHop({ name: 'a', put: () => true }, 'a').ok).toBe(true);
   });
 });
 
@@ -151,6 +154,13 @@ describe('registry', () => {
     const ea = fakeEntry(el(), 'z'), eb = fakeEntry(el(), 'z', { enabled: false }), ec = fakeEntry(el(), 'z');
     reg(ea); reg(eb); reg(ec);
     expect(getKeyboardRegistry().findHopTarget(ea, 1)).toBe(ec);
+  });
+
+  it('findHopTarget returns null for a pull:false source', () => {
+    const ea = fakeEntry(el(), { name: 'z', pull: false });
+    const eb = fakeEntry(el(), 'z');
+    reg(ea); reg(eb);
+    expect(getKeyboardRegistry().findHopTarget(ea, 1)).toBeNull();
   });
 
   it('findHopTarget skips put:false', () => {
