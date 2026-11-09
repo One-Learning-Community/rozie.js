@@ -592,6 +592,43 @@ for (const target of TARGETS) {
     },
   );
 
+  // The list a row hops into unmounts in its own `add` handler while holding
+  // the lift: it never emits again; the origin list (the `start` host) ends
+  // the lift, so `start` and `end` pair.
+  for (const burst of [false, true]) {
+    runner(
+      `sortable-keyboard-cross-list [${target}]: the origin ends a lift whose holder unmounted in its add handler${burst ? ', back-to-back (no waits)' : ''}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await clickKeepingFocus(mount, 'top-unmount-on-add');
+        await grip(mount, 'Hero banner').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowUp']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Hero banner, position 1 of 4']);
+          await page.keyboard.press('Shift+ArrowUp');
+        }
+        await expect(mount.locator('[role="list"][aria-label="Top sidebar"]')).toHaveCount(0);
+        await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Newsletter', 'Tag cloud', 'Hero banner']);
+        await expect.poll(() => state(mount, 'content')).toEqual(SEED.content.filter((l) => l !== 'Hero banner'));
+        await expect
+          .poll(() => texts(mount.locator(LOG_LI)))
+          .toEqual(['content:start:keyboard', 'top:add:keyboard', 'content:remove:keyboard', 'content:end:keyboard']);
+        await page.waitForTimeout(300);
+        expect(await texts(mount.locator(LOG_LI))).toEqual([
+          'content:start:keyboard',
+          'top:add:keyboard',
+          'content:remove:keyboard',
+          'content:end:keyboard',
+        ]);
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+  }
+
   runner(
     `sortable-keyboard-cross-list [${target}]: Escape after the origin list unmounts keeps the row where it is`,
     async ({ page }) => {

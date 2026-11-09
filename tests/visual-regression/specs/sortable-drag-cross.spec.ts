@@ -332,11 +332,12 @@ for (const target of TARGETS) {
     },
   );
 
-  // The destination unmounts in its own `add` handler: its pending `end` is
-  // dropped (an unmounted list emits nothing; Angular would log "Unexpected
-  // emit for destroyed OutputRef"), and no other list emits it instead.
+  // The destination unmounts in its own `add` handler: the unmounted list
+  // never emits (Angular would log "Unexpected emit for destroyed
+  // OutputRef"); the `end` comes from the origin list instead, so `start` and
+  // `end` still pair, with `to` still the destination's list element.
   runner(
-    `sortable-drag-cross [${target}]: no end from a destination that unmounted in its add handler`,
+    `sortable-drag-cross [${target}]: the origin ends a drag whose destination unmounted in its add handler`,
     async ({ page }) => {
       const { mount, errors } = await openZones(page);
       await mount.getByTestId('top-unmount-on-add').evaluate((b) => (b as HTMLElement).click());
@@ -344,8 +345,11 @@ for (const target of TARGETS) {
       await expect(mount.locator('[role="list"][aria-label="Top sidebar"]')).toHaveCount(0);
       await expect.poll(async () => [...(await zoneState(mount, 'top'))].sort()).toEqual(['Newsletter', 'Recent posts', 'Search', 'Tag cloud']);
       await expect.poll(() => zoneState(mount, 'bottom')).toEqual(['Contact']);
+      await expect
+        .poll(() => texts(mount.locator(LOG_LI)))
+        .toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer', 'bottom:end:pointer']);
       await page.waitForTimeout(300);
-      expect(await texts(mount.locator(LOG_LI))).toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer']);
+      expect(await texts(mount.locator(LOG_LI))).toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer', 'bottom:end:pointer']);
       expect(errors).toEqual([]);
     },
   );

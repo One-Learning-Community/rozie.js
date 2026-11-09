@@ -104,14 +104,17 @@ export interface KeyboardRegistry {
   listName(entry: ListEntry): string;
   indexOfLift(): number;
   /**
-   * Run `fire` (an `end` emit from `owner`) in a task, after every write made
-   * so far and whatever framework flush those writes scheduled
-   * (`afterFlush`). Pending ends run in order; `flushEnds()` runs them now.
-   * An unmounted list emits nothing: when `owner` unregisters first, or its
-   * list element has left the page by the time the end runs, its pending ends
-   * are dropped, and none is queued for an owner that isn't registered.
+   * Run `fire` (an `end` emit) in a task, after every write made so far and
+   * whatever framework flush those writes scheduled (`afterFlush`). Pending
+   * ends run in order; `flushEnds()` runs them now. `fire` gets the list to
+   * emit from, chosen when it runs: `owner` (the list the row ended up in)
+   * while it is mounted, else `fallback` (the list that emitted `start`)
+   * while that one is, else nothing runs — an unmounted list never emits.
+   * "Mounted" is registered with its list element in the page (React runs
+   * the cleanup that unregisters after the commit that removed it). With
+   * neither given, `fire` runs with null.
    */
-  deferEnd(fire: () => void, owner?: ListEntry | null): void;
+  deferEnd(fire: (host: ListEntry | null) => void, owner?: ListEntry | null, fallback?: ListEntry | null): void;
   /** Run every pending `end` now (before a new drag or lift emits `start`). */
   flushEnds(): void;
 }
@@ -366,7 +369,13 @@ export function canHop(from: GroupOption, to: GroupOption): { ok: boolean; copy:
 
 function createState(): Singleton {
   const entries = new Set<ListEntry>();
-  const pendingEnds: Array<{ fire: () => void; owner: ListEntry | null }> = [];
+  const pendingEnds: Array<{
+    fire: (host: ListEntry | null) => void;
+    owner: ListEntry | null;
+    fallback: ListEntry | null;
+  }> = [];
+  const mounted = (e: ListEntry | null): e is ListEntry =>
+    e != null && entries.has(e) && (e.el == null || e.el.isConnected !== false);
   const known = new WeakSet<HTMLElement>();
   const registry: KeyboardRegistry = {
     lift: null,
@@ -376,9 +385,6 @@ function createState(): Singleton {
       if (entry.el) known.add(entry.el);
       return () => {
         entries.delete(entry);
-        for (let i = pendingEnds.length - 1; i >= 0; i--) {
-          if (pendingEnds[i]!.owner === entry) pendingEnds.splice(i, 1);
-        }
         if (registry.lift && registry.lift.holder === entry) registry.lift = null;
         if (registry.speaker === entry) registry.speaker = null;
       };
@@ -439,19 +445,19 @@ function createState(): Singleton {
       l.index = i;
       return i;
     },
-    deferEnd(fire, owner = null) {
-      if (owner != null && !entries.has(owner)) return;
-      pendingEnds.push({ fire, owner });
+    deferEnd(fire, owner = null, fallback = null) {
+      pendingEnds.push({ fire, owner, fallback });
       afterFlush(() => registry.flushEnds());
     },
     flushEnds() {
       while (pendingEnds.length > 0) {
         const p = pendingEnds.shift()!;
-        // A list whose element has left the page has unmounted, even if its
-        // framework runs the cleanup that unregisters it later (React runs
-        // effect cleanups after the commit that removed the element).
-        if (p.owner != null && p.owner.el != null && p.owner.el.isConnected === false) continue;
-        p.fire();
+        if (p.owner == null && p.fallback == null) {
+          p.fire(null);
+          continue;
+        }
+        const host = mounted(p.owner) ? p.owner : mounted(p.fallback) ? p.fallback : null;
+        if (host != null) p.fire(host);
       }
     },
   };

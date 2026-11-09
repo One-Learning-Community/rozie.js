@@ -267,7 +267,42 @@ describe('registry', () => {
     r.flushEnds();
     expect(order).toEqual([]);
   });
-    it('wasList() knows an element that was a registered list, after it unregisters', () => {
+    it('a pending end whose list is gone runs from its fallback (the origin) when that is still mounted', () => {
+    const r = getKeyboardRegistry();
+    const a = el();
+    const b = el();
+    const ea = fakeEntry(a, 'z');
+    const eb = fakeEntry(b, 'z');
+    const unA = reg(ea);
+    const unB = reg(eb);
+    const hosts: unknown[] = [];
+    // Destination unregistered.
+    r.deferEnd((h) => hosts.push(h), ea, eb);
+    unA();
+    r.flushEnds();
+    expect(hosts).toEqual([eb]);
+    // Destination's element left the page (cleanup comes later).
+    const c = el();
+    const ec = fakeEntry(c, 'z');
+    reg(ec);
+    r.deferEnd((h) => hosts.push(h), ec, eb);
+    c.remove();
+    r.flushEnds();
+    expect(hosts).toEqual([eb, eb]);
+    // Both gone: nothing.
+    r.deferEnd((h) => hosts.push(h), ec, eb);
+    unB();
+    r.flushEnds();
+    expect(hosts).toEqual([eb, eb]);
+    // A live owner is used first.
+    const d = el();
+    const ed = fakeEntry(d, 'z');
+    reg(ed);
+    r.deferEnd((h) => hosts.push(h), ed, eb);
+    r.flushEnds();
+    expect(hosts).toEqual([eb, eb, ed]);
+  });
+  it('wasList() knows an element that was a registered list, after it unregisters', () => {
     const r = getKeyboardRegistry();
     const a = el();
     const un = reg(fakeEntry(a, 'z'));

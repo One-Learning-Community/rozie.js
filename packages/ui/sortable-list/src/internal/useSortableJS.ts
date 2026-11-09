@@ -64,6 +64,34 @@
 import SortableJS, { type Options as SortableOptions, type SortableEvent } from 'sortablejs';
 import { afterFlush } from './keyboardRegistry';
 
+/**
+ * Put `node` back into the SortableJS list `from` at `oldIndex`, which
+ * SortableJS counts among that list's `draggable` matches only (non-draggable
+ * children such as a header don't count). The selector is the list's own
+ * (`Sortable.get(from).options.draggable`), else SortableJS's default (`li`
+ * in a `<ul>` / `<ol>`, else any child). Past the last draggable sibling, the
+ * node goes right after it.
+ */
+function putBack(node: HTMLElement, from: HTMLElement, oldIndex: number | undefined): void {
+  const inst = (SortableJS as unknown as { get?: (el: HTMLElement) => { options?: { draggable?: unknown } } | undefined }).get?.(from);
+  const d = inst?.options?.draggable;
+  let sel = typeof d === 'string' && d.trim() !== '' ? d.trim() : /^[uo]l$/i.test(from.nodeName) ? 'li' : '*';
+  if (sel[0] === '>') sel = sel.slice(1).trim() || '*';
+  const matches = (el: Element): boolean => {
+    if (el.tagName === 'TEMPLATE') return false;
+    try {
+      return el.matches(sel);
+    } catch {
+      return true;
+    }
+  };
+  const rows = Array.from(from.children).filter((c) => c !== node && matches(c));
+  const at = typeof oldIndex === 'number' && oldIndex >= 0 ? oldIndex : rows.length;
+  if (at < rows.length) from.insertBefore(node, rows[at]!);
+  else if (rows.length > 0) from.insertBefore(node, rows[rows.length - 1]!.nextSibling);
+  else from.appendChild(node);
+}
+
 /** Symbol stashed on `e.item` between `onStart` and `onEnd` to ferry the
  * dragged item DATA (not just the DOM node) across cross-list moves and
  * survive `e.oldIndex` going null in fallback-mode events. The double
@@ -135,12 +163,13 @@ export interface UseSortableJSOptions<T> {
    * `handleCommit`). The caller decides which list
    * reports it (the one `info.to` belongs to). */
   onEnd?: (info: SortableDrag<T>) => void;
-  /** Optional: how `onEnd` is put off until after the writes' flushes. Called
-   * from a microtask queued after every list's commit, with a callback that
-   * calls `onEnd`; the default runs it via `afterFlush`. SortableList passes
-   * one that goes through its keyboard registry's `deferEnd`, so a pending
-   * `end` (pointer or keyboard) always fires before the next `start`. */
-  scheduleEnd?: (info: SortableDrag<T>, fire: () => void) => void;
+  /** Optional: takes over the end of the drag from `onEnd`. Called with the
+   * same info from a microtask queued after every list's commit; the caller
+   * puts off and emits the `end` itself. SortableList passes one that goes
+   * through its keyboard registry's `deferEnd`, so a pending `end` (pointer
+   * or keyboard) fires before the next `start`, never from an unmounted
+   * list, and from the origin when the destination has gone. */
+  scheduleEnd?: (info: SortableDrag<T>) => void;
   /** Optional: fires once per commit with the disambiguated event kind. */
   onChange?: (info: SortableChange<T>) => void;
   /** Optional: called immediately after `onCommit`. Used on Lit to invoke
@@ -471,8 +500,7 @@ export function useSortableJS<T>(
               node.remove();
               return;
             }
-            const at = typeof e.oldIndex === 'number' && e.oldIndex >= 0 ? e.oldIndex : from.children.length;
-            from.insertBefore(node, from.children[at] ?? null);
+            putBack(node, from, e.oldIndex);
           });
           return;
         }
@@ -557,10 +585,12 @@ export function useSortableJS<T>(
           newIndex: endNew,
           event: e,
         };
-        if (opts.onEnd) {
+        if (opts.scheduleEnd) {
+          const scheduleEnd = opts.scheduleEnd;
+          queueMicrotask(() => scheduleEnd(info));
+        } else if (opts.onEnd) {
           const onEnd = opts.onEnd;
-          const schedule = opts.scheduleEnd ?? ((_info: SortableDrag<T>, fire: () => void) => afterFlush(fire));
-          queueMicrotask(() => schedule(info, () => onEnd(info)));
+          queueMicrotask(() => afterFlush(() => onEnd(info)));
         }
       }
     }

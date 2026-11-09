@@ -288,8 +288,8 @@ private __rozieFirstUpdateDone = false;
 
     this._disconnectCleanups.push((() => {
       this.instance?.destroy();
-      // Unmounting while holding a keyboard lift ends it (with its `end` event,
-      // which some targets may no longer deliver during unmount).
+      // Unmounting while holding a keyboard lift ends it (its `end` comes from
+      // the origin list, if that one is still mounted).
       if (this.registry.lift != null && this.registry.lift.holder === this.entry) this.loseLift(true);
       this.unregisterEntry?.();
       this.unregisterEntry = null;
@@ -400,29 +400,27 @@ private __rozieFirstUpdateDone = false;
       // that isn't one of ours) this source list. It goes through the
       // registry's `deferEnd`, like a keyboard `end`: it fires in a task after
       // every list involved has written its items and the re-render those
-      // writes scheduled, before the next drag's or lift's `start`, and not at
-      // all if that list unmounts first. A destination that already unmounted
-      // (in its own `add` handler, say) gets no `end`, and no other list emits
-      // it instead.
-      scheduleEnd: (d: any, fire: any) => {
+      // writes scheduled, and before the next drag's or lift's `start`. An
+      // unmounted list never emits: if the destination has unmounted by then
+      // (in its own `add` handler, say), this list (the origin, which emitted
+      // `start`) emits it, `to` still the destination; if both are gone,
+      // nothing is emitted.
+      scheduleEnd: (d: any) => {
         const dest = this.registry.entryFor(d.to);
-        if (dest == null && d.to !== d.from && this.registry.wasList(d.to)) return;
-        this.registry.deferEnd(fire, dest ?? this.entry);
-      },
-      onEnd: (d: any) => {
-        const dest = this.registry.entryFor(d.to) ?? this.entry;
-        if (dest == null) return;
-        const row = d.item === undefined ? null : this.rowByKey(d.to, dest.keyOf(d.item, d.newIndex));
-        dest.emit('end', {
-          interaction: 'pointer',
-          item: d.item,
-          el: row ?? d.el,
-          from: d.from,
-          to: d.to,
-          oldIndex: d.oldIndex,
-          newIndex: d.newIndex,
-          originalEvent: d.event
-        });
+        const destGone = dest == null && d.to !== d.from && this.registry.wasList(d.to);
+        this.registry.deferEnd((host: any) => {
+          const row = d.item === undefined || host.el !== d.to ? null : this.rowByKey(d.to, host.keyOf(d.item, d.newIndex));
+          host.emit('end', {
+            interaction: 'pointer',
+            item: d.item,
+            el: row ?? d.el,
+            from: d.from,
+            to: d.to,
+            oldIndex: d.oldIndex,
+            newIndex: d.newIndex,
+            originalEvent: d.event
+          });
+        }, destGone ? null : dest ?? this.entry, this.entry);
       }
     });
     this.instance = sortable.instance;
@@ -1007,7 +1005,7 @@ private __rozieFirstUpdateDone = false;
   // that list's items (or re-keyed the item), or the list is unmounting. End the
   // lift without writing anything (the item is wherever the consumer's data put
   // it). `end` still fires once, with `item` = the lifted value and `el: null`
-  // (there is no row), so keyboard `start` / `end` always pair. Lost to a consumer change (not an
+  // (there is no row), so keyboard `start` / `end` pair (unless the holder and the origin have both unmounted). Lost to a consumer change (not an
   // unmount), the holder says `Lift ended` and, if focus fell to <body> with the
   // row, focuses its row nearest where the lifted row was.
   loseLift = (unmounting = false) => {
@@ -1029,9 +1027,12 @@ private __rozieFirstUpdateDone = false;
     oldIndex: lift.origin.index,
     newIndex: -1
   };
-  // Like every `end`, in a task after the writes. An unmounting list emits it
-  // now: a later emit from an unmounted component would not be delivered.
-  if (unmounting) h.emit('end', payload);else this.registry.deferEnd(() => h.emit('end', payload), h);
+  // Like every `end`, in a task after the writes, from the holder. An
+  // unmounted list never emits (Angular rejects an emit from a destroyed
+  // component): when the holder is unmounting, the origin list (which emitted
+  // `start`) ends the lift if it is still mounted, so `start` and `end` pair;
+  // if it is gone too, nothing is emitted.
+  this.registry.deferEnd((host: any) => host.emit('end', payload), h, lift.origin.list);
 };
 
   // Keyboard `start` / `end` (the same payload as every other event): `item` is
@@ -1044,20 +1045,20 @@ private __rozieFirstUpdateDone = false;
   // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
   // they schedule: a consumer `end` handler reads the new state on every target
   // (React included, whose handler closure is the one from the latest render).
-  // A list that unmounts before then emits nothing (its pending `end` is
-  // dropped).
+  // If `to` has unmounted by then, `from` (the origin, which emitted `start`)
+  // emits it instead, `to` unchanged in the payload; an unmounted list never
+  // emits.
   keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl: HTMLElement | null = null) => {
-  const host = name === 'start' ? from : to;
-  const fire = () => host.emit(name, {
+  const fire = (host: any) => host.emit(name, {
     interaction: 'keyboard',
     item: lift ? lift.item : null,
-    el: (lift ? this.rowByKey(host.el, lift.key) : null) ?? fallbackEl,
+    el: (lift && host === to ? this.rowByKey(host.el, lift.key) : null) ?? fallbackEl,
     from: from.el,
     to: to.el,
     oldIndex,
     newIndex
   });
-  if (name === 'end') this.registry.deferEnd(fire, host);else fire();
+  if (name === 'end') this.registry.deferEnd(fire, to, from);else fire(from);
 };
 
   // Move the lifted row to `toIndex` (clamped) within the list holding it.
@@ -1271,7 +1272,7 @@ private __rozieFirstUpdateDone = false;
     }
     // The copy is gone, so there is no row: `el: null`.
     const fromEl = origin.list.el;
-    this.registry.deferEnd(() => h.emit('end', {
+    this.registry.deferEnd((host: any) => host.emit('end', {
       interaction: 'keyboard',
       item,
       el: null,
@@ -1279,7 +1280,7 @@ private __rozieFirstUpdateDone = false;
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
-    }), h);
+    }), h, origin.list);
     return;
   }
   if (h !== origin.list && (!this.registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {

@@ -38,6 +38,9 @@ vi.mock('sortablejs', () => {
   }> = [];
   // biome-ignore lint/style/useNamingConvention: matches SortableJS API
   class MockSortable {
+    static get(el: unknown): unknown {
+      return (el as { __mockSortable?: unknown } | null)?.__mockSortable;
+    }
     constructor(listEl: HTMLElement, options: Record<string, unknown>) {
       const rec = { listEl, options, destroyed: false, optionCalls: [] };
       constructed.push(rec);
@@ -857,6 +860,28 @@ describe('end: after the write, once per drag', () => {
     expect(order).toEqual([]);
     expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['A', 'B', 'C']);
     expect(listEl.children.length).toBe(1);
+  });
+
+  it('a foreign row goes back at its draggable index, past a non-draggable header child', async () => {
+    const items: Item[] = [{ id: 'x' }];
+    const listEl = buildList(items);
+    const foreign = document.createElement('ul');
+    foreign.innerHTML = '<li class="hdr">H</li><li class="it">A</li><li class="it">B</li><li class="it">C</li>';
+    (foreign as unknown as { __mockSortable: unknown }).__mockSortable = { options: { draggable: '.it' } };
+    useSortableJS<Item>(listEl, { items: () => items, onCommit: () => {} });
+    const rec = getLastConstructed();
+    const dragged = foreign.children[2] as HTMLElement; // "B": draggable index 1
+    listEl.appendChild(dragged);
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({ item: dragged, oldIndex: 1, newIndex: 1, from: foreign, to: listEl });
+    await flushMicrotasks();
+    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['H', 'A', 'B', 'C']);
+    // The last draggable row goes back after its last draggable sibling.
+    const last = foreign.children[3] as HTMLElement; // "C": draggable index 2
+    foreign.insertAdjacentHTML('beforeend', '<li class="hdr">F</li>');
+    listEl.appendChild(last);
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({ item: last, oldIndex: 2, newIndex: 1, from: foreign, to: listEl });
+    await flushMicrotasks();
+    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['H', 'A', 'B', 'C', 'F']);
   });
 
   it('start and end indices are item-row indices (non-draggable header child)', async () => {

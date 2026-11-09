@@ -137,7 +137,7 @@ Order and source:
 
 - `start` fires from the origin list.
 - `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists, by mouse or keyboard, emits `add` from the destination and then `remove` from the source (a keyboard cancel that hands the row back does the same: `add` from the origin, then `remove` from the list it leaves).
-- `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. A list that unmounts before its pending `end` runs (for example, one your `add` handler removes) emits no `end`, and no other list emits it instead.
+- `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. An unmounted list never emits: if the list the row ended up in unmounts before its pending `end` runs (for example, one your `add` handler removes), the origin list (the one that emitted `start`) emits that `end`, with `to` still the unmounted list's element, so `start` and `end` still pair; only when the origin has unmounted too is no `end` emitted. A keyboard lift whose list unmounts mid-lift ends the same way.
 - `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end`, mouse or keyboard, comes before the next `start`.
 - Drops from a SortableJS list that is not a `SortableList` into a `SortableList` aren't supported: the row goes back where it came from and nothing is emitted (no `add`, no `end`). Use a `SortableList` on both sides.
 - A mouse drop back where the row started writes nothing and fires no `reorder`; `start` and `end` still fire, with `oldIndex === newIndex`.
@@ -159,6 +159,8 @@ Order and source:
 // Saves one zone's order; called from that zone's `remove` and `end`.
 const saveZone = (zone) => api.saveZone(zone, $data[zone].map((w) => w.id))
 ```
+
+If the destination unmounts before its `end` runs, the origin fires that `end` instead (`to` is the unmounted list's element); the destination's own handler never runs, so save the unmounted list from the code that removed it.
 
 Lists nested inside rows (a grid widget's columns) are lists of their own: a drop into a column fires `end` from the column, not from the zone holding the grid row. (On Lit the zone's listeners also hear the column's events; see the known limitations under [Scope](#scope).)
 
