@@ -141,7 +141,7 @@ const items = ref([
 </script>
 
 <SortableList bind:items itemKey="id">
-  {#snippet default({ item })}
+  {#snippet children({ item })}
     <span>{item.label}</span>
   {/snippet}
 </SortableList>`,
@@ -157,7 +157,7 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   imports: [SortableList],
   template: \`
     <rozie-sortable-list [items]="items" (itemsChange)="items = $event" itemKey="id">
-      <ng-template #default let-item="item">
+      <ng-template #defaultSlot let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
     </rozie-sortable-list>
@@ -182,36 +182,91 @@ export function Demo() {
   ]);
   return (
     <SortableList items={items()} onItemsChange={setItems} itemKey="id">
-      {({ item }) => <span>{item().label}</span>}
+      {({ item }) => <span>{item.label}</span>}
     </SortableList>
   );
 }`,
   },
   lit: {
     lang: 'ts',
-    code: `import '@rozie-ui/sortable-list-lit';
+    code: `import { html } from 'lit';
+import '@rozie-ui/sortable-list-lit'; // registers <rozie-sortable-list>
+import type { SortableList } from '@rozie-ui/sortable-list-lit';
 
-// <sortable-list> is a custom element. Bind \`items\` as a property and
-// listen for the \`items-change\` event to receive the reordered array.
-const el = document.querySelector('sortable-list');
+// The page holds <rozie-sortable-list></rozie-sortable-list>.
+const el = document.querySelector<SortableList>('rozie-sortable-list')!;
+el.itemKey = 'id';
 el.items = [
   { id: '1', label: 'Apple' },
   { id: '2', label: 'Banana' },
 ];
-el.itemKey = 'id';
+// Row content: a function from each row's { item, index, instructionsId }
+// to a lit template.
+el.__rozieDefaultSlot__ = ({ item }) => html\`<span>\${item.label}</span>\`;
+// \`items\` is two-way: the reordered array arrives in \`items-change\`.
 el.addEventListener('items-change', (e) => {
-  el.items = e.detail;
+  el.items = (e as CustomEvent<unknown[]>).detail;
 });`,
   },
 };
 
-const FRAMEWORK_PEER_LABEL = {
-  react: 'react + react-dom',
-  vue: 'vue',
-  svelte: 'svelte',
-  angular: '@angular/core + @angular/common',
-  solid: 'solid-js',
-  lit: 'lit',
+// ---------------------------------------------------------------------------
+// Per-framework event binding names and slot-filling notes (C14 / C15).
+// ---------------------------------------------------------------------------
+
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** How a consumer of `target` listens for the `ev` event. */
+export function eventBinding(target, ev) {
+  switch (target) {
+    case 'react':
+    case 'solid':
+      return `on${cap(ev)}`;
+    case 'vue':
+      return `@${ev}`;
+    case 'svelte':
+      return `on${ev}`;
+    case 'angular':
+      return `(${ev})`;
+    case 'lit':
+      return litEventName(ev);
+    default:
+      throw new Error(`eventBinding: unknown target "${target}"`);
+  }
+}
+
+/** How each framework receives the reordered `items` array. */
+const MODEL_BINDING = {
+  react: 'The reordered array arrives through `onItemsChange` (pair it with `items`; or pass `defaultItems` for an uncontrolled list).',
+  vue: 'The reordered array is written back through `v-model:items` (the `@update:items` event).',
+  svelte: 'The reordered array is written back through `bind:items`.',
+  angular: 'The reordered array is written back through `[(items)]` (the `(itemsChange)` output), or a forms directive (see Angular forms).',
+  solid: 'The reordered array arrives through `onItemsChange` (pair it with `items`).',
+  lit: 'The reordered array arrives in the `items-change` event (`e.detail`); set it back on `items`.',
+};
+
+const EVENT_PAYLOAD_NOTE = {
+  react: 'Each handler receives the payload.',
+  vue: 'Each handler receives the payload.',
+  svelte: 'Each handler receives the payload.',
+  angular: 'The payload is `$event`.',
+  solid: 'Each handler receives the payload.',
+  lit: 'Each event is a `CustomEvent`; the payload is `e.detail`.',
+};
+
+/** How each framework fills the row (default), `header` and `footer` slots. */
+const SLOT_FILLING = {
+  react:
+    'Rows render from a `children` function, `({ item, index, instructionsId }) => …`. Fill `header` / `footer` with the `renderHeader` / `renderFooter` props.',
+  vue: 'Rows render from `<template #default="{ item, index, instructionsId }">`. Fill `header` / `footer` with `<template #header>` / `<template #footer>`.',
+  svelte:
+    'Rows render from the `children` snippet, `{#snippet children({ item, index, instructionsId })}`. Fill `header` / `footer` with `{#snippet header()}` / `{#snippet footer()}`.',
+  angular:
+    'Rows render from `<ng-template #defaultSlot let-item="item" let-index="index" let-instructionsId="instructionsId">`. Fill `header` / `footer` with `<ng-template #header>` / `<ng-template #footer>`.',
+  solid:
+    'Rows render from a `children` function, `({ item, index, instructionsId }) => …` (`item` is the plain value, not an accessor). Fill `header` / `footer` with the `headerSlot` / `footerSlot` props.',
+  lit:
+    'Rows render from the `__rozieDefaultSlot__` property: a function from `{ item, index, instructionsId }` to a lit template, called once per row. Its markup renders inside the element\'s shadow root, so page CSS does not reach it: style it inside the template. Fill `header` / `footer` with light-DOM children carrying `slot="header"` / `slot="footer"`.',
 };
 
 // ---------------------------------------------------------------------------
@@ -234,7 +289,7 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   template: \`
     <!-- The user's drag-ordering IS the form value -->
     <rozie-sortable-list [formControl]="ranking" itemKey="id">
-      <ng-template #default let-item="item">
+      <ng-template #defaultSlot let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
     </rozie-sortable-list>
@@ -329,9 +384,10 @@ el.option('disabled', true);`,
  * @param {object} eventManifest  { [eventName]: description }
  * @param {string} pkgName the leaf's own package name (from its package.json)
  * @param {object} handleManifest  { [methodName]: description } for `$expose`
+ * @param {object} peers   the leaf's package.json `peerDependencies`
  * @returns {string} markdown
  */
-export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}) {
+export function renderReadme(target, ir, eventManifest, pkgName, handleManifest = {}, peers = {}) {
   const usage = USAGE[target];
   if (!usage) throw new Error(`renderReadme: no usage snippet for target "${target}"`);
 
@@ -352,10 +408,9 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
   lines.push(`npm i ${pkgName}`);
   lines.push('```');
   lines.push('');
-  lines.push(
-    `Peer dependencies: \`sortablejs ^1.15\` + \`${FRAMEWORK_PEER_LABEL[target]}\`. ` +
-      'Install them alongside this package.',
-  );
+  const peerList = Object.entries(peers).map(([name, range]) => `\`${name} ${range}\``);
+  if (peerList.length === 0) throw new Error(`renderReadme: ${pkgName} has no peerDependencies`);
+  lines.push(`Peer dependencies: ${peerList.join(', ')}. Install them alongside this package.`);
   lines.push('');
 
   // Disclose the @rozie/runtime-* dependency this leaf actually carries.
@@ -430,14 +485,24 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
     lines.push(LIT_EVENT_NOTE);
     lines.push('');
   }
-  lines.push('| Event | Description |');
-  lines.push('| --- | --- |');
+  lines.push(`| Event | ${target === 'lit' ? 'Listen for' : 'Bind as'} | Description |`);
+  lines.push('| --- | --- | --- |');
   for (const ev of ir.emits) {
     const desc = eventManifest[ev];
     if (!desc) throw new Error(`renderReadme: event "${ev}" missing from event-manifest`);
-    const eventCol = target === 'lit' ? litEventName(ev) : ev;
-    lines.push(`| \`${eventCol}\` | ${desc} |`);
+    lines.push(`| \`${ev}\` | \`${eventBinding(target, ev)}\` | ${desc} |`);
   }
+  lines.push('');
+  lines.push(
+    `${EVENT_PAYLOAD_NOTE[target]} Every event, pointer or keyboard, carries the same payload: ` +
+      "`{ interaction, item, el, from, to, oldIndex, newIndex, originalEvent? }`. `interaction` is `'pointer'` or `'keyboard'`; " +
+      '`item` is the row\'s data value; `el` is the row element (`null` when there is none); `from` / `to` are the list elements; ' +
+      '`oldIndex` / `newIndex` count item rows only (`-1` on the side that has none, as in `add` / `remove`); ' +
+      '`originalEvent` is the SortableJS event on pointer drags only. `end` fires once, after every list involved has written its array, ' +
+      'from the list where the row ends up. A drop back in place writes nothing and fires no `reorder`.',
+  );
+  lines.push('');
+  lines.push(MODEL_BINDING[target]);
   lines.push('');
 
   // Imperative handle — driven by ir.expose (Phase 21 `$expose`); emit the
@@ -473,6 +538,8 @@ export function renderReadme(target, ir, eventManifest, pkgName, handleManifest 
 
   // Slots
   lines.push('## Slots');
+  lines.push('');
+  lines.push(SLOT_FILLING[target]);
   lines.push('');
   lines.push('| Slot | Params |');
   lines.push('| --- | --- |');

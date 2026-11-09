@@ -49,6 +49,7 @@
   "peerDependencies": {
     "@angular/core": "^19",
     "@angular/common": "^19",
+    "@angular/forms": "^19",
     "sortablejs": "^1.15"
   },
   "peerDependenciesMeta": {
@@ -56,6 +57,9 @@
       "optional": false
     },
     "@angular/common": {
+      "optional": false
+    },
+    "@angular/forms": {
       "optional": false
     },
     "sortablejs": {

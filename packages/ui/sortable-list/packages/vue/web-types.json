@@ -263,17 +263,17 @@
             "events": [
               {
                 "name": "reorder",
-                "description": "Fired after the list order changes (same-list reorder commit).",
+                "description": "Fired after a row moves within the list: a drag, or each keyboard move. Not fired for a drop back in place.",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {
                 "name": "add",
-                "description": "Fired when an item is added from another list (cross-list destination commit).",
+                "description": "Fired by the destination list when a row arrives from another list (a clone copy included).",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {
                 "name": "remove",
-                "description": "Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode).",
+                "description": "Fired by the source list when a row leaves it for another list. A clone source keeps its row and does not fire it; cancelling a keyboard clone copy fires it from the list the copy leaves.",
                 "doc-url": "https://github.com/One-Learning-Community/rozie.js#readme"
               },
               {

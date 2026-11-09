@@ -518,13 +518,13 @@ export class SortableList {
   // Removes the document keydown listener that catches keys lost to <body>.
   unhookStrayKeys: any = null;
   // SortableJS also dispatches its events as BUBBLING native DOM events
-  // (`start`, `end`, `change`, `add`, …) on the list element, before it calls
-  // the option callbacks. Angular's `(start)` / `(change)` output bindings on the
-  // component host also catch native DOM events of the same name, so an Angular
-  // consumer got the raw SortableJS event as an extra `start`, plus a native
-  // `change` on every mid-drag position change. The component re-emits the
-  // committed events itself, so stop the raw ones at the list element (only
-  // events dispatched ON the list — an `<input>`'s own `change` is untouched).
+  // (`start`, `end`, `add`, `remove`, `change`, …) on the list element, before
+  // it calls the option callbacks. An output binding on the component host
+  // (Angular's `(start)` / `(end)` / `(add)` / `(remove)`, a Lit listener) also
+  // catches a native DOM event of the same name, so a consumer would get the raw
+  // SortableJS event as an extra event. The component re-emits the committed
+  // events itself, so stop the raw ones at the list element (only events
+  // dispatched ON the list — an `<input>`'s own `change` is untouched).
   SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out

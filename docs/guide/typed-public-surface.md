@@ -21,6 +21,8 @@ A consumer who wants `event.detail.id` has to cast. This guide adds four opt-in 
 
 All four are **opt-in and types-only**. A component that uses none of them compiles exactly as it did before, and none of them changes runtime behavior on any target. They work for plain-JS authors as well as TypeScript authors: the type strings are parsed as TypeScript whatever language your `<script>` uses.
 
+Props can be typed the same way: a prop's `type:` can [name a `<types>` type](#typed-props).
+
 Here is the whole thing in one small component:
 
 ```rozie
@@ -205,6 +207,30 @@ $expose(
 - A verb you do not list keeps the types its implementation already has. In `<script lang="ts">`, a verb with a return-type annotation (`function add(by: number): string`) or an annotated `const` (`const add: AddFn = …`) keeps those types on every target. A verb with no types at all is `(...args: any[]) => any`. So you can type the verbs consumers call most and leave the rest.
 - The implementation can stay untyped. A rest-argument forwarder such as `(...a) => cal?.gotoDate(...a)` is accepted against `'(date: DateInput) => void'` on every target.
 
+## Typed props {#typed-props}
+
+A prop's `type:` is normally a runtime constructor (`String`, `Array`, `Object`, …), which gives a loose static type: an `Array` is `any[]` and an `Object` a record. To type a prop precisely, set `type:` to a name declared or imported in `<types>`:
+
+```rozie
+<types>
+export type Orientation = 'vertical' | 'horizontal'
+export interface Labels { next: string; previous: string }
+</types>
+
+<props>
+{
+  orientation: { type: Orientation, default: 'vertical' },
+  labels: { type: Labels, default: null },
+}
+</props>
+```
+
+Every target prints that name as the prop's type: the React and Solid props interfaces (and React's `.d.ts`), Vue's `defineProps<…>`, Svelte's `Props`, Angular's `input<…>()` and the Lit property's field type. A prop whose default is `null` is typed `T | null`. Export the type so consumers can import it from the package entry, like any other `<types>` declaration.
+
+The name has no runtime check, with one exception on Lit, where a property's attribute converter depends on its type. An alias made only of string literals (`Orientation` above) becomes a reflected string attribute, and one made only of number literals a number attribute, so `<my-el orientation="horizontal">` works in plain HTML. Any other type (an interface, an object type, a mixed union) is an `Object` property: set it as a JavaScript property (`.labels=${…}`), not as an attribute.
+
+`@rozie-ui/sortable-list` uses this for `announcements` (`Announcements`), `keyboardTrigger` (`SortableKeyboardTrigger`) and `orientation` (`SortableOrientation`).
+
 ## Type-string scope {#type-string-scope}
 
 Every authored type string (an `<emits>` payload, a `:param-types` value, an `$expose` signature) may refer to:
@@ -244,7 +270,7 @@ The `.d.rozie.ts` sidecar for each target types slots the same way the compiled 
 
 ## Not yet supported
 
-- **Typed props.** A prop's static type is still derived from its runtime `type:` constructor, so an `Array` is `any[]` and an `Object` is a record. A `tsType:` key that narrows it is planned as a follow-up.
+- **Narrowing a constructor type in place.** A prop typed with a constructor keeps its loose type (`Array` is `any[]`); there is no key that narrows it while keeping the constructor. Name a `<types>` type instead (see [Typed props](#typed-props)).
 - **Payload flow-through to the IDE metadata sidecars.** The Vue `web-types.json` and the Lit custom-elements manifest do not carry event payload types yet.
 - **Composing typed children.** A component that composes another Rozie component through `<components>` reads the child's manifest for slot parameter types, but does not yet consume the child's emit payload types.
 - Generic components, multi-argument payloads and runtime payload validation are out of scope.

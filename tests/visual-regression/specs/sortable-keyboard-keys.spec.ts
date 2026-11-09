@@ -304,9 +304,9 @@ for (const target of TARGETS) {
     },
   );
 
-  // The list has a `#header` and a `#footer` (on Lit both render `<slot>`
-  // children of the list element). Every payload's indices count item rows
-  // only, and pointer and keyboard payloads have the same shape.
+  // The list has a `#header` and a `#footer` (rendered outside the
+  // `role="list"` element on every target). Every payload's indices count
+  // item rows only, and pointer and keyboard payloads have the same shape.
   const lastEnd = async (mount: ReturnType<Page['getByTestId']>) =>
     JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null');
 

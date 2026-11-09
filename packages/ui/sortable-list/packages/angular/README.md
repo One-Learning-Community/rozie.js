@@ -8,7 +8,7 @@ Idiomatic **angular** `SortableList` — a cross-framework drag-and-drop list co
 npm i @rozie-ui/sortable-list-angular
 ```
 
-Peer dependencies: `sortablejs ^1.15` + `@angular/core + @angular/common`. Install them alongside this package.
+Peer dependencies: `@angular/core ^19`, `@angular/common ^19`, `@angular/forms ^19`, `sortablejs ^1.15`. Install them alongside this package.
 
 Also installed: `@rozie/runtime-angular` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
@@ -24,7 +24,7 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   imports: [SortableList],
   template: `
     <rozie-sortable-list [items]="items" (itemsChange)="items = $event" itemKey="id">
-      <ng-template #default let-item="item">
+      <ng-template #defaultSlot let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
     </rozie-sortable-list>
@@ -54,7 +54,7 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   template: `
     <!-- The user's drag-ordering IS the form value -->
     <rozie-sortable-list [formControl]="ranking" itemKey="id">
-      <ng-template #default let-item="item">
+      <ng-template #defaultSlot let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
     </rozie-sortable-list>
@@ -106,13 +106,17 @@ The accessor contract: only real user interaction dirties the control — progra
 
 ## Events
 
-| Event | Description |
-| --- | --- |
-| `reorder` | Fired after the list order changes (same-list reorder commit). |
-| `add` | Fired when an item is added from another list (cross-list destination commit). |
-| `remove` | Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode). |
-| `start` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
-| `end` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+| Event | Bind as | Description |
+| --- | --- | --- |
+| `reorder` | `(reorder)` | Fired after a row moves within the list: a drag, or each keyboard move. Not fired for a drop back in place. |
+| `add` | `(add)` | Fired by the destination list when a row arrives from another list (a clone copy included). |
+| `remove` | `(remove)` | Fired by the source list when a row leaves it for another list. A clone source keeps its row and does not fire it; cancelling a keyboard clone copy fires it from the list the copy leaves. |
+| `start` | `(start)` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
+| `end` | `(end)` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+
+The payload is `$event`. Every event, pointer or keyboard, carries the same payload: `{ interaction, item, el, from, to, oldIndex, newIndex, originalEvent? }`. `interaction` is `'pointer'` or `'keyboard'`; `item` is the row's data value; `el` is the row element (`null` when there is none); `from` / `to` are the list elements; `oldIndex` / `newIndex` count item rows only (`-1` on the side that has none, as in `add` / `remove`); `originalEvent` is the SortableJS event on pointer drags only. `end` fires once, after every list involved has written its array, from the list where the row ends up. A drop back in place writes nothing and fires no `reorder`.
+
+The reordered array is written back through `[(items)]` (the `(itemsChange)` output), or a forms directive (see Angular forms).
 
 ## Imperative handle
 
@@ -135,6 +139,8 @@ export class DemoComponent {
 ```
 
 ## Slots
+
+Rows render from `<ng-template #defaultSlot let-item="item" let-index="index" let-instructionsId="instructionsId">`. Fill `header` / `footer` with `<ng-template #header>` / `<ng-template #footer>`.
 
 | Slot | Params |
 | --- | --- |

@@ -1,0 +1,48 @@
+---
+"@rozie-ui/sortable-list-react": minor
+"@rozie-ui/sortable-list-vue": minor
+"@rozie-ui/sortable-list-svelte": minor
+"@rozie-ui/sortable-list-angular": minor
+"@rozie-ui/sortable-list-solid": minor
+"@rozie-ui/sortable-list-lit": minor
+---
+
+SortableList release candidate: full keyboard reordering, one event payload, and the API it will keep at 1.0. Several changes break existing code; each is under **Changed** with what to do. The [SortableList docs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/components/sortable-list.md) describe everything below in full.
+
+**Changed**
+
+- The `change` event is now `reorder`: React and Solid `onChange` → `onReorder`, Vue `@change` → `@reorder`, Svelte `onchange` → `onreorder`, Angular `(change)` → `(reorder)`, Lit `change` → `reorder`. Rename your handler. (`change` clashed with the native `change` event of inputs inside rows.)
+- Every event (`reorder`, `add`, `remove`, `start`, `end`), mouse or keyboard, now has one payload: `{ interaction, item, el, from, to, oldIndex, newIndex, originalEvent? }`. `item` is always the row's data value, and `el` is the row element (`null` when there is none). A mouse `start` / `end` used to be SortableJS's raw event, with the row element as `item`; read the element from `el` now, and SortableJS's event from `originalEvent` (mouse only). Keyboard payloads used to carry the item as `data`; it is `item` now. `add` and `remove` carry the full payload. `oldIndex` / `newIndex` count item rows only, whatever `#header` / `#footer` hold, and are `-1` on the side that has none.
+- `end` fires once per drag or keyboard lift, from the list where the row ends up (the destination of a move between lists, a clone drop included), one task after every list involved has written its array. A mouse `end` used to come from the source list, before the destination had updated. An `end` handler now sees the new order in its bound array on all six frameworks, so `save(items)` works there. A mouse drop back where the row started writes nothing and fires no `reorder` (`start` and `end` still fire). A drop from a SortableJS list that isn't a SortableList fires `add` but no `end`.
+- `cloneable` now makes the list `{ pull: 'clone', put: false }`: a palette hands out copies and takes nothing back, by mouse or keyboard. It used to accept drops. To let a clone source receive rows, pass `options.group` yourself, e.g. `{ name: 'g', pull: 'clone', put: true }`.
+- The imperative `sort(order)` now writes the reordered array back through the bound `items` (your framework re-renders), and emits no event. It used to move the DOM behind the model.
+- The focus ring shows only for keyboard focus (`:focus-visible`), and is `#1a73e8` in every colour scheme. Set `--rozie-sortable-list-ring` to change it.
+- `keyboardTrigger` is typed `SortableKeyboardTrigger` (`'row' | 'handle'`) and `orientation` `SortableOrientation` (`'vertical' | 'horizontal'`); both types are exported. Any other string is now a type error.
+- `#header` and `#footer` render just outside the `role="list"` element, no longer inside it. They are not part of the drop area and not inside the `listClass` box any more; to draw one box around header, rows and footer, wrap the component in your own element.
+- The `instructionsId` slot prop is `null` until the list has mounted, so server-rendered markup and the first browser render agree. `aria-describedby` bound to `null` renders no attribute.
+- Every default spoken announcement has new text: `Lifted {label}, position {p} of {t}`, `Moved {label} to position {p} of {t}`, `Moved {label} to {list}, position {p} of {t}`, `Dropped {label} at position {p} of {t}`, `Dropped {label} in {list} at position {p} of {t}`, `{label} is already first`, `{label} is already last`, `{label} can't be moved within {list}`, `No list before {list}`, `No list after {list}`, `Cancelled. {label} returned to {list}, position {p} of {t}`, `Cancelled. {label} returned to position {p} of {t}`, `Cancelled. {label} stays in {list}, position {p} of {t}`, `Cancelled. {label} removed from {list}` and `Lift ended`. The default instructions are "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (a horizontal list says "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."; a list with a group adds "Hold Shift with an arrow key to move to another list."). Tests that assert the old text need updating.
+- Shift with an arrow key used to move a lifted row within its list, like the plain arrow key. Now, in a list with a `group`, it hops the row to the previous or next list, and in a list without a `group` it does nothing.
+- Only one keyboard lift exists on a page. Pressing Space or Enter on a row of another list drops the active lift and lifts that row.
+- SortableJS's own native DOM events (`choose`, `start`, `sort`, `filter`, `change` and the rest) no longer bubble out of the list element, on every framework. Listen to the component's events instead.
+
+**Added**
+
+- Keyboard moves between lists: while a row is lifted, Shift plus an arrow key hops it to the previous or next list that shares its `group`, following the same `pull` / `put` rules as a mouse drag (function-valued `pull` / `put` aren't reachable by keyboard). A forward hop lands at the top of the next list, a backward hop at the bottom of the previous one. Home, End, Page Up and Page Down also move a lifted row.
+- New props: `listLabel` (names the list for `aria-label` and announcements), `orientation`, `pageStep` (Page Up / Down distance, default 5), `keyboardInstructions` (replaces the spoken instructions), `keyboardTrigger` (`'handle'` moves keyboard reordering onto your own handle button: rows stop being tab stops and Space / Enter typed into a row's input never lifts the row; without a `handle` selector the keyboard is off and a console warning is logged) and `announcements`.
+- `announcements` rewords or translates everything the list says: an object of optional functions, one per message kind (the 15 above), each taking a context (`label`, `item`, `list`, and `position` / `total` where the message has them) and returning the text. The `Announcements`, `AnnouncementKind` and `AnnouncementContext` types are exported from every package.
+- The list element has `role="list"`, rows reference the instructions through `aria-describedby`, and the default slot receives `instructionsId` for a handle button. Every payload carries `interaction: 'pointer' | 'keyboard'`, and keyboard lifts fire `start` and `end`.
+- Changes to the `options` prop now reach SortableJS while the list is mounted (key by key, no remount), so mouse and keyboard follow the same values. `animation` is applied live too; `options.animation` and a runtime `option('animation', v)` win over the prop.
+
+**Fixed**
+
+- The keyboard now follows the same SortableJS rules as the mouse: `filter` (a matching row, or its slot root, can't be lifted; a matching control nested deeper blocks only presses on that control), `options.draggable`, `disabled` / `options.disabled` / `option('disabled', v)` and `sort: false`. Turning the keyboard off while a row is lifted ends the lift where it is (`Lift ended`, and `end` fires), and focus moves to a row or the list, never to `<body>`.
+- Escape cancels a lift and returns the row to the list and position it was lifted from. It used to leave the row where the last move put it.
+- If your code takes the lifted item out of the bound array mid-lift, the lift ends: the list says `Lift ended`, fires `end` with that item and `el: null`, and moves focus to the nearest row, or to the list itself when no rows are left.
+- The spoken label falls back to the row's text when an item has no `label` field, never `[object Object]`. A `label` of `0` or `''` is used as given.
+- "Moved X to position N" named the displaced row instead of the moved one on React, Vue and Lit.
+- Focus returns to the moved row (or its handle) after every keyboard move on all six frameworks, including a burst of quick key presses on Angular.
+- Angular: the lifted-row class is applied while a row is lifted, and SortableJS's DOM events no longer reach the host element as extra component events. `@angular/forms` is now a declared peer dependency (the component, a form control, always imported it).
+- Lit: a list removed from the page and added back works again. The `keyboard-trigger` and `orientation` attributes work in plain HTML (they used to be read as JSON and fall back to the default). A mouse drop into an empty list lands.
+- The README quick starts work: Svelte fills rows with the `children` snippet, Angular with `<ng-template #defaultSlot>`, Solid's row callback reads `item` as a value, and the Lit example uses the `rozie-sortable-list` tag and renders row content through the `__rozieDefaultSlot__` property. Each README lists every peer dependency and the event names in its framework's form.
+
+On Lit, markup in the element's light DOM can't reference `instructionsId` (an id reference doesn't cross the shadow root); rows rendered through `__rozieDefaultSlot__` can.

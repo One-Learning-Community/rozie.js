@@ -372,7 +372,8 @@ function main() {
 
     // (5) README from the single IR parse.
     const pkgName = leafPkgName(cfg.dir);
-    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest);
+    const leafPeers = JSON.parse(readFileSync(resolve(ROOT, 'packages', cfg.dir, 'package.json'), 'utf8')).peerDependencies ?? {};
+    const readme = renderReadme(target, ir, eventManifest, pkgName, handleManifest, leafPeers);
     writeFileSync(resolve(ROOT, 'packages', cfg.dir, 'README.md'), readme);
 
     // (5b) Vendor the repo LICENSE into each published leaf so the tarball

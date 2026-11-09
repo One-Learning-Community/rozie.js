@@ -8,7 +8,7 @@ Idiomatic **react** `SortableList` — a cross-framework drag-and-drop list comp
 npm i @rozie-ui/sortable-list-react
 ```
 
-Peer dependencies: `sortablejs ^1.15` + `react + react-dom`. Install them alongside this package.
+Peer dependencies: `react ^18.2 || ^19`, `react-dom ^18.2 || ^19`, `sortablejs ^1.15`. Install them alongside this package.
 
 Also installed: `@rozie/runtime-react` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
@@ -64,13 +64,17 @@ export function Demo() {
 
 ## Events
 
-| Event | Description |
-| --- | --- |
-| `reorder` | Fired after the list order changes (same-list reorder commit). |
-| `add` | Fired when an item is added from another list (cross-list destination commit). |
-| `remove` | Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode). |
-| `start` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
-| `end` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+| Event | Bind as | Description |
+| --- | --- | --- |
+| `reorder` | `onReorder` | Fired after a row moves within the list: a drag, or each keyboard move. Not fired for a drop back in place. |
+| `add` | `onAdd` | Fired by the destination list when a row arrives from another list (a clone copy included). |
+| `remove` | `onRemove` | Fired by the source list when a row leaves it for another list. A clone source keeps its row and does not fire it; cancelling a keyboard clone copy fires it from the list the copy leaves. |
+| `start` | `onStart` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
+| `end` | `onEnd` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+
+Each handler receives the payload. Every event, pointer or keyboard, carries the same payload: `{ interaction, item, el, from, to, oldIndex, newIndex, originalEvent? }`. `interaction` is `'pointer'` or `'keyboard'`; `item` is the row's data value; `el` is the row element (`null` when there is none); `from` / `to` are the list elements; `oldIndex` / `newIndex` count item rows only (`-1` on the side that has none, as in `add` / `remove`); `originalEvent` is the SortableJS event on pointer drags only. `end` fires once, after every list involved has written its array, from the list where the row ends up. A drop back in place writes nothing and fires no `reorder`.
+
+The reordered array arrives through `onItemsChange` (pair it with `items`; or pass `defaultItems` for an uncontrolled list).
 
 ## Imperative handle
 
@@ -94,6 +98,8 @@ sl.current?.option('disabled', true);
 ```
 
 ## Slots
+
+Rows render from a `children` function, `({ item, index, instructionsId }) => …`. Fill `header` / `footer` with the `renderHeader` / `renderFooter` props.
 
 | Slot | Params |
 | --- | --- |

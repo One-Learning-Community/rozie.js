@@ -8,25 +8,30 @@ Idiomatic **lit** `SortableList` — a cross-framework drag-and-drop list compil
 npm i @rozie-ui/sortable-list-lit
 ```
 
-Peer dependencies: `sortablejs ^1.15` + `lit`. Install them alongside this package.
+Peer dependencies: `lit ^3.2`, `@lit-labs/preact-signals ^1.0.0`, `@preact/signals-core ^1.3.0`, `sortablejs ^1.15`. Install them alongside this package.
 
 Also installed: `@rozie/runtime-lit` — Rozie's small, tree-shaken runtime helper package (controllable state, keyboard navigation, event modifiers, and safe interpolation). It arrives as a regular dependency, so npm pulls it for you. Your bundler keeps only the helpers this component actually uses — typically a few hundred bytes to a few KB, minified and gzipped. [What's in it and what it costs](https://github.com/One-Learning-Community/rozie.js/blob/main/docs/guide/output-and-runtime.md).
 
 ## Usage
 
 ```ts
-import '@rozie-ui/sortable-list-lit';
+import { html } from 'lit';
+import '@rozie-ui/sortable-list-lit'; // registers <rozie-sortable-list>
+import type { SortableList } from '@rozie-ui/sortable-list-lit';
 
-// <sortable-list> is a custom element. Bind `items` as a property and
-// listen for the `items-change` event to receive the reordered array.
-const el = document.querySelector('sortable-list');
+// The page holds <rozie-sortable-list></rozie-sortable-list>.
+const el = document.querySelector<SortableList>('rozie-sortable-list')!;
+el.itemKey = 'id';
 el.items = [
   { id: '1', label: 'Apple' },
   { id: '2', label: 'Banana' },
 ];
-el.itemKey = 'id';
+// Row content: a function from each row's { item, index, instructionsId }
+// to a lit template.
+el.__rozieDefaultSlot__ = ({ item }) => html`<span>${item.label}</span>`;
+// `items` is two-way: the reordered array arrives in `items-change`.
 el.addEventListener('items-change', (e) => {
-  el.items = e.detail;
+  el.items = (e as CustomEvent<unknown[]>).detail;
 });
 ```
 
@@ -63,13 +68,17 @@ el.addEventListener('items-change', (e) => {
 
 ## Events
 
-| Event | Description |
-| --- | --- |
-| `reorder` | Fired after the list order changes (same-list reorder commit). |
-| `add` | Fired when an item is added from another list (cross-list destination commit). |
-| `remove` | Fired when an item is moved out to another list (cross-list source commit; not fired in clone mode). |
-| `start` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
-| `end` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+| Event | Listen for | Description |
+| --- | --- | --- |
+| `reorder` | `reorder` | Fired after a row moves within the list: a drag, or each keyboard move. Not fired for a drop back in place. |
+| `add` | `add` | Fired by the destination list when a row arrives from another list (a clone copy included). |
+| `remove` | `remove` | Fired by the source list when a row leaves it for another list. A clone source keeps its row and does not fire it; cancelling a keyboard clone copy fires it from the list the copy leaves. |
+| `start` | `start` | Fired when a drag starts or a row is lifted by keyboard, from the origin list. |
+| `end` | `end` | Fired once when a drag or keyboard lift ends, from the list the row ends up in, after the bound arrays are written. |
+
+Each event is a `CustomEvent`; the payload is `e.detail`. Every event, pointer or keyboard, carries the same payload: `{ interaction, item, el, from, to, oldIndex, newIndex, originalEvent? }`. `interaction` is `'pointer'` or `'keyboard'`; `item` is the row's data value; `el` is the row element (`null` when there is none); `from` / `to` are the list elements; `oldIndex` / `newIndex` count item rows only (`-1` on the side that has none, as in `add` / `remove`); `originalEvent` is the SortableJS event on pointer drags only. `end` fires once, after every list involved has written its array, from the list where the row ends up. A drop back in place writes nothing and fires no `reorder`.
+
+The reordered array arrives in the `items-change` event (`e.detail`); set it back on `items`.
 
 ## Imperative handle
 
@@ -91,6 +100,8 @@ el.option('disabled', true);
 ```
 
 ## Slots
+
+Rows render from the `__rozieDefaultSlot__` property: a function from `{ item, index, instructionsId }` to a lit template, called once per row. Its markup renders inside the element's shadow root, so page CSS does not reach it: style it inside the template. Fill `header` / `footer` with light-DOM children carrying `slot="header"` / `slot="footer"`.
 
 | Slot | Params |
 | --- | --- |
