@@ -72,7 +72,7 @@ export default class SlotConditionalScopedSlotRIf extends SignalWatcher(LitEleme
   render() {
     return html`
 
-<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-896f7201>${this.show ? html`${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({title: this.title}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({title: this.title}); } catch { return '{}'; } })()}></slot>`}` : nothing}</div>
+<div class="r" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-896f7201>${this.show ? html`${this.rozieSlots?.['default'] !== undefined ? this.rozieSlots?.['default']!({title: this.title}) : this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({title: this.title}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({title: this.title}); } catch { return '{}'; } })()}></slot>`}` : nothing}</div>
 `;
   }
 
