@@ -134,6 +134,8 @@ private __rozieFirstUpdateDone = false;
     this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._disconnectCleanups.push((() => {
       if (this.instance) this.instance.destroy();
     }));

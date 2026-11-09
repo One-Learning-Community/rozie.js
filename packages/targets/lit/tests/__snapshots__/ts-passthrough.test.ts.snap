@@ -36,6 +36,8 @@ button[data-rozie-s-c72e01d0]:disabled { opacity: 0.4; cursor: not-allowed; }
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     console.log("hello from rozie");
   }
 

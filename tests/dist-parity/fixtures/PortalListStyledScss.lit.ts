@@ -104,6 +104,8 @@ private portals = {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     // Tiny inline "engine" — same shape as examples/PortalList.rozie but

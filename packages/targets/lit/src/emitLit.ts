@@ -892,6 +892,14 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     // the engine builds its shadow DOM in the $onMount hook, so the engine
     // chrome is styled the moment it appears.
     if (parts.adoptDocumentStyles) firstUpdatedParts.push('adoptDocumentStyles(this);');
+    // A first update that runs after the element left the page (removed
+    // before Lit got to render it) must not mount: nothing would tear that
+    // mount down until a reconnect and a second un-mount. Mark it torn down
+    // instead, so a reconnect sets up (connectedCallback) as after any
+    // un-mount.
+    if (hasReconnectSetup) {
+      firstUpdatedParts.push('if (!this.isConnected) { this._rozieTornDown = true; return; }');
+    }
     if (hasListenerWiring) firstUpdatedParts.push('this._armListeners();');
     if (hasMountHook) firstUpdatedParts.push(parts.mountHookBody);
     sections.push(

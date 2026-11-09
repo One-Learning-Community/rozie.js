@@ -106,6 +106,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
   }
 

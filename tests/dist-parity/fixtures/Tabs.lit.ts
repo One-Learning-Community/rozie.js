@@ -55,6 +55,8 @@ private __rozieCtxProvider_tabs = new ContextProvider(this, { context: __rozieCt
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this._disconnectCleanups.push(effect(() => { void this._active.value; this.__rozieCtxProvider_tabs.setValue(((__rozieCtxHost) => ({

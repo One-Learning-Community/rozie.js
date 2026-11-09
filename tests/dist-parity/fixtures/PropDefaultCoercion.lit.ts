@@ -41,6 +41,8 @@ export default class PropDefaultCoercion extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._observed.value = {
       a: this.a,
       b: this.b,

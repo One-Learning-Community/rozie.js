@@ -171,8 +171,10 @@ Three audiences in particular:
 A few small Lit-target edges (scoped-slot params travel via a property-fill
 bridge rather than native template slots; `$onMount` / `$onUnmount` timing
 on always-rendered components differs slightly from React; engine DOM
-mutation needs the `$reconcileAfterDomMutation()` escape hatch) are
-described in [Cross-Framework Parity](/parity).
+mutation needs the `$reconcileAfterDomMutation()` escape hatch; a wrapper
+forwarding `r-on="$listeners"` to a child component does not see listeners
+added before the component was defined) are described in
+[Cross-Framework Parity](/parity).
 
 ## Next steps
 

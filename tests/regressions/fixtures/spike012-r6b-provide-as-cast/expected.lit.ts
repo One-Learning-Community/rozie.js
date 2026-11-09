@@ -49,6 +49,8 @@ private __rozieCtxProvider_theme = new ContextProvider(this, { context: __rozieC
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this._disconnectCleanups.push(effect(() => { void this._color.value; this.__rozieCtxProvider_theme.setValue(((__rozieCtxHost) => ({

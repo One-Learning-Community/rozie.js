@@ -24,6 +24,8 @@ export default class RefReservedMemberConst extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._n.value = (this._refTitle as HTMLElement).childElementCount + this.title$local.length;
   }
 

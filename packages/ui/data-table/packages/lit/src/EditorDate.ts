@@ -79,6 +79,8 @@ private __rozieFirstUpdateDone = false;
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     if (this.autofocus) this._refInputEl?.focus();
   }
 

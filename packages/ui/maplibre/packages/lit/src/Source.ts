@@ -63,6 +63,8 @@ private get sources() { return this.__rozieCtxConsumer_maplibre_sources.value; }
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this.reg = this.sources;

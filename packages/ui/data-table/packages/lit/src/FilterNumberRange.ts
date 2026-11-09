@@ -52,6 +52,8 @@ private __rozieFirstUpdateDone = false;
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => Array.isArray(this.value) ? String(this.value[0]) + '\u0000' + String(this.value[1]) : '')(); untracked(() => { this.__rozieWatchPrev_0 = __watchVal; if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this._touched.value = false;
     })(); }); }));

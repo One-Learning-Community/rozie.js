@@ -23,6 +23,8 @@ export default class InlineEquivHostM extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this.refreshRowModelM = this.gridKeydownHandlersM(1, this.headM(2));
   }
 

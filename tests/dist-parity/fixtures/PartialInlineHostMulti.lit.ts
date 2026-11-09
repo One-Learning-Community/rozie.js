@@ -25,6 +25,8 @@ export default class PartialInlineHostMulti extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this.editTransitionM = 2;
   }
 

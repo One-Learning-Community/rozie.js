@@ -30,6 +30,8 @@ export default class ConnectedRearm extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
   }
 

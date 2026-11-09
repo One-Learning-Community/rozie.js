@@ -227,6 +227,34 @@ describe('rozieListeners — runtime-lit element-position AsyncDirective', () =>
     removeSpy.mockRestore();
   });
 
+  it('(9b) reconnected() re-attaches the last listener object without a re-render (a moved LitElement)', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const tpl = (obj: Record<string, unknown>) => html`<button ${rozieListeners(obj)}></button>`;
+    const click = vi.fn();
+    const part = render(tpl({ click }), container);
+    const btn = container.querySelector('button')!;
+    part.setConnected(false);
+    btn.click();
+    expect(click).toHaveBeenCalledTimes(0);
+    part.setConnected(true);
+    btn.click();
+    expect(click).toHaveBeenCalledTimes(1);
+    // A render after the reconnect does not add it a second time.
+    render(tpl({ click }), container);
+    expect(container.querySelector('button')).toBe(btn);
+    btn.click();
+    expect(click).toHaveBeenCalledTimes(2);
+    // A disconnect / reconnect cycle again, then a changed object.
+    part.setConnected(false);
+    part.setConnected(true);
+    const click2 = vi.fn();
+    render(tpl({ click: click2 }), container);
+    btn.click();
+    expect(click).toHaveBeenCalledTimes(2);
+    expect(click2).toHaveBeenCalledTimes(1);
+  });
+
   it('(10) `rozieListeners({})` removes prior listeners and adds none', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);

@@ -31,6 +31,8 @@ export default class CloneProbe extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._cloned.value = structuredClone(this._state.value);
   }
 

@@ -37,6 +37,8 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this._disconnectCleanups.push((() => {

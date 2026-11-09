@@ -97,6 +97,8 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 class RozieListenersDirective extends AsyncDirective {
   #hostElement: Element | null = null;
+  /** The listener object of the last `update()`, re-attached on `reconnected()`. */
+  #lastObj: Record<string, unknown> | null | undefined = undefined;
 
   constructor(partInfo: PartInfo) {
     super(partInfo);
@@ -116,7 +118,12 @@ class RozieListenersDirective extends AsyncDirective {
     // reference (lit-html guarantees the same instance for a given part, but
     // the assignment is cheap and defensive).
     this.#hostElement = el;
+    this.#lastObj = obj;
+    this.#apply(el, obj);
+    return noChange;
+  }
 
+  #apply(el: Element, obj: Record<string, unknown> | null | undefined): void {
     // CR-03 — a manual `r-on` whose expression resolves to null/undefined at
     // runtime (e.g. `$data.maybeNull`, an inline `cond ? listeners : null`)
     // previously crashed inside `for (const [k] of prev)` and
@@ -150,17 +157,15 @@ class RozieListenersDirective extends AsyncDirective {
     }
 
     prevListenersByElement.set(el, next);
-    return noChange;
   }
 
   /**
    * `disconnected()` is the AsyncDirective lifecycle hook called when the
    * part is detached from the DOM (e.g. lit-html `setConnected(false)`,
-   * element removed from a parent template). Iterate every captured pair and
-   * call `removeEventListener` so no listeners survive element disposal
-   * (T-15-V5-04). `prev.clear()` keeps the WeakMap entry but empties it, so a
-   * subsequent `reconnected()` followed by `update()` re-attaches every
-   * listener via the normal diff path against an empty prior snapshot.
+   * element removed from a parent template, or the LitElement that renders
+   * it moved in the DOM). Iterate every captured pair and call
+   * `removeEventListener` so no listeners survive element disposal
+   * (T-15-V5-04). `prev.clear()` keeps the WeakMap entry but empties it.
    */
   protected override disconnected(): void {
     const el = this.#hostElement;
@@ -174,14 +179,17 @@ class RozieListenersDirective extends AsyncDirective {
   }
 
   /**
-   * `reconnected()` is a no-op — the next `update()` will diff against the
-   * cleared Map and re-attach every listener. We do NOT eagerly re-attach
-   * here because we don't have the current listener object until the next
-   * `update()` call (the cleared Map intentionally has zero entries; eagerly
-   * walking it would attach nothing).
+   * `reconnected()` re-attaches the last rendered listener object (diffed
+   * against the empty snapshot `disconnected()` left). A reconnect does not
+   * re-render: a LitElement moved in the DOM (`appendChild` elsewhere) runs
+   * `setConnected(false)` then `setConnected(true)` on its parts with no
+   * `update()` in between, so waiting for the next `update()` would leave
+   * the element without its listeners until something else re-rendered it.
    */
   protected override reconnected(): void {
-    // intentionally empty — update() handles re-attach via diff
+    const el = this.#hostElement;
+    if (el === null) return;
+    this.#apply(el, this.#lastObj);
   }
 
   /**

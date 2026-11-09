@@ -123,6 +123,8 @@ export default class NumberField extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._disconnectCleanups.push((() => {
       this.stopHold();
       this.scrubbing = false;

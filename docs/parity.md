@@ -411,6 +411,32 @@ open would save the already-locked value and leave the page permanently
 unscrollable. Gate such effects so they run once per transition.
 :::
 
+### Lit — `r-on="$listeners"` onto a child component
+
+A Lit consumer listens on the host element itself (`<rz-wrapper @save=…>`,
+`addEventListener`); there is no bag of listeners to hand down. So a Lit
+wrapper that forwards its listeners to a child Rozie component
+(`<Inner r-on="$listeners" />`) records each event type its consumer listens
+for: its `addEventListener` (which Lit's `@event` bindings call too) maps the
+type to one forwarder on the child, and the forwarder re-dispatches the
+child's event on the host as a fresh non-bubbling, non-composed `CustomEvent`
+with the same `detail`. A composed event (a native `click` inside the child)
+already reaches the host and is not re-dispatched, so nothing fires twice. The
+forwarding survives the wrapper being moved in the DOM.
+
+Two edges follow from the DOM itself:
+
+- **Listeners added before the component was defined are not seen.** An
+  `addEventListener` call on the element before its module loaded (static HTML,
+  a lazily loaded component, a framework that sets listeners on a
+  not-yet-defined tag) goes to `HTMLElement` directly, and the DOM has no way
+  to list existing listeners after the upgrade. Add listeners after
+  `customElements.whenDefined('<tag>')`, or bind them with `@event` in a
+  template rendered after the component's import.
+- **A type stays recorded after its last listener is removed.** The child's
+  event is still re-dispatched on the host, where nobody hears it. It costs
+  one dispatch, never a second call of a listener.
+
 ---
 
 These are the *complete* set of documented limitations as of v1. Everything

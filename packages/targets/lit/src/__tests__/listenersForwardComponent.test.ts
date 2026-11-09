@@ -161,6 +161,51 @@ describe('Lit: r-on="$listeners" on a child component forwards consumer listener
     outer.remove();
   });
 
+  it('keeps forwarding after the wrapper is moved in the DOM, before any re-render', async () => {
+    const direct: unknown[] = [];
+    const { outer, host, inner, heard } = await mount('rozie-fwd-wrapper', (e) => direct.push((e as CustomEvent).detail));
+    const save = () => (inner.shadowRoot!.querySelector('button.save') as HTMLButtonElement).click();
+    const elsewhere = document.createElement('section');
+    document.body.appendChild(elsewhere);
+    // Moved, and the child emits in the same task (the re-render a reconnect
+    // requests has not run yet).
+    elsewhere.appendChild(host);
+    save();
+    expect(heard).toEqual([7]);
+    expect(direct).toEqual([7]);
+    await flush();
+    save();
+    expect(heard).toEqual([7, 7]);
+    // Out of the page across a task (torn down), then back.
+    host.remove();
+    await flush();
+    outer.appendChild(host);
+    save();
+    await flush();
+    save();
+    expect(heard).toEqual([7, 7, 7, 7]);
+    expect(direct).toEqual([7, 7, 7, 7]);
+    elsewhere.remove();
+    outer.remove();
+  });
+
+  it('a removed listener is not called and the others still hear the event once', async () => {
+    const { outer, host, inner, heard } = await mount('rozie-fwd-wrapper');
+    const gone: unknown[] = [];
+    const h = (e: Event) => gone.push((e as CustomEvent).detail);
+    host.addEventListener('save', h);
+    host.removeEventListener('save', h);
+    (inner.shadowRoot!.querySelector('button.save') as HTMLButtonElement).click();
+    expect(gone).toEqual([]);
+    expect(heard).toEqual([7]);
+    // Added again later: heard once, not twice.
+    host.addEventListener('save', h);
+    (inner.shadowRoot!.querySelector('button.save') as HTMLButtonElement).click();
+    expect(gone).toEqual([7]);
+    expect(heard).toEqual([7, 7]);
+    outer.remove();
+  });
+
   it('a composed native event from inside the child reaches the host once', async () => {
     const { outer, inner, clicks } = await mount('rozie-fwd-wrapper');
     (inner.shadowRoot!.querySelector('button.save') as HTMLButtonElement).click();
@@ -257,5 +302,33 @@ describe('Lit: a teardown before the first update does not stick', () => {
     expect(g.__fwdMounts).toBe(1);
     el.remove();
     await flush();
+  });
+
+  it('a first update that runs after the element left the page does not mount until it is back', async () => {
+    const g = globalThis as { __fwdMounts?: number };
+    g.__fwdMounts = 0;
+    const el = document.createElement('rozie-fwd-mount-count') as El;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    el.scheduleUpdate = async function (this: El) {
+      await gate;
+      return this.performUpdate();
+    };
+    document.body.appendChild(el);
+    el.remove();
+    await flush(); // the deferred teardown runs; no first update yet
+    release();
+    await el.updateComplete;
+    await flush();
+    expect(el.hasUpdated).toBe(true);
+    // Detached: nothing would ever tear a mount down.
+    expect(g.__fwdMounts).toBe(0);
+    document.body.appendChild(el);
+    await el.updateComplete;
+    await flush();
+    expect(g.__fwdMounts).toBe(1);
+    el.remove();
+    await flush();
+    expect(g.__fwdMounts).toBe(0);
   });
 });

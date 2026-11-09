@@ -54,6 +54,8 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._disconnectCleanups.push((() => {
       this.disposed = true;
     }));

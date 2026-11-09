@@ -310,6 +310,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
   }
 

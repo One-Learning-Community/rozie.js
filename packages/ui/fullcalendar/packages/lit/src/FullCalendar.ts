@@ -515,6 +515,8 @@ private portals = {
     this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this._disconnectCleanups.push((() => {

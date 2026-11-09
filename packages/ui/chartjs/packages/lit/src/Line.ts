@@ -155,6 +155,8 @@ private portals = {
     this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     ChartJS.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Legend, Tooltip, Colors);
