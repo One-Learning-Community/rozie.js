@@ -64,7 +64,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "wavecolor",
+              "attribute": "wave-color",
               "default": "\"#8a2be2\""
             },
             {
@@ -74,7 +74,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "progresscolor",
+              "attribute": "progress-color",
               "default": "\"#5a189a\""
             },
             {
@@ -84,7 +84,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "cursorcolor",
+              "attribute": "cursor-color",
               "default": "\"#333333\""
             },
             {
@@ -94,7 +94,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "cursorwidth",
+              "attribute": "cursor-width",
               "default": "1"
             },
             {
@@ -104,7 +104,7 @@
               "type": {
                 "text": "unknown"
               },
-              "attribute": "barwidth",
+              "attribute": "bar-width",
               "default": "null"
             },
             {
@@ -114,7 +114,7 @@
               "type": {
                 "text": "unknown"
               },
-              "attribute": "bargap",
+              "attribute": "bar-gap",
               "default": "null"
             },
             {
@@ -124,7 +124,7 @@
               "type": {
                 "text": "unknown"
               },
-              "attribute": "barradius",
+              "attribute": "bar-radius",
               "default": "null"
             },
             {
@@ -134,7 +134,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "minpxpersec",
+              "attribute": "min-px-per-sec",
               "default": "1"
             },
             {
@@ -154,7 +154,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "playbackrate",
+              "attribute": "playback-rate",
               "default": "1"
             },
             {
@@ -174,7 +174,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "normalizeamplitude",
+              "attribute": "normalize-amplitude",
               "default": "false"
             },
             {
@@ -184,7 +184,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "hidescrollbar",
+              "attribute": "hide-scrollbar",
               "default": "false"
             },
             {
@@ -194,7 +194,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "disableinteraction",
+              "attribute": "disable-interaction",
               "default": "false"
             },
             {
@@ -204,7 +204,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "disabledragtoseek",
+              "attribute": "disable-drag-to-seek",
               "default": "false"
             },
             {
@@ -234,7 +234,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "hovercolor",
+              "attribute": "hover-color",
               "default": "null"
             },
             {
@@ -254,7 +254,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "dragtocreateregions",
+              "attribute": "drag-to-create-regions",
               "default": "false"
             },
             {
@@ -264,7 +264,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "regioncolor",
+              "attribute": "region-color",
               "default": "null"
             },
             {
@@ -284,7 +284,7 @@
               "type": {
                 "text": "unknown"
               },
-              "attribute": "currenttime",
+              "attribute": "current-time",
               "default": "undefined"
             },
             {
@@ -411,7 +411,7 @@
               "default": "128"
             },
             {
-              "name": "wavecolor",
+              "name": "wave-color",
               "description": "The color of the unplayed portion of the waveform. Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "string"
@@ -420,7 +420,7 @@
               "default": "\"#8a2be2\""
             },
             {
-              "name": "progresscolor",
+              "name": "progress-color",
               "description": "The color of the played (progress) portion of the waveform. Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "string"
@@ -429,7 +429,7 @@
               "default": "\"#5a189a\""
             },
             {
-              "name": "cursorcolor",
+              "name": "cursor-color",
               "description": "The color of the playback cursor. Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "string"
@@ -438,7 +438,7 @@
               "default": "\"#333333\""
             },
             {
-              "name": "cursorwidth",
+              "name": "cursor-width",
               "description": "The width of the playback cursor in pixels. Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "number"
@@ -447,7 +447,7 @@
               "default": "1"
             },
             {
-              "name": "barwidth",
+              "name": "bar-width",
               "description": "Draw the waveform as bars of this pixel width. `null` (default) renders a continuous waveform. Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "unknown"
@@ -456,7 +456,7 @@
               "default": "null"
             },
             {
-              "name": "bargap",
+              "name": "bar-gap",
               "description": "The pixel gap between bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "unknown"
@@ -465,7 +465,7 @@
               "default": "null"
             },
             {
-              "name": "barradius",
+              "name": "bar-radius",
               "description": "The corner radius of bars (when `barWidth` is set). Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "unknown"
@@ -474,7 +474,7 @@
               "default": "null"
             },
             {
-              "name": "minpxpersec",
+              "name": "min-px-per-sec",
               "description": "The minimum pixels-per-second zoom level. Reconciled at runtime via `zoom`.",
               "type": {
                 "text": "number"
@@ -492,7 +492,7 @@
               "default": "1"
             },
             {
-              "name": "playbackrate",
+              "name": "playback-rate",
               "description": "Playback speed multiplier. Reconciled at runtime via `setPlaybackRate`.",
               "type": {
                 "text": "number"
@@ -510,7 +510,7 @@
               "default": "false"
             },
             {
-              "name": "normalizeamplitude",
+              "name": "normalize-amplitude",
               "description": "Normalize the waveform by its largest peak (wavesurfer's `normalize` option). Reconciled at runtime via `setOptions`.",
               "type": {
                 "text": "boolean"
@@ -519,7 +519,7 @@
               "default": "false"
             },
             {
-              "name": "hidescrollbar",
+              "name": "hide-scrollbar",
               "description": "Hide the horizontal scrollbar when the waveform is zoomed wider than its container. Construction-only.",
               "type": {
                 "text": "boolean"
@@ -528,7 +528,7 @@
               "default": "false"
             },
             {
-              "name": "disableinteraction",
+              "name": "disable-interaction",
               "description": "Disable click/seek interaction with the waveform (the engine defaults to interactive). Construction-only.",
               "type": {
                 "text": "boolean"
@@ -537,7 +537,7 @@
               "default": "false"
             },
             {
-              "name": "disabledragtoseek",
+              "name": "disable-drag-to-seek",
               "description": "Disable drag-to-seek across the waveform (the engine defaults to drag-seekable). Construction-only.",
               "type": {
                 "text": "boolean"
@@ -564,7 +564,7 @@
               "default": "false"
             },
             {
-              "name": "hovercolor",
+              "name": "hover-color",
               "description": "The line color of the Hover plugin cursor (only applies when `hover` is enabled). Read/applied when the Hover plugin is (re-)created — not live on an already-registered instance.",
               "type": {
                 "text": "string"
@@ -582,7 +582,7 @@
               "default": "undefined"
             },
             {
-              "name": "dragtocreateregions",
+              "name": "drag-to-create-regions",
               "description": "Allow drawing new regions by dragging over empty waveform space (Regions plugin `enableDragSelection`). Requires `regions` to be an array. Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
               "type": {
                 "text": "boolean"
@@ -591,7 +591,7 @@
               "default": "false"
             },
             {
-              "name": "regioncolor",
+              "name": "region-color",
               "description": "Default fill color for drag-created regions (only applies when `dragToCreateRegions` is on). Read/applied when the Regions plugin is (re-)created — not live on an already-registered instance.",
               "type": {
                 "text": "string"
@@ -609,7 +609,7 @@
               "default": "{}"
             },
             {
-              "name": "currenttime",
+              "name": "current-time",
               "description": "The current playback position in seconds. The lone two-way `model: true` prop: playback writes the live position back on every `timeupdate` (round-trip-guarded so a programmatic write does not ping-pong), and a consumer write seeks the engine via `setTime`.",
               "type": {
                 "text": "unknown"
@@ -717,7 +717,7 @@
               "description": "Fired with the updated `regions` (`event.detail`) when it changes."
             },
             {
-              "name": "currentTime-change",
+              "name": "current-time-change",
               "type": {
                 "text": "CustomEvent"
               },

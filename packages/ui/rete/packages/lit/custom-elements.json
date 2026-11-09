@@ -33,7 +33,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "validatetypes",
+              "attribute": "validate-types",
               "default": "true"
             },
             {
@@ -93,7 +93,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "minzoom",
+              "attribute": "min-zoom",
               "default": "0.1"
             },
             {
@@ -103,7 +103,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "maxzoom",
+              "attribute": "max-zoom",
               "default": "4"
             },
             {
@@ -113,7 +113,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "snapgrid",
+              "attribute": "snap-grid",
               "default": "0"
             },
             {
@@ -123,7 +123,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "accumulateonctrl",
+              "attribute": "accumulate-on-ctrl",
               "default": "true"
             },
             {
@@ -143,7 +143,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "fitonmount",
+              "attribute": "fit-on-mount",
               "default": "true"
             },
             {
@@ -183,7 +183,7 @@
               "type": {
                 "text": "((...args: any[]) => any)"
               },
-              "attribute": "canconnect",
+              "attribute": "can-connect",
               "default": "null"
             },
             {
@@ -223,7 +223,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "nodetoolbar",
+              "attribute": "node-toolbar",
               "default": "false"
             },
             {
@@ -372,7 +372,7 @@
               "fieldName": "graph"
             },
             {
-              "name": "validatetypes",
+              "name": "validate-types",
               "description": "Automatic typed-socket validation (default ON). When `true`, the canvas resolves each endpoint's port type from the per-`<NodeType>` `<Port type>` schema and auto-rejects a type-mismatched connection (firing `connection-rejected`). `canConnect` survives as the optional custom-rule override that runs in addition. Set `false` for pure-`canConnect` (type as metadata only).",
               "type": {
                 "text": "boolean"
@@ -426,7 +426,7 @@
               "default": "false"
             },
             {
-              "name": "minzoom",
+              "name": "min-zoom",
               "description": "Minimum zoom level — the lower bound of the area's zoom restrictor. `0` disables the bound.",
               "type": {
                 "text": "number"
@@ -435,7 +435,7 @@
               "default": "0.1"
             },
             {
-              "name": "maxzoom",
+              "name": "max-zoom",
               "description": "Maximum zoom level — the upper bound of the area's zoom restrictor. `0` disables the bound.",
               "type": {
                 "text": "number"
@@ -444,7 +444,7 @@
               "default": "4"
             },
             {
-              "name": "snapgrid",
+              "name": "snap-grid",
               "description": "Snap-to-grid size in pixels for node dragging. `0` turns snapping off. Applied live — changing it after mount affects the next drag. Snapping applies to user drags only; positions applied from the bound `graph` are never snapped.",
               "type": {
                 "text": "number"
@@ -453,7 +453,7 @@
               "default": "0"
             },
             {
-              "name": "accumulateonctrl",
+              "name": "accumulate-on-ctrl",
               "description": "When selectable, hold Ctrl to add to the current selection instead of replacing it.",
               "type": {
                 "text": "boolean"
@@ -471,7 +471,7 @@
               "default": "0.3"
             },
             {
-              "name": "fitonmount",
+              "name": "fit-on-mount",
               "description": "After the initial graph mounts, pan/zoom the viewport to fit all nodes (`AreaExtensions.zoomAt`).",
               "type": {
                 "text": "boolean"
@@ -507,7 +507,7 @@
               "default": "\"dots\""
             },
             {
-              "name": "canconnect",
+              "name": "can-connect",
               "description": "Connection-validation predicate `(conn) => boolean`, receiving the normalized candidate connection `{ source, sourceOutput, target, targetInput }`. Return `false` to reject the connection — no edge is committed, no ghost path is drawn, and `connection-rejected` fires. Runs in addition to the automatic `:validate-types` check (the custom-rule override) and gates all connection paths uniformly (drag-to-connect, imperative `addConnection`, graph reconcile). Absent/`null` imposes no custom rule. Note: the mid-drag incompatible-port hint (dimmed target sockets while dragging) is resolved from port TYPES only — this predicate is evaluated once, at connection time, and is deliberately not invoked per-socket during a drag.",
               "type": {
                 "text": "((...args: any[]) => any)"
@@ -543,7 +543,7 @@
               "default": "false"
             },
             {
-              "name": "nodetoolbar",
+              "name": "node-toolbar",
               "description": "Render the opt-in NodeToolbar (default OFF) — a floating toolbar over the single selected node (positioned from the engine node-view rect + the area transform, re-tracked on pan/zoom/drag). Default content is Delete (cascading controlled-graph `deleteNode`) + Duplicate (clone the node spec at an offset with a new id into a fresh `graph` object); both fire `@node-action` (`name: 'delete' | 'duplicate'`). Override the content by filling the `#toolbar` reactive slot.",
               "type": {
                 "text": "boolean"
@@ -718,7 +718,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "minwidth",
+              "attribute": "min-width",
               "default": "null"
             },
             {
@@ -728,7 +728,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "minheight",
+              "attribute": "min-height",
               "default": "null"
             },
             {
@@ -738,7 +738,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "maxwidth",
+              "attribute": "max-width",
               "default": "null"
             },
             {
@@ -748,7 +748,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "maxheight",
+              "attribute": "max-height",
               "default": "null"
             }
           ],
@@ -789,7 +789,7 @@
               "default": "null"
             },
             {
-              "name": "minwidth",
+              "name": "min-width",
               "description": "Minimum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
               "type": {
                 "text": "number"
@@ -798,7 +798,7 @@
               "default": "null"
             },
             {
-              "name": "minheight",
+              "name": "min-height",
               "description": "Minimum height (px) for this type. Clamps the RENDERED box whatever its size came from, and bounds how far a corner-drag may shrink it. Falls back to a small sane default (~40px) if resizable is true and this is unset, so a node can never be dragged to 0px.",
               "type": {
                 "text": "number"
@@ -807,7 +807,7 @@
               "default": "null"
             },
             {
-              "name": "maxwidth",
+              "name": "max-width",
               "description": "Maximum width (px) for this type. Clamps the RENDERED box whatever its size came from — auto-sized body content, an authored `width`, or a resize gesture — so body content can never stretch a node past it. Unset = unbounded.",
               "type": {
                 "text": "number"
@@ -816,7 +816,7 @@
               "default": "null"
             },
             {
-              "name": "maxheight",
+              "name": "max-height",
               "description": "Maximum height (px) for this type. Clamps the RENDERED box whatever its size came from, so body content can never stretch a node past it. Unset = unbounded.",
               "type": {
                 "text": "number"

@@ -83,7 +83,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -103,7 +103,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -113,7 +113,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -123,7 +123,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -257,7 +257,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -275,7 +275,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -284,7 +284,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -293,7 +293,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -431,7 +431,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -451,7 +451,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -461,7 +461,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -471,7 +471,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -596,7 +596,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -614,7 +614,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -623,7 +623,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -632,7 +632,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -770,7 +770,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -790,7 +790,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -800,7 +800,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -810,7 +810,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -935,7 +935,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -953,7 +953,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -962,7 +962,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -971,7 +971,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -1109,7 +1109,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -1129,7 +1129,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -1139,7 +1139,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -1149,7 +1149,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -1274,7 +1274,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -1292,7 +1292,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -1301,7 +1301,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -1310,7 +1310,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -1448,7 +1448,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -1468,7 +1468,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -1478,7 +1478,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -1488,7 +1488,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -1613,7 +1613,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -1631,7 +1631,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -1640,7 +1640,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -1649,7 +1649,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -1787,7 +1787,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -1807,7 +1807,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -1817,7 +1817,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -1827,7 +1827,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -1952,7 +1952,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -1970,7 +1970,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -1979,7 +1979,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -1988,7 +1988,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -2126,7 +2126,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -2146,7 +2146,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -2156,7 +2156,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -2166,7 +2166,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -2291,7 +2291,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -2309,7 +2309,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -2318,7 +2318,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -2327,7 +2327,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -2465,7 +2465,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -2485,7 +2485,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -2495,7 +2495,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -2505,7 +2505,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -2630,7 +2630,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -2648,7 +2648,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -2657,7 +2657,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -2666,7 +2666,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"
@@ -2804,7 +2804,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "updatemode",
+              "attribute": "update-mode",
               "default": "undefined"
             },
             {
@@ -2824,7 +2824,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "undefined"
             },
             {
@@ -2834,7 +2834,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "datasetidkey",
+              "attribute": "dataset-id-key",
               "default": "\"label\""
             },
             {
@@ -2844,7 +2844,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "destroydelay",
+              "attribute": "destroy-delay",
               "default": "0"
             },
             {
@@ -2969,7 +2969,7 @@
               "default": "[]"
             },
             {
-              "name": "updatemode",
+              "name": "update-mode",
               "description": "The Chart.js `update` mode string used by the in-place data reconcile (e.g. `none` to skip the animation on every data tick).",
               "type": {
                 "text": "string"
@@ -2987,7 +2987,7 @@
               "default": "false"
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "Accessible label applied to the `<canvas role=\"img\">`, since canvas charts are otherwise opaque to assistive tech. For richer fallback content, fill the `fallback` slot.",
               "type": {
                 "text": "string"
@@ -2996,7 +2996,7 @@
               "default": "undefined"
             },
             {
-              "name": "datasetidkey",
+              "name": "dataset-id-key",
               "description": "The dataset-identity key (react-chartjs-2 parity). Across data updates, datasets are matched by `dataset[datasetIdKey]`, falling back to array index when the key is absent, so a stable keyed dataset reconciles onto its prior slot even if its index moved — guarding the \"first dataset copied over the others\" hazard.",
               "type": {
                 "text": "string"
@@ -3005,7 +3005,7 @@
               "default": "\"label\""
             },
             {
-              "name": "destroydelay",
+              "name": "destroy-delay",
               "description": "Milliseconds to defer `chart.destroy()` on unmount so an exit transition can finish (vue-chartjs parity). `0` (the default) destroys immediately.",
               "type": {
                 "text": "number"

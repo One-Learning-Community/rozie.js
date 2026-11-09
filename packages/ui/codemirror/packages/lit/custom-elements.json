@@ -54,7 +54,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "readonly",
+              "attribute": "read-only",
               "default": "false"
             },
             {
@@ -94,7 +94,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "basicsetup",
+              "attribute": "basic-setup",
               "default": "false"
             },
             {
@@ -104,7 +104,7 @@
               "type": {
                 "text": "any[]"
               },
-              "attribute": "gutterlines",
+              "attribute": "gutter-lines",
               "default": "[]"
             },
             {
@@ -207,7 +207,7 @@
               "default": "\"light\""
             },
             {
-              "name": "readonly",
+              "name": "read-only",
               "description": "Make the document read-only. Runtime-updatable via a `readOnlyCompartment` reconfigure (no remount).",
               "type": {
                 "text": "boolean"
@@ -243,7 +243,7 @@
               "default": "[]"
             },
             {
-              "name": "basicsetup",
+              "name": "basic-setup",
               "description": "When `true`, swap the thin manual baseline (line numbers + history + default/history keymaps) for CodeMirror 6's batteries-included `basicSetup` bundle — autocomplete, search, bracket matching, code folding, lint gutter, and richer keymaps. The curated props and consumer `:extensions` still compose **after** it, so they continue to win. Runtime-updatable via a `baselineCompartment` reconfigure — toggling it swaps the bundle live, no remount required.",
               "type": {
                 "text": "boolean"
@@ -252,7 +252,7 @@
               "default": "false"
             },
             {
-              "name": "gutterlines",
+              "name": "gutter-lines",
               "description": "The 1-based line numbers that each get a custom gutter marker rendered by the `gutter` reactive multi-instance portal slot (one portal handle per visible marker). Out-of-range lines are ignored. Runtime-updatable via a `gutterCompartment` reconfigure — changing the array re-marks the lines with no remount. Only meaningful when the `gutter` slot is filled.",
               "type": {
                 "text": "any[]"

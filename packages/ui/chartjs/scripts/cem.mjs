@@ -16,7 +16,7 @@
  * Everything here is derivable from the IR + the Lit emit conventions this
  * repo's emitter uses, verified against the emitted Chart.ts / Bar.ts / …:
  *   - tag name        = `rozie-` + kebab(componentName)   (@customElement)
- *   - HTML attribute  = Lit default = propName.toLowerCase() (no explicit `attribute:`)
+ *   - HTML attribute  = kebab-cased prop name (`keyboardTrigger` -> `keyboard-trigger`; the emitter declares `attribute: '<kebab>'` whenever it differs from the lowercase)
  *   - source events   = ir.emits, kebab-cased at dispatch (quick 260811-nre,
  *     D-01 — a multi-word emit name is dispatched hyphenated, NOT verbatim;
  *     rendered via the shared litEventName, the compiler's own toKebabCase
@@ -138,7 +138,7 @@ export function buildCustomElementsManifest({
       name: p.name,
       ...(p.docs?.description ? { description: p.docs.description } : {}),
       type: { text: litTypeText(p.typeAnnotation) },
-      attribute: p.name.toLowerCase(),
+      attribute: litEventName(p.name),
     };
     const def = defaultText(p.defaultValue);
     if (def !== undefined) m.default = def;
@@ -150,10 +150,10 @@ export function buildCustomElementsManifest({
     ...(handleManifest[mth.name] ? { description: handleManifest[mth.name] } : {}),
   }));
 
-  // HTML attributes (Lit default = lowercased property name), linked to their field.
+  // HTML attributes (kebab-cased property name, as the Lit emitter declares them), linked to their field.
   const attributes = ir.props.map((p) => {
     const a = {
-      name: p.name.toLowerCase(),
+      name: litEventName(p.name),
       ...(p.docs?.description ? { description: p.docs.description } : {}),
       type: { text: litTypeText(p.typeAnnotation) },
       fieldName: p.name,

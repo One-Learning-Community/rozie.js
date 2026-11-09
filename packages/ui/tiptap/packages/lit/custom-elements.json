@@ -64,7 +64,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "editorclass",
+              "attribute": "editor-class",
               "default": "\"\""
             },
             {
@@ -74,7 +74,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "arialabel",
+              "attribute": "aria-label",
               "default": "\"Rich text editor\""
             },
             {
@@ -84,7 +84,7 @@
               "type": {
                 "text": "Record<string, any>"
               },
-              "attribute": "editorprops",
+              "attribute": "editor-props",
               "default": "{}"
             },
             {
@@ -104,7 +104,7 @@
               "type": {
                 "text": "Record<string, any>"
               },
-              "attribute": "starterkit",
+              "attribute": "starter-kit",
               "default": "{}"
             },
             {
@@ -114,7 +114,7 @@
               "type": {
                 "text": "any[]"
               },
-              "attribute": "nodespecs",
+              "attribute": "node-specs",
               "default": "[]"
             },
             {
@@ -124,7 +124,7 @@
               "type": {
                 "text": "((...args: any[]) => any)"
               },
-              "attribute": "uploadimage",
+              "attribute": "upload-image",
               "default": "null"
             },
             {
@@ -134,7 +134,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "maxlength",
+              "attribute": "max-length",
               "default": "null"
             },
             {
@@ -144,7 +144,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "enforcemaxlength",
+              "attribute": "enforce-max-length",
               "default": "false"
             },
             {
@@ -154,7 +154,7 @@
               "type": {
                 "text": "((...args: any[]) => any)"
               },
-              "attribute": "bubblemenushouldshow",
+              "attribute": "bubble-menu-should-show",
               "default": "null"
             },
             {
@@ -321,7 +321,7 @@
               "default": "false"
             },
             {
-              "name": "editorclass",
+              "name": "editor-class",
               "description": "A CSS class applied to the contenteditable element (`editorProps.attributes.class`).",
               "type": {
                 "text": "string"
@@ -330,7 +330,7 @@
               "default": "\"\""
             },
             {
-              "name": "arialabel",
+              "name": "aria-label",
               "description": "The accessible name (`aria-label`) applied to the contenteditable element.",
               "type": {
                 "text": "string"
@@ -339,7 +339,7 @@
               "default": "\"Rich text editor\""
             },
             {
-              "name": "editorprops",
+              "name": "editor-props",
               "description": "ProseMirror `editorProps` passthrough — `handleKeyDown`, `handlePaste`, a custom `attributes`, etc. Spread **last** so consumer `editorProps` win the wrapper's attribute defaults.",
               "type": {
                 "text": "Record<string, any>"
@@ -357,7 +357,7 @@
               "default": "[]"
             },
             {
-              "name": "starterkit",
+              "name": "starter-kit",
               "description": "StarterKit config passthrough — spread into `StarterKit.configure(...)`. Accepts per-extension option objects or `false` to disable an extension, e.g. `{ heading:false }`, `{ heading:{ levels:[1,2] } }`, `{ link:false }`. A StarterKit-bundled node/mark is auto-disabled when a same-named custom extension is supplied via `extensions`; an explicitly-set key here is always respected and never overridden by that auto-disable scan.",
               "type": {
                 "text": "Record<string, any>"
@@ -366,7 +366,7 @@
               "default": "{}"
             },
             {
-              "name": "nodespecs",
+              "name": "node-specs",
               "description": "Custom ProseMirror node registration for the reactive `nodeView` portal slot — general facility, read ONCE at mount (setup-once construction, not reactive). Each entry: `{ name, tag, group, inline, atom, content, selectable, defining, attrs }` — `name` (required, unique node name), `tag` (required, parseHTML selector string | string[]), `group` (default `'block'`), `inline` (default `false`), `atom` (default `false` — no contentDOM), `content` (e.g. `'inline*'`; presence ⇒ the node gets an editable contentDOM), `selectable` (default `true`), `defining` (default `false`), `attrs` (`{ key: { default } }`, ProseMirror `addAttributes` shape). One `Node.create` is built per entry; all render through the SAME `nodeView` fragment, which dispatches on `scope.node.type.name`. An empty array (default) registers no custom nodes — zero overhead.",
               "type": {
                 "text": "any[]"
@@ -375,7 +375,7 @@
               "default": "[]"
             },
             {
-              "name": "uploadimage",
+              "name": "upload-image",
               "description": "An async image-upload hook, signature `(file: File) => Promise<...>`, resolving to the image URL, or to `{ src, alt }` to also set the alt text. When provided, the (otherwise-absent) Image extension is registered AND pasting/dropping image files uploads them via this function. Every pasted or dropped image file is uploaded at once, and each image is inserted as soon as its own upload finishes: at the caret / drop position, in file order, all of them together in the same place (the same list item or blockquote). A slow or failed upload does not hold back the others; a failed one is skipped. The caret is moved after the last inserted image only if you have not moved it or typed in the meantime, and inserting an image never focuses the editor. When `null` (default), the Image extension is absent and paste/drop are unchanged — zero overhead. The wrapper's paste/drop handling is a fallback: a consumer-supplied `editorProps.handlePaste` / `handleDrop` still wins.",
               "type": {
                 "text": "((...args: any[]) => any)"
@@ -384,7 +384,7 @@
               "default": "null"
             },
             {
-              "name": "maxlength",
+              "name": "max-length",
               "description": "A soft character-count threshold. `null` (default) registers NO CharacterCount extension and renders no counter — zero overhead. A number registers CharacterCount (gated — see `enforceMaxLength`) and renders a live `characters / maxLength` counter (overridable via the `#count` slot); once `$data.count.characters` exceeds it, the counter gets the `over` state. Overflow is still ALLOWED unless `enforceMaxLength` is also set.",
               "type": {
                 "text": "number"
@@ -393,7 +393,7 @@
               "default": "null"
             },
             {
-              "name": "enforcemaxlength",
+              "name": "enforce-max-length",
               "description": "Opts into a HARD cap at `maxLength` (negative-opt-out — `false` by default, soft mode). When `true` AND `maxLength` is set, CharacterCount is configured with `{ limit: maxLength }`, so ProseMirror itself refuses input past the limit — no overflow ever reaches the document. When `false` (default), the counter still tracks and surfaces the `over` state past `maxLength`, but typing/pasting is never blocked. Has no effect when `maxLength` is `null`.",
               "type": {
                 "text": "boolean"
@@ -402,7 +402,7 @@
               "default": "false"
             },
             {
-              "name": "bubblemenushouldshow",
+              "name": "bubble-menu-should-show",
               "description": "A custom `shouldShow` predicate for the GENERAL `bubbleMenu` slot — the TipTap signature `({ editor, view, state, oldState, from, to }) => boolean`. When provided, it REPLACES the general bubbleMenu's default predicate (show on a non-empty text selection), turning the `bubbleMenu` slot into a fully consumer-controllable selection-tooling surface (e.g. show only inside a table, or only for a specific mark). When `null` (default), the default non-empty-selection behavior applies. Orthogonal to the built-in link editor, which is its own bubble-menu surface with a link-aware trigger. NOTE: as a Function prop it lowers to a loosely-typed callable on some targets (React `any` / Angular `unknown`) — pass a correctly-typed predicate; the wrapper forwards it verbatim to `BubbleMenu.configure({ shouldShow })`.",
               "type": {
                 "text": "((...args: any[]) => any)"

@@ -147,7 +147,7 @@ describe('lit leaf — custom-elements.json manifest', () => {
 
   it('lists both model props\' <prop>-change writeback events', () => {
     const events = cem.modules[0].declarations[0].events.map((e: { name: string }) => e.name);
-    expect(events).toContain('currentTime-change');
+    expect(events).toContain('current-time-change');
     expect(events).toContain('regions-change');
   });
 
@@ -162,5 +162,31 @@ describe('lit leaf — custom-elements.json manifest', () => {
     const ceDefs = exports.filter((e: { kind: string }) => e.kind === 'custom-element-definition');
     expect(ceDefs).toHaveLength(1);
     expect(ceDefs[0].name).toBe(TAG);
+  });
+});
+
+describe('lit leaf — custom-elements.json attribute names match the emitted element', () => {
+  const kebabAttr = (name: string) =>
+    name.replace(/([a-z0-9]|[A-Z](?=[A-Z][a-z]))([A-Z])/g, '$1-$2').toLowerCase();
+
+  it('multi-word props are listed in kebab-case, exactly as the emitted `attribute:` literal', () => {
+    for (const decl of cem.modules[0].declarations) {
+      const src = readFileSync(resolve(LIT_DIR, 'src', `${decl.name}.ts`), 'utf8');
+      const attrs = decl.attributes as Array<{ name: string; fieldName: string }>;
+      const fields = decl.members.filter((m: { kind: string }) => m.kind === 'field') as Array<{
+        name: string;
+        attribute: string;
+      }>;
+      for (const a of attrs) {
+        expect(a.name, `${decl.name}.${a.fieldName} attribute`).toBe(kebabAttr(a.fieldName));
+        // Never advertise an attribute the element does not observe.
+        expect(src.includes(`attribute: '${a.name}'`) || a.name === a.fieldName.toLowerCase(), `${decl.name} ${a.name}`).toBe(true);
+        expect(fields.find((f) => f.name === a.fieldName)?.attribute).toBe(a.name);
+      }
+      // Model events are dispatched kebab-cased (`current-time-change`).
+      for (const e of decl.events as Array<{ name: string }>) {
+        if (e.name.endsWith('-change')) expect(e.name).toBe(e.name.toLowerCase());
+      }
+    }
   });
 });
