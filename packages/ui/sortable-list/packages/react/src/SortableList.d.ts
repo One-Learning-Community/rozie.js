@@ -48,7 +48,7 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    */
   group?: (string) | null;
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount). `options.animation`, and a runtime `option('animation', v)`, win over this prop.
    */
   animation?: number;
   /**

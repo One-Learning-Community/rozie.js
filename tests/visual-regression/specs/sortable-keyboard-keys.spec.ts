@@ -393,9 +393,42 @@ for (const target of TARGETS) {
     await expect(mount.getByTestId('animation')).toHaveText('0');
   });
 
+  // `options.animation` wins over the `animation` prop, and a runtime
+  // `option('animation', v)` wins over both, as for the keyboard options.
+  runner(`sortable-keyboard-keys [${target}]: options.animation wins over a later animation prop change`, async ({ page }) => {
+    const { mount } = await open(page);
+    const read = async () => {
+      await clickKeepingFocus(mount, 'read-animation');
+      return (await mount.getByTestId('animation').textContent())?.trim();
+    };
+    await clickKeepingFocus(mount, 'options-animation-0');
+    await expect.poll(read).toBe('0');
+    await clickKeepingFocus(mount, 'animation-300');
+    await page.waitForTimeout(100);
+    await expect.poll(read).toBe('0');
+    // Dropping the key hands it back to the prop.
+    await clickKeepingFocus(mount, 'options-clear');
+    await expect.poll(read).toBe('300');
+  });
+
+  runner(`sortable-keyboard-keys [${target}]: option('animation') wins over a later animation prop change`, async ({ page }) => {
+    const { mount } = await open(page);
+    const read = async () => {
+      await clickKeepingFocus(mount, 'read-animation');
+      return (await mount.getByTestId('animation').textContent())?.trim();
+    };
+    await clickKeepingFocus(mount, 'option-animation-50');
+    await expect.poll(read).toBe('50');
+    await clickKeepingFocus(mount, 'animation-300');
+    await page.waitForTimeout(100);
+    await expect.poll(read).toBe('50');
+  });
+
   // The imperative sort() reorders the bound array (the framework re-renders);
   // keys it doesn't list keep their order after the listed ones.
-  runner(`sortable-keyboard-keys [${target}]: sort() reorders the bound array`, async ({ page }) => {
+  for (const burst of [false, true]) {
+  const tag = burst ? ', back-to-back (no waits)' : '';
+  runner(`sortable-keyboard-keys [${target}]: sort() reorders the bound array${tag}`, async ({ page }) => {
     const { mount, items } = await open(page);
     await clickKeepingFocus(mount, 'sort-cae');
     const want = ['Cherry', 'Apple', 'Elderberry', 'Banana', 'Date'];
@@ -415,13 +448,23 @@ for (const target of TARGETS) {
     await assertInvariant(mount);
     // The keyboard then moves rows of the new order.
     await items.nth(0).focus();
-    await page.keyboard.press('Space');
-    await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Cherry, position 1 of 5');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Space');
-    await expectOrder(mount, items, ['Apple', 'Cherry', 'Elderberry', 'Banana', 'Date']);
+    if (burst) {
+      for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Dropped Cherry at position 3 of 5');
+      await expectOrder(mount, items, ['Apple', 'Elderberry', 'Cherry', 'Banana', 'Date']);
+    } else {
+      await page.keyboard.press('Space');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Cherry, position 1 of 5');
+      await page.keyboard.press('ArrowDown');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Moved Cherry to position 2 of 5');
+      await page.keyboard.press('Space');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Dropped Cherry at position 2 of 5');
+      await expectOrder(mount, items, ['Apple', 'Cherry', 'Elderberry', 'Banana', 'Date']);
+    }
+    await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard', 'reorder:keyboard', ...(burst ? ['reorder:keyboard'] : []), 'end:keyboard']);
     await assertInvariant(mount);
   });
+  }
 
   runner(`sortable-keyboard-keys [${target}]: keyboard end payload matches pointer`, async ({ page }) => {
     const { mount, items, aria } = await open(page);

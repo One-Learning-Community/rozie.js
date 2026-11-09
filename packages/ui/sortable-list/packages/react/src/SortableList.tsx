@@ -55,7 +55,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   group?: (string) | null;
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount). `options.animation`, and a runtime `option('animation', v)`, win over this prop.
    */
   animation?: number;
   /**
@@ -424,6 +424,19 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       [name]: value
     }));
   }
+  function clearOverride(name: any) {
+    const ov: any = optionOverrides;
+    if (ov == null || !Object.prototype.hasOwnProperty.call(ov, name)) return;
+    const next = {
+      ...ov
+    };
+    delete next[name];
+    setOptionOverrides(next);
+  }
+  // Options whose runtime value (`option(name, v)`) is remembered, so a later
+  // change of the matching prop doesn't overwrite it: the keyboard ones, plus
+  // `animation` (runtime override → `options` → prop).
+  const TRACKED_OPTIONS = useMemo(() => [...KEYBOARD_OPTIONS, 'animation'], []);
   const keyboardEnabled = useCallback(() => !props.disableKeyboard && !liveOption('disabled', props.disabled), [liveOption, props.disableKeyboard, props.disabled]);
   // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
   // from the consumer's handle element instead. Any other value is 'row' mode.
@@ -1187,11 +1200,12 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // runtime escape hatch for any SortableJS option beyond the curated props.
   // Setting `disabled`, `filter`, `draggable` or `sort` also applies to the
   // keyboard; `option('disabled', true)` mid-lift ends the lift this list holds.
+  // A runtime `animation` is kept over later `animation` prop changes.
   function option(name: any, value: any) {
     if (!instance.current) return undefined;
     if (value === undefined) return instance.current.option(name);
     instance.current.option(name, value);
-    if (KEYBOARD_OPTIONS.includes(name)) setOverride(name, value);
+    if (TRACKED_OPTIONS.includes(name)) setOverride(name, value);
     if (name === 'disabled' && value) keyboardTurnedOff();
     return value;
   }
@@ -1405,8 +1419,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
     const v = props.animation;
-    instance.current?.option('animation', v);
-  }, [props.animation]);
+    instance.current?.option('animation', liveOption('animation', v));
+  }, [props.animation]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch2First.current) { _watch2First.current = false; return; }
     if (!instance.current) return;
@@ -1428,7 +1442,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     const applied = reapplyOptions(instance.current, appliedOptions.current, next, base);
     appliedOptions.current = next;
     for (const key of applied as any) {
-      if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.current.option(key));
+      // The keyboard reads the value SortableJS now runs with. A remembered
+      // runtime `animation` is superseded by the newer `options` value.
+      if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.current.option(key));else if (TRACKED_OPTIONS.includes(key)) clearOverride(key);
     }
   }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

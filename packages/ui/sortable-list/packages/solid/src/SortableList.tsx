@@ -29,20 +29,13 @@ export type SortableKeyboardTrigger = 'row' | 'handle';
 /** Which arrow keys move a lifted row within the list (the `orientation` prop). */
 export type SortableOrientation = 'vertical' | 'horizontal';
 
-__rozieInjectStyle('SortableList-0af24eae', `@media (prefers-color-scheme: dark) {
-  .rozie-sortable-item[data-rozie-s-0af24eae]:focus-visible { outline-color: var(--rozie-sortable-list-ring, #8ab4f8); }
-  .rozie-sortable-item-lifted[data-rozie-s-0af24eae] {
-    background: rgba(138, 180, 248, 0.12);
-    box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #8ab4f8) inset;
-  }
-}
-.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
+__rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-list[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-item[data-rozie-s-0af24eae] { display: block; outline: none; }
-.rozie-sortable-item[data-rozie-s-0af24eae]:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #0b57d0); outline-offset: -2px; }
+.rozie-sortable-item[data-rozie-s-0af24eae]:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #1a73e8); outline-offset: -2px; }
 .rozie-sortable-item-lifted[data-rozie-s-0af24eae] {
-  background: rgba(11, 87, 208, 0.08);
-  box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #0b57d0) inset;
+  background: rgba(26, 115, 232, 0.1);
+  box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #1a73e8) inset;
 }
 .rozie-sortable-aria-live[data-rozie-s-0af24eae] {
   position: absolute;
@@ -80,7 +73,7 @@ interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'
    */
   group?: (string) | null;
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount). `options.animation`, and a runtime `option('animation', v)`, win over this prop.
    */
   animation?: number;
   /**
@@ -203,7 +196,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     instance?.option('disabled', v);
     setOverride('disabled', v);
   })(v)), { defer: true }));
-  createEffect(on(() => (() => local.animation)(), (v) => untrack(() => ((v: any) => instance?.option('animation', v))(v)), { defer: true }));
+  createEffect(on(() => (() => local.animation)(), (v) => untrack(() => ((v: any) => instance?.option('animation', liveOption('animation', v)))(v)), { defer: true }));
   createEffect(on(() => (() => local.options)(), (v) => untrack(() => (() => {
     if (!instance) return;
     const next = local.options;
@@ -224,7 +217,9 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     const applied = reapplyOptions(instance, appliedOptions, next, base);
     appliedOptions = next;
     for (const key of applied as any) {
-      if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.option(key));
+      // The keyboard reads the value SortableJS now runs with. A remembered
+      // runtime `animation` is superseded by the newer `options` value.
+      if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.option(key));else if (TRACKED_OPTIONS.includes(key)) clearOverride(key);
     }
   })()), { defer: true }));
   createEffect(on(() => (() => [local.disabled, local.disableKeyboard, local.options, optionOverrides()])(), (v) => untrack(() => (() => {
@@ -615,6 +610,19 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       [name]: value
     });
   }
+  function clearOverride(name: any) {
+    const ov: any = optionOverrides();
+    if (ov == null || !Object.prototype.hasOwnProperty.call(ov, name)) return;
+    const next = {
+      ...ov
+    };
+    delete next[name];
+    setOptionOverrides(next);
+  }
+  // Options whose runtime value (`option(name, v)`) is remembered, so a later
+  // change of the matching prop doesn't overwrite it: the keyboard ones, plus
+  // `animation` (runtime override → `options` → prop).
+  const TRACKED_OPTIONS = [...KEYBOARD_OPTIONS, 'animation'];
   function keyboardEnabled() {
     return !local.disableKeyboard && !liveOption('disabled', local.disabled);
   }
@@ -1393,11 +1401,12 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // runtime escape hatch for any SortableJS option beyond the curated props.
   // Setting `disabled`, `filter`, `draggable` or `sort` also applies to the
   // keyboard; `option('disabled', true)` mid-lift ends the lift this list holds.
+  // A runtime `animation` is kept over later `animation` prop changes.
   function option(name: any, value: any) {
     if (!instance) return undefined;
     if (value === undefined) return instance.option(name);
     instance.option(name, value);
-    if (KEYBOARD_OPTIONS.includes(name)) setOverride(name, value);
+    if (TRACKED_OPTIONS.includes(name)) setOverride(name, value);
     if (name === 'disabled' && value) keyboardTurnedOff();
     return value;
   }

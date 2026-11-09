@@ -35,7 +35,10 @@
     - `animation-0`    sets the `animation` prop to 0, and `read-animation`
                        writes the handle's `option('animation')` into
                        `<output data-testid="animation">`,
-    - `sort-cae`       calls the imperative `sort(['c', 'a', 'e'])`.
+    - `sort-cae`       calls the imperative `sort(['c', 'a', 'e'])`,
+    - `options-animation-0` sets the `options` prop to `{ animation: 0 }`,
+      `animation-300` sets the `animation` prop to 300, and
+      `option-animation-50` calls the imperative `option('animation', 50)`.
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -158,6 +161,18 @@ const clearOptions = () => {
   $data.listOptions = {}
 }
 
+const animationOptions0 = () => {
+  $data.listOptions = { animation: 0 }
+}
+
+const animation300 = () => {
+  $data.animation = 300
+}
+
+const optionAnimation50 = () => {
+  $refs.list.option('animation', 50)
+}
+
 const animationOff = () => {
   $data.animation = 0
 }
@@ -197,6 +212,9 @@ $onMount(() => {
     <button type="button" data-testid="options-clear" @click="clearOptions">options cleared</button>
     <button type="button" data-testid="animation-0" @click="animationOff">animation 0</button>
     <button type="button" data-testid="read-animation" @click="readAnimation">read option('animation')</button>
+    <button type="button" data-testid="options-animation-0" @click="animationOptions0">options.animation 0</button>
+    <button type="button" data-testid="animation-300" @click="animation300">animation 300</button>
+    <button type="button" data-testid="option-animation-50" @click="optionAnimation50">option('animation', 50)</button>
     <button type="button" data-testid="sort-cae" @click="sortCAE">sort(['c', 'a', 'e'])</button>
   </div>
   <SortableList

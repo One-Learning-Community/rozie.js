@@ -593,12 +593,16 @@ function literalUnionAliases(ir: IRComponent): Map<string, 'String' | 'Number'> 
   return out;
 }
 
+/** The annotation a prop's ATTRIBUTE converts by: a literal-union alias stands for its constructor. */
+function attrAnnotation(prop: PropDecl, aliases: Map<string, 'String' | 'Number'>): PropTypeAnnotation {
+  return prop.typeAnnotation.kind === 'identifier' && aliases.has(prop.typeAnnotation.name)
+    ? { ...prop.typeAnnotation, name: aliases.get(prop.typeAnnotation.name)! }
+    : prop.typeAnnotation;
+}
+
 function emitNonModelProp(prop: PropDecl, aliases: Map<string, 'String' | 'Number'> = new Map()): string {
   // A literal-union alias converts like the constructor it stands for.
-  const attrAnn: PropTypeAnnotation =
-    prop.typeAnnotation.kind === 'identifier' && aliases.has(prop.typeAnnotation.name)
-      ? { ...prop.typeAnnotation, name: aliases.get(prop.typeAnnotation.name)! }
-      : prop.typeAnnotation;
+  const attrAnn = attrAnnotation(prop, aliases);
   const litType = renderType(attrAnn);
   const reflect = isPrimitiveType(attrAnn);
   const reflectField = reflect ? ', reflect: true' : '';
@@ -639,8 +643,13 @@ interface ModelPropEmit {
   attrCallback: string;
 }
 
-function emitModelProp(prop: PropDecl, componentName: string): ModelPropEmit {
-  const litType = renderType(prop.typeAnnotation);
+function emitModelProp(
+  prop: PropDecl,
+  componentName: string,
+  aliases: Map<string, 'String' | 'Number'> = new Map(),
+): ModelPropEmit {
+  // A literal-union alias converts like the constructor it stands for.
+  const litType = renderType(attrAnnotation(prop, aliases));
   // Add-on F (quick 261019-ti9): a `default: null` model prop types `T | null`, like
   // every other target (the controllable generic, the coerce cast and the accessor).
   const tsType = nullWidenedTsType(prop);
@@ -1651,7 +1660,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   const aliases = literalUnionAliases(ir);
   for (const prop of ir.props) {
     if (prop.isModel) {
-      const emit = emitModelProp(prop, ir.name);
+      const emit = emitModelProp(prop, ir.name, aliases);
       fieldLines.push(emit.fieldDecl);
       attrCallbackLines.push(emit.attrCallback);
     } else {

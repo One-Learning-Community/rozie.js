@@ -65,20 +65,13 @@ interface FooterCtx {}
   `,
   styles: [`
     :host(rozie-sortable-list) { display: contents; }
-    @media (prefers-color-scheme: dark) {
-      .rozie-sortable-item:focus-visible { outline-color: var(--rozie-sortable-list-ring, #8ab4f8); }
-      .rozie-sortable-item-lifted {
-        background: rgba(138, 180, 248, 0.12);
-        box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #8ab4f8) inset;
-      }
-    }
     .rozie-sortable-wrap { display: block; }
     .rozie-sortable-list { display: block; }
     .rozie-sortable-item { display: block; outline: none; }
-    .rozie-sortable-item:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #0b57d0); outline-offset: -2px; }
+    .rozie-sortable-item:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #1a73e8); outline-offset: -2px; }
     .rozie-sortable-item-lifted {
-      background: rgba(11, 87, 208, 0.08);
-      box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #0b57d0) inset;
+      background: rgba(26, 115, 232, 0.1);
+      box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #1a73e8) inset;
     }
     .rozie-sortable-aria-live {
       position: absolute;
@@ -123,7 +116,7 @@ export class SortableList {
    */
   group = input<(string) | null>(null);
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount). `options.animation`, and a runtime `option('animation', v)`, win over this prop.
    */
   animation = input<number>(150);
   /**
@@ -258,7 +251,7 @@ export class SortableList {
       this.instance?.option('disabled', v);
       this.setOverride('disabled', v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.animation())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.option('animation', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.animation())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.option('animation', this.liveOption('animation', v)))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
       if (!this.instance) return;
       const next = this.options();
@@ -279,7 +272,9 @@ export class SortableList {
       const applied = reapplyOptions(this.instance, this.appliedOptions, next, base);
       this.appliedOptions = next;
       for (const key of applied as any) {
-        if (this.KEYBOARD_OPTIONS.includes(key)) this.setOverride(key, this.instance.option(key));
+        // The keyboard reads the value SortableJS now runs with. A remembered
+        // runtime `animation` is superseded by the newer `options` value.
+        if (this.KEYBOARD_OPTIONS.includes(key)) this.setOverride(key, this.instance.option(key));else if (this.TRACKED_OPTIONS.includes(key)) this.clearOverride(key);
       }
     })(); }); });
     effect(() => { const __watchVal = (() => [(this.disabled() || this.__rozieCvaDisabled()), this.disableKeyboard(), this.options(), this.optionOverrides()])(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
@@ -668,6 +663,19 @@ export class SortableList {
       [name]: value
     });
   };
+  clearOverride = (name: any) => {
+    const ov: any = this.optionOverrides();
+    if (ov == null || !Object.prototype.hasOwnProperty.call(ov, name)) return;
+    const next = {
+      ...ov
+    };
+    delete next[name];
+    this.optionOverrides.set(next);
+  };
+  // Options whose runtime value (`option(name, v)`) is remembered, so a later
+  // change of the matching prop doesn't overwrite it: the keyboard ones, plus
+  // `animation` (runtime override → `options` → prop).
+  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation'];
   keyboardEnabled = () => !this.disableKeyboard() && !this.liveOption('disabled', (this.disabled() || this.__rozieCvaDisabled()));
   // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
   // from the consumer's handle element instead. Any other value is 'row' mode.
@@ -1418,11 +1426,12 @@ export class SortableList {
   // runtime escape hatch for any SortableJS option beyond the curated props.
   // Setting `disabled`, `filter`, `draggable` or `sort` also applies to the
   // keyboard; `option('disabled', true)` mid-lift ends the lift this list holds.
+  // A runtime `animation` is kept over later `animation` prop changes.
   option = (name: any, value: any) => {
     if (!this.instance) return undefined;
     if (value === undefined) return this.instance.option(name);
     this.instance.option(name, value);
-    if (this.KEYBOARD_OPTIONS.includes(name)) this.setOverride(name, value);
+    if (this.TRACKED_OPTIONS.includes(name)) this.setOverride(name, value);
     if (name === 'disabled' && value) this.keyboardTurnedOff();
     return value;
   };

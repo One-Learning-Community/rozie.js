@@ -35,6 +35,8 @@ export interface Shape { x: number }
   step: { type: Step, default: 1 },
   mixed: { type: Mixed, default: 'a' },
   shape: { type: Shape, default: null },
+  mode: { type: Trigger, default: 'row', model: true },
+  level: { type: Step, default: 1, model: true },
 }
 </props>
 <template><div>x</div></template>
@@ -64,5 +66,11 @@ describe('Lit: <types> literal-union alias props', () => {
   it('a mixed union and an interface stay Object', () => {
     expect(propertyLine(code, 'mixed')).toBe("@property({ type: Object }) mixed: Mixed = 'a';");
     expect(propertyLine(code, 'shape')).toBe('@property({ type: Object }) shape: Shape | null = null;');
+  });
+
+  it('a model prop typed by a literal-union alias converts its attribute the same way', () => {
+    expect(propertyLine(code, '_mode_attr')).toBe("@property({ type: String, attribute: 'mode' }) _mode_attr: Trigger = 'row';");
+    expect(propertyLine(code, '_level_attr')).toBe("@property({ type: Number, attribute: 'level' }) _level_attr: Step = 1;");
+    expect(code).toContain("if (name === 'level') this._levelControllable.notifyAttributeChange(value === null ? 1 : Number(value));");
   });
 });

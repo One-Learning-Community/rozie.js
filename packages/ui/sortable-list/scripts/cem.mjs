@@ -25,6 +25,11 @@
 
 import { litEventName } from '../../lit-event-name.mjs';
 
+// A prop's HTML attribute name on the Lit element. The emitter kebab-cases it
+// with the same toKebabCase it uses for event names (`keyboardTrigger` ->
+// `keyboard-trigger`), so this is litEventName under the name of what it does.
+const litAttrName = litEventName;
+
 const SCHEMA_VERSION = '2.1.0';
 
 /** camelCase / PascalCase → kebab-case (for the custom-element tag name). */
@@ -118,7 +123,7 @@ export function buildCustomElementsManifest({
       name: p.name,
       ...(p.docs?.description ? { description: p.docs.description } : {}),
       type: { text: litTypeText(p.typeAnnotation) },
-      attribute: litEventName(p.name),
+      attribute: litAttrName(p.name),
     };
     const def = defaultText(p.defaultValue);
     if (def !== undefined) m.default = def;
@@ -133,7 +138,7 @@ export function buildCustomElementsManifest({
   // HTML attributes (kebab-cased property name, as the Lit emitter declares them), linked to their field.
   const attributes = ir.props.map((p) => {
     const a = {
-      name: litEventName(p.name),
+      name: litAttrName(p.name),
       ...(p.docs?.description ? { description: p.docs.description } : {}),
       type: { text: litTypeText(p.typeAnnotation) },
       fieldName: p.name,
