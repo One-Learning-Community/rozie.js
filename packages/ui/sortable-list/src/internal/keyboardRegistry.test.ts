@@ -36,6 +36,7 @@ function fakeEntry(node: HTMLElement, group: GroupOption, opts: FakeOpts = {}): 
     items: () => [],
     keyOf: (_i, idx) => String(idx),
     labelOf: (item) => String(item),
+    message: () => '',
     onKey: () => false,
     write: () => {},
     setLifted: () => {},

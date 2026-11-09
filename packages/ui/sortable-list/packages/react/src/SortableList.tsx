@@ -5,10 +5,11 @@ import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState }
 import './SortableList.css';
 import { useSortableJS } from './internal/useSortableJS';
 import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
+import { announcementText, defaultInstructions, fallbackLabel } from './internal/announcements';
 
 interface ChildrenCtx { item: any; index: any; instructionsId: any; }
 
-interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle' | 'onReorder' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
+interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'announcements' | 'itemStyle' | 'onReorder' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
    * @example
@@ -50,7 +51,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   options?: Record<string, any>;
   /**
-   * Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label` (or `String(item)` when no `label` field exists).
+   * Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label`; without a `label` field, the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`.
    */
   labelFor?: ((...args: any[]) => any) | null;
   /**
@@ -94,7 +95,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   itemClass?: string | any[] | Record<string, any> | ((...args: any[]) => any);
   /**
-   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1`, `Dropped Hero banner in Top sidebar at position 3`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.
+   * The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1 of 4`, `Dropped Hero banner in Top sidebar at position 3 of 4`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.
    */
   listLabel?: (string) | null;
   /**
@@ -106,9 +107,15 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   pageStep?: number;
   /**
-   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." (with `orientation: 'horizontal'`, "Use the left and right arrow keys to move"). When `group` is set the default adds "Hold Shift with an arrow key to move to another list."
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (with `orientation: 'horizontal'`, "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."). When the list has a group (`group` or `options.group`) the default adds "Hold Shift with an arrow key to move to another list."
    */
   keyboardInstructions?: (string) | null;
+  /**
+   * Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see "Announcements").
+   * @example
+   * <SortableList items={todos} onItemsChange={setTodos} announcements={{ moved: ({ label, position, total }) => label + ' → ' + position + '/' + total }} />
+   */
+  announcements?: (Record<string, any>) | null;
   /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
@@ -133,7 +140,7 @@ export interface SortableListHandle {
 
 const SortableList = forwardRef<SortableListHandle, SortableListProps>(function SortableList(_props: SortableListProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; disableKeyboard: boolean; keyboardTrigger: string; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); listLabel: (string) | null; orientation: string; pageStep: number; keyboardInstructions: (string) | null; itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
+  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'announcements' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; disableKeyboard: boolean; keyboardTrigger: string; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); listLabel: (string) | null; orientation: string; pageStep: number; keyboardInstructions: (string) | null; announcements: (Record<string, any>) | null; itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
     ..._props,
     itemKey: _props.itemKey ?? null,
     handle: _props.handle ?? null,
@@ -158,16 +165,18 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     orientation: _props.orientation ?? 'vertical',
     pageStep: _props.pageStep ?? 5,
     keyboardInstructions: _props.keyboardInstructions ?? null,
+    announcements: _props.announcements ?? null,
     itemStyle: _props.itemStyle ?? null,
   };
   const attrs: Record<string, unknown> = (() => {
-    const { items, itemKey, handle, group, animation, disabled, disableKeyboard, keyboardTrigger, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, listLabel, orientation, pageStep, keyboardInstructions, itemStyle, defaultValue, onItemsChange, defaultItems, onReorder, onAdd, onRemove, onStart, onEnd, renderHeader, children, renderFooter, slots, ...rest } = _props as SortableListProps & Record<string, unknown>;
-    void items; void itemKey; void handle; void group; void animation; void disabled; void disableKeyboard; void keyboardTrigger; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void listLabel; void orientation; void pageStep; void keyboardInstructions; void itemStyle; void defaultValue; void onItemsChange; void defaultItems; void onReorder; void onAdd; void onRemove; void onStart; void onEnd; void renderHeader; void children; void renderFooter; void slots;
+    const { items, itemKey, handle, group, animation, disabled, disableKeyboard, keyboardTrigger, options, labelFor, ghostClass, chosenClass, dragClass, filter, easing, forceFallback, swapThreshold, cloneable, listClass, itemClass, listLabel, orientation, pageStep, keyboardInstructions, announcements, itemStyle, defaultValue, onItemsChange, defaultItems, onReorder, onAdd, onRemove, onStart, onEnd, renderHeader, children, renderFooter, slots, ...rest } = _props as SortableListProps & Record<string, unknown>;
+    void items; void itemKey; void handle; void group; void animation; void disabled; void disableKeyboard; void keyboardTrigger; void options; void labelFor; void ghostClass; void chosenClass; void dragClass; void filter; void easing; void forceFallback; void swapThreshold; void cloneable; void listClass; void itemClass; void listLabel; void orientation; void pageStep; void keyboardInstructions; void announcements; void itemStyle; void defaultValue; void onItemsChange; void defaultItems; void onReorder; void onAdd; void onRemove; void onStart; void onEnd; void renderHeader; void children; void renderFooter; void slots;
     return rest;
   })();
   const entry = useRef<any>(null);
   const instance = useRef<any>(null);
   const unhookNativeEvents = useRef<any>(null);
+  const lastSpoken = useRef('');
   const unregisterEntry = useRef<any>(null);
   const unhookStrayKeys = useRef<any>(null);
   const __rowKeySeq = useRef(0);
@@ -178,6 +187,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   });
   const _animationRef = useRef(props.animation);
   _animationRef.current = props.animation;
+  const _announcementsRef = useRef(props.announcements);
+  _announcementsRef.current = props.announcements;
   const _chosenClassRef = useRef(props.chosenClass);
   _chosenClassRef.current = props.chosenClass;
   const _disabledRef = useRef(props.disabled);
@@ -252,13 +263,16 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // render.
   const instructionsId = useMemo(() => nextInstructionsId(), []);
   // role="list" takes no aria-orientation, so a horizontal list says which
-  // arrow keys move in its instructions instead.
-  const GROUP_INSTRUCTIONS = ' Hold Shift with an arrow key to move to another list.';
+  // arrow keys move in its instructions instead. A `sort: false` list leaves out
+  // the move sentence, and a list with a group (the one SortableJS runs with,
+  // `options.group` included) says how to hop.
   function instructionsText() {
     if (props.keyboardInstructions != null) return props.keyboardInstructions;
-    const arrows = props.orientation === 'horizontal' ? 'Use the left and right arrow keys to move' : 'Use the arrow keys to move';
-    const text = 'Press Space or Enter to pick up. ' + arrows + ', Home and End to jump, and Escape to cancel.';
-    return props.group != null ? text + GROUP_INSTRUCTIONS : text;
+    return defaultInstructions({
+      horizontal: props.orientation === 'horizontal',
+      sortable: liveOption('sort', true) !== false,
+      grouped: effectiveGroup() != null
+    });
   }
 
   // Instance-scoped synthetic-id store for id-less object items. Keyed by object
@@ -335,13 +349,17 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // Read the display label for an item — used by the aria-live announcer.
   // Phase 16 R7 / D-08: $props.labelFor reads as `null` on all 6 targets when
   // the consumer omits it (Plan 16-01 prop-default coercion fix); the check is
-  // a plain null compare — NO runtime callable-type coercion.
+  // a plain null compare — NO runtime callable-type coercion. Without
+  // `labelFor` or a `label` field, the row's text (`row`), else `String(item)`
+  // for a primitive, else `item {position}`.
   const { labelFor: _rozieProp_labelFor } = props;
-    const labelOf = useCallback((item: any, idx: any) => {
+    const labelOf = useCallback((item: any, idx: any, row = null) => {
     if (_rozieProp_labelFor !== null) return _rozieProp_labelFor(item, idx);
-    if (item !== null && typeof item === 'object' && 'label' in item) return item.label;
-    return String(item);
+    if (item !== null && typeof item === 'object' && item.label != null) return item.label;
+    return fallbackLabel(item, idx, row);
   }, [_rozieProp_labelFor]);
+  // The text this list's live region showed last (see the registry entry's
+  // `announce`).
   // Keyboard handler (Phase 16 R7): Space/Enter lift and drop; while lifted,
   // ArrowUp/ArrowDown (ArrowLeft/ArrowRight when horizontal), Home/End and
   // PageUp/PageDown move the row, and Escape returns it to where it was lifted
@@ -529,6 +547,27 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     target.announce(text);
   }
 
+  // Say announcement `kind` from `target`, in `target`'s words: its
+  // `announcements` function for that kind, else the default text (see
+  // ./internal/announcements). `index` is the row's 0-based position in
+  // `target`, `row` the row element its label is read from (when there is no
+  // `labelFor` or `label` field), and `total` how many rows `target` holds after
+  // the change (null for the kinds without a position). A function returning
+  // null or '' clears the region, so nothing is said.
+  function say(target: any, kind: any, item: any, index: any, row: any, total = null, fromList = null) {
+    const ctx: any = {
+      label: target.labelOf(item, index, row),
+      item,
+      list: registry.listName(target)
+    };
+    if (total != null) {
+      ctx.position = index + 1;
+      ctx.total = total;
+    }
+    if (fromList != null) ctx.fromList = registry.listName(fromList);
+    speak(target, target.message(kind, ctx));
+  }
+
   // The lifted item is no longer in the list holding it: the consumer changed
   // that list's items (or re-keyed the item), or the list is unmounting. End the
   // lift without writing anything (the item is wherever the consumer's data put
@@ -543,7 +582,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     registry.lift = null;
     h.setLifted(null);
     if (!unmounting) {
-      speak(h, 'Lift ended');
+      say(h, 'liftEnded', lift.item, lift.index ?? lift.origin.index, lift.liftedRowEl);
       h.focusNear(lift.index ?? lift.origin.index);
     }
     const payload = {
@@ -558,7 +597,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // Like every `end`, in a task after the writes. An unmounting list emits it
     // now: a later emit from an unmounted component would not be delivered.
     if (unmounting) h.emit('end', payload);else registry.deferEnd(() => h.emit('end', payload));
-  }, [speak]);
+  }, [say]);
   // Keyboard `start` / `end` (the same payload as every other event): `item` is
   // the item value, `el` its row element. `start` fires from the origin list
   // (`from`), `end` from the list the row ends up in (`to`). `el` is the row in
@@ -584,8 +623,9 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }
 
   // Move the lifted row to `toIndex` (clamped) within the list holding it.
-  // Works through the registry entry, so it acts on the current holder.
-  function moveLiftTo(toIndex: any) {
+  // Works through the registry entry, so it acts on the current holder. `dir`
+  // is the key's direction (-1 toward the start), for when the row can't move.
+  function moveLiftTo(toIndex: any, dir: any) {
     const lift = registry.lift;
     if (!lift) return;
     const h = lift.holder;
@@ -596,9 +636,13 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     }
     const items = h.items();
     const to = Math.max(0, Math.min(items.length - 1, toIndex));
-    if (to === from) return;
     // The moved row's element, read before the write (an index key changes).
     const el = h.rowEl(from);
+    if (to === from) {
+      // Nowhere to go: say so (the row is already at that end).
+      say(h, dir < 0 ? 'atStart' : 'atEnd', items[from], from, el ?? lift.liftedRowEl, items.length);
+      return;
+    }
     const next = [...items];
     const [moved] = next.splice(from, 1);
     next.splice(to, 0, moved);
@@ -612,7 +656,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // Name the row that MOVED from the local `moved` item: on React/Vue/Lit the
     // items prop still holds the pre-write array here. Labels come from the
     // holder's own `labelFor`.
-    speak(h, 'Moved ' + h.labelOf(moved, to) + ' to position ' + (to + 1));
+    say(h, 'moved', moved, to, el, items.length);
     h.focusRow(moved, to);
     h.emit('reorder', {
       interaction: 'keyboard',
@@ -648,7 +692,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     lift.liftedRowEl = el ?? lift.liftedRowEl;
     const to = registry.findHopTarget(from, dir);
     if (to == null) {
-      speak(from, (dir === 1 ? 'No list after ' : 'No list before ') + registry.listName(from));
+      say(from, dir === 1 ? 'noListAfter' : 'noListBefore', data, i, el ?? lift.liftedRowEl);
       return;
     }
     const origin = lift.origin;
@@ -678,7 +722,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       });
       from.setLifted(null);
       to.setLifted(home);
-      speak(to, 'Moved ' + to.labelOf(data, home) + ' to ' + registry.listName(to) + ', position ' + (home + 1));
+      say(to, 'movedToList', data, home, el, toItems.length, from);
       to.focusRow(toItems[home], home);
       return;
     }
@@ -725,7 +769,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     });
     from.setLifted(null);
     to.setLifted(at);
-    speak(to, 'Moved ' + to.labelOf(data, at) + ' to ' + registry.listName(to) + ', position ' + (at + 1));
+    say(to, 'movedToList', data, at, el, toItems.length + 1, from);
     to.focusRow(data, at);
   }
 
@@ -746,13 +790,15 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     }
     const items = h.items();
     const item = items[at];
-    // The lifted row's element, read before any write below.
+    // The lifted row's element, read before any write below. Right after a hop
+    // the holder may not have rendered it yet: its label is read from the
+    // lifted row element then.
     const el = h.rowEl(at);
-    const name = (e: any) => registry.listName(e);
+    const row = el ?? lift.liftedRowEl;
     if (kind === 'drop' || kind === 'off') {
       // A row that hopped always names its list, even back in its origin. The
       // keyboard turned off mid-lift ('off') ends it where it is, too.
-      speak(h, kind === 'off' ? 'Lift ended' : !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
+      if (kind === 'off') say(h, 'liftEnded', item, at, row);else say(h, lift.hopped ? 'droppedInList' : 'dropped', item, at, row, items.length);
       h.setLifted(null);
       registry.lift = null;
       keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
@@ -778,7 +824,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         newIndex: -1
       });
       h.setLifted(null);
-      speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' removed from ' + name(h));
+      say(h, 'cancelledRemoved', item, at, row);
       if (rest.length > 0) {
         const k = Math.min(at, rest.length - 1);
         h.focusRow(rest[k], k);
@@ -800,7 +846,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       // The origin list has unmounted, is hidden, or has its keyboard off:
       // there is nowhere to return to (focus would be stranded), so the row
       // stays where it is (the lift ends as a drop at its position).
-      speak(h, 'Cancelled. ' + h.labelOf(item, at) + ' stays in ' + name(h) + ', position ' + (at + 1));
+      say(h, 'cancelledStays', item, at, row, items.length);
       h.setLifted(null);
       registry.lift = null;
       keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
@@ -825,7 +871,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
           newIndex: to
         });
       }
-      speak(h, lift.hopped ? 'Cancelled. ' + h.labelOf(item, to) + ' returned to ' + name(h) + ', position ' + (to + 1) : 'Cancelled. ' + h.labelOf(item, to) + ' returned to position ' + (to + 1));
+      say(h, lift.hopped ? 'cancelledReturnedToList' : 'cancelledReturned', item, to, row, items.length);
       h.setLifted(null);
       registry.lift = null;
       keyboardStartEnd('end', lift, origin.list, h, origin.index, to, el);
@@ -875,11 +921,11 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // `home` holds the lift during its write, so a target whose items watcher
     // runs synchronously on the write (Solid) highlighted the row there: clear it.
     home.setLifted(null);
-    speak(home, 'Cancelled. ' + home.labelOf(item, back) + ' returned to ' + name(home) + ', position ' + (back + 1));
+    say(home, 'cancelledReturnedToList', item, back, row, homeItems.length + (lift.copy ? 0 : 1));
     home.focusRow(lift.copy ? homeItems[back] : item, back);
     registry.lift = null;
     keyboardStartEnd('end', lift, home, home, origin.index, back, lift.copy ? home.rowEl(back) : el);
-  }, [keyboardStartEnd, loseLift, speak]);
+  }, [keyboardStartEnd, loseLift, say]);
   // This list's keyboard was turned off (`disabled`, `disableKeyboard`, or
   // `option('disabled', true)`): a lift it holds ends where the row is, with
   // its `end`.
@@ -929,7 +975,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       index
     };
     setLiftedIndex(index);
-    speak(entry.current, 'Lifted ' + labelOf(item, index));
+    say(entry.current, 'lifted', item, index, registry.lift.liftedRowEl, items.length);
     keyboardStartEnd('start', registry.lift, entry.current, entry.current, index, index);
   }
   const onRowKeyDown = useCallback(($event: any, index: any) => {
@@ -1026,11 +1072,15 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = entry.current.items().length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
     if (to === null) return false;
     // `sort: false`: no moves within the list (as by mouse). The key is still
-    // taken, so it does not scroll the page while a row is lifted.
-    if (liveOption('sort', true) === false) return true;
-    moveLiftTo(to);
+    // taken, so it does not scroll the page while a row is lifted, and says why
+    // nothing moved.
+    if (liveOption('sort', true) === false) {
+      say(entry.current, 'notSortable', entry.current.items()[from], from, entry.current.rowEl(from) ?? lift.liftedRowEl);
+      return true;
+    }
+    moveLiftTo(to, key === prevKey || key === 'Home' || key === 'PageUp' ? -1 : 1);
     return true;
-  }, [effectiveGroup, endLift, hop, liveOption, loseLift, moveLiftTo, props.orientation, props.pageStep]);
+  }, [effectiveGroup, endLift, hop, liveOption, loseLift, moveLiftTo, props.orientation, props.pageStep, say]);
   // A key pressed while focus has fallen to <body> during a lift. A hop removes
   // the focused row from one list and the destination may render (and take
   // focus) only after the handler returns (Angular), so the next key of a fast
@@ -1233,7 +1283,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       keyboardEnabled: () => _keyboardEnabledRef.current() && !(_handleModeRef.current() && _handleRef.current == null),
       items: () => _itemsRef.current,
       keyOf: (item: any, i: any) => String(_keyForRef.current(item, i)),
-      labelOf: (item: any, i: any) => String(_labelOfRef.current(item, i)),
+      labelOf: (item: any, i: any, row = null) => String(_labelOfRef.current(item, i, row)),
+      message: (kind: any, ctx: any) => announcementText(_announcementsRef.current, kind, ctx),
       onKey: (key: any, shift: any) => _holderKeyRef.current(key, shift),
       write: (next: any) => {
         setItems(next);
@@ -1241,8 +1292,13 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       setLifted: (i: any) => {
         setLiftedIndex(i);
       },
+      // The same text twice in a row would not change the region, and a screen
+      // reader would not read it again ("Apple is already first", twice): a
+      // repeat alternates a trailing no-break space, which is not spoken.
       announce: (text: any) => {
-        setAriaLiveText(text);
+        const next = text !== '' && text === lastSpoken.current ? text + '\u00A0' : text;
+        lastSpoken.current = next;
+        setAriaLiveText(next);
       },
       focusRow: (item: any, i: any) => _refocusRowRef.current(item, i),
       focusNear: (i: any) => _focusNearRowRef.current(i),

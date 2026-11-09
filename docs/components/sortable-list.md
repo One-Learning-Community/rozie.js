@@ -85,13 +85,14 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `swapThreshold` | `Number` | `1` | yes | SortableJS swap-threshold (0..1). Lower = swap earlier. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed. |
 | `cloneable` | `Boolean` | `false` | yes | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount. |
 | `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
-| `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). |
+| `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). Without it the announcer reads `item.label`, else the row's text, else `String(item)` for a primitive, else `item {position}`. |
 | `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, an object (Vue-style class binding), or a `(item, index) => class` function for per-row classes, normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
 | `listLabel` | `String` | `null` | yes | The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. |
 | `orientation` | `String` | `"vertical"` | yes | Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move". |
 | `pageStep` | `Number` | `5` | yes | How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain. |
-| `keyboardInstructions` | `String` | `null` | yes | Replaces the spoken keyboard instructions, read via `aria-describedby` when a row (row mode) or handle (handle mode, through the `instructionsId` slot prop) gets focus. See [Keyboard accessibility](#keyboard-accessibility). |
+| `keyboardInstructions` | `String` | `null` | yes | Replaces the spoken keyboard instructions, read via `aria-describedby` when a row (row mode) or handle (handle mode, through the `instructionsId` slot prop) gets focus. See [Instructions](#instructions) for the default text. |
+| `announcements` | `Object` | `null` | yes | Rewords or translates what the list says during keyboard reordering: an object of optional functions, one per message kind, each taking a context and returning the text (`null` or `''` says nothing). Kinds without a function keep the default. See [Announcements](#announcements). |
 | `itemStyle` | `String \| Object \| Function` | `null` | yes | Per-row inline style on the item wrapper. Accepts a CSS string, a flat style object (`Record<string, string \| number>`), or a `(item, index) => string \| object` function. Lands on the `.rozie-sortable-item` wrapper — the direct child of the list container — so it can drive CSS-grid placement (`grid-column` / `align-self`) when `listClass` sets `display: grid`. Normalized per target (React/Solid `parseInlineStyle`, Lit/Svelte `rozieStyle`, Vue/Angular native); `null` / empty drops the attribute. |
 
 ### Events
@@ -263,7 +264,7 @@ The canonical example is [`SortableListNestedDemo`](https://github.com/One-Learn
 - Space (or Enter) drops it.
 - Escape cancels: the row goes back to the list and position it was lifted from. A clone copy is removed.
 
-These keys act only while a row is lifted, so they never take keys away from fields inside a row. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", and "Cancelled. X returned to position N".
+These keys act only while a row is lifted, so they never take keys away from fields inside a row. The aria-live announcer reads, for example, "Lifted Apple, position 1 of 5", "Moved Apple to position 2 of 5", "Dropped Apple at position 2 of 5" and "Cancelled. Apple returned to position 1 of 5". A key that would not move the row says why: "Apple is already first" or "Apple is already last". Every message can be reworded or translated; see [Announcements](#announcements).
 
 The keyboard follows the same SortableJS rules as the mouse:
 
@@ -273,16 +274,16 @@ The keyboard follows the same SortableJS rules as the mouse:
 | `options.draggable` | When set, only rows matching it can be lifted (a leading `>` is SortableJS's child syntax). |
 | `disabled` (prop, `options.disabled` or `option('disabled', v)`) | Turns keyboard reordering off. Turning it on while a row is lifted ends the lift where the row is: the list says `Lift ended` and `end` fires. In row mode the rows leave the tab order, so if one of them had focus, focus moves to the list itself (never `<body>`). |
 | `disableKeyboard` | Keyboard only: turns keyboard reordering off, ending a lift and moving focus the same way. |
-| `options.sort: false` | No moves within the list: the arrow keys, Home, End, Page Up and Page Down move nothing. Hops to other lists still follow `pull` / `put`. |
+| `options.sort: false` | No moves within the list: the arrow keys, Home, End, Page Up and Page Down move nothing, and each says `{label} can't be moved within {list}`. The default instructions leave out the move sentence. Hops to other lists still follow `pull` / `put`. |
 | `group` `pull` / `put` | Decide which lists a row can hop to (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)). |
 
 Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too; a change to the `options` prop object reaches the keyboard at once but SortableJS only at construction, so re-key the list to change it for both.
 
-The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that `role="list"` element. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby`: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." With `orientation="horizontal"` the second sentence reads "Use the left and right arrow keys to move, Home and End to jump, and Escape to cancel." Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
+The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that `role="list"` element. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
 
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
 
-To customize the aria-live label per row, pass `:labelFor="(item) => item.title"` — by default the announcer reads `item.label` (or `String(item)` if no `label` field).
+To customize the aria-live label per row, pass `:labelFor="(item) => item.title"`. By default the announcer reads `item.label`; without a `label` field it reads the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`. Pass `labelFor` when the row's text is not a good name (a row full of controls, say).
 
 #### Moving between lists by keyboard
 
@@ -333,13 +334,63 @@ A `cloneable` palette resolves to `put: true`, so with keyboard hops it accepts 
 />
 ```
 
-Announcements: `Moved {label} to {list}, position {n}`, `Dropped {label} in {list} at position {n}` (whenever the row hopped, even if it hopped back into its origin), and `Cancelled. {label} returned to {list}, position {n}` (`Cancelled. {label} returned to position {n}` when the row never left its list). If the origin list has gone, is hidden, or has its keyboard turned off, the cancel reads `Cancelled. {label} stays in {list}, position {n}` and the row stays where it is; if a clone copy is cancelled after its palette unmounted, `Cancelled. {label} removed from {list}`. `{list}` is `listLabel`, or else `list {i} of {n}`, counting the lists of the same group in hop order. Pass the zone's visible heading text as `listLabel` so spoken names match what sighted users see.
+Announcements: `Moved {label} to {list}, position {p} of {t}`, `Dropped {label} in {list} at position {p} of {t}` (whenever the row hopped, even if it hopped back into its origin), and `Cancelled. {label} returned to {list}, position {p} of {t}` (`Cancelled. {label} returned to position {p} of {t}` when the row never left its list). If the origin list has gone, is hidden, or has its keyboard turned off, the cancel reads `Cancelled. {label} stays in {list}, position {p} of {t}` and the row stays where it is; if a clone copy is cancelled after its palette unmounted, `Cancelled. {label} removed from {list}`. `{list}` is `listLabel`, or else `list {i} of {n}`, counting the lists of the same group in hop order. Pass the zone's visible heading text as `listLabel` so spoken names match what sighted users see. The full list, and how to change it, is under [Announcements](#announcements).
 
 With a clone palette, repeated deposits of the same palette item share that item's key. Give the copy a fresh id in the destination's `end` handler (see [Clone mode](#clone-mode)); that works for mouse and keyboard drops alike. Don't do it in `add`: a keyboard hop fires `add` while the row is still lifted, and re-keying an item while it is lifted ends the lift. (Swapping the lifted item for a new object with the same key is fine, and so is changing its key in place on the same object; the lift follows it.) When a lift ends because the consumer changed its data, the list says `Lift ended`, fires `end` with the lifted value as `item` and `el: null`, and moves focus to the nearest row if focus was lost (or to the list itself if it has no rows left).
 
 #### Instructions
 
-The hidden instructions text defaults to "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." (with `orientation="horizontal"`, "Use the left and right arrow keys to move"), and, when `group` is set, adds " Hold Shift with an arrow key to move to another list." Pass `keyboardInstructions` to replace it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit, plain-HTML consumers cannot do this: an id reference does not cross a shadow root, so give the handle its own `aria-label` or description instead.
+The hidden instructions text defaults to:
+
+> Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.
+
+With `orientation="horizontal"` it says "the left and right arrow keys". A `sort: false` list can't move rows within itself, so its text is "Press Space or Enter to pick up, and again to drop. Press Escape to cancel." When the list has a group (the `group` prop or `options.group`, the one SortableJS uses), " Hold Shift with an arrow key to move to another list." is added. Pass `keyboardInstructions` to replace all of it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit, plain-HTML consumers cannot do this: an id reference does not cross a shadow root, so give the handle its own `aria-label` or description instead.
+
+#### Announcements
+
+Everything the list says during keyboard reordering comes from one of the message kinds below. `{label}` is the row's label (`labelFor`, else `item.label`, else the row's text), `{p}` its 1-based position, `{t}` how many rows that list holds, and `{list}` the list's name (`listLabel`, or `list {i} of {n}`). The list holding the row speaks, in its own aria-live region.
+
+| Kind | Context | Default |
+| --- | --- | --- |
+| `lifted` | `label`, `item`, `position`, `total`, `list` | `Lifted {label}, position {p} of {t}` |
+| `moved` | `label`, `item`, `position`, `total`, `list` | `Moved {label} to position {p} of {t}` |
+| `movedToList` | `label`, `item`, `position`, `total`, `list`, `fromList` | `Moved {label} to {list}, position {p} of {t}` |
+| `dropped` | `label`, `item`, `position`, `total`, `list` | `Dropped {label} at position {p} of {t}` |
+| `droppedInList` | `label`, `item`, `position`, `total`, `list` | `Dropped {label} in {list} at position {p} of {t}` |
+| `atStart` | `label`, `item`, `position`, `total`, `list` | `{label} is already first` |
+| `atEnd` | `label`, `item`, `position`, `total`, `list` | `{label} is already last` |
+| `notSortable` | `label`, `item`, `list` | `{label} can't be moved within {list}` |
+| `noListBefore` | `label`, `item`, `list` | `No list before {list}` |
+| `noListAfter` | `label`, `item`, `list` | `No list after {list}` |
+| `cancelledReturnedToList` | `label`, `item`, `position`, `total`, `list` | `Cancelled. {label} returned to {list}, position {p} of {t}` |
+| `cancelledReturned` | `label`, `item`, `position`, `total`, `list` | `Cancelled. {label} returned to position {p} of {t}` |
+| `cancelledStays` | `label`, `item`, `position`, `total`, `list` | `Cancelled. {label} stays in {list}, position {p} of {t}` |
+| `cancelledRemoved` | `label`, `item`, `list` | `Cancelled. {label} removed from {list}` |
+| `liftEnded` | `label`, `item`, `list` | `Lift ended` |
+
+`atStart` and `atEnd` are said when an arrow key, Home, End, Page Up or Page Down would not move the row (in a sortable list). `notSortable` is said for those keys in a `sort: false` list. `droppedInList` and `cancelledReturnedToList` are used once the row has hopped to another list. `liftEnded` is said when the lift ends because the keyboard was turned off or the consumer's data took the row away. The same message twice in a row is still read out again.
+
+Pass `announcements` to change any of them. Each key is an optional function that takes the context and returns the text; `null` or `''` says nothing, and kinds you leave out keep the default. To translate:
+
+```rozie
+<SortableList
+  r-model:items="$data.tasks"
+  itemKey="id"
+  listLabel="Aufgaben"
+  keyboardInstructions="Leertaste oder Enter zum Aufnehmen und erneut zum Ablegen. Pfeiltasten zum Verschieben, Escape zum Abbrechen."
+  :announcements="{
+    lifted: ({ label, position, total }) => label + ' aufgenommen, Position ' + position + ' von ' + total,
+    moved: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' verschoben',
+    dropped: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' abgelegt',
+    atStart: ({ label }) => label + ' ist bereits ganz oben',
+    atEnd: ({ label }) => label + ' ist bereits ganz unten',
+    cancelledReturned: ({ label, position, total }) => 'Abgebrochen. ' + label + ' zurück auf Position ' + position + ' von ' + total,
+    liftEnded: () => 'Verschieben beendet',
+  }"
+/>
+```
+
+Instructions are one string, so pass `keyboardInstructions` alongside a translation (choose the wording for the list's orientation, `sort` and group yourself).
 
 #### Handle-only keyboard reordering
 

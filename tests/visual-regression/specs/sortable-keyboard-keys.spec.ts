@@ -38,7 +38,8 @@ const LIFTED = '[class*="rozie-sortable-item-lifted"]';
 
 const SEED = ['Apple', 'Banana', 'Cherry', 'Date', 'Elderberry'];
 const INSTRUCTIONS =
-  'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.';
+  'Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.';
+const NOT_SORTABLE_INSTRUCTIONS = 'Press Space or Enter to pick up, and again to drop. Press Escape to cancel.';
 
 function displayedLabels(locator: ReturnType<Page['locator']>) {
   return locator.evaluateAll((els) =>
@@ -122,11 +123,11 @@ for (const target of TARGETS) {
     const { mount, items, aria } = await open(page);
     await items.nth(0).focus();
     await page.keyboard.press('Space');
-    await expect(aria).toHaveText('Lifted Apple');
+    await expect(aria).toHaveText('Lifted Apple, position 1 of 5');
     await page.keyboard.press('End');
-    await expect(aria).toHaveText('Moved Apple to position 5');
+    await expect(aria).toHaveText('Moved Apple to position 5 of 5');
     await page.keyboard.press('Space');
-    await expect(aria).toHaveText('Dropped Apple at position 5');
+    await expect(aria).toHaveText('Dropped Apple at position 5 of 5');
     await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Elderberry', 'Apple']);
   });
 
@@ -134,9 +135,9 @@ for (const target of TARGETS) {
     const { mount, items, aria } = await open(page);
     await items.nth(4).focus();
     await page.keyboard.press('Space');
-    await expect(aria).toHaveText('Lifted Elderberry');
+    await expect(aria).toHaveText('Lifted Elderberry, position 5 of 5');
     await page.keyboard.press('Home');
-    await expect(aria).toHaveText('Moved Elderberry to position 1');
+    await expect(aria).toHaveText('Moved Elderberry to position 1 of 5');
     await page.keyboard.press('Space');
     await expectOrder(mount, items, ['Elderberry', 'Apple', 'Banana', 'Cherry', 'Date']);
   });
@@ -147,15 +148,15 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(1).focus();
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText('Lifted Banana');
+      await expect(aria).toHaveText('Lifted Banana, position 2 of 5');
       await page.keyboard.press('PageDown');
-      await expect(aria).toHaveText('Moved Banana to position 5');
+      await expect(aria).toHaveText('Moved Banana to position 5 of 5');
       await page.keyboard.press('Space');
       await expectOrder(mount, items, ['Apple', 'Cherry', 'Date', 'Elderberry', 'Banana']);
       // And PageUp clamps at the start.
       await page.keyboard.press('Space');
       await page.keyboard.press('PageUp');
-      await expect(aria).toHaveText('Moved Banana to position 1');
+      await expect(aria).toHaveText('Moved Banana to position 1 of 5');
       await page.keyboard.press('Space');
       await expectOrder(mount, items, ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
     },
@@ -166,11 +167,11 @@ for (const target of TARGETS) {
     await items.nth(0).focus();
     await page.keyboard.press('Space');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 2');
+    await expect(aria).toHaveText('Moved Apple to position 2 of 5');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 3');
+    await expect(aria).toHaveText('Moved Apple to position 3 of 5');
     await page.keyboard.press('Escape');
-    await expect(aria).toHaveText('Cancelled. Apple returned to position 1');
+    await expect(aria).toHaveText('Cancelled. Apple returned to position 1 of 5');
     await expectOrder(mount, items, SEED);
     await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
     // The lift is over: an arrow no longer moves anything.
@@ -220,7 +221,7 @@ for (const target of TARGETS) {
       const section = mount.getByTestId('handle-list');
       await expect(section.locator(ITEM)).toHaveCount(4);
       await expect(section.locator(GRIP).first()).toHaveAccessibleDescription(
-        /^Press Space or Enter to pick up\./,
+        /^Press Space or Enter to pick up, and again to drop\./,
       );
     },
   );
@@ -232,7 +233,7 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(0).focus();
       for (const key of ['Space', 'End', 'ArrowUp', 'Space']) await page.keyboard.press(key);
-      await expect(aria).toHaveText('Dropped Apple at position 4');
+      await expect(aria).toHaveText('Dropped Apple at position 4 of 5');
       await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Apple', 'Elderberry']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
       await assertInvariant(mount);
@@ -246,7 +247,7 @@ for (const target of TARGETS) {
       await items.nth(0).focus();
       // 5 rows, pageStep 5: PageDown clamps 0 → 4, Home → 0, PageDown → 4.
       for (const key of ['Space', 'PageDown', 'Home', 'PageDown', 'Space']) await page.keyboard.press(key);
-      await expect(aria).toHaveText('Dropped Apple at position 5');
+      await expect(aria).toHaveText('Dropped Apple at position 5 of 5');
       await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Elderberry', 'Apple']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
       await assertInvariant(mount);
@@ -274,7 +275,7 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(0).focus();
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText('Lifted Apple');
+      await expect(aria).toHaveText('Lifted Apple, position 1 of 5');
       await expect(mount.locator(LIFTED)).toHaveCount(1);
       // Drag Banana below Date with the pointer.
       await synthesizeDrag(page, {
@@ -296,7 +297,7 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(0).focus();
       for (const key of ['Space', 'End', 'Home', 'ArrowDown', 'Space']) await page.keyboard.press(key);
-      await expect(aria).toHaveText('Dropped Apple at position 2');
+      await expect(aria).toHaveText('Dropped Apple at position 2 of 5');
       await expectOrder(mount, items, ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
       await expect.poll(() => activeText(page), { timeout: 5000 }).toBe('Apple');
       await assertInvariant(mount);
@@ -350,11 +351,11 @@ for (const target of TARGETS) {
     await items.nth(0).focus();
     await page.keyboard.press('Space');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 2');
+    await expect(aria).toHaveText('Moved Apple to position 2 of 5');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 3');
+    await expect(aria).toHaveText('Moved Apple to position 3 of 5');
     await page.keyboard.press('Space');
-    await expect(aria).toHaveText('Dropped Apple at position 3');
+    await expect(aria).toHaveText('Dropped Apple at position 3 of 5');
     await expect.poll(() => lastEnd(mount)).toEqual({
       item: 'Apple',
       el: 'element',
@@ -374,7 +375,7 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(0).focus();
       for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
-      await expect(aria).toHaveText('Dropped Apple at position 3');
+      await expect(aria).toHaveText('Dropped Apple at position 3 of 5');
       await expectOrder(mount, items, ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry']);
       await expect.poll(() => lastEnd(mount)).toEqual({
         item: 'Apple',
@@ -396,11 +397,11 @@ for (const target of TARGETS) {
     await items.nth(0).focus();
     await page.keyboard.press('Space');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 2');
+    await expect(aria).toHaveText('Moved Apple to position 2 of 5');
     await page.keyboard.press('ArrowDown');
-    await expect(aria).toHaveText('Moved Apple to position 3');
+    await expect(aria).toHaveText('Moved Apple to position 3 of 5');
     await page.keyboard.press('Escape');
-    await expect(aria).toHaveText('Cancelled. Apple returned to position 1');
+    await expect(aria).toHaveText('Cancelled. Apple returned to position 1 of 5');
     await expectOrder(mount, items, SEED);
     await expect(mount.getByTestId('end-order')).toHaveText('a,b,c,d,e');
     await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual([
@@ -419,7 +420,7 @@ for (const target of TARGETS) {
       const { mount, items, aria } = await open(page);
       await items.nth(0).focus();
       for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Escape']) await page.keyboard.press(key);
-      await expect(aria).toHaveText('Cancelled. Apple returned to position 1');
+      await expect(aria).toHaveText('Cancelled. Apple returned to position 1 of 5');
       await expectOrder(mount, items, SEED);
       await expect(mount.getByTestId('end-order')).toHaveText('a,b,c,d,e');
       await assertInvariant(mount);
@@ -457,9 +458,9 @@ for (const target of TARGETS) {
           for (const key of ['Space', 'ArrowDown']) await page.keyboard.press(key);
         } else {
           await page.keyboard.press('Space');
-          await expect(aria).toHaveText('Lifted Banana');
+          await expect(aria).toHaveText('Lifted Banana, position 2 of 5');
           await page.keyboard.press('ArrowDown');
-          await expect(aria).toHaveText('Moved Banana to position 3');
+          await expect(aria).toHaveText('Moved Banana to position 3 of 5');
         }
         await clickKeepingFocus(
           mount,
@@ -521,24 +522,122 @@ for (const target of TARGETS) {
       );
     }
 
-    // option('sort', false) at runtime: no in-list moves by keyboard.
+    // option('sort', false) at runtime: no in-list moves by keyboard. Each
+    // in-list move key says so, and the instructions drop the move sentence.
     runner(`sortable-keyboard-keys [${target}]: option('sort', false) stops in-list moves${tag}`, async ({ page }) => {
       const { mount, items, aria } = await open(page);
       await clickKeepingFocus(mount, 'sort-off');
+      await expect(items.nth(1)).toHaveAccessibleDescription(NOT_SORTABLE_INSTRUCTIONS);
       await items.nth(1).focus();
       if (burst) {
         for (const key of ['Space', 'ArrowDown', 'End', 'Home', 'PageDown', 'Space']) await page.keyboard.press(key);
       } else {
         await page.keyboard.press('Space');
-        await expect(aria).toHaveText('Lifted Banana');
+        await expect(aria).toHaveText('Lifted Banana, position 2 of 5');
         for (const key of ['ArrowDown', 'End', 'Home', 'PageDown']) await page.keyboard.press(key);
         await page.waitForTimeout(100);
-        await expect(aria).toHaveText('Lifted Banana');
+        await expect(aria).toHaveText("Banana can't be moved within Fruit");
+        await expectOrder(mount, items, SEED);
         await page.keyboard.press('Space');
       }
-      await expect(aria).toHaveText('Dropped Banana at position 2');
+      await expect(aria).toHaveText('Dropped Banana at position 2 of 5');
       await expectOrder(mount, items, SEED);
       await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard', 'end:keyboard']);
+      await assertInvariant(mount);
+    });
+
+    // `announcements` replaces the text of the kinds it has a function for;
+    // every other kind keeps its default.
+    runner(`sortable-keyboard-keys [${target}]: announcements override replaces one message and keeps the rest${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await clickKeepingFocus(mount, 'announce-custom');
+      await items.nth(0).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowDown', 'ArrowDown']) await page.keyboard.press(key);
+      } else {
+        await page.keyboard.press('Space');
+        await expect(aria).toHaveText('Lifted Apple, position 1 of 5');
+        await page.keyboard.press('ArrowDown');
+        await expect(aria).toHaveText('Apple → 2');
+        await page.keyboard.press('ArrowDown');
+      }
+      await expect(aria).toHaveText('Apple → 3');
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText('Dropped Apple at position 3 of 5');
+      await expectOrder(mount, items, ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry']);
+      await assertInvariant(mount);
+    });
+
+    // A function returning '' says nothing (and clears the last message).
+    runner(`sortable-keyboard-keys [${target}]: returning '' stays silent${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await clickKeepingFocus(mount, 'announce-silent');
+      await items.nth(0).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      } else {
+        await page.keyboard.press('Space');
+        await expect(aria).toHaveText('Lifted Apple, position 1 of 5');
+        await page.keyboard.press('ArrowDown');
+        await expect(aria).toHaveText('Moved Apple to position 2 of 5');
+        await page.keyboard.press('Space');
+      }
+      await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard', 'reorder:keyboard', 'end:keyboard']);
+      await expect(aria).toHaveText('');
+      await expectOrder(mount, items, ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
+      await assertInvariant(mount);
+    });
+
+    // A move key that would not move the row says why; the same message twice
+    // in a row still changes the live region, so it is spoken again.
+    runner(`sortable-keyboard-keys [${target}]: ArrowUp on the first row says "{label} is already first"${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      const raw = () => aria.evaluate((el) => el.textContent ?? '');
+      await items.nth(0).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowUp', 'Home', 'PageUp']) await page.keyboard.press(key);
+        await expect(aria).toHaveText('Apple is already first');
+        for (const key of ['End', 'ArrowDown']) await page.keyboard.press(key);
+        await expect(aria).toHaveText('Apple is already last');
+      } else {
+        await page.keyboard.press('Space');
+        await expect(aria).toHaveText('Lifted Apple, position 1 of 5');
+        await page.keyboard.press('ArrowUp');
+        await expect(aria).toHaveText('Apple is already first');
+        const first = await raw();
+        await page.keyboard.press('ArrowUp');
+        await expect.poll(raw).not.toBe(first);
+        await expect(aria).toHaveText('Apple is already first');
+        await page.keyboard.press('End');
+        await expect(aria).toHaveText('Moved Apple to position 5 of 5');
+        await page.keyboard.press('PageDown');
+        await expect(aria).toHaveText('Apple is already last');
+      }
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText('Dropped Apple at position 5 of 5');
+      await expectOrder(mount, items, ['Banana', 'Cherry', 'Date', 'Elderberry', 'Apple']);
+      await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard', 'reorder:keyboard', 'end:keyboard']);
+      await assertInvariant(mount);
+    });
+
+    // No `labelFor` and no `label` field: the row's text names the item.
+    runner(`sortable-keyboard-keys [${target}]: object items without label are read by their row text${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await clickKeepingFocus(mount, 'strip-labels');
+      await expect(mount.locator(LOG_LI)).toHaveCount(0);
+      await expect.poll(() => displayedLabels(items)).toEqual(SEED);
+      await items.nth(1).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      } else {
+        await page.keyboard.press('Space');
+        await expect(aria).toHaveText('Lifted Banana, position 2 of 5');
+        await page.keyboard.press('ArrowDown');
+        await expect(aria).toHaveText('Moved Banana to position 3 of 5');
+        await page.keyboard.press('Space');
+      }
+      await expect(aria).toHaveText('Dropped Banana at position 3 of 5');
+      await expectOrder(mount, items, ['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
       await assertInvariant(mount);
     });
 
@@ -565,9 +664,9 @@ for (const target of TARGETS) {
       // Cherry matches: it lifts and moves.
       await items.nth(2).focus();
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText('Lifted Cherry');
+      await expect(aria).toHaveText('Lifted Cherry, position 3 of 5');
       await page.keyboard.press('ArrowUp');
-      await expect(aria).toHaveText('Moved Cherry to position 2');
+      await expect(aria).toHaveText('Moved Cherry to position 2 of 5');
       await page.keyboard.press('Space');
       await expectOrder(mount, items, ['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
       await assertInvariant(mount);
@@ -579,21 +678,21 @@ for (const target of TARGETS) {
         const { mount, items, aria } = await open(page);
         await items.nth(1).focus();
         await page.keyboard.press('Space');
-        if (!burst) await expect(aria).toHaveText('Lifted Banana');
+        if (!burst) await expect(aria).toHaveText('Lifted Banana, position 2 of 5');
         await clickKeepingFocus(mount, 'prepend');
         await expect(items).toHaveCount(SEED.length + 1);
         await expect.poll(() => liftedLabels(mount)).toEqual(['Banana']);
         if (burst) {
           for (const key of ['ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
-          await expect(aria).toHaveText('Dropped Banana at position 5');
+          await expect(aria).toHaveText('Dropped Banana at position 5 of 6');
           await expectOrder(mount, items, ['Zucchini', 'Apple', 'Cherry', 'Date', 'Banana', 'Elderberry']);
         } else {
           await page.keyboard.press('ArrowDown');
-          await expect(aria).toHaveText('Moved Banana to position 4');
+          await expect(aria).toHaveText('Moved Banana to position 4 of 6');
           await expectOrder(mount, items, ['Zucchini', 'Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
           await expect.poll(() => liftedLabels(mount)).toEqual(['Banana']);
           await page.keyboard.press('Space');
-          await expect(aria).toHaveText('Dropped Banana at position 4');
+          await expect(aria).toHaveText('Dropped Banana at position 4 of 6');
         }
         await expect(mount.locator(LIFTED)).toHaveCount(0);
         await assertEachOnce(mount, [...SEED, 'Zucchini']);
@@ -635,9 +734,9 @@ for (const target of TARGETS) {
         // An unlocked row still lifts.
         await rows.nth(1).focus();
         await page.keyboard.press('Space');
-        await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Drafts');
+        await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Drafts, position 2 of 5');
         await page.keyboard.press('Escape');
-        await expect(mount.locator(ARIA_LIVE)).toHaveText('Cancelled. Drafts returned to position 2');
+        await expect(mount.locator(ARIA_LIVE)).toHaveText('Cancelled. Drafts returned to position 2 of 5');
         await expect.poll(() => displayedLabels(rows)).toEqual(seed);
       },
     );

@@ -110,7 +110,7 @@
             {
               "kind": "field",
               "name": "labelFor",
-              "description": "Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label` (or `String(item)` when no `label` field exists).",
+              "description": "Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label`; without a `label` field, the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`.",
               "type": {
                 "text": "((...args: any[]) => any)"
               },
@@ -220,7 +220,7 @@
             {
               "kind": "field",
               "name": "listLabel",
-              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1`, `Dropped Hero banner in Top sidebar at position 3`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
+              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1 of 4`, `Dropped Hero banner in Top sidebar at position 3 of 4`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
               "type": {
                 "text": "string"
               },
@@ -250,11 +250,21 @@
             {
               "kind": "field",
               "name": "keyboardInstructions",
-              "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.\" (with `orientation: 'horizontal'`, \"Use the left and right arrow keys to move\"). When `group` is set the default adds \"Hold Shift with an arrow key to move to another list.\"",
+              "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.\" (with `orientation: 'horizontal'`, \"the left and right arrow keys\"; a `sort: false` list says only \"Press Space or Enter to pick up, and again to drop. Press Escape to cancel.\"). When the list has a group (`group` or `options.group`) the default adds \"Hold Shift with an arrow key to move to another list.\"",
               "type": {
                 "text": "string"
               },
               "attribute": "keyboardinstructions",
+              "default": "null"
+            },
+            {
+              "kind": "field",
+              "name": "announcements",
+              "description": "Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see \"Announcements\").",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "attribute": "announcements",
               "default": "null"
             },
             {
@@ -372,7 +382,7 @@
             },
             {
               "name": "labelfor",
-              "description": "Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label` (or `String(item)` when no `label` field exists).",
+              "description": "Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label`; without a `label` field, the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`.",
               "type": {
                 "text": "((...args: any[]) => any)"
               },
@@ -471,7 +481,7 @@
             },
             {
               "name": "listlabel",
-              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1`, `Dropped Hero banner in Top sidebar at position 3`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
+              "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1 of 4`, `Dropped Hero banner in Top sidebar at position 3 of 4`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
               "type": {
                 "text": "string"
               },
@@ -498,11 +508,20 @@
             },
             {
               "name": "keyboardinstructions",
-              "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel.\" (with `orientation: 'horizontal'`, \"Use the left and right arrow keys to move\"). When `group` is set the default adds \"Hold Shift with an arrow key to move to another list.\"",
+              "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.\" (with `orientation: 'horizontal'`, \"the left and right arrow keys\"; a `sort: false` list says only \"Press Space or Enter to pick up, and again to drop. Press Escape to cancel.\"). When the list has a group (`group` or `options.group`) the default adds \"Hold Shift with an arrow key to move to another list.\"",
               "type": {
                 "text": "string"
               },
               "fieldName": "keyboardInstructions",
+              "default": "null"
+            },
+            {
+              "name": "announcements",
+              "description": "Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see \"Announcements\").",
+              "type": {
+                "text": "Record<string, any>"
+              },
+              "fieldName": "announcements",
               "default": "null"
             },
             {

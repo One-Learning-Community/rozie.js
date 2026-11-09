@@ -7,7 +7,9 @@
   Top sidebar, Content, Bottom sidebar — plus, in source order:
     - `Locked` (`pull: false`: nothing hops out of it) first,
     - a clone palette (`Palette`: `pull: 'clone'`, `put: false`, the
-      recommended palette shape — it takes nothing back) before Top sidebar,
+      recommended palette shape — it takes nothing back) before Top sidebar;
+      like the docs' palette it sets its group ONLY through `options.group`
+      (no `group` prop),
     - a "Grid" widget in Content whose row renders two nested lists
       (`Grid column 1`, `Grid column 2`) in the same group,
     - a `put: false` list (`Archive`) after Bottom sidebar,
@@ -294,7 +296,6 @@ $onMount(() => seed())
       r-if="$data.paletteMounted"
       r-model:items="$data.palette"
       itemKey="id"
-      group="zones"
       :options="{ group: { name: 'zones', pull: 'clone', put: false } }"
       listLabel="Palette"
       :keyboardTrigger="$data.trigger"

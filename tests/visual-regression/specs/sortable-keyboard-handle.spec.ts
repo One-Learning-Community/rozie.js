@@ -111,23 +111,23 @@ for (const target of TARGETS) {
         .poll(async () => (await deepestActive(page)).ariaLabel, { timeout: 2000 })
         .toBe(`Reorder ${HERO}`);
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText(`Lifted ${HERO}`);
+      await expect(aria).toHaveText(`Lifted ${HERO}, position 1 of 4`);
 
       // MOVE twice; focus must follow the moved row's handle each time.
       await page.keyboard.press('ArrowDown');
-      await expect(aria).toHaveText(`Moved ${HERO} to position 2`);
+      await expect(aria).toHaveText(`Moved ${HERO} to position 2 of 4`);
       await expect
         .poll(async () => (await deepestActive(page)).ariaLabel, { timeout: 5000 })
         .toBe(`Reorder ${HERO}`);
       await page.keyboard.press('ArrowDown');
-      await expect(aria).toHaveText(`Moved ${HERO} to position 3`);
+      await expect(aria).toHaveText(`Moved ${HERO} to position 3 of 4`);
       await expect
         .poll(async () => (await deepestActive(page)).ariaLabel, { timeout: 5000 })
         .toBe(`Reorder ${HERO}`);
 
       // Enter DROPS.
       await page.keyboard.press('Enter');
-      await expect(aria).toHaveText(`Dropped ${HERO} at position 3`);
+      await expect(aria).toHaveText(`Dropped ${HERO} at position 3 of 4`);
 
       const expected = [PRICING, TESTIMONIALS, HERO, FOOTER];
       await expect.poll(() => displayedLabels(items)).toEqual(expected);
@@ -140,9 +140,9 @@ for (const target of TARGETS) {
 
       // Lift again, then Escape cancels.
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText(`Lifted ${HERO}`);
+      await expect(aria).toHaveText(`Lifted ${HERO}, position 3 of 4`);
       await page.keyboard.press('Escape');
-      await expect(aria).toHaveText(`Cancelled. ${HERO} returned to position 3`);
+      await expect(aria).toHaveText(`Cancelled. ${HERO} returned to position 3 of 4`);
     },
   );
 
@@ -161,7 +161,7 @@ for (const target of TARGETS) {
         .poll(async () => (await deepestActive(page)).ariaLabel, { timeout: 2000 })
         .toBe(`Reorder ${HERO}`);
       for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
-      await expect(section.locator(ARIA_LIVE)).toHaveText(`Dropped ${HERO} at position 3`);
+      await expect(section.locator(ARIA_LIVE)).toHaveText(`Dropped ${HERO} at position 3 of 4`);
       const expected = [PRICING, TESTIMONIALS, HERO, FOOTER];
       await expect.poll(() => displayedLabels(items)).toEqual(expected);
       await expect.poll(() => stateLabels(section.locator(STATE_LI))).toEqual(expected);
@@ -243,7 +243,7 @@ for (const target of TARGETS) {
       await expect(section.getByTestId('keyboard-state')).toHaveText('on');
       await items.first().locator(GRIP).focus();
       await page.keyboard.press('Space');
-      await expect(aria).toHaveText(`Lifted ${HERO}`);
+      await expect(aria).toHaveText(`Lifted ${HERO}, position 1 of 4`);
     },
   );
 

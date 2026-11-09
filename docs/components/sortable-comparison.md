@@ -1,5 +1,5 @@
 ---
-surface_hash: 6978738e73dc
+surface_hash: c18018da9e36
 ---
 
 # Sortable libraries comparison
@@ -58,7 +58,7 @@ Per-framework column = the de-facto leader for that framework (React = `@dnd-kit
 
 - **First-class packages everywhere** — including the two the ecosystem underserves: **Solid** (`@thisbeyond/solid-dnd` ~91k/wk, ~3 yr stale) and **Lit** (no reorderable-list component exists). A Lit dev today hand-rolls SortableJS over their own DOM; a Solid dev reaches for a toolkit that hasn't shipped since 2023.
 - **One reorderable-list contract everywhere.** The same props, events, two-way binding, and handle: one component to learn, document, and migrate across your stack.
-- **Keyboard drag + screen-reader announcements built in**: Space / Arrow / Escape / Enter with `aria-live`, and the cross-framework focus-restoration leak closed by [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders). dnd-kit, CDK, and svelte-dnd-action have keyboard stories too, but each is per-framework; react-sortablejs and vuedraggable have none. An opt-in `keyboardTrigger: 'handle'` mode limits it to a consumer-owned handle button.
+- **Keyboard drag + screen-reader announcements built in**: Space / Arrow / Escape / Enter with `aria-live`, and the cross-framework focus-restoration leak closed by [`$restoreFocus`](/guide/engine-wrappers#restorefocus-selector-idx-—-keep-focus-on-a-row-across-keyed-reconciler-re-renders). dnd-kit, CDK, and svelte-dnd-action have keyboard stories too, but each is per-framework; react-sortablejs and vuedraggable have none. An opt-in `keyboardTrigger: 'handle'` mode limits it to a consumer-owned handle button. Every spoken message (with position and total) can be reworded or translated through the `announcements` prop.
 - **Two-way bound `items` array** (`r-model:items`) — the thing every dnd-kit / CDK / solid-dnd consumer wires by hand. Pass an array, render rows through the scoped default slot, get the reordered array back.
 - **Cross-list sync + nesting**: `SortableListPair` (atomic transfer across two bound arrays) and `SortableListNested` / `KanbanColumn` (reorderable columns of reorderable cards).
 - **Custom drag handles via `$classSelector`**, which resolves on every target including React's scoped-CSS (authored class names render literally; `$classSelector` lowers to the literal `".grip"` per target and typo-checks it against your `<style>` at compile time).

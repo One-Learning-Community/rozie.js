@@ -68,9 +68,9 @@ const SEED_LABELS = Object.values(SEED).flat();
 const TOP_INSTRUCTIONS =
   'Press Space to pick up this widget. Shift with an arrow key moves it to another zone.';
 const GROUP_INSTRUCTIONS =
-  'Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
+  'Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
 const HORIZONTAL_GROUP_INSTRUCTIONS =
-  'Press Space or Enter to pick up. Use the left and right arrow keys to move, Home and End to jump, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
+  'Press Space or Enter to pick up, and again to drop. Use the left and right arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel. Hold Shift with an arrow key to move to another list.';
 
 type Mount = ReturnType<Page['getByTestId']>;
 
@@ -224,13 +224,13 @@ for (const target of TARGETS) {
       const { mount } = await open(page);
       await grip(mount, 'Tag cloud').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud, position 3 of 3']);
       await assertNothingDisappeared(mount);
 
       await page.keyboard.press('Shift+ArrowDown');
       await expect.poll(() => state(mount, 'content')).toEqual(['Tag cloud', ...SEED.content]);
       await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Newsletter']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Tag cloud to Content, position 1']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Tag cloud to Content, position 1 of 5']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Tag cloud');
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
@@ -240,7 +240,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Dropped Tag cloud in Content at position 1']);
+        .toEqual(['Dropped Tag cloud in Content at position 1 of 5']);
       await expect(mount.locator(LIFTED)).toHaveCount(0);
       await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('content:end:keyboard');
       // Keyboard `end` carries the same payload as pointer: the item value
@@ -265,14 +265,14 @@ for (const target of TARGETS) {
         .toEqual([...SEED.top, 'Hero banner']);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Hero banner to Top sidebar, position 4']);
+        .toEqual(['Moved Hero banner to Top sidebar, position 4 of 4']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Hero banner');
       await assertNothingDisappeared(mount);
 
       await page.keyboard.press('Space');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Dropped Hero banner in Top sidebar at position 4']);
+        .toEqual(['Dropped Hero banner in Top sidebar at position 4 of 4']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -290,7 +290,7 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'grid1')).toEqual(['Intro text', 'Left card']);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Intro text to Grid column 1, position 1']);
+        .toEqual(['Moved Intro text to Grid column 1, position 1 of 2']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Intro text');
       await assertNothingDisappeared(mount);
 
@@ -299,14 +299,14 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'grid1')).toEqual(['Left card']);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Intro text to Grid column 2, position 1']);
+        .toEqual(['Moved Intro text to Grid column 2, position 1 of 2']);
       await assertNothingDisappeared(mount);
 
       await page.keyboard.press('Shift+ArrowDown');
       await expect.poll(() => state(mount, 'bottom')).toEqual(['Intro text', ...SEED.bottom]);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Intro text to Bottom sidebar, position 1']);
+        .toEqual(['Moved Intro text to Bottom sidebar, position 1 of 3']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Intro text');
       await assertNothingDisappeared(mount);
 
@@ -315,12 +315,12 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'grid2')).toEqual(['Right card', 'Intro text']);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Intro text to Grid column 2, position 2']);
+        .toEqual(['Moved Intro text to Grid column 2, position 2 of 2']);
       await assertNothingDisappeared(mount);
       await page.keyboard.press('Space');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Dropped Intro text in Grid column 2 at position 2']);
+        .toEqual(['Dropped Intro text in Grid column 2 at position 2 of 2']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -336,7 +336,7 @@ for (const target of TARGETS) {
       await expect
         .poll(() => state(mount, 'content'))
         .toEqual(['Hero banner', 'Intro text', 'Gallery']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Grid to Bottom sidebar, position 1']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Grid to Bottom sidebar, position 1 of 3']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Grid');
       // The columns travelled with the Grid row.
       await expect(grip(mount, 'Left card')).toBeVisible();
@@ -344,7 +344,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Dropped Grid in Bottom sidebar at position 1']);
+        .toEqual(['Dropped Grid in Bottom sidebar at position 1 of 3']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -366,7 +366,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Escape');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Contact returned to position 2']);
+        .toEqual(['Cancelled. Contact returned to position 2 of 2']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -382,12 +382,12 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Moved Text block to Top sidebar, position 1']);
+        .toEqual(['Moved Text block to Top sidebar, position 1 of 4']);
       await assertNothingDisappeared(mount, ['Text block']);
       await page.keyboard.press('Space');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Dropped Text block in Top sidebar at position 1']);
+        .toEqual(['Dropped Text block in Top sidebar at position 1 of 4']);
       await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
       await expect.poll(() => state(mount, 'top')).toEqual(['Text block', ...SEED.top]);
       await expect
@@ -414,7 +414,7 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'grid1')).toEqual(SEED.grid1);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Newsletter returned to Top sidebar, position 2']);
+        .toEqual(['Cancelled. Newsletter returned to Top sidebar, position 2 of 3']);
       await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('top:end:keyboard');
       await expect(mount.locator(LIFTED)).toHaveCount(0);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Newsletter');
@@ -436,7 +436,7 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Image returned to Palette, position 2']);
+        .toEqual(['Cancelled. Image returned to Palette, position 2 of 2']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Image');
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
@@ -458,7 +458,7 @@ for (const target of TARGETS) {
     }
     await expect
       .poll(() => liveTexts(mount))
-      .toEqual(['Dropped Tag cloud in Grid column 1 at position 2']);
+      .toEqual(['Dropped Tag cloud in Grid column 1 at position 2 of 2']);
     await expect.poll(() => state(mount, 'grid1')).toEqual(['Left card', 'Tag cloud']);
     await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Newsletter']);
     await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
@@ -473,16 +473,16 @@ for (const target of TARGETS) {
     await expect(row).toHaveAttribute('tabindex', '0');
     await row.focus();
     await page.keyboard.press('Space');
-    await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud']);
+    await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud, position 3 of 3']);
     await page.keyboard.press('Shift+ArrowDown');
     await expect.poll(() => state(mount, 'content')).toEqual(['Tag cloud', ...SEED.content]);
-    await expect.poll(() => liveTexts(mount)).toEqual(['Moved Tag cloud to Content, position 1']);
+    await expect.poll(() => liveTexts(mount)).toEqual(['Moved Tag cloud to Content, position 1 of 5']);
     await expect.poll(() => active(page), { timeout: 5000 }).toBe('row:Tag cloud');
     await assertNothingDisappeared(mount);
     await page.keyboard.press('Space');
     await expect
       .poll(() => liveTexts(mount))
-      .toEqual(['Dropped Tag cloud in Content at position 1']);
+      .toEqual(['Dropped Tag cloud in Content at position 1 of 5']);
     await assertNothingDisappeared(mount);
   });
 
@@ -508,7 +508,7 @@ for (const target of TARGETS) {
       // still fires once, and nothing is written.
       await grip(mount, 'Newsletter').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter, position 1 of 2']);
       await clickKeepingFocus(mount, 'move-top-first-to-bottom');
       await expect.poll(() => state(mount, 'bottom')).toEqual([...SEED.bottom, 'Newsletter']);
       await expect(mount.locator(LIFTED)).toHaveCount(0);
@@ -540,7 +540,7 @@ for (const target of TARGETS) {
       const { mount, errors } = await open(page);
       await grip(mount, 'Newsletter').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter, position 2 of 3']);
       await clickKeepingFocus(mount, 'empty-top');
       await expect.poll(() => state(mount, 'top')).toEqual([]);
       await expect.poll(() => state(mount, 'bottom')).toEqual([...SEED.bottom, ...SEED.top]);
@@ -569,7 +569,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Escape');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Newsletter stays in Content, position 1']);
+        .toEqual(['Cancelled. Newsletter stays in Content, position 1 of 5']);
       await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
       await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('content:end:keyboard');
       await expect(mount.locator(LIFTED)).toHaveCount(0);
@@ -588,14 +588,14 @@ for (const target of TARGETS) {
       await expect(items).toHaveCount(seed.length);
       await items.nth(0).focus();
       await page.keyboard.press('Space');
-      await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Apple');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Apple, position 1 of 5');
       await page.keyboard.press('Shift+ArrowDown');
       await page.waitForTimeout(100);
       await expect.poll(() => texts(mount.locator('[class*="state-list"] li'))).toEqual(seed);
-      await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Apple');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Apple, position 1 of 5');
       await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard']);
       await page.keyboard.press('Space');
-      await expect(mount.locator(ARIA_LIVE)).toHaveText('Dropped Apple at position 1');
+      await expect(mount.locator(ARIA_LIVE)).toHaveText('Dropped Apple at position 1 of 5');
     },
   );
 
@@ -616,7 +616,7 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
       // Today's behaviour: the lift itself stays.
       await expect(mount.locator(LIFTED)).toHaveCount(1);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter, position 2 of 3']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -657,7 +657,7 @@ for (const target of TARGETS) {
       const { mount } = await open(page);
       await grip(mount, 'Tag cloud').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Tag cloud, position 3 of 3']);
       // Toolbar A is in group 'tools': its arrows do not move the zones lift.
       await grip(mount, 'Bold').focus();
       await page.keyboard.press('ArrowRight');
@@ -667,7 +667,7 @@ for (const target of TARGETS) {
       await expect.poll(() => state(mount, 'toola')).toEqual(SEED.toola);
       // Space there drops the foreign lift and lifts its own row.
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold, position 1 of 3']);
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
         .toEqual(['top:start:keyboard', 'top:end:keyboard', 'toola:start:keyboard']);
@@ -714,7 +714,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await page.keyboard.press('ArrowRight');
       await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Bold', 'Underline']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to position 2']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to position 2 of 3']);
       // Vertical arrows do nothing in a horizontal list, shifted or not.
       await page.keyboard.press('Shift+ArrowDown');
       await page.keyboard.press('ArrowDown');
@@ -723,18 +723,18 @@ for (const target of TARGETS) {
       await page.keyboard.press('Shift+ArrowRight');
       await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
       await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar B, position 1']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar B, position 1 of 3']);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Bold');
       await assertNothingDisappeared(mount);
       await page.keyboard.press('ArrowRight');
       await expect.poll(() => state(mount, 'toolb')).toEqual(['Link', 'Bold', 'Quote']);
       await page.keyboard.press('Shift+ArrowLeft');
       await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline', 'Bold']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar A, position 3']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar A, position 3 of 3']);
       await assertNothingDisappeared(mount);
       // It hopped out and back: the drop still names the list.
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Bold in Toolbar A at position 3']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Bold in Toolbar A at position 3 of 3']);
       await assertNothingDisappeared(mount);
     },
   );
@@ -762,7 +762,7 @@ for (const target of TARGETS) {
         }
         await expect
           .poll(() => liveTexts(mount))
-          .toEqual(['Cancelled. Tag cloud returned to Top sidebar, position 3']);
+          .toEqual(['Cancelled. Tag cloud returned to Top sidebar, position 3 of 3']);
         await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
         await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
         await expect
@@ -838,22 +838,41 @@ for (const target of TARGETS) {
     },
   );
 
+  // The palette sets its group only through `options.group` (the docs'
+  // palette recipe): its rows leave only by Shift+arrow, so it says so.
+  runner(
+    `sortable-keyboard-cross-list [${target}]: options.group palette instructions mention Shift`,
+    async ({ page }) => {
+      const { mount } = await open(page);
+      await expect(grip(mount, 'Text block')).toHaveAccessibleDescription(GROUP_INSTRUCTIONS);
+    },
+  );
+
+  runner(
+    `sortable-keyboard-cross-list [${target}]: horizontal instructions say left and right`,
+    async ({ page }) => {
+      const { mount } = await open(page);
+      await expect(grip(mount, 'Link')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
+      await expect(grip(mount, 'Link')).toHaveAccessibleDescription(/Use the left and right arrow keys to move/);
+    },
+  );
+
   runner(
     `sortable-keyboard-cross-list [${target}]: the consumer swapping the lifted item for a same-key object keeps the lift`,
     async ({ page }) => {
       const { mount, errors } = await open(page);
       await grip(mount, 'Newsletter').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter, position 2 of 3']);
       await clickKeepingFocus(mount, 'replace-newsletter');
       await page.waitForTimeout(100);
       await expect(mount.locator(LIFTED)).toHaveCount(1);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Newsletter, position 2 of 3']);
       await page.keyboard.press('ArrowDown');
       await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Tag cloud', 'Newsletter']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Newsletter to position 3']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Newsletter to position 3 of 3']);
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Newsletter at position 3']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Newsletter at position 3 of 3']);
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
         .toEqual(['top:start:keyboard', 'top:reorder:keyboard', 'top:end:keyboard']);
@@ -900,14 +919,14 @@ for (const target of TARGETS) {
       await page.keyboard.press('Space');
       await page.keyboard.press('Shift+ArrowUp');
       await expect.poll(() => state(mount, 'locked')).toEqual([...SEED.locked, 'Search']);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Locked, position 2']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Locked, position 2 of 2']);
       await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Search');
       await assertNothingDisappeared(mount);
       await page.keyboard.press('Escape');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Search returned to Top sidebar, position 1']);
+        .toEqual(['Cancelled. Search returned to Top sidebar, position 1 of 3']);
       await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
       await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
       await assertNothingDisappeared(mount);
@@ -920,17 +939,17 @@ for (const target of TARGETS) {
       const { mount } = await open(page);
       await grip(mount, 'Search').focus();
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search, position 1 of 3']);
       await grip(mount, 'Hero banner').focus();
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('Shift+ArrowDown');
       await page.waitForTimeout(100);
       await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
       await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search, position 1 of 3']);
       // Space there drops the Top lift and lifts its own row.
       await page.keyboard.press('Space');
-      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Hero banner']);
+      await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Hero banner, position 1 of 4']);
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
         .toEqual(['top:start:keyboard', 'top:end:keyboard', 'content:start:keyboard']);
@@ -956,7 +975,7 @@ for (const target of TARGETS) {
       await page.keyboard.press('Escape');
       await expect
         .poll(() => liveTexts(mount))
-        .toEqual(['Cancelled. Newsletter stays in Content, position 1']);
+        .toEqual(['Cancelled. Newsletter stays in Content, position 1 of 5']);
       await expect.poll(() => state(mount, 'content')).toEqual(['Newsletter', ...SEED.content]);
       await expect.poll(() => state(mount, 'top')).toEqual(['Search', 'Tag cloud']);
       await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('content:end:keyboard');
@@ -987,23 +1006,23 @@ for (const target of TARGETS) {
           for (const key of ['Space', 'ArrowDown', 'End', 'PageDown', 'ArrowDown']) await page.keyboard.press(key);
         } else {
           await page.keyboard.press('Space');
-          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search, position 1 of 3']);
           for (const key of ['ArrowDown', 'End', 'PageDown', 'ArrowDown']) await page.keyboard.press(key);
           await page.waitForTimeout(100);
-          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+          await expect.poll(() => liveTexts(mount)).toEqual(["Search can't be moved within Top sidebar"]);
         }
         await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
         await expect(mount.locator(LIFTED)).toHaveCount(1);
         await page.keyboard.press('Shift+ArrowDown');
         await expect.poll(() => state(mount, 'content')).toEqual(['Search', ...SEED.content]);
         await expect.poll(() => state(mount, 'top')).toEqual(['Newsletter', 'Tag cloud']);
-        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Content, position 1']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Content, position 1 of 5']);
         await assertNothingDisappeared(mount);
         // Content sorts: the arrow moves the row there.
         await page.keyboard.press('ArrowDown');
         await expect.poll(() => state(mount, 'content')).toEqual(['Hero banner', 'Search', 'Intro text', 'Grid', 'Gallery']);
         await page.keyboard.press('Space');
-        await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Search in Content at position 2']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Search in Content at position 2 of 5']);
         expect(
           (await texts(mount.locator(LOG_LI))).filter((e) => e.startsWith('top:reorder')),
         ).toEqual([]);
@@ -1029,7 +1048,7 @@ for (const target of TARGETS) {
           .toEqual(['0', '1']);
         await grip(mount, 'Bold').focus();
         await page.keyboard.press('Space');
-        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold, position 1 of 3']);
         // Link is Toolbar B's row 0: the same key as the lifted Bold.
         await grip(mount, 'Link').focus();
         if (burst) {
@@ -1041,17 +1060,17 @@ for (const target of TARGETS) {
         await page.waitForTimeout(100);
         await expect.poll(() => state(mount, 'toola')).toEqual(SEED.toola);
         await expect.poll(() => state(mount, 'toolb')).toEqual(SEED.toolb);
-        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold, position 1 of 3']);
         await expect(mount.getByTestId('zone-toola').locator(LIFTED)).toHaveCount(1);
         // Space there drops Bold where it is and lifts Link.
         if (burst) {
           for (const key of ['Space', 'ArrowRight', 'Space']) await page.keyboard.press(key);
-          await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Link at position 2']);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Link at position 2 of 2']);
         } else {
           await page.keyboard.press('Space');
-          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Link']);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Link, position 1 of 2']);
           await page.keyboard.press('ArrowRight');
-          await expect.poll(() => liveTexts(mount)).toEqual(['Moved Link to position 2']);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Moved Link to position 2 of 2']);
           await page.keyboard.press('Space');
         }
         await expect.poll(() => state(mount, 'toolb')).toEqual(['Quote', 'Link']);
@@ -1090,7 +1109,7 @@ for (const target of TARGETS) {
           for (const key of ['Space', 'Shift+ArrowRight']) await page.keyboard.press(key);
         } else {
           await page.keyboard.press('Space');
-          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold, position 1 of 3']);
           await page.keyboard.press('Shift+ArrowRight');
         }
         await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
@@ -1102,12 +1121,12 @@ for (const target of TARGETS) {
         await page.waitForTimeout(100);
         await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
         await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
-        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar B, position 1']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar B, position 1 of 3']);
         // Space there drops Bold and lifts Italic.
         await page.keyboard.press('Space');
-        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Italic']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Italic, position 1 of 2']);
         await page.keyboard.press('Escape');
-        await expect.poll(() => liveTexts(mount)).toEqual(['Cancelled. Italic returned to position 1']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Cancelled. Italic returned to position 1 of 2']);
         await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
         await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
         await assertNothingDisappeared(mount);

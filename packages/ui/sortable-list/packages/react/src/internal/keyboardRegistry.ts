@@ -5,6 +5,8 @@
  * copies of the component share one registry. Framework-free.
  */
 
+import type { AnnouncementContext, AnnouncementKind } from './announcements';
+
 export type Interaction = 'pointer' | 'keyboard';
 
 /**
@@ -41,8 +43,13 @@ export interface ListEntry {
   keyboardEnabled(): boolean;
   items(): readonly unknown[];
   keyOf(item: unknown, index: number): string;
-  /** The screen-reader label of one of this list's items (its `labelFor`). */
-  labelOf(item: unknown, index: number): string;
+  /**
+   * The screen-reader label of one of this list's items (its `labelFor`, else
+   * `item.label`, else the text of `row`, the item's row element).
+   */
+  labelOf(item: unknown, index: number, row?: HTMLElement | null): string;
+  /** The text this list says for announcement `kind` (its `announcements`, else the default). */
+  message(kind: AnnouncementKind, ctx: AnnouncementContext): string;
   /**
    * Handle a reorder key for the lift this list holds. Keys pressed in any
    * list while a lift exists are routed here, to the holder. Returns true

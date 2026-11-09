@@ -137,9 +137,9 @@ for (const target of TARGETS) {
       // completes (and the moved row's tabindex/role re-applies on the
       // DOM that was either reused (track) or re-created (other engines)).
       await page.keyboard.press('ArrowDown');
-      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 2`);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 2 of ${SEED_ITEM_COUNT}`);
       await page.keyboard.press('ArrowDown');
-      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 3`);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Moved ${before[0]} to position 3 of ${SEED_ITEM_COUNT}`);
 
       // Space DROPS the lift (committing the move).
       await page.keyboard.press('Space');
@@ -213,7 +213,7 @@ for (const target of TARGETS) {
       const [b0, b1, b2, ...bRest] = await displayedLabels(items);
       await items.first().focus();
       for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
-      await expect(mount.locator(ARIA_LIVE)).toContainText(`Dropped ${b0} at position 3`);
+      await expect(mount.locator(ARIA_LIVE)).toHaveText(`Dropped ${b0} at position 3 of ${SEED_ITEM_COUNT}`);
       await expect.poll(() => displayedLabels(items)).toEqual([b1, b2, b0, ...bRest]);
     },
   );
