@@ -333,6 +333,35 @@ for (const target of TARGETS) {
     },
   );
 
+  // The other direction is refused too (items never disappear): a row
+  // dropped into a plain SortableJS list goes back where it was, nothing is
+  // written, no `remove` / `reorder` is emitted, and the `end` reports the
+  // drop in place (`to` is the origin, `newIndex` is `oldIndex`).
+  runner(
+    `sortable-drag-cross [${target}]: a drop into a non-SortableList list puts the row back; end reports it in place`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await mount.getByTestId('foreign-init').evaluate((b) => (b as HTMLElement).click());
+      const foreign = mount.getByTestId('foreign').locator('li');
+      await expect(foreign).toHaveCount(4);
+      // Both lists on screen at once: a real drag can't leave the viewport.
+      await page.setViewportSize({ width: 1280, height: 4000 });
+      await nativeDrag(page, { sourceHandle: zoneGrip(mount, 'Search'), target: foreign.nth(2) });
+      await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['top:start:pointer', 'top:end:pointer']);
+      await page.waitForTimeout(150);
+      expect(await texts(mount.locator(LOG_LI))).toEqual(['top:start:pointer', 'top:end:pointer']);
+      expect(await texts(foreign)).toEqual(['Foreign header', 'Foreign A', 'Foreign B', 'Foreign C']);
+      await expect.poll(() => zoneState(mount, 'top')).toEqual(['Search', 'Newsletter', 'Tag cloud']);
+      await expect.poll(() => zoneRows(mount, 'Top sidebar')).toEqual(['Search', 'Newsletter', 'Tag cloud']);
+      expect(JSON.parse((await mount.getByTestId('last-pointer-end-where').textContent()) || 'null')).toEqual({
+        to: 'from',
+        oldIndex: 0,
+        newIndex: 0,
+      });
+      expect(errors).toEqual([]);
+    },
+  );
+
   // The destination unmounts in its own `add` handler: the unmounted list
   // never emits (Angular would log "Unexpected emit for destroyed
   // OutputRef"); the `end` comes from the origin list instead, so `start` and

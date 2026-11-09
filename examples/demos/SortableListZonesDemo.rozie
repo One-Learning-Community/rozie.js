@@ -50,6 +50,8 @@
                                  pulled from now, over its `options.group`),
     - `toggle-toolb`             unmounts / remounts Toolbar B (Toolbar A's
                                  only peer).
+    - `rekey-toolb`              re-keys Toolbar B: the old one unmounts and a
+                                 new one mounts in the same update.
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
@@ -57,7 +59,9 @@
   `<output data-testid="last-end">` as JSON ({ item, el, interaction }, with
   `item` reported as the item's label and `el` as "element", "detached" (an
   element no longer in the page) or null); the last pointer `end` likewise in
-  `<output data-testid="last-pointer-end">`.
+  `<output data-testid="last-pointer-end">`, and where it says the row
+  ended (`to` "from" when it is the origin list, and the indices) in
+  `<output data-testid="last-pointer-end-where">`.
   `<output data-testid="end-state">` shows the Palette, Top sidebar and Content
   labels as the last `end` handler read them (JSON).
 
@@ -88,7 +92,9 @@
   log: [],
   lastEnd: '',
   lastPointerEnd: '',
+  lastPointerEndWhere: '',
   toolbMounted: true,
+  toolbKey: 0,
   endState: '',
   trigger: 'handle',
   topMounted: true,
@@ -167,7 +173,10 @@ const record = (slug, name, e) => {
       interaction: p.interaction,
     })
     if (p.interaction === 'keyboard') $data.lastEnd = summary
-    else $data.lastPointerEnd = summary
+    else {
+      $data.lastPointerEnd = summary
+      $data.lastPointerEndWhere = JSON.stringify({ to: p.to === p.from ? 'from' : 'other', oldIndex: p.oldIndex, newIndex: p.newIndex })
+    }
   }
 }
 
@@ -235,6 +244,10 @@ const toggleToolb = () => {
   $data.toolbMounted = !$data.toolbMounted
 }
 
+const rekeyToolb = () => {
+  $data.toolbKey = $data.toolbKey + 1
+}
+
 const setUnmountTopOnAdd = () => {
   $data.unmountTopOnAdd = true
 }
@@ -270,6 +283,7 @@ $onMount(() => seed())
     <button type="button" data-testid="foreign-init" @click="initForeign">Foreign SortableJS list</button>
     <button type="button" data-testid="locked-runtime-group" @click="setLockedRuntimeGroup">Locked: option('group')</button>
     <button type="button" data-testid="toggle-toolb" @click="toggleToolb">Toggle toolbar B</button>
+    <button type="button" data-testid="rekey-toolb" @click="rekeyToolb">Re-key toolbar B</button>
   </div>
 
   <section data-testid="zone-locked">
@@ -800,6 +814,7 @@ $onMount(() => seed())
     <h4>Toolbar B</h4>
     <SortableList
       r-if="$data.toolbMounted"
+      :key="$data.toolbKey"
       r-model:items="$data.toolb"
       :itemKey="$data.toolsIndexKeys ? indexKey : 'id'"
       group="tools"
@@ -831,6 +846,7 @@ $onMount(() => seed())
   </section>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
   <output data-testid="last-pointer-end">{{ $data.lastPointerEnd }}</output>
+  <output data-testid="last-pointer-end-where">{{ $data.lastPointerEndWhere }}</output>
   <output data-testid="end-state">{{ $data.endState }}</output>
   <ol class="event-log">
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>

@@ -1228,6 +1228,24 @@ for (const target of TARGETS) {
     },
   );
 
+  // Toolbar B re-keyed: the old one unmounts and a new one mounts in the same
+  // update, so Toolbar A hears "no peer" then "a peer" before it renders
+  // again. It still says the Shift sentence afterwards.
+  runner(
+    `sortable-keyboard-cross-list [${target}]: the Shift sentence survives a peer that unmounts and remounts in one update`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
+      for (let i = 0; i < 2; i++) {
+        await clickKeepingFocus(mount, 'rekey-toolb');
+        await expect(grip(mount, 'Link')).toBeVisible();
+        await page.waitForTimeout(100);
+        await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
+      }
+      expect(errors).toEqual([]);
+    },
+  );
+
   // A runtime `option('group', v)` wins over `options.group` and the named
   // props, for the keyboard as for the mouse, and a later `cloneable` change
   // keeps it. Locked's `options.group` forbids pulling; the runtime group

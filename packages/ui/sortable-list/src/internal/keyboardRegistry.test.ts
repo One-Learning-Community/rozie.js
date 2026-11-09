@@ -283,13 +283,44 @@ describe('registry', () => {
     r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
     r.flushEnds();
     expect(hosts).toEqual(['a', 'a']);
-    // Moved: out of the page and back in, before the task runs.
+    // Moved: out of the page when the end's task runs, back in before the
+    // one more flush it waits (still registered all along).
     document.body.appendChild(a);
     r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
     a.remove();
-    document.body.appendChild(a);
-    await new Promise((res) => setTimeout(res, 30));
+    let outAtFirstCheck: boolean | null = null;
+    // Posted after the end's first check: it sees `a` out of the page.
+    afterFlush(() => {
+      outAtFirstCheck = !a.isConnected;
+      expect(hosts).toEqual(['a', 'a']);
+      document.body.appendChild(a);
+    });
+    await new Promise((res) => setTimeout(res, 40));
+    expect(outAtFirstCheck).toBe(true);
     expect(hosts).toEqual(['a', 'a', 'a']);
+  });
+  it('a second pending end does not hurry the first past the flush it waits for an out-of-page list', async () => {
+    const r = getKeyboardRegistry();
+    const a = el();
+    const b = el();
+    const ea = fakeEntry(a, 'z');
+    const eb = fakeEntry(b, 'z');
+    const unA = reg(ea);
+    reg(eb);
+    const hosts: string[] = [];
+    const name = (h: ListEntry) => (h === ea ? 'a' : h === eb ? 'b' : '?');
+    r.deferEnd((h) => hosts.push('1' + name(h)), ea, eb);
+    a.remove();
+    // Queued a task later than the first end, before its wait flush: it must
+    // not fire the first end from `a`, which unregisters right after.
+    setTimeout(() => {
+      r.deferEnd((h) => hosts.push('2' + name(h)), eb);
+      // React's cleanup: `a` unregisters after the second end's run, within
+      // the one flush the first end waits.
+      afterFlush(() => unA());
+    }, 0);
+    await new Promise((res) => setTimeout(res, 60));
+    expect(hosts).toEqual(['1b', '2b']);
   });
   it('a list whose element left the page and that unregisters a flush later (React cleanup) hands its end to the fallback', async () => {
     const r = getKeyboardRegistry();
@@ -380,6 +411,45 @@ describe('registry', () => {
     calls.length = 0;
     unB();
     expect(calls).toEqual(['a']);
+  });
+  it('peersChanged gets the answer; ungrouped lists cost no peer sweep', () => {
+    const r = getKeyboardRegistry();
+    let reads = 0;
+    const counted = (g: GroupOption): ListEntry => {
+      const e = fakeEntry(el(), g);
+      // What SortableList does with the answer (it used to ask hasHopPeer).
+      e.peersChanged = (v) => {
+        if (v === undefined) r.hasHopPeer(e);
+      };
+      e.group = () => {
+        reads++;
+        return g;
+      };
+      return e;
+    };
+    // 60 ungrouped lists: registering each reads a handful of groups, not
+    // every list's for every list.
+    for (let i = 0; i < 60; i++) reg(counted(null));
+    expect(reads).toBeLessThanOrEqual(60 * 2);
+    // Grouped: one sweep reads each list's group once.
+    const seen: boolean[] = [];
+    const ga = counted('z');
+    ga.peersChanged = (v) => seen.push(v);
+    reg(ga);
+    expect(seen).toEqual([false]);
+    reads = 0;
+    const gb = counted('z');
+    reg(gb);
+    expect(seen).toEqual([false, true]);
+    expect(reads).toBeLessThanOrEqual(62 * 2);
+    reads = 0;
+    r.notifyPeers();
+    expect(reads).toBeLessThanOrEqual(62 * 2);
+    // An ungrouped list registering or leaving changes nobody's answer.
+    seen.length = 0;
+    const un = reg(counted(null));
+    un();
+    expect(seen).toEqual([]);
   });
   it('wasList() knows an element that was a registered list, after it unregisters', () => {
     const r = getKeyboardRegistry();

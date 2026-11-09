@@ -235,7 +235,18 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       sort: true,
       draggable: ROW_DRAGGABLE
     };
-    const applied = reapplyOptions(instance, appliedOptions, next, base);
+    // A fresh inline function with the same content (React re-renders) is
+    // applied so SortableJS runs the newest closure, but it is no change: a
+    // runtime `option(name, v)` still in force keeps winning over it.
+    const applied = reapplyOptions(instance, appliedOptions, next, base, {
+      keep: (key: any, prev: any) => {
+        const ov: any = optionOverrides();
+        return ov != null && Object.prototype.hasOwnProperty.call(ov, key) && ov[key] !== prev;
+      },
+      refreshed: (key: any) => {
+        if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.option(key));
+      }
+    });
     appliedOptions = next;
     for (const key of applied as any) {
       // The keyboard reads the value SortableJS now runs with. A remembered
@@ -437,9 +448,11 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
         if (i < 0 || i >= list.length) return null;
         return rowByKey(listEl, String(keyFor(list[i], i)));
       },
-      peersChanged: () => {
-        const v = entry != null && registry.hasHopPeer(entry);
-        if (hasHopPeer() !== v) setHasHopPeer(v);
+      // Always set (an equal value is a no-op on every target): a compare
+      // against $data would read React's render-time ref, stale when two peer
+      // changes land in one commit (one list unmounts, another mounts).
+      peersChanged: (v: any) => {
+        setHasHopPeer(v);
       },
       emit: (name: any, payload: any) => {
         if (name === 'add') _props.onAdd?.(payload);else if (name === 'remove') _props.onRemove?.(payload);else if (name === 'reorder') _props.onReorder?.(payload);else if (name === 'start') _props.onStart?.(payload);else if (name === 'end') _props.onEnd?.(payload);

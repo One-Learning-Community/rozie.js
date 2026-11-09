@@ -180,6 +180,8 @@ describe('useSortableJS', () => {
     const sourceItems: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const sourceListEl = buildList(sourceItems);
     const destListEl = buildList([]);
+    // The destination is a SortableList too (a drop into any other list is refused).
+    useSortableJS<Item>(destListEl, { items: () => [], onCommit: () => {} });
 
     const commits: Item[][] = [];
     const changes: Array<SortableChange<Item>> = [];
@@ -480,6 +482,8 @@ describe('useSortableJS', () => {
     ];
     const sourceListEl = buildList(sourceItems);
     const destListEl = buildList([]);
+    // The destination is a SortableList too (a drop into any other list is refused).
+    useSortableJS<Item>(destListEl, { items: () => [], onCommit: () => {} });
 
     const commits: Item[][] = [];
     const changes: Array<SortableChange<Item>> = [];
@@ -801,12 +805,12 @@ describe('end: after the write, once per drag', () => {
     expect(ends[0]!.item?.id).toBe('b');
   });
 
-  it('foreign destination falls back to source end', async () => {
-    // The row went to a SortableJS list that is not one of ours: nothing
-    // emits `add`, and the source still ends the drag, once, after its write.
-    const items: Item[] = [{ id: 'a' }, { id: 'b' }];
+  it('a drop into a non-SortableList list is refused: the row goes back, nothing is written, end reports it in place', async () => {
+    // Symmetric with a foreign row dropped in: items never disappear.
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const listEl = buildList(items);
-    const foreign = buildList([]);
+    const foreign = document.createElement('ul');
+    foreign.innerHTML = '<li>F1</li><li>F2</li>';
     const order: string[] = [];
     const ends: Array<SortableDrag<Item>> = [];
     useSortableJS<Item>(listEl, {
@@ -821,7 +825,7 @@ describe('end: after the write, once per drag', () => {
     const rec = getLastConstructed();
     const dragged = listEl.children[1] as HTMLElement;
     rec.options.onStart?.({ item: dragged, oldIndex: 1, oldDraggableIndex: 1, from: listEl, to: listEl });
-    foreign.appendChild(dragged);
+    foreign.insertBefore(dragged, foreign.children[0] ?? null);
     rec.options.onEnd?.({
       item: dragged,
       oldIndex: 1,
@@ -832,11 +836,58 @@ describe('end: after the write, once per drag', () => {
       to: foreign,
     });
     await flushMicrotasks();
-    expect(order).toEqual(['commit', 'remove', 'end']);
+    expect(order).toEqual(['end']);
+    expect(Array.from(listEl.children).map((c) => c.getAttribute('data-id'))).toEqual(['a', 'b', 'c']);
+    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['F1', 'F2']);
     expect(ends.length).toBe(1);
     expect(ends[0]!.from).toBe(listEl);
-    expect(ends[0]!.to).toBe(foreign);
+    expect(ends[0]!.to).toBe(listEl);
     expect(ends[0]!.item?.id).toBe('b');
+    expect(ends[0]!.oldIndex).toBe(1);
+    expect(ends[0]!.newIndex).toBe(1);
+  });
+
+  it('a clone-mode drop into a non-SortableList list is refused: the original swaps back for the clone', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }];
+    const listEl = buildList(items);
+    const foreign = document.createElement('ul');
+    const order: string[] = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => order.push('commit'),
+      onChange: (c) => order.push(c.kind),
+      onEnd: (info) => {
+        order.push('end');
+        ends.push(info);
+      },
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[0] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 0, oldDraggableIndex: 0, from: listEl, to: listEl });
+    // SortableJS clone mode: the original travels, a clone stays in its place.
+    const clone = dragged.cloneNode(true) as HTMLElement;
+    listEl.insertBefore(clone, dragged);
+    foreign.appendChild(dragged);
+    rec.options.onEnd?.({
+      item: dragged,
+      clone,
+      pullMode: 'clone',
+      oldIndex: 0,
+      newIndex: 0,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 0,
+      from: listEl,
+      to: foreign,
+    });
+    await flushMicrotasks();
+    expect(order).toEqual(['end']);
+    expect(listEl.children[0]).toBe(dragged);
+    expect(listEl.children.length).toBe(2);
+    expect(clone.isConnected).toBe(false);
+    expect(foreign.children.length).toBe(0);
+    expect(ends[0]!.to).toBe(listEl);
+    expect(ends[0]!.newIndex).toBe(0);
   });
 
   it('a row from a non-SortableList source goes back where it came from; nothing is written or emitted', async () => {
@@ -1059,7 +1110,58 @@ describe('reapplyOptions: a live `options` change reaches SortableJS', () => {
     expect(applied).toEqual([]);
     expect(reapplyOptions(inst, { group: { name: 'zones', pull: false } }, { group: { name: 'zones', pull: true } }, {})).toEqual(['group']);
     expect(reapplyOptions(inst, { group: { name: 'zones' } }, { group: { name: 'zones', put: false } }, {})).toEqual(['group']);
-    expect(reapplyOptions(inst, { filter: fn }, { filter: () => true }, {})).toEqual(['filter']);
+  });
+
+  it('a fresh function of the same content is applied (newest closure) but is not a change, and a runtime value wins over it', () => {
+    const inst = fakeInstance();
+    const pull1 = () => true;
+    const pull2 = () => true;
+    const refreshed: string[] = [];
+    // React: an inline `options={{ group: { pull: (to, from) => … } }}` makes a
+    // new function every render.
+    const applied = reapplyOptions(
+      inst,
+      { group: { name: 'z', pull: pull1, put: true }, filter: pull1 },
+      { group: { name: 'z', pull: pull2, put: true }, filter: pull2 },
+      {},
+      { refreshed: (k) => refreshed.push(k) },
+    );
+    expect(applied).toEqual([]);
+    expect(refreshed).toEqual(['group', 'filter']);
+    expect(inst.calls.map(([k]) => k)).toEqual(['group', 'filter']);
+    // A runtime option('group', v) is in force: the re-render does not undo it.
+    const kept = fakeInstance();
+    const keepCalls: Array<[string, unknown]> = [];
+    expect(
+      reapplyOptions(
+        kept,
+        { group: { name: 'z', pull: pull1 } },
+        { group: { name: 'z', pull: pull2 } },
+        {},
+        {
+          keep: (k, prev) => {
+            keepCalls.push([k, prev]);
+            return k === 'group';
+          },
+        },
+      ),
+    ).toEqual([]);
+    expect(kept.calls).toEqual([]);
+    expect(keepCalls).toEqual([['group', { name: 'z', pull: pull1 }]]);
+    // Content changes still apply over a runtime value (and are returned).
+    expect(
+      reapplyOptions(kept, { group: { name: 'z', pull: pull1 } }, { group: { name: 'y', pull: pull2 } }, {}, { keep: () => true }),
+    ).toEqual(['group']);
+  });
+
+  it('a cyclic options object does not overflow the stack', () => {
+    const inst = fakeInstance();
+    const a: Record<string, unknown> = { name: 'z' };
+    a.self = a;
+    const b: Record<string, unknown> = { name: 'z' };
+    b.self = b;
+    expect(() => reapplyOptions(inst, { group: a }, { group: b }, {})).not.toThrow();
+    expect(reapplyOptions(inst, { group: a }, { group: a }, {})).toEqual([]);
   });
 
   it('a key dropped from options goes back to its base value; one with no base is left alone', () => {
@@ -1115,16 +1217,20 @@ describe('orderByKeys: the imperative sort() order', () => {
     expect(orderByKeys(nums, ['30', 10], (n) => n)).toEqual([30, 10, 20]);
   });
 
-  it('items sharing a key stay together, in their order; a large list sorts in linear time', () => {
+  it('items sharing a key stay together, in their order; each key is read once (no comparison sort)', () => {
     const dup = [{ id: 'a', n: 1 }, { id: 'b', n: 2 }, { id: 'a', n: 3 }];
     expect(orderByKeys(dup, ['a'], (i) => i.id).map((i) => i.n)).toEqual([1, 3, 2]);
-    const big = Array.from({ length: 200000 }, (_, i) => ({ id: String(i) }));
+    const big = Array.from({ length: 5000 }, (_, i) => ({ id: String(i) }));
     const reversed = big.map((i) => i.id).reverse();
-    const t = performance.now();
-    const out = orderByKeys(big, reversed, keyOf);
-    expect(performance.now() - t).toBeLessThan(2000);
+    let reads = 0;
+    const out = orderByKeys(big, reversed, (item) => {
+      reads++;
+      return item.id;
+    });
+    // A sort would read keys in its comparator, O(n log n) times.
+    expect(reads).toBe(big.length);
     expect(out[0]).toBe(big[big.length - 1]);
-    expect(out.length).toBe(big.length);
+    expect(out.map((i) => i.id)).toEqual(reversed);
   });
 
   it('keeps the item values (identity), and an empty order keeps the list', () => {

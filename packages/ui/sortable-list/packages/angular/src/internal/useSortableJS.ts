@@ -98,6 +98,18 @@ function putBack(node: HTMLElement, from: HTMLElement, oldIndex: number | null |
   else from.appendChild(node);
 }
 
+/**
+ * Every list element a SortableList's helper has run SortableJS on (kept
+ * after it unmounts), shared by separately bundled copies through a
+ * `globalThis` `Symbol.for` key. A drag between one of these and any other
+ * SortableJS list is refused in both directions.
+ */
+const LISTS_KEY = Symbol.for('rozie.sortable-list.lists.v1');
+function sortableLists(): WeakSet<Element> {
+  const g = globalThis as unknown as Record<symbol, WeakSet<Element> | undefined>;
+  return (g[LISTS_KEY] ??= new WeakSet<Element>());
+}
+
 /** Symbol stashed on `e.item` between `onStart` and `onEnd` to ferry the
  * dragged item DATA (not just the DOM node) across cross-list moves and
  * survive `e.oldIndex` going null in fallback-mode events. The double
@@ -250,44 +262,78 @@ export const ROW_DRAGGABLE = '.rozie-sortable-item';
 export const HELPER_OWNED_OPTION_KEYS: readonly string[] = ['onStart', 'onEnd', 'onUpdate', 'onAdd', 'onRemove', 'onClone'];
 
 /**
- * Whether two option values are the same: identical, or plain objects /
- * arrays with the same content (a consumer passing an inline
- * `options={{ group: { … } }}` hands over a fresh object every render, and
- * reapplying it would undo a runtime `option(name, v)`). Functions and other
- * objects compare by identity.
+ * How two option values differ: `'none'` (identical, or plain objects /
+ * arrays with the same content), `'functions'` (the same content but for
+ * function leaves of different identity), or `'content'`. A consumer passing
+ * an inline `options={{ group: { … } }}` hands over a fresh object every
+ * render, and in React a fresh inline `pull` / `put` / `filter` function too.
+ * Non-plain objects compare by identity. Symbol keys are ignored (SortableJS
+ * reads none). A cyclic object compares by identity where it repeats, so a
+ * self-referencing config cannot overflow the stack.
  */
-function sameOption(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (a == null || b == null || typeof a !== 'object' || typeof b !== 'object') return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
+export function optionChange(a: unknown, b: unknown, seen: WeakSet<object> = new WeakSet()): 'none' | 'functions' | 'content' {
+  if (a === b) return 'none';
+  if (typeof a === 'function' && typeof b === 'function') return 'functions';
+  if (a == null || b == null || typeof a !== 'object' || typeof b !== 'object') return 'content';
+  if (Array.isArray(a) !== Array.isArray(b)) return 'content';
   const plain = (o: object) => Array.isArray(o) || Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null;
-  if (!plain(a) || !plain(b)) return false;
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  for (const k of ka) {
-    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
-    if (!sameOption((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+  if (!plain(a) || !plain(b)) return 'content';
+  if (seen.has(a)) return 'content';
+  seen.add(a);
+  try {
+    const ka = Object.keys(a);
+    const kb = Object.keys(b);
+    if (ka.length !== kb.length) return 'content';
+    let out: 'none' | 'functions' = 'none';
+    for (const k of ka) {
+      if (!Object.prototype.hasOwnProperty.call(b, k)) return 'content';
+      const c = optionChange((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], seen);
+      if (c === 'content') return 'content';
+      if (c === 'functions') out = 'functions';
+    }
+    return out;
+  } finally {
+    seen.delete(a);
   }
-  return true;
+}
+
+/** What `reapplyOptions` should do about a key whose value differs only in function identity. */
+export interface ReapplyHooks {
+  /**
+   * True when `key` has a runtime value (`option(key, v)`) that should win:
+   * a function-only difference (a fresh inline function, same content) is
+   * then not applied, so the runtime value stays until the options' content
+   * changes. `prev` is the key's previous effective value.
+   */
+  keep?(key: string, prev: unknown): boolean;
+  /** Called after a function-only difference was applied (fresh closures reach SortableJS). */
+  refreshed?(key: string): void;
 }
 
 /**
  * Reapply an `options` object that changed after construction to the live
  * SortableJS instance, so a pointer drag obeys the new value (SortableJS only
  * reads its constructor options once). Each key whose effective value
- * changed (by content, see `sameOption`) is set with `instance.option(key, value)`. The effective value is
- * the one in `options`, else `base[key]` (what the key means without
- * `options`: the named props and the helper's own defaults), so a key
- * dropped from `options` goes back to it. A dropped key with no base value
- * keeps the value SortableJS has now. Helper-owned handler keys are skipped.
- * Returns the keys it set, in order.
+ * changed by content (see `optionChange`) is set with
+ * `instance.option(key, value)`; the effective value is the one in `options`,
+ * else `base[key]` (what the key means without `options`: the named props and
+ * the helper's own defaults), so a key dropped from `options` goes back to it.
+ * A dropped key with no base value keeps the value SortableJS has now.
+ * Helper-owned handler keys are skipped. Returns the keys whose content
+ * changed, in order.
+ *
+ * A key whose value differs only by function identity (a fresh inline
+ * `filter`, or `group` with a fresh `pull` / `put` function) is set too, so
+ * SortableJS runs the consumer's newest closure, but it is not a change: it is
+ * not returned, goes to `hooks.refreshed`, and is skipped when `hooks.keep`
+ * says a runtime value should win.
  */
 export function reapplyOptions(
   instance: { option(name: string, value: unknown): unknown },
   prev: Record<string, unknown> | null | undefined,
   next: Record<string, unknown> | null | undefined,
   base: Record<string, unknown>,
+  hooks: ReapplyHooks = {},
 ): string[] {
   const p = prev ?? {};
   const n = next ?? {};
@@ -296,7 +342,16 @@ export function reapplyOptions(
   for (const key of new Set([...Object.keys(p), ...Object.keys(n)])) {
     if (HELPER_OWNED_OPTION_KEYS.includes(key)) continue;
     const v = valueIn(n, key);
-    if (v === undefined || sameOption(v, valueIn(p, key))) continue;
+    if (v === undefined) continue;
+    const before = valueIn(p, key);
+    const change = optionChange(v, before);
+    if (change === 'none') continue;
+    if (change === 'functions') {
+      if (hooks.keep?.(key, before)) continue;
+      instance.option(key, v);
+      hooks.refreshed?.(key);
+      continue;
+    }
     instance.option(key, v);
     applied.push(key);
   }
@@ -338,13 +393,14 @@ export function useSortableJS<T>(
   // `opts.options` straight into the constructor argument unmodified, since
   // a user-supplied `onUpdate` would silently bypass our reconciler dance.
   const baseOptions: SortableOptions = { ...(opts.options ?? {}) };
+  sortableLists().add(listEl);
 
   /** Item-scoped child lookup. The DOM-restore sites index ONLY the item rows
    * (`:scope > .rozie-sortable-item`), so the restore index stays
    * item-relative whatever else is a child of the list element. (`#header` /
    * `#footer` render outside it, around the `role="list"` element.) */
   const itemChildAt = (i: number): Element | null =>
-    listEl.querySelectorAll(':scope > .rozie-sortable-item')[i] ?? null;
+    Array.from(listEl.children).filter((c) => c.classList.contains('rozie-sortable-item'))[i] ?? null;
   // Build the explicit handler set — these always win over anything the
   // caller passed in via `options`.
   // `onClone` is owned by the helper too: we use it to bridge the
@@ -406,6 +462,7 @@ export function useSortableJS<T>(
     let endOld = plainIndex(e.oldIndex, e.oldDraggableIndex);
     let endNew = rowIndex(e.to, e.item, plainIndex(e.newIndex, e.newDraggableIndex));
     let endItem: T | undefined = stashAtEntry;
+    let endTo: HTMLElement = e.to;
     try {
       const fromUs = e.from === listEl;
       const toUs = e.to === listEl;
@@ -480,6 +537,31 @@ export function useSortableJS<T>(
         next.splice(targetIdx, 0, moved);
         oldIndex = movedFromIdx;
         newIndex = targetIdx;
+      } else if (fromUs && !sortableLists().has(e.to)) {
+        // Dropped into a SortableJS list that is not a SortableList. Refused,
+        // as a row from one is refused here (items never disappear): the row
+        // goes back where it was, nothing is written or emitted, and the
+        // `end` reports a drop in place (`to` is this list, `newIndex` is
+        // `oldIndex`). In clone mode the original went to the other list and
+        // SortableJS left its clone here: they swap back.
+        const at =
+          stashedItem !== undefined && current.indexOf(stashedItem) !== -1
+            ? current.indexOf(stashedItem)
+            : oldIndexHint;
+        endOld = at;
+        endNew = at;
+        endTo = listEl;
+        if (at >= 0 && at < current.length) endItem = current[at] as T;
+        safeDom(() => {
+          const node = e.item as HTMLElement;
+          const clone = (e as SortableEvent & { clone?: HTMLElement | null }).clone;
+          if (clone != null && clone !== node && clone.parentNode === listEl) {
+            listEl.replaceChild(node, clone);
+            return;
+          }
+          listEl.insertBefore(node, at >= 0 ? itemChildAt(at) : null);
+        });
+        return;
       } else if (fromUs) {
         // CLONE MODE — short-circuit. When SortableJS is in clone mode
         // (`group.pull === 'clone'`), `e.pullMode === 'clone'` on cross-
@@ -624,7 +706,7 @@ export function useSortableJS<T>(
           item: endItem,
           el: e.item,
           from: e.from,
-          to: e.to,
+          to: endTo,
           oldIndex: endOld,
           newIndex: endNew,
           event: e,

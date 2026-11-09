@@ -286,6 +286,8 @@ private __rozieFirstUpdateDone = false;
 
   firstUpdated(): void {
     this._rozieTornDown = false;
+    if (!this.isConnected) { this._rozieTornDown = true; return; }
+
     this._armListeners();
 
     this._disconnectCleanups.push((() => {
@@ -492,9 +494,11 @@ private __rozieFirstUpdateDone = false;
         if (i < 0 || i >= list.length) return null;
         return this.rowByKey(listEl, String(this.keyFor(list[i], i)));
       },
-      peersChanged: () => {
-        const v = this.entry != null && this.registry.hasHopPeer(this.entry);
-        if (this._hasHopPeer.value !== v) this._hasHopPeer.value = v;
+      // Always set (an equal value is a no-op on every target): a compare
+      // against $data would read React's render-time ref, stale when two peer
+      // changes land in one commit (one list unmounts, another mounts).
+      peersChanged: (v: any) => {
+        this._hasHopPeer.value = v;
       },
       emit: (name: any, payload: any) => {
         if (name === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
@@ -562,7 +566,18 @@ private __rozieFirstUpdateDone = false;
         sort: true,
         draggable: ROW_DRAGGABLE
       };
-      const applied = reapplyOptions(this.instance, this.appliedOptions, next, base);
+      // A fresh inline function with the same content (React re-renders) is
+      // applied so SortableJS runs the newest closure, but it is no change: a
+      // runtime `option(name, v)` still in force keeps winning over it.
+      const applied = reapplyOptions(this.instance, this.appliedOptions, next, base, {
+        keep: (key: any, prev: any) => {
+          const ov: any = this._optionOverrides.value;
+          return ov != null && Object.prototype.hasOwnProperty.call(ov, key) && ov[key] !== prev;
+        },
+        refreshed: (key: any) => {
+          if (this.KEYBOARD_OPTIONS.includes(key)) this.setOverride(key, this.instance.option(key));
+        }
+      });
       this.appliedOptions = next;
       for (const key of applied as any) {
         // The keyboard reads the value SortableJS now runs with. A remembered

@@ -272,8 +272,6 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const [instructionsId, setInstructionsId] = useState<any>(null);
   const [optionOverrides, setOptionOverrides] = useState<Record<string, any>>({});
   const [hasHopPeer, setHasHopPeer] = useState(false);
-  const _hasHopPeerRef = useRef(hasHopPeer);
-  _hasHopPeerRef.current = hasHopPeer;
   const _instructionsIdRef = useRef(instructionsId);
   _instructionsIdRef.current = instructionsId;
   const _optionOverridesRef = useRef(optionOverrides);
@@ -1445,9 +1443,11 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
         if (i < 0 || i >= list.length) return null;
         return rowByKey(listEl$local, String(_keyForRef.current(list[i], i)));
       },
-      peersChanged: () => {
-        const v = entry.current != null && registry.hasHopPeer(entry.current);
-        if (_hasHopPeerRef.current !== v) setHasHopPeer(v);
+      // Always set (an equal value is a no-op on every target): a compare
+      // against $data would read React's render-time ref, stale when two peer
+      // changes land in one commit (one list unmounts, another mounts).
+      peersChanged: (v: any) => {
+        setHasHopPeer(v);
       },
       emit: (name: any, payload: any) => {
         if (name === 'add') _onAddRef.current && _onAddRef.current(payload);else if (name === 'remove') _onRemoveRef.current && _onRemoveRef.current(payload);else if (name === 'reorder') _onReorderRef.current && _onReorderRef.current(payload);else if (name === 'start') _onStartRef.current && _onStartRef.current(payload);else if (name === 'end') _onEndRef.current && _onEndRef.current(payload);
@@ -1512,7 +1512,18 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       sort: true,
       draggable: ROW_DRAGGABLE
     };
-    const applied = reapplyOptions(instance.current, appliedOptions.current, next, base);
+    // A fresh inline function with the same content (React re-renders) is
+    // applied so SortableJS runs the newest closure, but it is no change: a
+    // runtime `option(name, v)` still in force keeps winning over it.
+    const applied = reapplyOptions(instance.current, appliedOptions.current, next, base, {
+      keep: (key: any, prev: any) => {
+        const ov: any = optionOverrides;
+        return ov != null && Object.prototype.hasOwnProperty.call(ov, key) && ov[key] !== prev;
+      },
+      refreshed: (key: any) => {
+        if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.current.option(key));
+      }
+    });
     appliedOptions.current = next;
     for (const key of applied as any) {
       // The keyboard reads the value SortableJS now runs with. A remembered
