@@ -32,7 +32,7 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
 
   connectedCallback(): void {
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {

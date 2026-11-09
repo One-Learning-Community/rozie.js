@@ -621,7 +621,7 @@ private __rozieFirstUpdateDone = false;
     this._hasSlotGroupHeading = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupHeading');
     this._hasSlotGroupMore = Array.from(this.children).some((el) => el.getAttribute('slot') === 'groupMore');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -683,6 +683,8 @@ private __rozieFirstUpdateDone = false;
       })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
+      this.__rozieWatchInitial_1 = true;
     });
   }
 

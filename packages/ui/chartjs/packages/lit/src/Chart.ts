@@ -162,7 +162,7 @@ private portals = {
     this._hasSlotFallback = Array.from(this.children).some((el) => el.getAttribute('slot') === 'fallback');
     this._hasSlotTooltip = Array.from(this.children).some((el) => el.getAttribute('slot') === 'tooltip');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {

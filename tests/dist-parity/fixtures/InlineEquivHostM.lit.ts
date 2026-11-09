@@ -16,6 +16,11 @@ export default class InlineEquivHostM extends SignalWatcher(LitElement) {
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
+  }
+
   firstUpdated(): void {
     this.refreshRowModelM = this.gridKeydownHandlersM(1, this.headM(2));
   }

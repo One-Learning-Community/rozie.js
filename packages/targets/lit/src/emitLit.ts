@@ -441,13 +441,13 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   //   - render(): returns html``
   //   - user methods (rewritten from <script>)
   //   - attributeChangedCallback (for model props)
-  // D-SH-02: separate the re-armable listener wiring (addEventListener,
-  // outside-click, slotchange, host listeners — all push to
-  // _disconnectCleanups, all drained on disconnect) from the user `$onMount`
-  // hook body (mount-once semantics — must NOT re-run on reconnect). The
-  // listener wiring goes into `_armListeners()`, called from `firstUpdated()`
-  // the first time AND from `connectedCallback()` on every subsequent connect;
-  // the `$onMount` body stays first-render-only in `firstUpdated()`.
+  // D-SH-02: the re-armable listener wiring (addEventListener, outside-click,
+  // slotchange, host listeners — all push to _disconnectCleanups, all drained
+  // on disconnect) goes into `_armListeners()`. `firstUpdated()` runs it and
+  // the mount (`$watch` effects + `$onMount`). A reconnect after a real
+  // teardown (the element stayed out of the page past the deferred drain) is
+  // a remount: it runs `firstUpdated()` again when there is a mount, else only
+  // `_armListeners()`. A plain DOM move never tears down, so it runs neither.
   const listenerWiring = combineListenerWiring(
     listenersResult.firstUpdatedBody,
     templateResult.hostListenerWiring,
@@ -520,6 +520,7 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
     adoptDocumentStyles: ir.adoptDocumentStyles,
     disconnectedBody: scriptResult.unmountHookBody,
     slotFillerDisconnectReset: templateResult.slotFillerDisconnectReset.join('\n'),
+    remountResetBody: scriptResult.remountResetBody,
     updatedBody: composedUpdatedBody,
     renderBody: templateResult.renderBody,
     userMethods: [scriptResult.methodDecls, litAttrsGetter, litListenersGetter]
@@ -631,10 +632,10 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
 
 /**
  * D-SH-02: combine the re-armable listener wiring (listeners, host listeners,
- * slotchange) — but NOT the `$onMount` hook body, which has mount-once
- * semantics and must stay first-render-only. The combined body is emitted into
- * a private `_armListeners()` method that both `firstUpdated()` and
- * `connectedCallback()` (on reconnect) call.
+ * slotchange) — but NOT the `$onMount` hook body, which runs once per mount.
+ * The combined body is emitted into a private `_armListeners()` method that
+ * `firstUpdated()` calls (and `connectedCallback()` on a reconnect after a
+ * real teardown, directly or through `firstUpdated()`).
  */
 function combineListenerWiring(
   listenerWiring: string,
@@ -715,7 +716,7 @@ interface ComposeClassBodyParts {
    * and from `connectedCallback()` on reconnect.
    */
   listenerWiringBody: string;
-  /** User `$onMount` hook body — mount-once, stays in `firstUpdated()`. */
+  /** User `$onMount` hook body (with `$watch` effects), in `firstUpdated()` — which a reconnect after a real teardown runs again. */
   mountHookBody: string;
   /**
    * Item 3 (engine-CSS shadow bridge) — `true` when `<rozie
@@ -733,6 +734,12 @@ interface ComposeClassBodyParts {
    * re-mount cycle re-attempts wiring cleanly.
    */
   slotFillerDisconnectReset: string;
+  /**
+   * Lazy effect-route `$watch` first-run flag resets (from emitScript),
+   * appended to the teardown after the `_disconnectCleanups` drain so the
+   * mount a reconnect re-runs skips their first fire like the first mount.
+   */
+  remountResetBody: string;
   updatedBody: string;
   renderBody: string;
   userMethods: string;
@@ -788,6 +795,8 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
 
   const hasListenerWiring = parts.listenerWiringBody.trim().length > 0;
   const hasMountHook = parts.mountHookBody.trim().length > 0;
+  // A reconnect after a real teardown sets up again what the teardown removed.
+  const hasReconnectSetup = hasListenerWiring || hasMountHook;
   const hasSlotPreSeed = parts.slotPreSeedLines.trim().length > 0;
 
   // D-SH-02: re-armable listener wiring lives in `_armListeners()`, called
@@ -807,7 +816,7 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   // initial slot presence). The two surfaces compose: pre-seed lines run
   // first (so `super.connectedCallback()` and downstream reactive updates see
   // the seeded state), then super, then re-arm.
-  if (hasListenerWiring || hasSlotPreSeed) {
+  if (hasReconnectSetup || hasSlotPreSeed) {
     const ccParts: string[] = [];
     if (hasSlotPreSeed) {
       // Phase 07.3.1 D-LIT-15 — pre-seed _hasSlot<X> from light DOM so first
@@ -818,12 +827,16 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
       ccParts.push('    ' + parts.slotPreSeedLines);
     }
     ccParts.push('    super.connectedCallback();');
-    if (hasListenerWiring) {
-      // Re-arm only after a genuine un-mount actually tore listeners down. A
-      // bare re-parent (DOM move) leaves them attached — the deferred teardown
-      // saw the reconnect and skipped — so re-arming there would double them.
+    if (hasReconnectSetup) {
+      // Set up again only after a genuine un-mount actually tore it down. A
+      // bare re-parent (DOM move) leaves everything attached — the deferred
+      // teardown saw the reconnect and skipped — so re-running there would
+      // double it. With a mount (`$watch` effects / `$onMount`), the teardown
+      // drained its effects and cleanup too: run the whole `firstUpdated()`
+      // (listeners + mount) again, as every other target does on a remount.
+      const setup = hasMountHook ? 'this.firstUpdated();' : 'this._armListeners();';
       ccParts.push(
-        '    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }',
+        `    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; ${setup} }`,
       );
     }
     sections.push(['  connectedCallback(): void {', ...ccParts, '  }'].join('\n'));
@@ -874,6 +887,9 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   // `updated()` re-attempt forever.
   if (parts.slotFillerDisconnectReset.trim().length > 0) {
     teardownParts.push(parts.slotFillerDisconnectReset);
+  }
+  if (parts.remountResetBody.trim().length > 0) {
+    teardownParts.push(parts.remountResetBody);
   }
   // Re-parenting survival: a DOM move (SortableJS reordering a nested list, a
   // node hopping containers) fires disconnectedCallback THEN a synchronous

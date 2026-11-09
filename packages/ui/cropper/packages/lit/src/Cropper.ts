@@ -125,6 +125,11 @@ private __rozieFirstUpdateDone = false;
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
+  }
+
   firstUpdated(): void {
     adoptDocumentStyles(this);
 
@@ -170,6 +175,7 @@ private __rozieFirstUpdateDone = false;
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_4 = true;
     });
   }
 

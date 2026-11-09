@@ -269,7 +269,7 @@ private __rozieFirstUpdateDone = false;
     this._slotDefaultAssigned.value = Array.from(this.children).filter((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotThumb = Array.from(this.children).some((el) => el.getAttribute('slot') === 'thumb');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -421,6 +421,8 @@ private __rozieFirstUpdateDone = false;
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
+      this.__rozieWatchInitial_4 = true;
     });
   }
 

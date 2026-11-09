@@ -93,7 +93,7 @@ private __rozieWatchInitial_0 = true;
     this._hasSlotTrigger = Array.from(this.children).some((el) => el.getAttribute('slot') === 'trigger');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -114,6 +114,7 @@ private __rozieWatchInitial_0 = true;
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
     });
   }
 

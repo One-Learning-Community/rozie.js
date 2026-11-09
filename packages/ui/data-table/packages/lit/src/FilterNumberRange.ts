@@ -45,6 +45,11 @@ private __rozieFirstUpdateDone = false;
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
+  }
+
   firstUpdated(): void {
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => Array.isArray(this.value) ? String(this.value[0]) + '\u0000' + String(this.value[1]) : '')(); untracked(() => { this.__rozieWatchPrev_0 = __watchVal; if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {
       this._touched.value = false;
@@ -65,6 +70,7 @@ private __rozieFirstUpdateDone = false;
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
     });
   }
 

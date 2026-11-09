@@ -337,7 +337,7 @@ private portals = {
     this._hasSlotGutter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'gutter');
     this._hasSlotDecoration = Array.from(this.children).some((el) => el.getAttribute('slot') === 'decoration');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -392,6 +392,7 @@ private portals = {
       this._portalContainers.clear();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
     });
   }
 

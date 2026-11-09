@@ -528,7 +528,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     this._hasSlotPresets = Array.from(this.children).some((el) => el.getAttribute('slot') === 'presets');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {

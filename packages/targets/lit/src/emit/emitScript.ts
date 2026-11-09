@@ -111,6 +111,14 @@ export interface EmitScriptResult {
   mountHookBody: string;
   /** disconnectedCallback body — $onUnmount calls (super + cleanup drain is added by orchestrator). */
   unmountHookBody: string;
+  /**
+   * Lines the teardown runs after draining `_disconnectCleanups`, so a mount
+   * re-run on reconnect starts like the first one: each lazy effect-route
+   * `$watch` first-run flag goes back to `true` (its effect was disposed by
+   * the drain; the re-registered effect's first run must skip the callback
+   * again). Empty when there are no such watchers.
+   */
+  remountResetBody: string;
   /** updated() body — $onUpdate calls. */
   updateHookBody: string;
   /** attributeChangedCallback body (for model-prop notifyAttributeChange). */
@@ -1913,6 +1921,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   // 1:1 by source-order pairing — the same algorithm React's emitScript uses
   // (see `pairClonedWatchers`).
   const watcherCleanupPushes: string[] = [];
+  const remountResetLines: string[] = [];
   const watcherUpdatedBranches: string[] = [];
   if (partition.watcherHooks.length > 0) {
     // We may add 'effect' below depending on classification — accumulate.
@@ -2114,6 +2123,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
         } else {
           const flag = `__rozieWatchInitial_${i}`;
           fieldLines.push(`private ${flag} = true;`);
+          remountResetLines.push(`this.${flag} = true;`);
           watcherCleanupPushes.push(
             `this._disconnectCleanups.push(effect(() => { const __watchVal = (${getterCode})(); untracked(() => { ${record}if (this.${flag}) { this.${flag} = false; return; } (${cbCode})(${callArg}); }); }));`,
           );
@@ -2214,6 +2224,7 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
     methodDecls,
     mountHookBody: mountSegments.join('\n\n'),
     unmountHookBody: unmountSegments.join('\n\n'),
+    remountResetBody: remountResetLines.join('\n'),
     updateHookBody: updatedSegments.join('\n\n'),
     attributeChangedBody: attrCallbackLines.join('\n'),
     userImports,

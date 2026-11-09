@@ -51,6 +51,11 @@ private get layers() { return this.__rozieCtxConsumer_maplibre_layers.value; }
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
+  }
+
   firstUpdated(): void {
     this.reg = this.layers;
     this.ctx = this.srcCtx;
@@ -113,6 +118,7 @@ private get layers() { return this.__rozieCtxConsumer_maplibre_layers.value; }
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
     });
   }
 

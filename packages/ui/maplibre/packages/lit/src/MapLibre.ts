@@ -339,7 +339,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     this._hasSlotPopup = Array.from(this.children).some((el) => el.getAttribute('slot') === 'popup');
     this._hasSlotControl = Array.from(this.children).some((el) => el.getAttribute('slot') === 'control');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -678,6 +678,12 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
       this._portalContainers.clear();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
+      this.__rozieWatchInitial_1 = true;
+      this.__rozieWatchInitial_2 = true;
+      this.__rozieWatchInitial_3 = true;
+      this.__rozieWatchInitial_12 = true;
+      this.__rozieWatchInitial_13 = true;
     });
   }
 

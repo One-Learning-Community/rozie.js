@@ -493,7 +493,7 @@ private portals = {
     this._hasSlotLinkEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'linkEditor');
     this._hasSlotNodeView = Array.from(this.children).some((el) => el.getAttribute('slot') === 'nodeView');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -915,6 +915,7 @@ private portals = {
       this._portalContainers.clear();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
     });
   }
 

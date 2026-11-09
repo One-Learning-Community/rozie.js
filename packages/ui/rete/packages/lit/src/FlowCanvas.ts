@@ -680,7 +680,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     this._hasSlotToolbar = Array.from(this.children).some((el) => el.getAttribute('slot') === 'toolbar');
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -3556,6 +3556,10 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
       this._portalContainers.clear();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
+      this.__rozieWatchInitial_1 = true;
+      this.__rozieWatchInitial_2 = true;
+      this.__rozieWatchInitial_3 = true;
     });
   }
 

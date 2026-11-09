@@ -29,6 +29,11 @@ export default class EngineDomEscape extends SignalWatcher(LitElement) {
   // run (a genuine un-mount), so a subsequent reconnect knows to re-arm.
   private _rozieTornDown = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
+  }
+
   firstUpdated(): void {
     // Tiny inline "engine" that appends a `.cm-editor` element the author cannot
     // reach with scoped CSS (no Rozie scope attribute is stamped onto it). The

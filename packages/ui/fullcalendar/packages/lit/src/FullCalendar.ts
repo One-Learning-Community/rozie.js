@@ -508,7 +508,7 @@ private portals = {
     this._hasSlotSlotLaneContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'slotLaneContent');
     this._hasSlotNoEventsContent = Array.from(this.children).some((el) => el.getAttribute('slot') === 'noEventsContent');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -907,6 +907,7 @@ private portals = {
       this._portalContainers.clear();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_1 = true;
     });
   }
 

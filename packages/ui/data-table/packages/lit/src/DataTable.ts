@@ -1203,7 +1203,7 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
     this._hasSlotCell = Array.from(this.children).some((el) => el.getAttribute('slot') === 'cell');
     this._hasSlotEditor = Array.from(this.children).some((el) => el.getAttribute('slot') === 'editor');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -1774,6 +1774,9 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
       })();
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_0 = true;
+      this.__rozieWatchInitial_1 = true;
+      this.__rozieWatchInitial_2 = true;
     });
   }
 
