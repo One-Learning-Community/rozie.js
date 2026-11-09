@@ -2,6 +2,26 @@ import type { ReactNode } from 'react';
 import type { ForwardRefExoticComponent, RefAttributes } from 'react';
 import type * as React from 'react';
 
+/** The kind of message the list speaks during keyboard reordering (a key of the `announcements` prop). */
+export type AnnouncementKind = 'lifted' | 'moved' | 'movedToList' | 'dropped' | 'droppedInList' | 'atStart' | 'atEnd' | 'notSortable' | 'noListBefore' | 'noListAfter' | 'cancelledReturnedToList' | 'cancelledReturned' | 'cancelledStays' | 'cancelledRemoved' | 'liftEnded';
+/** What an `announcements` function receives. */
+export interface AnnouncementContext {
+  /** The row's screen-reader label (`labelFor`, else `item.label`, else the row's text). */
+  label: string;
+  /** The item value. */
+  item: unknown;
+  /** The name of the list the message is about (`listLabel`, or `list 2 of 3`). */
+  list: string;
+  /** 1-based position of the row in `list` (kinds that have a position). */
+  position?: number;
+  /** How many rows `list` holds (kinds that have a position). */
+  total?: number;
+  /** The list the row came from (`movedToList` only). */
+  fromList?: string;
+}
+/** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
+export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+
 export interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRef<'div'>, 'items' | 'defaultItems' | 'onItemsChange' | 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'announcements' | 'itemStyle' | 'onReorder' | 'onAdd' | 'onRemove' | 'onStart' | 'onEnd' | 'renderHeader' | 'children' | 'renderFooter' | 'slots' | 'dangerouslySetInnerHTML'> {
   /**
    * The bound items array. The sole `model: true` prop — two-way bind it (`r-model:items` / `v-model:items` / `bind:items` / `[(items)]`) and SortableList writes the re-ordered array back whenever a drag, cross-list move, or keyboard reorder commits, with no manual `onChange → setState` wiring.
@@ -104,11 +124,11 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    */
   keyboardInstructions?: (string) | null;
   /**
-   * Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see "Announcements").
+   * Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see "Announcements"). Define the object in your script and bind it (Angular templates reject inline arrow functions), e.g. `const announcements = { moved: ({ label, position, total }) => label + ' → ' + position + '/' + total }`. Typed as `Announcements`, exported with `AnnouncementKind` and `AnnouncementContext`.
    * @example
-   * <SortableList items={todos} onItemsChange={setTodos} announcements={{ moved: ({ label, position, total }) => label + ' → ' + position + '/' + total }} />
+   * <SortableList items={todos} onItemsChange={setTodos} announcements={announcements} />
    */
-  announcements?: (Record<string, unknown>) | null;
+  announcements?: (Announcements) | null;
   /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */

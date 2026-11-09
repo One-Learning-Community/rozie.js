@@ -30,6 +30,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync
 import { resolve } from 'node:path';
 import { compile, createDefaultRegistry, lowerToIR, parse } from '@rozie/core';
 import { validateDocsSurfaceNames } from '../../docs-surface-guard.mjs';
+import { typedSurfaceBarrelLines } from '../../typed-surface-barrel.mjs';
 import { buildCustomElementsManifest } from './cem.mjs';
 import { eventManifest } from './event-manifest.mjs';
 import { handleManifest } from './handle-manifest.mjs';
@@ -115,6 +116,7 @@ function emitVueDualPackaging({
   eventManifest,
   description,
   docUrl,
+  typesBarrel = '',
 }) {
   const renderExternal = (e) => (e instanceof RegExp ? e.toString() : `'${e}'`);
   const externalsLiteral = `[${externals.map(renderExternal).join(', ')}]`;
@@ -154,7 +156,7 @@ export default defineConfig({
     resolve(leafDir, 'src', 'index.ts'),
     `export { default as ${componentName} } from './${componentName}.vue';
 export { default } from './${componentName}.vue';
-`,
+${typesBarrel}`,
   );
 
   // tsconfig.json — drives vue-tsc DECLARATION EMIT (dist/index.d.ts) with relaxed
@@ -328,6 +330,8 @@ function main() {
         eventManifest,
         description: WEB_TYPES_DESCRIPTION,
         docUrl: WEB_TYPES_DOC_URL,
+        // `<types>` names (Announcements, …) on the package entry.
+        typesBarrel: typedSurfaceBarrelLines(target, ir, 'SortableList'),
       });
     }
 
@@ -342,7 +346,7 @@ function main() {
       // itself (Phase 21 $expose), so the barrel forwards it verbatim for
       // `import type { SortableListHandle }`. Lit gets no named type — its handle
       // is the custom element itself — so the plain barrel is correct there.
-      const barrel =
+      let barrel =
         (target === 'react' || target === 'solid') && ir.expose.length > 0
           ? `export { default as SortableList } from './SortableList';\n` +
             `export { default } from './SortableList';\n\n` +
@@ -351,6 +355,9 @@ function main() {
               .join(', ')} }. */\n` +
             `export type { SortableListHandle } from './SortableList';\n`
           : `export { default as SortableList } from './SortableList';\nexport { default } from './SortableList';\n`;
+      // `<types>` names (Announcements, AnnouncementKind, AnnouncementContext)
+      // on the package entry — see ../../typed-surface-barrel.mjs.
+      barrel += typedSurfaceBarrelLines(target, ir, 'SortableList');
       writeFileSync(resolve(leafSrc, 'index.ts'), barrel);
     }
 

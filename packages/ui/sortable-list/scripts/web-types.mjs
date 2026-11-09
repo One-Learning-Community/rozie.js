@@ -43,7 +43,9 @@ function identToken(name) {
     case 'Function':
       return 'function';
     default:
-      return name ? name.toLowerCase() : 'any';
+      // A declared TS type (a `<types>` name such as `Announcements`) is kept
+      // as written: web-types `type` accepts a TypeScript type expression.
+      return name || 'any';
   }
 }
 

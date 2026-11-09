@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   announcementText,
   defaultInstructions,
@@ -111,5 +114,15 @@ describe('fallbackLabel / rowText', () => {
     expect(fallbackLabel(7, 0, null)).toBe('7');
     expect(fallbackLabel({ id: 1 }, 2, row('   '))).toBe('item 3');
     expect(fallbackLabel({ id: 1 }, 0, null)).toBe('item 1');
+  });
+});
+
+describe('public types', () => {
+  it("the component's exported AnnouncementKind lists exactly the kinds that have a default", () => {
+    const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'SortableList.rozie'), 'utf8');
+    const m = /export type AnnouncementKind =([^]*?)\n\/\*\*/.exec(src);
+    expect(m).not.toBeNull();
+    const kinds = [...m![1]!.matchAll(/'(\w+)'/g)].map((x) => x[1]).sort();
+    expect(kinds).toEqual(Object.keys(DEFAULT_ANNOUNCEMENTS).sort());
   });
 });

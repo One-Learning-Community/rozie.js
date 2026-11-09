@@ -5,6 +5,26 @@ import { useSortableJS } from './internal/useSortableJS';
 import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
 import { announcementText, defaultInstructions, fallbackLabel } from './internal/announcements';
 
+/** The kind of message the list speaks during keyboard reordering (a key of the `announcements` prop). */
+export type AnnouncementKind = 'lifted' | 'moved' | 'movedToList' | 'dropped' | 'droppedInList' | 'atStart' | 'atEnd' | 'notSortable' | 'noListBefore' | 'noListAfter' | 'cancelledReturnedToList' | 'cancelledReturned' | 'cancelledStays' | 'cancelledRemoved' | 'liftEnded';
+/** What an `announcements` function receives. */
+export interface AnnouncementContext {
+  /** The row's screen-reader label (`labelFor`, else `item.label`, else the row's text). */
+  label: string;
+  /** The item value. */
+  item: unknown;
+  /** The name of the list the message is about (`listLabel`, or `list 2 of 3`). */
+  list: string;
+  /** 1-based position of the row in `list` (kinds that have a position). */
+  position?: number;
+  /** How many rows `list` holds (kinds that have a position). */
+  total?: number;
+  /** The list the row came from (`movedToList` only). */
+  fromList?: string;
+}
+/** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
+export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+
 __rozieInjectStyle('SortableList-0af24eae', `.rozie-sortable-wrap[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-list[data-rozie-s-0af24eae] { display: block; }
 .rozie-sortable-item[data-rozie-s-0af24eae] { display: block; outline: none; }
@@ -129,11 +149,11 @@ interface SortableListProps extends Omit<import('solid-js').ComponentProps<'div'
    */
   keyboardInstructions?: (string) | null;
   /**
-   * Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see "Announcements").
+   * Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `''` says nothing. Kinds without a function keep the default English text (see "Announcements"). Define the object in your script and bind it (Angular templates reject inline arrow functions), e.g. `const announcements = { moved: ({ label, position, total }) => label + ' → ' + position + '/' + total }`. Typed as `Announcements`, exported with `AnnouncementKind` and `AnnouncementContext`.
    * @example
-   * <SortableList items={todos()} onItemsChange={setTodos} announcements={{ moved: ({ label, position, total }) => label + ' → ' + position + '/' + total }} />
+   * <SortableList items={todos()} onItemsChange={setTodos} announcements={announcements} />
    */
-  announcements?: (Record<string, any>) | null;
+  announcements?: (Announcements) | null;
   /**
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
@@ -299,6 +319,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     // update, with focus going nowhere (`relatedTarget` null): it would land on
     // <body>. Move it to the list instead.
     const rowBlurred = (ev: any) => {
+      if (listEl == null) return;
       const row: any = ev.target;
       if (ev.relatedTarget != null || row == null || row.parentNode !== listEl) return;
       if (!row.classList.contains('rozie-sortable-item') || row.hasAttribute('tabindex') || !row.isConnected) return;
@@ -322,7 +343,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       keyboardEnabled: () => keyboardEnabled() && !(handleMode() && local.handle == null),
       items: () => items(),
       keyOf: (item: any, i: any) => String(keyFor(item, i)),
-      labelOf: (item: any, i: any, row = null) => String(labelOf(item, i, row)),
+      labelOf: (item: any, i: any, row: HTMLElement | null = null) => String(labelOf(item, i, row)),
       message: (kind: any, ctx: any) => announcementText(local.announcements ?? undefined, kind, ctx),
       onKey: (key: any, shift: any) => holderKey(key, shift),
       write: (next: any) => {
@@ -510,7 +531,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // a plain null compare — NO runtime callable-type coercion. Without
   // `labelFor` or a `label` field, the row's text (`row`), else `String(item)`
   // for a primitive, else `item {position}`.
-  function labelOf(item: any, idx: any, row = null) {
+  function labelOf(item: any, idx: any, row: HTMLElement | null = null) {
     if (local.labelFor !== null) return local.labelFor(item, idx);
     if (item !== null && typeof item === 'object' && item.label != null) return item.label;
     return fallbackLabel(item, idx, row);
@@ -723,12 +744,22 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // `labelFor` or `label` field), and `total` how many rows `target` holds after
   // the change (null for the kinds without a position). A function returning
   // null or '' clears the region, so nothing is said.
-  function say(target: any, kind: any, item: any, index: any, row: any, total = null, fromList = null) {
+  function say(target: any, kind: AnnouncementKind, item: unknown, index: number, row: HTMLElement | null, total: number | null = null, fromList: any = null) {
     const ctx: any = {
-      label: target.labelOf(item, index, row),
       item,
       list: registry.listName(target)
     };
+    // The label is read only when the text needs it (a default with `{label}`,
+    // or an override that reads `label`), so `labelFor` is not called for a
+    // message that doesn't name the row (`Lift ended`: the item has left).
+    let label: string | null = null;
+    Object.defineProperty(ctx, 'label', {
+      enumerable: true,
+      get: () => {
+        if (label === null) label = target.labelOf(item, index, row);
+        return label;
+      }
+    });
     if (total != null) {
       ctx.position = index + 1;
       ctx.total = total;
@@ -755,7 +786,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
       h.focusNear(lift.index ?? lift.origin.index);
     }
     const payload = {
-      interaction: 'keyboard',
+      interaction: 'keyboard' as const,
       item: lift.item,
       el: null,
       from: lift.origin.list.el,
@@ -778,7 +809,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
   // they schedule: a consumer `end` handler reads the new state on every target
   // (React included, whose handler closure is the one from the latest render).
-  function keyboardStartEnd(name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl = null) {
+  function keyboardStartEnd(name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl: HTMLElement | null = null) {
     const host = name === 'start' ? from : to;
     const fire = () => host.emit(name, {
       interaction: 'keyboard',

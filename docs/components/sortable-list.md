@@ -92,7 +92,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `orientation` | `String` | `"vertical"` | yes | Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move". |
 | `pageStep` | `Number` | `5` | yes | How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain. |
 | `keyboardInstructions` | `String` | `null` | yes | Replaces the spoken keyboard instructions, read via `aria-describedby` when a row (row mode) or handle (handle mode, through the `instructionsId` slot prop) gets focus. See [Instructions](#instructions) for the default text. |
-| `announcements` | `Object` | `null` | yes | Rewords or translates what the list says during keyboard reordering: an object of optional functions, one per message kind, each taking a context and returning the text (`null` or `''` says nothing). Kinds without a function keep the default. See [Announcements](#announcements). |
+| `announcements` | `Announcements` | `null` | yes | Rewords or translates what the list says during keyboard reordering: an object of optional functions, one per message kind, each taking a context and returning the text (`null` or `''` says nothing). Kinds without a function keep the default. Typed `Announcements` (exported with `AnnouncementKind` and `AnnouncementContext`). See [Announcements](#announcements). |
 | `itemStyle` | `String \| Object \| Function` | `null` | yes | Per-row inline style on the item wrapper. Accepts a CSS string, a flat style object (`Record<string, string \| number>`), or a `(item, index) => string \| object` function. Lands on the `.rozie-sortable-item` wrapper — the direct child of the list container — so it can drive CSS-grid placement (`grid-column` / `align-self`) when `listClass` sets `display: grid`. Normalized per target (React/Solid `parseInlineStyle`, Lit/Svelte `rozieStyle`, Vue/Angular native); `null` / empty drops the attribute. |
 
 ### Events
@@ -370,25 +370,35 @@ Everything the list says during keyboard reordering comes from one of the messag
 
 `atStart` and `atEnd` are said when an arrow key, Home, End, Page Up or Page Down would not move the row (in a sortable list). `notSortable` is said for those keys in a `sort: false` list. `droppedInList` and `cancelledReturnedToList` are used once the row has hopped to another list. `liftEnded` is said when the lift ends because the keyboard was turned off or the consumer's data took the row away. The same message twice in a row is still read out again.
 
-Pass `announcements` to change any of them. Each key is an optional function that takes the context and returns the text; `null` or `''` says nothing, and kinds you leave out keep the default. To translate:
+Pass `announcements` to change any of them. Each key is an optional function that takes the context and returns the text; `null` or `''` says nothing, and kinds you leave out keep the default. Define the object in your script and bind it (Angular templates do not accept inline arrow functions). The type is exported from every package as `Announcements`, with `AnnouncementKind` and `AnnouncementContext`. To translate:
 
 ```rozie
+<script>
+const announcements = {
+  lifted: ({ label, position, total }) => label + ' aufgenommen, Position ' + position + ' von ' + total,
+  moved: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' verschoben',
+  dropped: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' abgelegt',
+  atStart: ({ label }) => label + ' ist bereits ganz oben',
+  atEnd: ({ label }) => label + ' ist bereits ganz unten',
+  cancelledReturned: ({ label, position, total }) => 'Abgebrochen. ' + label + ' zurück auf Position ' + position + ' von ' + total,
+  liftEnded: () => 'Verschieben beendet',
+}
+</script>
+
+<template>
 <SortableList
   r-model:items="$data.tasks"
   itemKey="id"
   listLabel="Aufgaben"
   keyboardInstructions="Leertaste oder Enter zum Aufnehmen und erneut zum Ablegen. Pfeiltasten zum Verschieben, Escape zum Abbrechen."
-  :announcements="{
-    lifted: ({ label, position, total }) => label + ' aufgenommen, Position ' + position + ' von ' + total,
-    moved: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' verschoben',
-    dropped: ({ label, position, total }) => label + ' auf Position ' + position + ' von ' + total + ' abgelegt',
-    atStart: ({ label }) => label + ' ist bereits ganz oben',
-    atEnd: ({ label }) => label + ' ist bereits ganz unten',
-    cancelledReturned: ({ label, position, total }) => 'Abgebrochen. ' + label + ' zurück auf Position ' + position + ' von ' + total,
-    liftEnded: () => 'Verschieben beendet',
-  }"
+  :announcements="announcements"
 />
+</template>
 ```
+
+In a TypeScript consumer, annotate it to get the context typed: `const announcements: Announcements = { … }` (React: `import { SortableList, type Announcements } from '@rozie-ui/sortable-list-react'`). Inline, `announcements={{ moved: ({ label }) => … }}` is typed from the prop.
+
+The label is computed only when the text uses it, so `labelFor` is not called for a message that doesn't name the row. For `liftEnded` the row has left the list, so a `label` read there comes from the item and its last known index.
 
 Instructions are one string, so pass `keyboardInstructions` alongside a translation (choose the wording for the list's orientation, `sort` and group yourself).
 

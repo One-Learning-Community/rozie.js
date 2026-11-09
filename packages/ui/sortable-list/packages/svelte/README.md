@@ -59,7 +59,7 @@ Also installed: `@rozie/runtime-svelte` — Rozie's small, tree-shaken runtime h
 | `orientation` | `String` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
-| `announcements` | `Object` | `null` |  |  |
+| `announcements` | `Announcements` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events

@@ -29,6 +29,43 @@
 
 <rozie name="SortableList">
 
+<types>
+/** The kind of message the list speaks during keyboard reordering (a key of the `announcements` prop). */
+export type AnnouncementKind =
+  | 'lifted'
+  | 'moved'
+  | 'movedToList'
+  | 'dropped'
+  | 'droppedInList'
+  | 'atStart'
+  | 'atEnd'
+  | 'notSortable'
+  | 'noListBefore'
+  | 'noListAfter'
+  | 'cancelledReturnedToList'
+  | 'cancelledReturned'
+  | 'cancelledStays'
+  | 'cancelledRemoved'
+  | 'liftEnded'
+/** What an `announcements` function receives. */
+export interface AnnouncementContext {
+  /** The row's screen-reader label (`labelFor`, else `item.label`, else the row's text). */
+  label: string
+  /** The item value. */
+  item: unknown
+  /** The name of the list the message is about (`listLabel`, or `list 2 of 3`). */
+  list: string
+  /** 1-based position of the row in `list` (kinds that have a position). */
+  position?: number
+  /** How many rows `list` holds (kinds that have a position). */
+  total?: number
+  /** The list the row came from (`movedToList` only). */
+  fromList?: string
+}
+/** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
+export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>
+</types>
+
 <props>
 {
   items: {
@@ -270,12 +307,12 @@
     },
   },
   announcements: {
-    type: Object,
+    type: Announcements,
     default: null,
     docs: {
       description:
-        'Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `\'\'` says nothing. Kinds without a function keep the default English text (see "Announcements").',
-      example: '<SortableList r-model:items="$data.todos" :announcements="{ moved: ({ label, position, total }) => label + \' → \' + position + \'/\' + total }" />',
+        'Rewords or translates what the list says during keyboard reordering. An object of optional functions keyed by message kind (`lifted`, `moved`, `movedToList`, `dropped`, `droppedInList`, `atStart`, `atEnd`, `notSortable`, `noListBefore`, `noListAfter`, `cancelledReturnedToList`, `cancelledReturned`, `cancelledStays`, `cancelledRemoved`, `liftEnded`). Each receives a context (`label`, `item`, `list`, and for kinds with a position `position` (1-based) and `total`; `movedToList` also `fromList`) and returns the text to speak; `null` or `\'\'` says nothing. Kinds without a function keep the default English text (see "Announcements"). Define the object in your script and bind it (Angular templates reject inline arrow functions), e.g. `const announcements = { moved: ({ label, position, total }) => label + \' → \' + position + \'/\' + total }`. Typed as `Announcements`, exported with `AnnouncementKind` and `AnnouncementContext`.',
+      example: '<SortableList r-model:items="$data.todos" :announcements="announcements" />',
     },
   },
   itemStyle: {
@@ -432,7 +469,7 @@ const itemStyleFor = (item, index) => {
 // a plain null compare — NO runtime callable-type coercion. Without
 // `labelFor` or a `label` field, the row's text (`row`), else `String(item)`
 // for a primitive, else `item {position}`.
-const labelOf = (item, idx, row = null) => {
+const labelOf = (item, idx, row: HTMLElement | null = null) => {
   if ($props.labelFor !== null) return $props.labelFor(item, idx)
   if (item !== null && typeof item === 'object' && item.label != null) return item.label
   return fallbackLabel(item, idx, row)
@@ -636,8 +673,19 @@ const speak = (target, text) => {
 // `labelFor` or `label` field), and `total` how many rows `target` holds after
 // the change (null for the kinds without a position). A function returning
 // null or '' clears the region, so nothing is said.
-const say = (target, kind, item, index, row, total = null, fromList = null) => {
-  const ctx: any = { label: target.labelOf(item, index, row), item, list: registry.listName(target) }
+const say = (target: any, kind: AnnouncementKind, item: unknown, index: number, row: HTMLElement | null, total: number | null = null, fromList: any = null) => {
+  const ctx: any = { item, list: registry.listName(target) }
+  // The label is read only when the text needs it (a default with `{label}`,
+  // or an override that reads `label`), so `labelFor` is not called for a
+  // message that doesn't name the row (`Lift ended`: the item has left).
+  let label: string | null = null
+  Object.defineProperty(ctx, 'label', {
+    enumerable: true,
+    get: () => {
+      if (label === null) label = target.labelOf(item, index, row)
+      return label
+    },
+  })
   if (total != null) {
     ctx.position = index + 1
     ctx.total = total
@@ -664,7 +712,7 @@ const loseLift = (unmounting = false) => {
     h.focusNear(lift.index ?? lift.origin.index)
   }
   const payload = {
-    interaction: 'keyboard',
+    interaction: 'keyboard' as const,
     item: lift.item,
     el: null,
     from: lift.origin.list.el,
@@ -688,7 +736,7 @@ const loseLift = (unmounting = false) => {
 // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
 // they schedule: a consumer `end` handler reads the new state on every target
 // (React included, whose handler closure is the one from the latest render).
-const keyboardStartEnd = (name, lift, from, to, oldIndex, newIndex, fallbackEl = null) => {
+const keyboardStartEnd = (name, lift, from, to, oldIndex, newIndex, fallbackEl: HTMLElement | null = null) => {
   const host = name === 'start' ? from : to
   const fire = () => host.emit(name, {
     interaction: 'keyboard',
@@ -1189,6 +1237,7 @@ $onMount(() => {
   // update, with focus going nowhere (`relatedTarget` null): it would land on
   // <body>. Move it to the list instead.
   const rowBlurred = (ev) => {
+    if (listEl == null) return
     const row: any = ev.target
     if (ev.relatedTarget != null || row == null || row.parentNode !== listEl) return
     if (!row.classList.contains('rozie-sortable-item') || row.hasAttribute('tabindex') || !row.isConnected) return
@@ -1212,7 +1261,7 @@ $onMount(() => {
     keyboardEnabled: () => keyboardEnabled() && !(handleMode() && $props.handle == null),
     items: () => $props.items,
     keyOf: (item, i) => String(keyFor(item, i)),
-    labelOf: (item, i, row = null) => String(labelOf(item, i, row)),
+    labelOf: (item, i, row: HTMLElement | null = null) => String(labelOf(item, i, row)),
     message: (kind, ctx) => announcementText($props.announcements, kind, ctx),
     onKey: (key, shift) => holderKey(key, shift),
     write: (next) => { $model.items = next },

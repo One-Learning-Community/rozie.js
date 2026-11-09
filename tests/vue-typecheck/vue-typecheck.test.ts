@@ -115,7 +115,7 @@ describe('VUE-TSC — vue-tsc --noEmit clean over emitted Vue SFCs', () => {
       // resolve it. Only needed when SortableList is in the EXAMPLES set.
       if (EXAMPLES.includes('SortableList')) {
         mkdirSync(join(tmpDir, 'internal'), { recursive: true });
-        for (const helper of ['useSortableJS.ts', 'keyboardRegistry.ts']) {
+        for (const helper of ['useSortableJS.ts', 'keyboardRegistry.ts', 'announcements.ts']) {
           copyFileSync(
             resolve(ROOT, 'packages/ui/sortable-list/src/internal', helper),
             join(tmpDir, 'internal', helper),

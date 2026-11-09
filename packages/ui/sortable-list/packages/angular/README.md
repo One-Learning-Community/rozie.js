@@ -101,7 +101,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `orientation` | `String` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
-| `announcements` | `Object` | `null` |  |  |
+| `announcements` | `Announcements` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events

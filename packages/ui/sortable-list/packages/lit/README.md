@@ -58,7 +58,7 @@ el.addEventListener('items-change', (e) => {
 | `orientation` | `String` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
-| `announcements` | `Object` | `null` |  |  |
+| `announcements` | `Announcements` | `null` |  |  |
 | `itemStyle` | `String \| Object \| Function` | `null` |  |  |
 
 ## Events
