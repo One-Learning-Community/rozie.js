@@ -105,6 +105,7 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

@@ -410,7 +410,45 @@ export function emitLit(ir: IRComponent, opts: EmitLitOptions = {}): EmitLitResu
   // `r-on="$listeners"`. Dynamic `r-on="someObj"` does NOT trigger the
   // getter (its emit shape is `${rozieListeners(this.someObj)}` — no
   // bare `$listeners` reference).
-  const litListenersGetter = templateResult.rozieListenersUsed
+  //
+  // Exception — `r-on="$listeners"` onto a child Rozie component. The child's
+  // `$emit` events do not bubble (nor cross the shadow root), so the consumer's
+  // listener on THIS host would never hear them. There `$listeners` is a real
+  // bag: the host records each event type its consumer listens for (an
+  // `addEventListener` override — a Lit `@evt=${…}` binding on the host goes
+  // through it too) and maps it to one stable forwarder, which the
+  // `rozieListeners` directive attaches to the child. The forwarder
+  // re-dispatches the child's event on the host as a fresh non-bubbling,
+  // non-composed CustomEvent with the same type and detail. A composed event
+  // (a native click from inside the child) already reaches the host, so it is
+  // not re-dispatched — nothing fires twice.
+  const litListenersGetter = templateResult.listenersForwardedToComponent
+    ? [
+        '  private _rozieListenerBag: Record<string, EventListener> = {};',
+        '  private _rozieForwardListener = (e: Event): void => {',
+        '    if (e.composed) return;',
+        '    this.dispatchEvent(new CustomEvent(e.type, { detail: (e as CustomEvent).detail, bubbles: false, composed: false }));',
+        '  };',
+        '  /**',
+        '   * Consumer-passed listener cluster for `r-on="$listeners"` on a child',
+        '   * component: one forwarder per event type the consumer listens for on',
+        "   * this host, so the child's non-bubbling events are re-dispatched here.",
+        '   */',
+        '  private get $listeners(): Record<string, EventListener> {',
+        '    return this._rozieListenerBag;',
+        '  }',
+        '  addEventListener<K extends keyof HTMLElementEventMap>(type: K, listener: (this: HTMLElement, ev: HTMLElementEventMap[K]) => unknown, options?: boolean | AddEventListenerOptions): void;',
+        '  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;',
+        '  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {',
+        '    super.addEventListener(type, listener, options);',
+        '    // Field initializers have not run yet when called during construction.',
+        '    const bag = this._rozieListenerBag;',
+        '    if (!listener || bag === undefined || Object.hasOwn(bag, type)) return;',
+        '    this._rozieListenerBag = { ...bag, [type]: this._rozieForwardListener };',
+        '    this.requestUpdate();',
+        '  }',
+      ].join('\n')
+    : templateResult.rozieListenersUsed
     ? [
         '  /**',
         '   * Phase 15 D-19 — consumer-passed listener cluster placeholder.',
@@ -846,6 +884,10 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
   // user $onMount hooks (the latter mount-once — never re-run on reconnect).
   if (hasListenerWiring || hasMountHook || parts.adoptDocumentStyles) {
     const firstUpdatedParts: string[] = [];
+    // A teardown that ran before the first update (removed before Lit
+    // rendered it) leaves `_rozieTornDown` true; the mount below is live, so
+    // clear it — else the next un-mount skips its teardown and a reconnect
+    // mounts again on top of this one.
     // Item 3 — adopt document stylesheets into the shadow root FIRST, before
     // the engine builds its shadow DOM in the $onMount hook, so the engine
     // chrome is styled the moment it appears.
@@ -853,7 +895,11 @@ function composeClassBody(parts: ComposeClassBodyParts): string {
     if (hasListenerWiring) firstUpdatedParts.push('this._armListeners();');
     if (hasMountHook) firstUpdatedParts.push(parts.mountHookBody);
     sections.push(
-      ['  firstUpdated(): void {', indent(firstUpdatedParts.join('\n\n'), 4), '  }'].join('\n'),
+      [
+        '  firstUpdated(): void {',
+        indent('this._rozieTornDown = false;\n' + firstUpdatedParts.join('\n\n'), 4),
+        '  }',
+      ].join('\n'),
     );
   }
 

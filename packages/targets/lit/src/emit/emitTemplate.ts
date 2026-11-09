@@ -178,6 +178,8 @@ export interface EmitTemplateOpts {
      * `styleMapUsed` plumbing).
      */
     rozieListenersUsed: boolean;
+    /** A bare `r-on="$listeners"` spread lands on a child Rozie component element. */
+    listenersForwardedToComponent: boolean;
     /** `${rozieOptionListeners([...])}` was emitted (same plumbing as `rozieListenersUsed`). */
     rozieOptionListenersUsed: boolean;
     /**
@@ -308,6 +310,11 @@ export interface EmitTemplateResult {
    * (same plumbing as `rozieSpreadUsed`).
    */
   rozieListenersUsed: boolean;
+  /**
+   * A bare `r-on="$listeners"` spread lands on a child Rozie component
+   * element; emitLit then makes `$listeners` a real forwarding bag.
+   */
+  listenersForwardedToComponent: boolean;
   /** `${rozieOptionListeners([...])}` was emitted (same plumbing as `rozieListenersUsed`). */
   rozieOptionListenersUsed: boolean;
   /**
@@ -1646,6 +1653,17 @@ function emitElementOpenTag(
   for (const spread of dynamicListenerSpreads) {
     const expr = rewriteTemplateExpression(spread.expression, ir);
     if (opts._state) opts._state.rozieListenersUsed = true;
+    // `r-on="$listeners"` onto a child Rozie component: the child's `$emit`
+    // events do not bubble, so `$listeners` must be a real bag here (see
+    // emitLit's `$listeners` getter) for the consumer's host listeners to hear them.
+    if (
+      opts._state &&
+      node.tagKind !== 'html' &&
+      spread.expression.type === 'Identifier' &&
+      spread.expression.name === '$listeners'
+    ) {
+      opts._state.listenersForwardedToComponent = true;
+    }
     parts.push(`\${rozieListeners(${expr})}`);
   }
 
@@ -2473,6 +2491,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
     styleMapUsed: false,
     rozieSpreadUsed: false,
     rozieListenersUsed: false,
+    listenersForwardedToComponent: false,
     rozieOptionListenersUsed: false,
     refUsed: false,
     keyedUsed: false,
@@ -2516,6 +2535,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
       styleMapUsed: state.styleMapUsed,
       rozieSpreadUsed: state.rozieSpreadUsed,
       rozieListenersUsed: state.rozieListenersUsed,
+      listenersForwardedToComponent: state.listenersForwardedToComponent,
       rozieOptionListenersUsed: state.rozieOptionListenersUsed,
       refUsed: state.refUsed,
       keyedUsed: state.keyedUsed,
@@ -2545,6 +2565,7 @@ export function emitTemplate(ir: IRComponent, opts: EmitTemplateOpts): EmitTempl
     styleMapUsed: state.styleMapUsed,
     rozieSpreadUsed: state.rozieSpreadUsed,
     rozieListenersUsed: state.rozieListenersUsed,
+    listenersForwardedToComponent: state.listenersForwardedToComponent,
     rozieOptionListenersUsed: state.rozieOptionListenersUsed,
     refUsed: state.refUsed,
     keyedUsed: state.keyedUsed,

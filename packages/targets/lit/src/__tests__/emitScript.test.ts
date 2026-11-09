@@ -268,7 +268,7 @@ $onMount(() => reset())
       source: src,
       modifierRegistry: registry,
     }).code;
-    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
+    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\._rozieTornDown = false;\s*this\.reset\(\);\s*\}/);
     expect(code).not.toContain('this.reset()()');
   });
 
@@ -293,7 +293,7 @@ $onMount(reset)
       source: src,
       modifierRegistry: registry,
     }).code;
-    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\.reset\(\);\s*\}/);
+    expect(code).toMatch(/firstUpdated\(\):\s*void\s*\{\s*this\._rozieTornDown = false;\s*this\.reset\(\);\s*\}/);
   });
 
   it('fullcalendar-lit-watch-property fix (2026-05-19) — $watch on $props.X routes through updated(changedProperties), NOT effect()', () => {
