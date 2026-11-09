@@ -250,7 +250,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   _itemsRef.current = items;
   const [liftedIndex, setLiftedIndex] = useState<any>(null);
   const [ariaLiveText, setAriaLiveText] = useState('');
+  const [instructionsId, setInstructionsId] = useState<any>(null);
   const [optionOverrides, setOptionOverrides] = useState<Record<string, any>>({});
+  const _instructionsIdRef = useRef(instructionsId);
+  _instructionsIdRef.current = instructionsId;
   const listEl = useRef<HTMLDivElement | null>(null);
   const _watch0First = useRef(true);
   const _watch1First = useRef(true);
@@ -285,11 +288,6 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   // committed events itself, so stop the raw ones at the list element (only
   // events dispatched ON the list — an `<input>`'s own `change` is untouched).
   const SORTABLE_DOM_EVENTS = useMemo(() => ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'], []);
-  // Per-instance id of the hidden spoken-instructions element. Assigned once
-  // per instance: it is also read in $onMount (the registry entry), which makes
-  // the React emitter keep it across renders instead of minting a new id each
-  // render.
-  const instructionsId = useMemo(() => nextInstructionsId(), []);
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out
   // the move sentence, and a list with a group (the one SortableJS runs with,
@@ -1237,6 +1235,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const _warnIfHandleMissingRef = useRef(warnIfHandleMissing);
   _warnIfHandleMissingRef.current = warnIfHandleMissing;
   useEffect(() => {
+    // Kept across a Lit element's disconnect and reconnect (mount runs again).
+    if (_instructionsIdRef.current == null) setInstructionsId(nextInstructionsId());
     _warnIfHandleMissingRef.current();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -1345,7 +1345,6 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
     // when a keyboard lift hands a row between lists.
     entry.current = {
       el: listEl$local,
-      instructionsId,
       group: () => _effectiveGroupRef.current(),
       label: () => _listLabelRef.current,
       // A handle-mode list without a handle selector has its keyboard off.
@@ -1525,13 +1524,14 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   return (
     <>
     <div {...attrs} className={clsx("rozie-sortable-wrap", (attrs.className as string | undefined))} data-rozie-s-0af24eae="">
+      
+      {(props.renderHeader ?? props.slots?.['header'])?.()}
       <div className={clsx(['rozie-sortable-list', props.listClass])} ref={listEl} part="list" role="list" aria-label={rozieAttr(props.listLabel)} data-rozie-s-0af24eae="">
-        {(props.renderHeader ?? props.slots?.['header'])?.()}
         {items.map((item, index) => <div key={keyFor(item, index)} className={clsx(['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabIndex={(rowTabbable() ? 0 : undefined) ?? undefined} aria-describedby={rozieAttr(rowTabbable() ? instructionsId : undefined)} onKeyDown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae="">
           {typeof (props.children ?? props.slots?.['']) === 'function' ? ((props.children ?? props.slots?.['']) as Function)({ item, index, instructionsId }) : (props.children ?? props.slots?.[''])}
         </div>)}
-        {(props.renderFooter ?? props.slots?.['footer'])?.()}
       </div>
+      {(props.renderFooter ?? props.slots?.['footer'])?.()}
       <div className={"rozie-sortable-aria-live"} data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae="">{ariaLiveText}</div>
       <span hidden={true} id={rozieAttr(instructionsId)} data-rozie-s-0af24eae="">{rozieDisplay(instructionsText())}</span>
     </div>

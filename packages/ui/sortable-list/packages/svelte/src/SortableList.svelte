@@ -196,6 +196,7 @@ const footer = $derived(__footerProp ?? snippets?.footer);
 
 let liftedIndex: any = $state(null);
 let ariaLiveText = $state('');
+let instructionsId: any = $state(null);
 let optionOverrides = $state({});
 
 let listEl = $state<HTMLElement | undefined>(undefined);
@@ -226,11 +227,6 @@ let unhookStrayKeys: any = null;
 // committed events itself, so stop the raw ones at the list element (only
 // events dispatched ON the list — an `<input>`'s own `change` is untouched).
 const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
-// Per-instance id of the hidden spoken-instructions element. Assigned once
-// per instance: it is also read in $onMount (the registry entry), which makes
-// the React emitter keep it across renders instead of minting a new id each
-// render.
-const instructionsId = nextInstructionsId();
 // role="list" takes no aria-orientation, so a horizontal list says which
 // arrow keys move in its instructions instead. A `sort: false` list leaves out
 // the move sentence, and a list with a group (the one SortableJS runs with,
@@ -1217,6 +1213,8 @@ $effect(() => { (() => items)(); untrack(() => { if (__rozieWatchInitial_14) { _
 })(); }); });
 
 onMount(() => {
+  // Kept across a Lit element's disconnect and reconnect (mount runs again).
+  if (instructionsId == null) instructionsId = nextInstructionsId();
   warnIfHandleMissing();
   // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
   // when the options object below references it.
@@ -1325,7 +1323,6 @@ onMount(() => {
   // when a keyboard lift hands a row between lists.
   entry = {
     el: listEl$local,
-    instructionsId,
     group: () => effectiveGroup(),
     label: () => listLabel,
     // A handle-mode list without a handle selector has its keyboard off.
@@ -1392,7 +1389,7 @@ onMount(() => {
 });
 </script>
 
-<div {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae><div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" role="list" aria-label={listLabel} data-rozie-s-0af24eae>{@render header?.()}{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : ''])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex={rozieAttr(rowTabbable() ? 0 : null)} aria-describedby={rozieAttr(rowTabbable() ? instructionsId : null)} onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index, instructionsId })}</div>{/each}{@render footer?.()}</div><div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div><span hidden id={rozieAttr(instructionsId)} data-rozie-s-0af24eae>{rozieDisplay(instructionsText())}</span></div>
+<div {...__rozieAttrs} class={["rozie-sortable-wrap", (__rozieAttrs)?.class]} use:applyListeners={__rozieAttrs} data-rozie-s-0af24eae>{@render header?.()}<div class={rozieClass(['rozie-sortable-list', listClass])} bind:this={listEl} part="list" role="list" aria-label={listLabel} data-rozie-s-0af24eae>{#each items as item, index (keyFor(item, index))}<div class={rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : ''])} style={rozieStyle(itemStyleFor(item, index))} data-id={rozieAttr(keyFor(item, index))} role="listitem" tabindex={rozieAttr(rowTabbable() ? 0 : null)} aria-describedby={rozieAttr(rowTabbable() ? instructionsId : null)} onkeydown={($event) => { onRowKeyDown($event, index); }} data-rozie-s-0af24eae>{@render children?.({ item, index, instructionsId })}</div>{/each}</div>{@render footer?.()}<div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>{ariaLiveText}</div><span hidden id={rozieAttr(instructionsId)} data-rozie-s-0af24eae>{rozieDisplay(instructionsText())}</span></div>
 
 <style>
 :global {

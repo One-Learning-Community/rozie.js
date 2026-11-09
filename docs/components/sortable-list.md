@@ -120,7 +120,7 @@ interface SortablePayload {
 }
 ```
 
-Indices count item rows only: `#header` / `#footer` content (and, on Lit, their `<slot>` elements) never shifts them. `el` is the row element when it exists; after a move into another list it can be the element that was moved, which that list replaces with its own row when it re-renders.
+Indices count item rows only: `#header` / `#footer` content never shifts them. `el` is the row element when it exists; after a move into another list it can be the element that was moved, which that list replaces with its own row when it re-renders.
 
 Order and source:
 
@@ -149,7 +149,7 @@ To rename a slot param to a more readable local name in nested-template contexts
 
 #### `#header` / `#footer` slots
 
-`#header` and `#footer` render inside the SortableJS container, as non-draggable siblings of the item rows (`#header` first, `#footer` last). That container is the `role="list"` element, so header and footer content is read as part of the list. Use them for an "Add item" row, a running total, an empty-state message, or any chrome that should sit with the list but not participate in the drag order.
+`#header` renders just before the list element and `#footer` just after it, inside the component's root. They are not part of the `role="list"` element (the SortableJS container), whose children are the item rows only. ARIA lets a list contain only list items, and screen readers count just the rows. Use them for a heading, a running total, an "Add item" button, or any chrome that should sit with the list but not take part in the drag order.
 
 ```rozie
 <SortableList r-model:items="$data.items" itemKey="id">
@@ -165,7 +165,7 @@ To rename a slot param to a more readable local name in nested-template contexts
 </SortableList>
 ```
 
-Header and footer are non-draggable: SortableJS is scoped to `.rozie-sortable-item` rows only (`draggable: '.rozie-sortable-item'`), so dropping onto or near the header/footer never reorders them and the DOM-restore index math stays item-relative.
+Header and footer are outside the drop area: a row dropped on them doesn't land in the list. To draw one box around header, rows and footer, wrap the component in your own element and style that: `listClass` styles the rows' container only. An empty list takes a mouse drop only within its own area, so give it a `min-height` through `listClass` (see [Cross-list drag](#cross-list-drag)).
 
 ### Imperative handle
 
@@ -282,7 +282,7 @@ The keyboard follows the same SortableJS rules as the mouse:
 
 Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too. A change to the `options` prop object is reapplied to SortableJS key by key (no remount), so mouse and keyboard always follow the same values.
 
-The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that `role="list"` element. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
+The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders outside that element, so its children are the rows only. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
 
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
 
@@ -425,7 +425,7 @@ The rules:
 - Handled keys call `preventDefault`, so the handle button's own click does not fire.
 - Focus returns to the moved row's handle after each move, on every framework.
 - You own the handle markup and its accessible name. The component adds no `tabindex` or `role` to slot content.
-- The default slot receives `instructionsId`, the id of the hidden instructions element. Bind it as the handle's `aria-describedby` so screen readers read the keys on focus. On Lit this works for Rozie consumers, whose slot content renders inside the list's shadow root; plain-HTML consumers of the Lit element can't reference an id across the shadow boundary.
+- The default slot receives `instructionsId`, the id of the hidden instructions element. Bind it as the handle's `aria-describedby` so screen readers read the keys on focus. It is `null` until the list has mounted (the id is assigned then, so server-rendered markup and the first browser render agree); `aria-describedby` bound to `null` renders no attribute. On Lit this works for Rozie consumers, whose slot content renders inside the list's shadow root; plain-HTML consumers of the Lit element can't reference an id across the shadow boundary.
 - Without a `handle` selector, keyboard reordering is off (and the list is not a keyboard hop target) and a console warning is logged. There is no silent fallback to row mode.
 - `disabled` and `disableKeyboard` still turn keyboard reordering off.
 

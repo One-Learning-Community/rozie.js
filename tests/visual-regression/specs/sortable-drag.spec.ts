@@ -177,11 +177,10 @@ for (const target of TARGETS) {
 //     run after the script returns, with no `window.event`, so React schedules
 //     the write's render in a later task. `end` runs in a task after that one.
 //   - `nativeDrag` drags with the real mouse (trusted events).
-// The drivers land Apple at different rows (row 3's lower half vs. just
-// past row 2), so each pins its own exact order.
+// Both release Apple in row 3's lower half, so it lands after Cherry.
 const DRIVERS = [
   { name: 'script-dispatched drop', drag: synthesizeDrag, ids: 'b,c,a,d,e', labels: ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry'] },
-  { name: 'native mouse drop', drag: nativeDrag, ids: 'b,a,c,d,e', labels: ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry'] },
+  { name: 'native mouse drop', drag: nativeDrag, ids: 'b,c,a,d,e', labels: ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry'] },
 ] as const;
 
 for (const target of TARGETS) {

@@ -98,7 +98,7 @@ export interface SortableChange<T> {
 
 /** Argument shape for the `onStart` / `onEnd` callbacks. Indices are
  * item-row indices (SortableJS's draggable-relative ones), never counting
- * the `#header` / `#footer` children of the list. */
+ * a non-row child of the list. */
 export interface SortableDrag<T> {
   /** The dragged item's data value (from the stash). */
   item: T | undefined;
@@ -254,11 +254,10 @@ export function useSortableJS<T>(
   // a user-supplied `onUpdate` would silently bypass our reconciler dance.
   const baseOptions: SortableOptions = { ...(opts.options ?? {}) };
 
-  /** Item-scoped child lookup. `listEl.children` now also includes the
-   * non-draggable `#header` / `#footer` slot holes (direct children of the
-   * list container), so the DOM-restore sites must index ONLY the item rows —
-   * `:scope > .rozie-sortable-item` — to keep the restore index item-relative
-   * and correct (no off-by-one from header/footer). */
+  /** Item-scoped child lookup. The DOM-restore sites index ONLY the item rows
+   * (`:scope > .rozie-sortable-item`), so the restore index stays
+   * item-relative whatever else is a child of the list element. (`#header` /
+   * `#footer` render outside it, around the `role="list"` element.) */
   const itemChildAt = (i: number): Element | null =>
     listEl.querySelectorAll(':scope > .rozie-sortable-item')[i] ?? null;
   // Build the explicit handler set — these always win over anything the
@@ -275,7 +274,7 @@ export function useSortableJS<T>(
     const current = opts.items();
     // The source index in this list (onStart fires from the source). Prefer the
     // DRAGGABLE-relative index: with non-draggable element children present
-    // (Lit shadow-DOM `#header`/`#footer` `<slot>`s), plain `e.oldIndex` counts
+    // (rows left out by a consumer `options.draggable`), plain `e.oldIndex` counts
     // all children and is offset — stashing `current[oldIndex]` would capture
     // the WRONG item (the row after the one actually grabbed), and the
     // identity-based commit lookup would then faithfully move that wrong item.
@@ -349,14 +348,11 @@ export function useSortableJS<T>(
       // siblings — while `oldDraggableIndex`/`newDraggableIndex` use
       // `index(dragEl, options.draggable)`, counting only the
       // `.rozie-sortable-item` rows. When the list container also holds
-      // non-draggable element children, the plain indices are offset. This bites
-      // ONLY on Lit: the `#header` / `#footer` named slots render as real
-      // `<slot>` ELEMENTS inside the shadow-DOM list container (the 5 light-DOM
-      // targets render nothing for an empty named slot), so the leading
-      // `<slot name="header">` shifts every plain `newIndex` by +1 and the
-      // writeback dropped items one slot too far. The draggable indices stay
+      // non-draggable element children, the plain indices are offset. (On Lit
+      // the `#header` / `#footer` `<slot>` elements used to be such children;
+      // they now render outside the list element.) The draggable indices stay
       // item-relative everywhere; when no non-draggable children exist the two
-      // coincide, so the 5 light-DOM targets are unchanged.
+      // coincide.
       const oldIndexHint = endOld;
       const newIndexHint = endNew;
 
@@ -395,7 +391,7 @@ export function useSortableJS<T>(
         // restore throws (fragile event), proceed to the model writeback —
         // the re-render off the new model will reconcile.
         safeDom(() => {
-          // Item-scoped: header/footer are non-item direct children of listEl,
+          // Item-scoped: listEl may hold non-row children (see itemChildAt),
           // so index against the .rozie-sortable-item rows only.
           const ref = itemChildAt(movedFromIdx);
           listEl.insertBefore(e.item, ref);
@@ -440,7 +436,7 @@ export function useSortableJS<T>(
         // (fragile event — common path here when destination's onAdd
         // already detached e.item), proceed to writeback anyway.
         safeDom(() => {
-          // Item-scoped: header/footer are non-item direct children of listEl,
+          // Item-scoped: listEl may hold non-row children (see itemChildAt),
           // so index against the .rozie-sortable-item rows only.
           const ref = itemChildAt(movedFromIdx);
           listEl.insertBefore(e.item, ref);
@@ -590,9 +586,9 @@ export function useSortableJS<T>(
   };
 
   const instance = new SortableJS(listEl, {
-    // Scope dragging to item rows only so the `#header` / `#footer` slot holes
-    // (non-draggable direct children of listEl) are skipped — keeps SortableJS's
-    // own e.oldIndex/e.newIndex hints item-relative. Placed BEFORE the spread so
+    // Scope dragging to item rows only, so any non-row child of listEl is
+    // skipped — keeps SortableJS's own e.oldIndex/e.newIndex hints
+    // item-relative. Placed BEFORE the spread so
     // a consumer-supplied `options.draggable` still overrides it (pass-through).
     draggable: ROW_DRAGGABLE,
     ...baseOptions,

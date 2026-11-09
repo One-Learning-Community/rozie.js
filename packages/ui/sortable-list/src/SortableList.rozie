@@ -334,6 +334,12 @@ export type SortableOrientation = 'vertical' | 'horizontal'
 {
   liftedIndex: null,
   ariaLiveText: '',
+  // Id of the hidden spoken-instructions element. Assigned in $onMount, not
+  // during render: it comes from a page-global counter, and a server counts
+  // differently from the browser, so a render-time id would not match on
+  // hydration. Until mount, no `id` / `aria-describedby` is rendered and the
+  // `instructionsId` slot prop is null.
+  instructionsId: null,
   // SortableJS options set at runtime (the `disabled` / `filter` watchers and
   // the imperative `option(name, value)`), for the ones the keyboard honours.
   // A key present here is what SortableJS runs with now.
@@ -371,12 +377,6 @@ let unhookStrayKeys = null
 // committed events itself, so stop the raw ones at the list element (only
 // events dispatched ON the list — an `<input>`'s own `change` is untouched).
 const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect']
-
-// Per-instance id of the hidden spoken-instructions element. Assigned once
-// per instance: it is also read in $onMount (the registry entry), which makes
-// the React emitter keep it across renders instead of minting a new id each
-// render.
-const instructionsId = nextInstructionsId()
 
 // role="list" takes no aria-orientation, so a horizontal list says which
 // arrow keys move in its instructions instead. A `sort: false` list leaves out
@@ -1193,6 +1193,8 @@ const onStrayKey = (ev) => {
 // back, what to emit, and how to bridge `afterCommit` to the Lit-only
 // `$reconcileAfterDomMutation()` sigil.
 $onMount(() => {
+  // Kept across a Lit element's disconnect and reconnect (mount runs again).
+  if ($data.instructionsId == null) $data.instructionsId = nextInstructionsId()
   warnIfHandleMissing()
   // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
   // when the options object below references it.
@@ -1273,7 +1275,6 @@ $onMount(() => {
   // when a keyboard lift hands a row between lists.
   entry = {
     el: listEl,
-    instructionsId,
     group: () => effectiveGroup(),
     label: () => $props.listLabel,
     // A handle-mode list without a handle selector has its keyboard off.
@@ -1473,6 +1474,11 @@ $expose({ getInstance, toArray, sort, option })
 
 <template>
 <div class="rozie-sortable-wrap">
+  <!-- #header / #footer sit around the role="list" element, not inside it:
+       the list's children are its rows only (a list may own only listitems).
+       This also keeps an empty list empty for SortableJS (on Lit the slot
+       elements would otherwise be children of the list). -->
+  <slot name="header" />
   <div
     :class="['rozie-sortable-list', $props.listClass]"
     ref="listEl"
@@ -1481,7 +1487,6 @@ $expose({ getInstance, toArray, sort, option })
     role="list"
     :aria-label="$props.listLabel"
   >
-    <slot name="header" />
     <div
       r-for="item, index in $props.items"
       :key="keyFor(item, index)"
@@ -1490,20 +1495,20 @@ $expose({ getInstance, toArray, sort, option })
       :data-id="keyFor(item, index)"
       role="listitem"
       :tabindex="rowTabbable() ? 0 : null"
-      :aria-describedby="rowTabbable() ? instructionsId : null"
+      :aria-describedby="rowTabbable() ? $data.instructionsId : null"
       @keydown="onRowKeyDown($event, index)"
     >
-      <slot :item="item" :index="index" :instructionsId="instructionsId" />
+      <slot :item="item" :index="index" :instructionsId="$data.instructionsId" />
     </div>
-    <slot name="footer" />
   </div>
+  <slot name="footer" />
   <div
     class="rozie-sortable-aria-live"
     data-rozie-sortable-aria-live
     aria-live="polite"
     aria-atomic="true"
   >{{ $data.ariaLiveText }}</div>
-  <span hidden :id="instructionsId">{{ instructionsText() }}</span>
+  <span hidden :id="$data.instructionsId">{{ instructionsText() }}</span>
 </div>
 </template>
 

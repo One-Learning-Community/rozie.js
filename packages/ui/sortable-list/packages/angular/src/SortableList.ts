@@ -49,17 +49,18 @@ interface FooterCtx {}
   template: `
 
     <div class="rozie-sortable-wrap" #rozieSpread_0 #rozieListenersTarget_1>
+      
+      <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
       <div [class]="rozieClass(['rozie-sortable-list', listClass()])" #listEl part="list" role="list" [attr.aria-label]="rozieAttr(listLabel())">
-        <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
         @for (item of items(); track keyFor(item, index); let index = $index) {
-    <div [class]="rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''])" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId : null)" (keydown)="onRowKeyDown($event, index)">
-          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index, instructionsId: instructionsId }, item: item, index: index, instructionsId: instructionsId }" />
+    <div [class]="rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''])" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId() : null)" (keydown)="onRowKeyDown($event, index)">
+          <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index, instructionsId: instructionsId() }, item: item, index: index, instructionsId: instructionsId() }" />
         </div>
     }
-        <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />
       </div>
+      <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />
       <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText() }}</div>
-      <span hidden="" [attr.id]="rozieAttr(instructionsId)">{{ rozieDisplay(instructionsText()) }}</span>
+      <span hidden="" [attr.id]="rozieAttr(instructionsId())">{{ rozieDisplay(instructionsText()) }}</span>
     </div>
 
   `,
@@ -207,6 +208,7 @@ export class SortableList {
   itemStyle = input<(string | Record<string, any> | ((...args: any[]) => any)) | null>(null);
   liftedIndex = signal<any>(null);
   ariaLiveText = signal('');
+  instructionsId = signal<any>(null);
   optionOverrides = signal({});
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
   reorder = output<unknown>();
@@ -316,6 +318,8 @@ export class SortableList {
 
   ngAfterViewInit() {
     const __options = this.options();
+    // Kept across a Lit element's disconnect and reconnect (mount runs again).
+    if (this.instructionsId() == null) this.instructionsId.set(nextInstructionsId());
     this.warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -432,7 +436,6 @@ export class SortableList {
     // when a keyboard lift hands a row between lists.
     this.entry = {
       el: listEl,
-      instructionsId: this.instructionsId,
       group: () => this.effectiveGroup(),
       label: () => this.listLabel(),
       // A handle-mode list without a handle selector has its keyboard off.
@@ -523,11 +526,6 @@ export class SortableList {
   // committed events itself, so stop the raw ones at the list element (only
   // events dispatched ON the list — an `<input>`'s own `change` is untouched).
   SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
-  // Per-instance id of the hidden spoken-instructions element. Assigned once
-  // per instance: it is also read in $onMount (the registry entry), which makes
-  // the React emitter keep it across renders instead of minting a new id each
-  // render.
-  instructionsId = nextInstructionsId();
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out
   // the move sentence, and a list with a group (the one SortableJS runs with,

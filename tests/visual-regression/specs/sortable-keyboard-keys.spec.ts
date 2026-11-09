@@ -434,14 +434,13 @@ for (const target of TARGETS) {
     const want = ['Cherry', 'Apple', 'Elderberry', 'Banana', 'Date'];
     await expectOrder(mount, items, want);
     await expect(items).toHaveCount(SEED.length);
-    // The rows stay between the header and the footer.
-    // (On Lit the header / footer are `<slot>` children of the list.)
+    // The list still holds the rows only (header and footer sit around it).
     const kinds = await mount.locator(LIST).first().evaluate((list) =>
       Array.from(list.children)
         .map((c) => ((c.getAttribute('class') ?? '').includes('rozie-sortable-item') ? 'r' : 'o'))
         .join(''),
     );
-    expect(kinds).toMatch(/^o+r{5}o+$/);
+    expect(kinds).toBe('rrrrr');
     // sort() is the consumer's own call: no event.
     await page.waitForTimeout(100);
     await expect(mount.locator(LOG_LI)).toHaveCount(0);

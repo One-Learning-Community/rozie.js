@@ -1,13 +1,14 @@
 <template>
 
 <div class="rozie-sortable-wrap" v-bind="$attrs">
+  
+  <slot name="header"></slot>
   <div :class="['rozie-sortable-list', props.listClass]" ref="listElRef" part="list" role="list" :aria-label="(props.listLabel) ?? undefined">
-    <slot name="header"></slot>
     <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : '']" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="(rowTabbable() ? 0 : undefined) ?? undefined" :aria-describedby="(rowTabbable() ? instructionsId : undefined) ?? undefined" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index" :instructionsId="instructionsId"></slot>
     </div>
-    <slot name="footer"></slot>
   </div>
+  <slot name="footer"></slot>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText }}</div>
   <span hidden :id="instructionsId">{{ instructionsText() }}</span>
 </div>
@@ -190,6 +191,7 @@ defineSlots<{
 
 const liftedIndex = ref<any>(null);
 const ariaLiveText = ref('');
+const instructionsId = ref<any>(null);
 const optionOverrides = ref({});
 
 const listElRef = ref<HTMLElement>();
@@ -217,11 +219,6 @@ let unhookStrayKeys: any = null;
 // committed events itself, so stop the raw ones at the list element (only
 // events dispatched ON the list — an `<input>`'s own `change` is untouched).
 const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
-// Per-instance id of the hidden spoken-instructions element. Assigned once
-// per instance: it is also read in $onMount (the registry entry), which makes
-// the React emitter keep it across renders instead of minting a new id each
-// render.
-const instructionsId = nextInstructionsId();
 // role="list" takes no aria-orientation, so a horizontal list says which
 // arrow keys move in its instructions instead. A `sort: false` list leaves out
 // the move sentence, and a list with a group (the one SortableJS runs with,
@@ -1128,6 +1125,8 @@ function option(name: any, value: any) {
 
 let _cleanup_0: (() => void) | undefined;
 onMounted(() => {
+  // Kept across a Lit element's disconnect and reconnect (mount runs again).
+  if (instructionsId.value == null) instructionsId.value = nextInstructionsId();
   warnIfHandleMissing();
   // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
   // when the options object below references it.
@@ -1236,7 +1235,6 @@ onMounted(() => {
   // when a keyboard lift hands a row between lists.
   entry = {
     el: listEl,
-    instructionsId,
     group: () => effectiveGroup(),
     label: () => props.listLabel,
     // A handle-mode list without a handle selector has its keyboard off.

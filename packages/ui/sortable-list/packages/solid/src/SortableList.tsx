@@ -191,6 +191,7 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   const [items, setItems] = createControllableSignal<any[]>(_props as unknown as Record<string, unknown>, 'items', (() => [])());
   const [liftedIndex, setLiftedIndex] = createSignal<any>(null);
   const [ariaLiveText, setAriaLiveText] = createSignal('');
+  const [instructionsId, setInstructionsId] = createSignal<any>(null);
   const [optionOverrides, setOptionOverrides] = createSignal<Record<string, any>>({});
   createEffect(on(() => (() => local.disabled)(), (v) => untrack(() => ((v: any) => {
     instance?.option('disabled', v);
@@ -259,6 +260,8 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   })()), { defer: true }));
   onMount(() => {
     const _cleanup = (() => {
+    // Kept across a Lit element's disconnect and reconnect (mount runs again).
+    if (instructionsId() == null) setInstructionsId(nextInstructionsId());
     warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -367,7 +370,6 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
     // when a keyboard lift hands a row between lists.
     entry = {
       el: listEl,
-      instructionsId,
       group: () => effectiveGroup(),
       label: () => local.listLabel,
       // A handle-mode list without a handle selector has its keyboard off.
@@ -461,12 +463,6 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   // committed events itself, so stop the raw ones at the list element (only
   // events dispatched ON the list — an `<input>`'s own `change` is untouched).
   const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
-
-  // Per-instance id of the hidden spoken-instructions element. Assigned once
-  // per instance: it is also read in $onMount (the registry entry), which makes
-  // the React emitter keep it across renders instead of minting a new id each
-  // render.
-  const instructionsId = nextInstructionsId();
 
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out
@@ -1414,15 +1410,16 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
+      
+      {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
       <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" role="list" aria-label={rozieAttr(local.listLabel)} data-rozie-s-0af24eae="">
-        {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), liftedIndex() === index() ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
-          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, get index() { return index(); }, instructionsId }) : resolved()}
+        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId() : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), liftedIndex() === index() ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+          {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, get index() { return index(); }, get instructionsId() { return instructionsId(); } }) : resolved()}
         </div>}</For>
-        {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
       </div>
+      {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
       <div class={"rozie-sortable-aria-live"} data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae="">{ariaLiveText()}</div>
-      <span hidden={true} id={rozieAttr(instructionsId)} data-rozie-s-0af24eae="">{rozieDisplay(instructionsText())}</span>
+      <span hidden={true} id={rozieAttr(instructionsId())} data-rozie-s-0af24eae="">{rozieDisplay(instructionsText())}</span>
     </div>
     </>
   );

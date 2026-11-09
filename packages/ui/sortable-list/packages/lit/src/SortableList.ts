@@ -176,6 +176,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   @property({ type: String, attribute: 'item-style' }) itemStyle: string | any | (((...args: any[]) => any) | null) = null;
   private _liftedIndex = signal<any>(null);
   private _ariaLiveText = signal('');
+  private _instructionsId = signal<any>(null);
   private _optionOverrides = signal<any>({});
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
 private __rozieWatchPrev_3: unknown;
@@ -251,7 +252,7 @@ private __rozieFirstUpdateDone = false;
     this._hasSlotDefault = Array.from(this.children).some((el) => !el.hasAttribute('slot') && (el.nodeType !== 3 || (el.textContent?.trim().length ?? 0) > 0));
     this._hasSlotFooter = Array.from(this.children).some((el) => el.getAttribute('slot') === 'footer');
     super.connectedCallback();
-    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this._armListeners(); }
+    if (this.hasUpdated && this._rozieTornDown) { this._rozieTornDown = false; this.firstUpdated(); }
   }
 
   firstUpdated(): void {
@@ -290,6 +291,8 @@ private __rozieFirstUpdateDone = false;
       this.focusNearRow(i, lift.key);
     })(); }); }));
 
+    // Kept across a Lit element's disconnect and reconnect (mount runs again).
+    if (this._instructionsId.value == null) this._instructionsId.value = nextInstructionsId();
     this.warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -414,7 +417,6 @@ private __rozieFirstUpdateDone = false;
     // when a keyboard lift hands a row between lists.
     this.entry = {
       el: listEl,
-      instructionsId: this.instructionsId,
       group: () => this.effectiveGroup(),
       label: () => this.listLabel,
       // A handle-mode list without a handle selector has its keyboard off.
@@ -548,6 +550,8 @@ private __rozieFirstUpdateDone = false;
       this._rozieTornDown = true;
       for (const fn of this._disconnectCleanups) fn();
       this._disconnectCleanups = [];
+      this.__rozieWatchInitial_3 = true;
+      this.__rozieWatchInitial_14 = true;
     });
   }
 
@@ -559,15 +563,16 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-0af24eae>
+  
+  <slot name="header"></slot>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" role="list" aria-label=${rozieAttr(this.listLabel)} data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
-    <slot name="header"></slot>
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this.instructionsId : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
-      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index, instructionsId: this.instructionsId}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index, instructionsId: this.instructionsId}); } catch { return '{}'; } })()}></slot>`}
+    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this._instructionsId.value : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index, instructionsId: this._instructionsId.value}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index, instructionsId: this._instructionsId.value}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
-    <slot name="footer"></slot>
   `)}</div>
+  <slot name="footer"></slot>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>${this._ariaLiveText.value}</div>
-  <span hidden="" id=${rozieAttr(this.instructionsId)} data-rozie-s-0af24eae>${rozieDisplay(this.instructionsText())}</span>
+  <span hidden="" id=${rozieAttr(this._instructionsId.value)} data-rozie-s-0af24eae>${rozieDisplay(this.instructionsText())}</span>
 </div>
 `;
   }
@@ -602,12 +607,6 @@ private __rozieFirstUpdateDone = false;
   // committed events itself, so stop the raw ones at the list element (only
   // events dispatched ON the list — an `<input>`'s own `change` is untouched).
   SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
-
-  // Per-instance id of the hidden spoken-instructions element. Assigned once
-  // per instance: it is also read in $onMount (the registry entry), which makes
-  // the React emitter keep it across renders instead of minting a new id each
-  // render.
-  instructionsId = nextInstructionsId();
 
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out

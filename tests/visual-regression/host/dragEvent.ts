@@ -211,6 +211,13 @@ export async function nativeDrag(page: Page, args: SyntheticDragArgs): Promise<v
   await page.mouse.down();
   await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
   await page.mouse.move(b.x + b.width / 2, b.y + Math.max(1, b.height - 2), { steps: 10 });
+  // Rest on the target, then move once more before releasing, as a hand does.
+  // A row swap on the way (the path crossed another row of the source list)
+  // makes SortableJS ignore dragover for 30ms, and a stationary Playwright
+  // mouse fires no more dragover: released at once, an empty destination list
+  // never sees the drag (a real browser keeps firing dragover while held).
+  await page.waitForTimeout(50);
+  await page.mouse.move(b.x + b.width / 2 + 1, b.y + Math.max(1, b.height - 2));
   await page.mouse.up();
   await page.waitForTimeout(200);
 }

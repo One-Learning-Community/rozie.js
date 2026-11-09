@@ -306,19 +306,12 @@ for (const target of TARGETS) {
       const rowKeys = () =>
         canvas.evaluateAll((rows) => rows.map((r) => r.getAttribute('data-id') ?? ''));
 
-      // A real mouse drag everywhere except Lit. KNOWN GAP on Lit (Task 6): a
-      // native drop onto the EMPTY canvas list never lands. On Lit the list's
-      // `#header` / `#footer` `<slot>`s (`display: contents`) are element
-      // children of the list, so SortableJS's `_detectNearestEmptySortable` /
-      // `lastChild` don't see it as an empty list to drop into. The
-      // script-dispatched drop targets the list element directly and lands.
-      const drag = target === 'lit' ? synthesizeDrag : nativeDrag;
-      // First copy onto the empty canvas, then a second copy of the same
-      // widget onto it.
-      await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
+      // A real mouse drag on every target. First copy onto the empty canvas,
+      // then a second copy of the same widget onto it.
+      await nativeDrag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
       await expect(canvas).toHaveCount(1);
       await expect.poll(canvasIds).toEqual(['button-1']);
-      await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvas.nth(0) });
+      await nativeDrag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvas.nth(0) });
       await expect(canvas).toHaveCount(2);
       await expect.poll(async () => [...(await canvasIds())].sort()).toEqual(['button-1', 'button-2']);
       await expect.poll(async () => [...(await rowKeys())].sort()).toEqual(['button-1', 'button-2']);
@@ -341,6 +334,35 @@ for (const target of TARGETS) {
     },
   );
 
+  // A real mouse drag of ANY palette row lands on the empty canvas (a drop
+  // into an empty list), not only of the first one.
+  for (const row of [0, 1, 2, 3]) {
+    runner(
+      `sortable-drag-cross [${target}]: a mouse drag of palette row ${row} lands on the empty canvas`,
+      async ({ page }) => {
+        await page.goto(`/?example=SortableListClone&target=${target}`);
+        const mount = page.getByTestId('rozie-mount');
+        await expect(mount).toBeVisible();
+        const palette = mount.locator('[class*="palette-pane"]').locator(ITEM);
+        const canvasList = mount.locator('[class*="canvas-pane"] [role="list"]');
+        const canvas = canvasList.locator(`:scope > ${ITEM}`);
+        const PALETTE = ['button', 'input', 'card', 'heading'];
+        await expect(palette).toHaveCount(4);
+        await expect(canvas).toHaveCount(0);
+        await nativeDrag(page, { sourceHandle: palette.nth(row).locator(GRIP).first(), target: canvasList });
+        await expect.poll(() => texts(mount.locator('[class*="state-canvas"] li'))).toEqual([`${PALETTE[row]}-1`]);
+        await expect(canvas).toHaveCount(1);
+        await expect.poll(() => texts(mount.locator('[class*="state-palette"] li'))).toEqual(PALETTE);
+        await expect(palette).toHaveCount(4);
+        expect(await texts(mount.locator(LOG_LI))).toEqual([
+          'palette:start:pointer',
+          'canvas:add:pointer',
+          'canvas:end:pointer',
+        ]);
+      },
+    );
+  }
+
   // `cloneable` lowers to `put: false`: a palette takes nothing back, by
   // pointer or by keyboard (audit B5). One copy goes onto the canvas, then the
   // canvas row is dragged onto the palette and hopped toward it.
@@ -360,7 +382,7 @@ for (const target of TARGETS) {
         const canvasIds = () => texts(mount.locator('[class*="state-canvas"] li'));
         const PALETTE = ['button', 'input', 'card', 'heading'];
         await expect(palette).toHaveCount(4);
-        const drag = target === 'lit' ? synthesizeDrag : nativeDrag;
+        const drag = nativeDrag;
         await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
         await expect.poll(canvasIds).toEqual(['button-1']);
         await expect(canvas).toHaveCount(1);
