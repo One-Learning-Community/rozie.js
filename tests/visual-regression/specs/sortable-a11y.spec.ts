@@ -225,6 +225,69 @@ for (const target of TARGETS) {
       expect(errors).toEqual([]);
     });
 
+    /**
+     * Move the SortableList within its parent in ONE task (disconnect and
+     * reconnect with no task between: a re-append), and report how many
+     * keyboard-registry entries point at its list element afterwards.
+     */
+    async function moveInOneTask(page: Page) {
+      return page.evaluate(async () => {
+        const find = (root: Document | ShadowRoot): Element | null => {
+          for (const el of Array.from(root.querySelectorAll('*'))) {
+            if (el.tagName === 'ROZIE-SORTABLE-LIST') return el;
+            const sr = (el as HTMLElement).shadowRoot;
+            if (sr) {
+              const hit = find(sr);
+              if (hit) return hit;
+            }
+          }
+          return null;
+        };
+        const el = find(document)!;
+        const parent = el.parentNode!;
+        const next = el.nextSibling;
+        parent.appendChild(el);
+        parent.insertBefore(el, next);
+        await new Promise((r) => setTimeout(r, 50));
+        const listEl = el.shadowRoot!.querySelector('[role="list"]');
+        const reg = (globalThis as any)[Symbol.for('rozie.sortable-list.keyboard.v1')].registry;
+        return reg.orderedLists().filter((e: { el: Element }) => e.el === listEl).length;
+      });
+    }
+
+    runner(`sortable-a11y [lit]: a list moved in the DOM within one task keeps one setup and still works`, async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      const { mount, items, aria } = await openKeys(page);
+      expect(await moveInOneTask(page)).toBe(1);
+      expect(await moveInOneTask(page)).toBe(1);
+      await expect(items).toHaveCount(SEED.length);
+
+      // Keyboard: one `start`, one `reorder`, one `end` (one registry entry).
+      await items.nth(0).focus();
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText(/^Lifted Apple/);
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText('Dropped Apple at position 2 of 5');
+      await expect.poll(() => labels(items)).toEqual(['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
+      await expect.poll(() => texts(mount.locator(STATE_LI))).toEqual(['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry']);
+
+      // Pointer: one set of events (one SortableJS instance).
+      await synthesizeDrag(page, {
+        sourceHandle: items.nth(0).locator('[class*="label"]'),
+        target: items.nth(2),
+      });
+      await expect.poll(() => labels(items)).toEqual(['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
+      await expect.poll(() => texts(mount.locator(STATE_LI))).toEqual(['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
+      await page.waitForTimeout(150);
+      expect(await texts(mount.locator(LOG_LI))).toEqual([
+        'start:keyboard', 'reorder:keyboard', 'end:keyboard',
+        'start:pointer', 'reorder:pointer', 'end:pointer',
+      ]);
+      expect(errors).toEqual([]);
+    });
+
     // A runtime `option()` set before the move applies to the SortableJS
     // instance built on reconnect too, not only to the keyboard.
     runner(`sortable-a11y [lit]: option('sort', false) survives a move in the DOM for the mouse`, async ({ page }) => {
