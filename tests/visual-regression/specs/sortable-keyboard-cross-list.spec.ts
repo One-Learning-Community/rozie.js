@@ -966,4 +966,108 @@ for (const target of TARGETS) {
       expect(errors).toEqual([]);
     },
   );
+
+  for (const burst of [false, true]) {
+    const tag = burst ? ', back-to-back (no waits)' : '';
+
+    // `options.sort: false`: no in-list moves by keyboard (as by mouse), but
+    // the row still hops by the group's pull / put.
+    runner(
+      `sortable-keyboard-cross-list [${target}]: sort:false list ignores arrow moves but still hops${tag}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await clickKeepingFocus(mount, 'top-no-sort');
+        // SortableJS reads options at construction: remount Top sidebar.
+        await clickKeepingFocus(mount, 'toggle-top');
+        await expect(grip(mount, 'Search')).toHaveCount(0);
+        await clickKeepingFocus(mount, 'toggle-top');
+        await expect(grip(mount, 'Search')).toBeVisible();
+        await grip(mount, 'Search').focus();
+        if (burst) {
+          for (const key of ['Space', 'ArrowDown', 'End', 'PageDown', 'ArrowDown']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+          for (const key of ['ArrowDown', 'End', 'PageDown', 'ArrowDown']) await page.keyboard.press(key);
+          await page.waitForTimeout(100);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Search']);
+        }
+        await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+        await expect(mount.locator(LIFTED)).toHaveCount(1);
+        await page.keyboard.press('Shift+ArrowDown');
+        await expect.poll(() => state(mount, 'content')).toEqual(['Search', ...SEED.content]);
+        await expect.poll(() => state(mount, 'top')).toEqual(['Newsletter', 'Tag cloud']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Search to Content, position 1']);
+        await assertNothingDisappeared(mount);
+        // Content sorts: the arrow moves the row there.
+        await page.keyboard.press('ArrowDown');
+        await expect.poll(() => state(mount, 'content')).toEqual(['Hero banner', 'Search', 'Intro text', 'Grid', 'Gallery']);
+        await page.keyboard.press('Space');
+        await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Search in Content at position 2']);
+        expect(
+          (await texts(mount.locator(LOG_LI))).filter((e) => e.startsWith('top:reorder')),
+        ).toEqual([]);
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+
+    // Two same-group lists whose rows share keys (index keys): a key on the
+    // other list's row with the lifted row's key is that row's own key.
+    runner(
+      `sortable-keyboard-cross-list [${target}]: same key in another list does not hijack keys${tag}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await clickKeepingFocus(mount, 'tools-index-keys');
+        await expect
+          .poll(() =>
+            mount
+              .getByTestId('zone-toolb')
+              .locator(ITEM)
+              .evaluateAll((els) => els.map((el) => el.getAttribute('data-id'))),
+          )
+          .toEqual(['0', '1']);
+        await grip(mount, 'Bold').focus();
+        await page.keyboard.press('Space');
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+        // Link is Toolbar B's row 0: the same key as the lifted Bold.
+        await grip(mount, 'Link').focus();
+        if (burst) {
+          for (const key of ['ArrowRight', 'ArrowRight']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('ArrowRight');
+          await page.keyboard.press('ArrowRight');
+        }
+        await page.waitForTimeout(100);
+        await expect.poll(() => state(mount, 'toola')).toEqual(SEED.toola);
+        await expect.poll(() => state(mount, 'toolb')).toEqual(SEED.toolb);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+        await expect(mount.getByTestId('zone-toola').locator(LIFTED)).toHaveCount(1);
+        // Space there drops Bold where it is and lifts Link.
+        if (burst) {
+          for (const key of ['Space', 'ArrowRight', 'Space']) await page.keyboard.press(key);
+          await expect.poll(() => liveTexts(mount)).toEqual(['Dropped Link at position 2']);
+        } else {
+          await page.keyboard.press('Space');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Link']);
+          await page.keyboard.press('ArrowRight');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Moved Link to position 2']);
+          await page.keyboard.press('Space');
+        }
+        await expect.poll(() => state(mount, 'toolb')).toEqual(['Quote', 'Link']);
+        await expect.poll(() => state(mount, 'toola')).toEqual(SEED.toola);
+        await expect
+          .poll(() => texts(mount.locator(LOG_LI)))
+          .toEqual([
+            'toola:start:keyboard',
+            'toola:end:keyboard',
+            'toolb:start:keyboard',
+            'toolb:reorder:keyboard',
+            'toolb:end:keyboard',
+          ]);
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+  }
 }

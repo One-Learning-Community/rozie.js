@@ -15,6 +15,10 @@
   the item's label, `el` as "element" or null and `from` / `to` as the list's
   aria-label). `<output data-testid="end-order">` shows the ids of the bound
   `items` as an `end` handler read them.
+  Controls (the spec clicks them without moving focus):
+    - `disable-prop`   toggles the `disabled` prop,
+    - `disable-option` calls the imperative `option('disabled', true)`,
+    - `prepend`        inserts a new first item (a consumer change mid-lift).
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -36,6 +40,7 @@
   log: [],
   lastEnd: '',
   endOrder: '',
+  disabled: false,
 }
 </data>
 
@@ -81,6 +86,18 @@ const record = (name, e) => {
   }
 }
 
+const toggleDisabled = () => {
+  $data.disabled = !$data.disabled
+}
+
+const disableByOption = () => {
+  $refs.list.option('disabled', true)
+}
+
+const prependItem = () => {
+  $data.items = [{ id: 'z', label: 'Zucchini' }, ...$data.items]
+}
+
 $onMount(() => {
   $data.items = SEED()
 })
@@ -89,9 +106,16 @@ $onMount(() => {
 <template>
 <div class="keys-demo">
   <h4>Keyboard keys</h4>
+  <div class="controls">
+    <button type="button" data-testid="disable-prop" @click="toggleDisabled">Toggle disabled</button>
+    <button type="button" data-testid="disable-option" @click="disableByOption">option('disabled', true)</button>
+    <button type="button" data-testid="prepend" @click="prependItem">Prepend</button>
+  </div>
   <SortableList
+    ref="list"
     r-model:items="$data.items"
     itemKey="id"
+    :disabled="$data.disabled"
     :itemClass="{ 'demo-item-flag': true, 'demo-item-off': false }"
     :listClass="['demo-list', { 'demo-list-flag': true }]"
     listLabel="Fruit"

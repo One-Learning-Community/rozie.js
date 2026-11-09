@@ -73,13 +73,13 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
 | `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. Lists sharing a group also exchange rows by keyboard (Shift+arrow while lifted) — see [Moving between lists by keyboard](#moving-between-lists-by-keyboard). |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
-| `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. |
-| `disableKeyboard` | `Boolean` | `false` | yes | Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no tabindex) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. |
+| `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. Turning it on while a row is lifted ends the lift where the row is (`Lift ended`, and `end` fires). `options.disabled` and `option('disabled', v)` do the same. |
+| `disableKeyboard` | `Boolean` | `false` | yes | Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no tabindex) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. Turning it on while a row is lifted ends the lift where the row is. |
 | `keyboardTrigger` | `String` | `"row"` | yes | Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`. See [Handle-only keyboard reordering](#handle-only-keyboard-reordering). |
 | `ghostClass` | `String` | `null` | yes | Class name applied to the drop-placeholder element. See [Custom ghost / chosen / drag styling](#custom-ghost-chosen-drag-styling). |
 | `chosenClass` | `String` | `null` | yes | Class name applied to the currently-chosen item. |
 | `dragClass` | `String` | `null` | yes | Class name applied to the dragging element. |
-| `filter` | `String` | `null` | yes | CSS selector that prevents drag initiation on matching rows. See [Filter — locked items](#filter-—-locked-items). |
+| `filter` | `String` | `null` | yes | CSS selector that prevents drag initiation on matching rows, by mouse and by keyboard. See [Filter — locked items](#filter-—-locked-items). |
 | `easing` | `String` | `null` | yes | CSS easing function for the animation (e.g. `'ease-in'`, `'cubic-bezier(0.4, 0, 0.2, 1)'`). |
 | `forceFallback` | `Boolean` | `false` | **NO** | Force SortableJS's mouse-event drag path (over HTML5 DnD). Useful for touch testing and consistent cross-browser behavior. **Construction-time only** — see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes). |
 | `swapThreshold` | `Number` | `1` | yes | SortableJS swap-threshold (0..1). Lower = swap earlier. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed. |
@@ -265,6 +265,19 @@ The canonical example is [`SortableListNestedDemo`](https://github.com/One-Learn
 
 These keys act only while a row is lifted, so they never take keys away from fields inside a row. The aria-live announcer reads "Lifted X", "Moved X to position N", "Dropped X at position N", and "Cancelled. X returned to position N".
 
+The keyboard follows the same SortableJS rules as the mouse:
+
+| Option | Keyboard behaviour |
+| --- | --- |
+| `filter` (prop or `options.filter`) | A row the filter matches can't be lifted. A selector matches the row or anything inside it (a press anywhere in the row would hit it); a function is called as SortableJS calls it, `filter({}, row, sortable)`, with a synthetic `{}` event. Space or Enter on such a row does nothing and isn't prevented. |
+| `options.draggable` | When set, only rows matching it can be lifted (a leading `>` is SortableJS's child syntax). |
+| `disabled` (prop, `options.disabled` or `option('disabled', v)`) | Turns keyboard reordering off. Turning it on while a row is lifted ends the lift where the row is: the list says `Lift ended` and `end` fires. |
+| `disableKeyboard` | Keyboard only: turns keyboard reordering off, ending a lift the same way. |
+| `options.sort: false` | No moves within the list: the arrow keys, Home, End, Page Up and Page Down move nothing. Hops to other lists still follow `pull` / `put`. |
+| `group` `pull` / `put` | Decide which lists a row can hop to (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)). |
+
+Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too; a change to the `options` prop object reaches the keyboard at once but SortableJS only at construction, so re-key the list to change it for both.
+
 The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that `role="list"` element. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby`: "Press Space or Enter to pick up. Use the arrow keys to move, Home and End to jump, and Escape to cancel." With `orientation="horizontal"` the second sentence reads "Use the left and right arrow keys to move, Home and End to jump, and Escape to cancel." Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
 
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
@@ -418,7 +431,7 @@ A clone-mode list with no group name has no peer that can join its cross-list fl
 
 ### Filter — locked items
 
-`:filter="<selector>"` prevents drag initiation on matching rows. SortableJS checks the selector at `mousedown`/`touchstart` and aborts the drag if it matches.
+`:filter="<selector>"` prevents drag initiation on matching rows. SortableJS checks the selector at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a matching row can't be lifted with Space or Enter (see [Keyboard accessibility](#keyboard-accessibility)).
 
 A `data-*` attribute selector is the most robust choice — it's independent of styling and crosses every target's scoping / shadow-DOM transformation identically:
 

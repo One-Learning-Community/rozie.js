@@ -29,6 +29,12 @@
     - `rekey-newsletter`         swaps it for a new object with a NEW id (what
                                  a consumer minting ids in `add` would do),
     - `mode-row`                 switches every list to keyboardTrigger 'row'.
+    - `top-no-sort`              sets Top sidebar's `options` to
+                                 `{ sort: false }` (SortableJS reads options
+                                 at construction: remount Top with
+                                 `toggle-top` twice to apply it),
+    - `tools-index-keys`         keys both toolbars by index, so their rows
+                                 share keys (`0`, `1`, …) across the lists.
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
@@ -70,6 +76,8 @@
   topHidden: false,
   paletteMounted: true,
   added: 0,
+  topOptions: {},
+  toolsIndexKeys: false,
 }
 </data>
 
@@ -181,6 +189,16 @@ const setRowMode = () => {
   $data.trigger = 'row'
 }
 
+const setTopNoSort = () => {
+  $data.topOptions = { sort: false }
+}
+
+const setToolsIndexKeys = () => {
+  $data.toolsIndexKeys = true
+}
+
+const indexKey = (item, index) => index
+
 $onMount(() => seed())
 </script>
 
@@ -196,6 +214,8 @@ $onMount(() => seed())
     <button type="button" data-testid="replace-newsletter" @click="swapNewsletter(false)">Replace Newsletter</button>
     <button type="button" data-testid="rekey-newsletter" @click="swapNewsletter(true)">Re-key Newsletter</button>
     <button type="button" data-testid="mode-row" @click="setRowMode">Row mode</button>
+    <button type="button" data-testid="top-no-sort" @click="setTopNoSort">Top: sort false</button>
+    <button type="button" data-testid="tools-index-keys" @click="setToolsIndexKeys">Toolbars: index keys</button>
   </div>
 
   <section data-testid="zone-locked">
@@ -347,6 +367,7 @@ $onMount(() => seed())
       r-model:items="$data.top"
       itemKey="id"
       group="zones"
+      :options="$data.topOptions"
       keyboardInstructions="Press Space to pick up this widget. Shift with an arrow key moves it to another zone."
       listLabel="Top sidebar"
       :keyboardTrigger="$data.trigger"
@@ -696,7 +717,7 @@ $onMount(() => seed())
     <h4>Toolbar A</h4>
     <SortableList
       r-model:items="$data.toola"
-      itemKey="id"
+      :itemKey="$data.toolsIndexKeys ? indexKey : 'id'"
       group="tools"
       orientation="horizontal"
       listClass="toolbar"
@@ -724,7 +745,7 @@ $onMount(() => seed())
     <h4>Toolbar B</h4>
     <SortableList
       r-model:items="$data.toolb"
-      itemKey="id"
+      :itemKey="$data.toolsIndexKeys ? indexKey : 'id'"
       group="tools"
       orientation="horizontal"
       listClass="toolbar"

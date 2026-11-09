@@ -36,11 +36,11 @@ const props = withDefaults(
      */
     animation?: number;
     /**
-     * Temporarily disable dragging without unmounting — reapplied live via `instance.option('disabled', v)` (no remount). Also suppresses keyboard reordering: a disabled list is not sortable by any input, so rows lose their `tabindex` and the keydown handler no-ops.
+     * Temporarily disable dragging without unmounting — reapplied live via `instance.option('disabled', v)` (no remount). Also suppresses keyboard reordering: a disabled list is not sortable by any input, so rows lose their `tabindex` and the keydown handler no-ops. Turning it on while a row is lifted ends the lift where the row is (`Lift ended`, and `end` fires); `options.disabled` and `option('disabled', v)` do the same.
      */
     disabled?: boolean;
     /**
-     * Opt out of keyboard reordering (Space lift / Arrow move / Shift+Arrow hop between lists / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no `tabindex`) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`.
+     * Opt out of keyboard reordering (Space lift / Arrow move / Shift+Arrow hop between lists / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no `tabindex`) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. Turning it on while a row is lifted ends the lift where the row is.
      */
     disableKeyboard?: boolean;
     /**
@@ -68,7 +68,7 @@ const props = withDefaults(
      */
     dragClass?: string | null;
     /**
-     * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+     * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row or anything inside it) cannot be lifted with Space/Enter. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
      */
     filter?: string | null;
     /**
@@ -154,11 +154,12 @@ defineSlots<{
 
 const liftedIndex = ref<any>(null);
 const ariaLiveText = ref('');
+const optionOverrides = ref({});
 
 const listElRef = ref<HTMLElement>();
 
 import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId } from './internal/keyboardRegistry';
+import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
 let instance: any = null;
 // Keyboard lift state lives in the shared registry (one active keyboard lift
 // per page, so a later task can hand a lifted row between lists).
@@ -287,7 +288,27 @@ const labelOf = (item: any, idx: any) => {
 // focusable only when reorderable) and the onRowKeyDown guard below. Reads
 // straight off $props so the tabindex binding re-evaluates reactively when
 // `disabled`/`disableKeyboard` toggle at runtime.
-const keyboardEnabled = () => !props.disabled && !props.disableKeyboard;
+//
+// The keyboard follows the SortableJS options the mouse obeys: `disabled`
+// (the prop, `options.disabled`, or `option('disabled', v)`), `filter` and
+// `draggable` (which rows lift, see rowLiftable) and `sort: false` (no moves
+// within the list). `liveOption` reads the value SortableJS runs with: one set
+// at runtime, else `options`, else the named prop.
+const KEYBOARD_OPTIONS = ['disabled', 'filter', 'draggable', 'sort'];
+const liveOption = (name: any, fallback: any) => {
+  const ov: any = optionOverrides.value;
+  if (ov != null && Object.prototype.hasOwnProperty.call(ov, name)) return ov[name];
+  const o: any = props.options;
+  if (o != null && o[name] !== undefined) return o[name];
+  return fallback;
+};
+const setOverride = (name: any, value: any) => {
+  optionOverrides.value = {
+    ...optionOverrides.value,
+    [name]: value
+  };
+};
+const keyboardEnabled = () => !props.disableKeyboard && !liveOption('disabled', props.disabled);
 // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
 // from the consumer's handle element instead. Any other value is 'row' mode.
 const handleMode = () => props.keyboardTrigger === 'handle';
@@ -627,7 +648,8 @@ const hop = (dir: any) => {
   speak(to, 'Moved ' + to.labelOf(data, at) + ' to ' + registry.listName(to) + ', position ' + (at + 1));
   to.focusRow(data, at);
 };
-// End the active keyboard lift. 'drop' leaves the row where it is; 'cancel'
+// End the active keyboard lift. 'drop' leaves the row where it is ('off' too,
+// announced as `Lift ended`: the holder's keyboard was turned off); 'cancel'
 // returns it to the list and position it was lifted from (after hops, a
 // reverse hand-off with its own `remove` / `add`; a clone copy is removed).
 // Emits `end` once, from the list the row ends up in.
@@ -646,9 +668,10 @@ const endLift = (kind: any) => {
   // The lifted row's element, read before any write below.
   const el = h.rowEl(at);
   const name = (e: any) => registry.listName(e);
-  if (kind === 'drop') {
-    // A row that hopped always names its list, even back in its origin.
-    speak(h, !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
+  if (kind === 'drop' || kind === 'off') {
+    // A row that hopped always names its list, even back in its origin. The
+    // keyboard turned off mid-lift ('off') ends it where it is, too.
+    speak(h, kind === 'off' ? 'Lift ended' : !lift.hopped ? 'Dropped ' + h.labelOf(item, at) + ' at position ' + (at + 1) : 'Dropped ' + h.labelOf(item, at) + ' in ' + name(h) + ' at position ' + (at + 1));
     h.setLifted(null);
     registry.lift = null;
     keyboardStartEnd('end', lift, origin.list, h, origin.index, at, el);
@@ -768,10 +791,20 @@ const endLift = (kind: any) => {
     });
   }
   h.setLifted(null);
+  // `home` holds the lift during its write, so a target whose items watcher
+  // runs synchronously on the write (Solid) highlighted the row there: clear it.
+  home.setLifted(null);
   speak(home, 'Cancelled. ' + home.labelOf(item, back) + ' returned to ' + name(home) + ', position ' + (back + 1));
   home.focusRow(lift.copy ? homeItems[back] : item, back);
   registry.lift = null;
   keyboardStartEnd('end', lift, home, home, origin.index, back, lift.copy ? home.rowEl(back) : el);
+};
+// This list's keyboard was turned off (`disabled`, `disableKeyboard`, or
+// `option('disabled', true)`): a lift it holds ends where the row is, with
+// its `end`.
+const endLiftIfHeld = () => {
+  const lift = registry.lift;
+  if (lift != null && lift.holder === entry) endLift('off');
 };
 // Lift the row at `index` of this list.
 const startLift = (index: any) => {
@@ -819,8 +852,9 @@ const onRowKeyDown = ($event: any, index: any) => {
   if (!keyboardEnabled()) return;
   // While a lift exists, reorder keys in the list holding it act on it. A key
   // from ANOTHER list of the holder's group is routed to the holder only when
-  // it comes from the lifted row itself (its old row, still there before the
-  // frameworks re-render after a hop) or while a refocus after a move is
+  // it comes from the lifted row element itself (its old row, still there
+  // before the frameworks re-render after a hop; compared by element, so a
+  // row of another list that shares the lifted row's key is not it) or while a refocus after a move is
   // outstanding (a fast burst). Any other row — and every row of an unrelated
   // list (another group, or none) — keeps single-list behaviour: Space/Enter
   // there drops the foreign lift and lifts its own row, other keys do nothing.
@@ -829,14 +863,22 @@ const onRowKeyDown = ($event: any, index: any) => {
   if (lift != null) {
     const mine = groupNameOf(effectiveGroup());
     const sameGroup = mine != null && mine === groupNameOf(lift.holder.group());
-    const fromLiftedRow = String(keyFor(items.value[index], index)) === lift.key;
+    const fromLiftedRow = lift.liftedRowEl != null && $event.currentTarget === lift.liftedRowEl;
     if (lift.holder === entry || sameGroup && (fromLiftedRow || lift.focusPending === true)) {
       if (lift.holder.onKey(key, !!$event.shiftKey)) $event.preventDefault();
       return;
     }
   }
-  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift.
+  // Space (' ' on browsers; KeyboardEvent.key === ' ') OR Enter — lift. A row
+  // the mouse can't drag (it matches `filter`, or not `draggable`) can't be
+  // lifted either: the key is left alone (not prevented).
   if (key === ' ' || key === 'Spacebar' || key === 'Enter') {
+    const rules = {
+      filter: liveOption('filter', props.filter),
+      draggable: liveOption('draggable', undefined),
+      sortable: instance
+    };
+    if (!rowLiftable($event.currentTarget as any, rules)) return;
     $event.preventDefault();
     if (lift != null) endLift('drop');
     startLift(index);
@@ -878,6 +920,9 @@ const holderKey = (key: any, shift: any) => {
   let to: any = null;
   if (key === nextKey) to = from + 1;else if (key === prevKey) to = from - 1;else if (key === 'Home') to = 0;else if (key === 'End') to = entry.items().length - 1;else if (key === 'PageDown') to = from + step;else if (key === 'PageUp') to = from - step;
   if (to === null) return false;
+  // `sort: false`: no moves within the list (as by mouse). The key is still
+  // taken, so it does not scroll the page while a row is lifted.
+  if (liveOption('sort', true) === false) return true;
   moveLiftTo(to);
   return true;
 };
@@ -933,10 +978,14 @@ function sort(order: any, useAnimation = true) {
 }
 // option(name) reads a live SortableJS option; option(name, value) sets one — the
 // runtime escape hatch for any SortableJS option beyond the curated props.
+// Setting `disabled`, `filter`, `draggable` or `sort` also applies to the
+// keyboard; `option('disabled', true)` mid-lift ends the lift this list holds.
 function option(name: any, value: any) {
   if (!instance) return undefined;
   if (value === undefined) return instance.option(name);
   instance.option(name, value);
+  if (KEYBOARD_OPTIONS.includes(name)) setOverride(name, value);
+  if (name === 'disabled' && value) endLiftIfHeld();
   return value;
 }
 
@@ -1096,7 +1145,14 @@ onMounted(() => {
 });
 onBeforeUnmount(() => { _cleanup_0?.(); });
 
-watch(() => props.disabled, (v: any) => instance?.option('disabled', v), { flush: 'post' });
+watch(() => props.disabled, (v: any) => {
+  instance?.option('disabled', v);
+  setOverride('disabled', v);
+  if (v) endLiftIfHeld();
+}, { flush: 'post' });
+watch(() => props.disableKeyboard, (v: any) => {
+  if (v) endLiftIfHeld();
+}, { flush: 'post' });
 watch(() => props.group, () => instance?.option('group', resolveGroup()), { flush: 'post' });
 watch(() => props.cloneable, () => instance?.option('group', resolveGroup()), { flush: 'post' });
 watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v), { flush: 'post' });
@@ -1108,13 +1164,21 @@ watch(() => props.keyboardTrigger, () => warnIfHandleMissing(), { flush: 'post' 
 watch(() => props.ghostClass, (v: any) => instance?.option('ghostClass', v), { flush: 'post' });
 watch(() => props.chosenClass, (v: any) => instance?.option('chosenClass', v), { flush: 'post' });
 watch(() => props.dragClass, (v: any) => instance?.option('dragClass', v), { flush: 'post' });
-watch(() => props.filter, (v: any) => instance?.option('filter', v), { flush: 'post' });
+watch(() => props.filter, (v: any) => {
+  instance?.option('filter', v);
+  setOverride('filter', v);
+}, { flush: 'post' });
 watch(() => props.easing, (v: any) => instance?.option('easing', v), { flush: 'post' });
 watch(() => items.value, () => {
   const lift = registry.lift;
   if (lift == null || lift.holder !== entry) return;
   const i = registry.indexOfLift();
-  if (i < 0) loseLift();else focusNearRow(i, lift.key);
+  if (i < 0) {
+    loseLift();
+    return;
+  }
+  if (liftedIndex.value !== i) liftedIndex.value = i;
+  focusNearRow(i, lift.key);
 }, { flush: 'post' });
 
 defineExpose({ getInstance, toArray, sort, option });

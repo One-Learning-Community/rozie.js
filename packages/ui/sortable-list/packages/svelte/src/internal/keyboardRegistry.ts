@@ -210,6 +210,70 @@ function contains(root: Node, target: Node): boolean {
   return false;
 }
 
+export interface LiftRules {
+  /** SortableJS `filter`: a selector list, or `(evt, target, sortable) => boolean`. */
+  filter: unknown;
+  /** SortableJS `draggable` selector (undefined: every row). */
+  draggable: unknown;
+  /** The SortableJS instance, passed to a function filter. */
+  sortable: unknown;
+}
+
+function safeMatches(el: Element, sel: string): boolean {
+  try {
+    return el.matches(sel);
+  } catch {
+    return false;
+  }
+}
+
+// The row, or an element inside it, matches `sel`. Walks slotted content
+// (Lit) and stops at the rows of a list nested inside this one.
+function rowHas(row: Element, sel: string): boolean {
+  const visit = (n: Element): boolean => {
+    if (n !== row && n.classList.contains('rozie-sortable-item')) return false;
+    if (safeMatches(n, sel)) return true;
+    const kids =
+      n.tagName === 'SLOT' && typeof (n as HTMLSlotElement).assignedElements === 'function'
+        ? (n as HTMLSlotElement).assignedElements({ flatten: true })
+        : Array.from(n.children);
+    for (const k of kids) if (visit(k)) return true;
+    return false;
+  };
+  return visit(row);
+}
+
+/**
+ * Whether a keyboard lift may start on `row`, by the rules SortableJS applies
+ * to a pointer press: the row must match `draggable` (when set; a leading `>`
+ * is SortableJS's child syntax), and must not be filtered. A selector filter
+ * is a comma-separated list checked against the row and everything inside it
+ * (a press anywhere in the row would hit it). A function filter is called as
+ * SortableJS calls it, with a synthetic `{}` event and the row.
+ */
+export function rowLiftable(row: HTMLElement, rules: LiftRules): boolean {
+  const d = rules.draggable;
+  if (typeof d === 'string' && d.trim() !== '') {
+    const sel = d.trim()[0] === '>' ? d.trim().slice(1) : d.trim();
+    let ok = true;
+    try {
+      ok = row.matches(sel);
+    } catch {
+      ok = true;
+    }
+    if (!ok) return false;
+  }
+  const f = rules.filter;
+  if (typeof f === 'function') return !f.call(rules.sortable, {}, row, rules.sortable);
+  if (typeof f === 'string' && f.trim() !== '') {
+    for (const part of f.split(',')) {
+      const sel = part.trim();
+      if (sel !== '' && rowHas(row, sel)) return false;
+    }
+  }
+  return true;
+}
+
 interface NormGroup {
   name: string | undefined;
   pull: unknown;

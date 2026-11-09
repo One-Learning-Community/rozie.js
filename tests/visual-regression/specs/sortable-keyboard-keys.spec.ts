@@ -425,4 +425,136 @@ for (const target of TARGETS) {
       await assertInvariant(mount);
     },
   );
+
+  /** Programmatic click: keeps focus where it is (a real click would move it). */
+  async function clickKeepingFocus(mount: ReturnType<Page['getByTestId']>, testId: string) {
+    await mount.getByTestId(testId).evaluate((b) => (b as HTMLElement).click());
+  }
+
+  /** The label of every highlighted (lifted) row. */
+  function liftedLabels(mount: ReturnType<Page['getByTestId']>) {
+    return displayedLabels(mount.locator(LIFTED));
+  }
+
+  /** Every label exactly once, in the rendered rows and in the state sidecar. */
+  async function assertEachOnce(mount: ReturnType<Page['getByTestId']>, labels: string[]) {
+    const want = [...labels].sort();
+    await expect.poll(async () => (await displayedLabels(mount.locator(ITEM))).sort()).toEqual(want);
+    await expect.poll(async () => (await texts(mount.locator(STATE_LI))).sort()).toEqual(want);
+  }
+
+  for (const burst of [false, true]) {
+    const tag = burst ? ', back-to-back (no waits)' : '';
+
+    // Turning the keyboard off mid-lift ends the lift where the row is, with
+    // `end` (once), whether through the prop or the imperative option().
+    for (const how of ['option', 'prop'] as const) {
+      const label = how === 'option' ? "option('disabled')" : 'disabled prop';
+      runner(`sortable-keyboard-keys [${target}]: ${label} mid-lift ends the lift${tag}`, async ({ page }) => {
+        const { mount, items, aria } = await open(page);
+        await items.nth(1).focus();
+        if (burst) {
+          for (const key of ['Space', 'ArrowDown']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect(aria).toHaveText('Lifted Banana');
+          await page.keyboard.press('ArrowDown');
+          await expect(aria).toHaveText('Moved Banana to position 3');
+        }
+        await clickKeepingFocus(mount, how === 'option' ? 'disable-option' : 'disable-prop');
+        // (A prop reaches Angular a task late: a key pressed before it lands
+        // still acts on the lift. Wait for the change, then press Escape.)
+        await expect(aria).toHaveText('Lift ended');
+        // Escape after it does nothing (the lift is over, the keyboard is off).
+        await page.keyboard.press('Escape');
+        await expect(aria).toHaveText('Lift ended');
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
+        await expectOrder(mount, items, ['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
+        await expect
+          .poll(() => texts(mount.locator(LOG_LI)))
+          .toEqual(['start:keyboard', 'reorder:keyboard', 'end:keyboard']);
+        await expect.poll(() => lastEnd(mount)).toEqual({
+          item: 'Banana',
+          el: 'element',
+          from: 'Fruit',
+          to: 'Fruit',
+          oldIndex: 1,
+          newIndex: 2,
+          interaction: 'keyboard',
+        });
+        await page.waitForTimeout(150);
+        expect((await texts(mount.locator(LOG_LI))).filter((e) => e.startsWith('end:'))).toEqual(['end:keyboard']);
+        await assertInvariant(mount);
+      });
+    }
+
+    runner(
+      `sortable-keyboard-keys [${target}]: lifted highlight follows the item after a consumer insert${tag}`,
+      async ({ page }) => {
+        const { mount, items, aria } = await open(page);
+        await items.nth(1).focus();
+        await page.keyboard.press('Space');
+        if (!burst) await expect(aria).toHaveText('Lifted Banana');
+        await clickKeepingFocus(mount, 'prepend');
+        await expect(items).toHaveCount(SEED.length + 1);
+        await expect.poll(() => liftedLabels(mount)).toEqual(['Banana']);
+        if (burst) {
+          for (const key of ['ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+          await expect(aria).toHaveText('Dropped Banana at position 5');
+          await expectOrder(mount, items, ['Zucchini', 'Apple', 'Cherry', 'Date', 'Banana', 'Elderberry']);
+        } else {
+          await page.keyboard.press('ArrowDown');
+          await expect(aria).toHaveText('Moved Banana to position 4');
+          await expectOrder(mount, items, ['Zucchini', 'Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
+          await expect.poll(() => liftedLabels(mount)).toEqual(['Banana']);
+          await page.keyboard.press('Space');
+          await expect(aria).toHaveText('Dropped Banana at position 4');
+        }
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
+        await assertEachOnce(mount, [...SEED, 'Zucchini']);
+      },
+    );
+
+    // A row matching `filter` (a locked row) can't be lifted by keyboard, as
+    // by mouse: Space / Enter on it does nothing and is not prevented.
+    runner(
+      `sortable-keyboard-keys [${target}]: a filtered (locked) row cannot be lifted by keyboard${tag}`,
+      async ({ page }) => {
+        await page.goto(`/?example=SortableListFilter&target=${target}`);
+        const mount = page.getByTestId('rozie-mount');
+        const rows = mount.locator(ITEM);
+        const seed = ['Inbox', 'Drafts', 'Sent', 'Archive', 'Trash'];
+        await expect(rows).toHaveCount(seed.length);
+        await expect.poll(() => displayedLabels(rows)).toEqual(seed);
+        // Record whether each keydown reached the document prevented.
+        await page.evaluate(() => {
+          (window as any).__prevented = [];
+          document.addEventListener('keydown', (e) => (window as any).__prevented.push(e.defaultPrevented));
+        });
+        await rows.nth(0).focus();
+        if (burst) {
+          for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await page.waitForTimeout(100);
+          await expect(mount.locator(LIFTED)).toHaveCount(0);
+          await page.keyboard.press('ArrowDown');
+          await page.keyboard.press('ArrowDown');
+          await page.keyboard.press('Space');
+        }
+        await page.waitForTimeout(150);
+        await expect.poll(() => displayedLabels(rows)).toEqual(seed);
+        await expect(mount.locator(ARIA_LIVE)).toHaveText('');
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
+        expect(await page.evaluate(() => (window as any).__prevented)).toEqual([false, false, false, false]);
+        // An unlocked row still lifts.
+        await rows.nth(1).focus();
+        await page.keyboard.press('Space');
+        await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Drafts');
+        await page.keyboard.press('Escape');
+        await expect(mount.locator(ARIA_LIVE)).toHaveText('Cancelled. Drafts returned to position 2');
+        await expect.poll(() => displayedLabels(rows)).toEqual(seed);
+      },
+    );
+  }
 }

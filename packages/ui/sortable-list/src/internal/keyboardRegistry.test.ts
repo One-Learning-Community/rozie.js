@@ -5,6 +5,7 @@ import {
   getKeyboardRegistry,
   isRenderable,
   nextInstructionsId,
+  rowLiftable,
   type GroupOption,
   type ListEntry,
 } from './keyboardRegistry';
@@ -318,4 +319,70 @@ describe('isRenderable', () => {
       expect(isRenderable(inner)).toBe(false);
     });
   }
+});
+
+describe('rowLiftable (keyboard honours filter / draggable like SortableJS)', () => {
+  function list(html: string): HTMLElement {
+    const l = el();
+    l.innerHTML = html;
+    cleanups.push(() => l.remove());
+    return l;
+  }
+
+  it('lifts any row when neither filter nor draggable is set', () => {
+    const l = list('<div class="rozie-sortable-item"><span>a</span></div>');
+    expect(rowLiftable(l.children[0] as HTMLElement, { filter: null, draggable: undefined, sortable: null })).toBe(true);
+  });
+
+  it('a selector filter matches the row itself or anything inside it', () => {
+    const l = list(
+      '<div class="rozie-sortable-item locked">a</div>' +
+        '<div class="rozie-sortable-item"><div class="row" data-locked="true"><span class="grip">g</span></div></div>' +
+        '<div class="rozie-sortable-item"><div class="row" data-locked="false">c</div></div>',
+    );
+    const rows = Array.from(l.children) as HTMLElement[];
+    const opts = { filter: ".locked, [data-locked='true']", draggable: undefined, sortable: null };
+    expect(rows.map((r) => rowLiftable(r, opts))).toEqual([false, false, true]);
+  });
+
+  it("a selector filter ignores rows of a list nested inside the row", () => {
+    const l = list(
+      '<div class="rozie-sortable-item"><div class="rozie-sortable-list">' +
+        '<div class="rozie-sortable-item" data-locked="true">inner</div></div></div>',
+    );
+    const outer = l.children[0] as HTMLElement;
+    expect(rowLiftable(outer, { filter: '[data-locked]', draggable: undefined, sortable: null })).toBe(true);
+    const inner = outer.querySelector('[data-locked]') as HTMLElement;
+    expect(rowLiftable(inner, { filter: '[data-locked]', draggable: undefined, sortable: null })).toBe(false);
+  });
+
+  it('a function filter is called with a synthetic event, the row and the sortable', () => {
+    const l = list('<div class="rozie-sortable-item" data-n="1">a</div><div class="rozie-sortable-item" data-n="2">b</div>');
+    const rows = Array.from(l.children) as HTMLElement[];
+    const sortable = { tag: 'sortable' };
+    const calls: unknown[][] = [];
+    const filter = function (this: unknown, evt: unknown, target: HTMLElement, s: unknown) {
+      calls.push([this, evt, target, s]);
+      return target.getAttribute('data-n') === '2';
+    };
+    expect(rows.map((r) => rowLiftable(r, { filter, draggable: undefined, sortable }))).toEqual([true, false]);
+    expect(calls[0]![0]).toBe(sortable);
+    expect(calls[0]![1]).toEqual({});
+    expect(calls[0]![2]).toBe(rows[0]);
+    expect(calls[0]![3]).toBe(sortable);
+  });
+
+  it('only rows matching draggable lift; a leading ">" is SortableJS child syntax', () => {
+    const l = list('<div class="rozie-sortable-item can">a</div><div class="rozie-sortable-item">b</div>');
+    const rows = Array.from(l.children) as HTMLElement[];
+    for (const draggable of ['.can', '>.can']) {
+      expect(rows.map((r) => rowLiftable(r, { filter: null, draggable, sortable: null }))).toEqual([true, false]);
+    }
+  });
+
+  it('an invalid selector neither blocks nor throws', () => {
+    const l = list('<div class="rozie-sortable-item">a</div>');
+    const row = l.children[0] as HTMLElement;
+    expect(rowLiftable(row, { filter: '[[bad', draggable: '[[bad', sortable: null })).toBe(true);
+  });
 });
