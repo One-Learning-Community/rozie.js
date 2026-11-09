@@ -29,6 +29,13 @@
     - `announce-silent` sets `announcements` to `{ dropped: () => '' }`,
     - `strip-labels`   replaces every item with `{ id, text }` (no `label`
                        field), so the list reads rows by their text.
+    - `options-sort-off` sets the `options` prop to `{ sort: false }` WITHOUT
+                       a remount (the live `options` watcher must reach
+                       SortableJS), `options-clear` sets it back to `{}`,
+    - `animation-0`    sets the `animation` prop to 0, and `read-animation`
+                       writes the handle's `option('animation')` into
+                       `<output data-testid="animation">`,
+    - `sort-cae`       calls the imperative `sort(['c', 'a', 'e'])`.
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -55,6 +62,8 @@
   listOptions: {},
   listKey: 0,
   announcements: null,
+  animation: 150,
+  animationRead: '',
 }
 </data>
 
@@ -141,6 +150,26 @@ const stripLabels = () => {
 // An item's display text: its `label`, or `text` once the labels are stripped.
 const labelText = (item) => (item.label != null ? item.label : item.text)
 
+const sortOffByOptions = () => {
+  $data.listOptions = { sort: false }
+}
+
+const clearOptions = () => {
+  $data.listOptions = {}
+}
+
+const animationOff = () => {
+  $data.animation = 0
+}
+
+const readAnimation = () => {
+  $data.animationRead = String($refs.list.option('animation'))
+}
+
+const sortCAE = () => {
+  $refs.list.sort(['c', 'a', 'e'])
+}
+
 const prependItem = () => {
   $data.items = [{ id: 'z', label: 'Zucchini' }, ...$data.items]
 }
@@ -164,6 +193,11 @@ $onMount(() => {
     <button type="button" data-testid="announce-custom" @click="announceCustom">Custom moved text</button>
     <button type="button" data-testid="announce-silent" @click="announceSilent">Silent dropped</button>
     <button type="button" data-testid="strip-labels" @click="stripLabels">Strip labels</button>
+    <button type="button" data-testid="options-sort-off" @click="sortOffByOptions">options.sort false</button>
+    <button type="button" data-testid="options-clear" @click="clearOptions">options cleared</button>
+    <button type="button" data-testid="animation-0" @click="animationOff">animation 0</button>
+    <button type="button" data-testid="read-animation" @click="readAnimation">read option('animation')</button>
+    <button type="button" data-testid="sort-cae" @click="sortCAE">sort(['c', 'a', 'e'])</button>
   </div>
   <SortableList
     ref="list"
@@ -171,6 +205,7 @@ $onMount(() => {
     r-model:items="$data.items"
     itemKey="id"
     :disabled="$data.disabled"
+    :animation="$data.animation"
     :disableKeyboard="$data.disableKeyboard"
     :options="$data.listOptions"
     :announcements="$data.announcements"
@@ -205,6 +240,7 @@ $onMount(() => {
   </ol>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
   <output data-testid="end-order">{{ $data.endOrder }}</output>
+  <output data-testid="animation">{{ $data.animationRead }}</output>
 </div>
 </template>
 

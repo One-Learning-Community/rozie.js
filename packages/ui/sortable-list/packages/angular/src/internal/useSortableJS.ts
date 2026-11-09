@@ -184,6 +184,66 @@ function safeDom(op: () => void): boolean {
  * Wire a SortableJS instance to a reactive items array. See module doc
  * for the full rationale + cross-target contract.
  */
+/** The `draggable` the helper constructs SortableJS with: item rows only. */
+export const ROW_DRAGGABLE = '.rozie-sortable-item';
+
+/** SortableJS handler keys the helper owns: never taken from `options`. */
+export const HELPER_OWNED_OPTION_KEYS: readonly string[] = ['onStart', 'onEnd', 'onUpdate', 'onAdd', 'onRemove', 'onClone'];
+
+/**
+ * Reapply an `options` object that changed after construction to the live
+ * SortableJS instance, so a pointer drag obeys the new value (SortableJS only
+ * reads its constructor options once). Each key whose effective value
+ * changed is set with `instance.option(key, value)`. The effective value is
+ * the one in `options`, else `base[key]` (what the key means without
+ * `options`: the named props and the helper's own defaults), so a key
+ * dropped from `options` goes back to it. A dropped key with no base value
+ * keeps the value SortableJS has now. Helper-owned handler keys are skipped.
+ * Returns the keys it set, in order.
+ */
+export function reapplyOptions(
+  instance: { option(name: string, value: unknown): unknown },
+  prev: Record<string, unknown> | null | undefined,
+  next: Record<string, unknown> | null | undefined,
+  base: Record<string, unknown>,
+): string[] {
+  const p = prev ?? {};
+  const n = next ?? {};
+  const valueIn = (o: Record<string, unknown>, k: string) => (o[k] !== undefined ? o[k] : base[k]);
+  const applied: string[] = [];
+  for (const key of new Set([...Object.keys(p), ...Object.keys(n)])) {
+    if (HELPER_OWNED_OPTION_KEYS.includes(key)) continue;
+    const v = valueIn(n, key);
+    if (v === undefined || v === valueIn(p, key)) continue;
+    instance.option(key, v);
+    applied.push(key);
+  }
+  return applied;
+}
+
+/**
+ * The order the imperative `sort(order)` gives `items`: the items whose key
+ * (`String(keyOf(item, index))`, the row's `data-id`) is listed in `order`
+ * come first, in that order; every other item follows in its current order.
+ * Unknown and repeated keys are ignored, so every item appears exactly once.
+ */
+export function orderByKeys<T>(items: readonly T[], order: readonly unknown[], keyOf: (item: T, index: number) => unknown): T[] {
+  const rank = new Map<string, number>();
+  for (const k of order) {
+    const key = String(k);
+    if (!rank.has(key)) rank.set(key, rank.size);
+  }
+  const listed: Array<{ item: T; at: number }> = [];
+  const rest: T[] = [];
+  items.forEach((item, i) => {
+    const at = rank.get(String(keyOf(item, i)));
+    if (at === undefined) rest.push(item);
+    else listed.push({ item, at });
+  });
+  listed.sort((a, b) => a.at - b.at);
+  return [...listed.map((e) => e.item), ...rest];
+}
+
 export function useSortableJS<T>(
   listEl: HTMLElement,
   opts: UseSortableJSOptions<T>,
@@ -203,16 +263,11 @@ export function useSortableJS<T>(
     listEl.querySelectorAll(':scope > .rozie-sortable-item')[i] ?? null;
   // Build the explicit handler set — these always win over anything the
   // caller passed in via `options`.
-  delete (baseOptions as Record<string, unknown>).onStart;
-  delete (baseOptions as Record<string, unknown>).onEnd;
-  delete (baseOptions as Record<string, unknown>).onUpdate;
-  delete (baseOptions as Record<string, unknown>).onAdd;
-  delete (baseOptions as Record<string, unknown>).onRemove;
-  // `onClone` is owned by the helper: we use it to bridge the
+  // `onClone` is owned by the helper too: we use it to bridge the
   // `__rozieItem` stash from the original DOM node to the cloned node
   // so the destination's `onAdd` can recover the dragged item DATA on
   // a clone-mode drag. See `handleClone` below.
-  delete (baseOptions as Record<string, unknown>).onClone;
+  for (const key of HELPER_OWNED_OPTION_KEYS) delete (baseOptions as Record<string, unknown>)[key];
 
   /** Stash dragged item DATA on `e.item` so cross-list moves can recover
    * it on the destination side. */
@@ -539,7 +594,7 @@ export function useSortableJS<T>(
     // (non-draggable direct children of listEl) are skipped — keeps SortableJS's
     // own e.oldIndex/e.newIndex hints item-relative. Placed BEFORE the spread so
     // a consumer-supplied `options.draggable` still overrides it (pass-through).
-    draggable: '.rozie-sortable-item',
+    draggable: ROW_DRAGGABLE,
     ...baseOptions,
     onStart: handleStart,
     // SortableJS event lifecycle is asymmetric: `onEnd` fires only on the

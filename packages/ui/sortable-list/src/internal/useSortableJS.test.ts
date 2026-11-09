@@ -65,7 +65,7 @@ vi.mock('sortablejs', () => {
 });
 
 // Late import so the mock is in place.
-import { useSortableJS, type SortableChange, type SortableDrag } from './useSortableJS.js';
+import { orderByKeys, reapplyOptions, useSortableJS, type SortableChange, type SortableDrag } from './useSortableJS.js';
 // Late import of the mock helpers for inspection.
 import * as SortableJSMock from 'sortablejs';
 
@@ -905,5 +905,87 @@ describe('end: after framework flushes', () => {
     expect(order).toContain('end');
     expect(order.indexOf('end')).toBe(order.length - 1);
     expect([...order].sort()).toEqual(['commit', 'end', 'flush:message', 'flush:microtask', 'flush:task']);
+  });
+});
+
+describe('reapplyOptions: a live `options` change reaches SortableJS', () => {
+  const fakeInstance = () => {
+    const calls: Array<[string, unknown]> = [];
+    return { calls, option: (name: string, value: unknown) => void calls.push([name, value]) };
+  };
+
+  it('sets each changed key, skips unchanged and helper-owned keys', () => {
+    const inst = fakeInstance();
+    const onEnd = () => {};
+    const applied = reapplyOptions(
+      inst,
+      { sort: true, delay: 10, onEnd },
+      { sort: false, delay: 10, onEnd: () => {}, onStart: () => {}, emptyInsertThreshold: 20 },
+      {},
+    );
+    expect(inst.calls).toEqual([
+      ['sort', false],
+      ['emptyInsertThreshold', 20],
+    ]);
+    expect(applied).toEqual(['sort', 'emptyInsertThreshold']);
+  });
+
+  it('a key dropped from options goes back to its base value; one with no base is left alone', () => {
+    const inst = fakeInstance();
+    const applied = reapplyOptions(
+      inst,
+      { sort: false, disabled: true, delay: 50 },
+      {},
+      { sort: true, disabled: false },
+    );
+    expect(inst.calls).toEqual([
+      ['sort', true],
+      ['disabled', false],
+    ]);
+    expect(applied).toEqual(['sort', 'disabled']);
+  });
+
+  it('a key present in options wins over its base value', () => {
+    const inst = fakeInstance();
+    reapplyOptions(inst, {}, { animation: 0 }, { animation: 150 });
+    expect(inst.calls).toEqual([['animation', 0]]);
+    const again = fakeInstance();
+    reapplyOptions(again, { animation: 150 }, {}, { animation: 150 });
+    expect(again.calls).toEqual([]);
+  });
+
+  it('null / undefined options objects are empty', () => {
+    const inst = fakeInstance();
+    reapplyOptions(inst, null, { sort: false }, {});
+    reapplyOptions(inst, { sort: false }, undefined, { sort: true });
+    expect(inst.calls).toEqual([
+      ['sort', false],
+      ['sort', true],
+    ]);
+  });
+});
+
+describe('orderByKeys: the imperative sort() order', () => {
+  const items = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }));
+  const keyOf = (item: { id: string }) => item.id;
+  const ids = (list: Array<{ id: string }>) => list.map((i) => i.id).join(',');
+
+  it('listed keys first in the given order, the rest after in their order', () => {
+    expect(ids(orderByKeys(items, ['c', 'a', 'e'], keyOf))).toBe('c,a,e,b,d');
+  });
+
+  it('every item exactly once: unknown and repeated keys are ignored', () => {
+    expect(ids(orderByKeys(items, ['zz', 'b', 'b', 'a'], keyOf))).toBe('b,a,c,d,e');
+  });
+
+  it('keys compare as strings (data-id)', () => {
+    const nums = [10, 20, 30];
+    expect(orderByKeys(nums, ['30', 10], (n) => n)).toEqual([30, 10, 20]);
+  });
+
+  it('keeps the item values (identity), and an empty order keeps the list', () => {
+    const out = orderByKeys(items, ['b'], keyOf);
+    expect(out[0]).toBe(items[1]);
+    expect(orderByKeys(items, [], keyOf)).toEqual(items);
   });
 });

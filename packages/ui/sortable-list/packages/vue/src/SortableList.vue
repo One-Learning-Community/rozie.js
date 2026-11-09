@@ -34,13 +34,17 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
+export type SortableKeyboardTrigger = 'row' | 'handle';
+/** Which arrow keys move a lifted row within the list (the `orientation` prop). */
+export type SortableOrientation = 'vertical' | 'horizontal';
 </script>
 
 <script setup lang="ts">
 import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
-import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
+import { ROW_DRAGGABLE, orderByKeys, reapplyOptions, useSortableJS } from './internal/useSortableJS';
+import { afterFlush, canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
 import { announcementText, defaultInstructions, fallbackLabel } from './internal/announcements';
 
 const props = withDefaults(
@@ -58,7 +62,7 @@ const props = withDefaults(
      */
     group?: string | null;
     /**
-     * Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.
+     * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
      */
     animation?: number;
     /**
@@ -70,11 +74,11 @@ const props = withDefaults(
      */
     disableKeyboard?: boolean;
     /**
-     * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.
+     * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed as `SortableKeyboardTrigger` (`'row' | 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`.
      */
-    keyboardTrigger?: string;
+    keyboardTrigger?: SortableKeyboardTrigger;
     /**
-     * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.
+     * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. Runtime-updatable: when `options` changes, each key whose value changed is reapplied via `instance.option(key, v)` (no remount), so mouse and keyboard obey the same values; a key you drop goes back to its named prop (or, for `sort` and `draggable`, the component default), and any other dropped key keeps its last value until you set it. `forceFallback` is still read only at construction.
      */
     options?: Record<string, any>;
     /**
@@ -110,7 +114,7 @@ const props = withDefaults(
      */
     swapThreshold?: number;
     /**
-     * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
+     * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged, and takes nothing back: no row can be dropped or keyboard-hopped into it (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
      */
     cloneable?: boolean;
     /**
@@ -126,9 +130,9 @@ const props = withDefaults(
      */
     listLabel?: string | null;
     /**
-     * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`).
+     * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`). Typed as `SortableOrientation` (`'vertical' | 'horizontal'`).
      */
-    orientation?: string;
+    orientation?: SortableOrientation;
     /**
      * How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.
      */
@@ -191,6 +195,8 @@ const optionOverrides = ref({});
 const listElRef = ref<HTMLElement>();
 
 let instance: any = null;
+// The `options` object SortableJS was last given (see the `options` watcher).
+let appliedOptions: any = null;
 // Keyboard lift state lives in the shared registry (one active keyboard lift
 // per page, so a later task can hand a lifted row between lists).
 // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
@@ -265,7 +271,8 @@ const keyFor = (item: any, index: any) => {
 };
 // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
 // prop that REPLACES a string `group` with SortableJS's
-// `{ name, pull: 'clone', put: true }` clone-mode object form. When
+// `{ name, pull: 'clone', put: false }` clone-mode object form (a palette
+// takes nothing back, by mouse or keyboard). When
 // `cloneable:false`, pass `$props.group` through verbatim. When
 // `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
 // list without a group name is not meaningful (no peer list can join the
@@ -274,7 +281,7 @@ const keyFor = (item: any, index: any) => {
 const resolveGroup = () => props.cloneable && typeof props.group === 'string' ? {
   name: props.group,
   pull: 'clone' as const,
-  put: true as const
+  put: false as const
 } : props.group ?? undefined;
 // The group SortableJS actually runs with: `options.group` lands after the
 // named props in the merge, so it wins. Keyboard hops follow the same rules
@@ -1069,14 +1076,28 @@ const onStrayKey = (ev: any) => {
 function getInstance() {
   return instance;
 }
-// toArray()/sort() operate on SortableJS's data-id ordering — every row carries
-// :data-id="keyFor(item, index)", so toArray() returns the current key order and
-// sort(order) reorders by those keys (set itemKey for stable object-list keys).
+// toArray()/sort() use the rows' data-id keys — every row carries
+// :data-id="keyFor(item, index)", so toArray() returns the current key order
+// (set itemKey for stable object-list keys).
 function toArray() {
   return instance ? instance.toArray() : [];
 }
+// sort(order) reorders the bound items by those keys and writes them back
+// (the framework re-renders the rows; SortableJS never moves them behind the
+// model). Listed keys come first, in order; the rest follow in their order. No
+// event fires: it is the consumer's own call. With `useAnimation` (and a
+// non-zero `animation`) the rows slide from where they were.
 function sort(order: any, useAnimation = true) {
-  instance?.sort(order, useAnimation);
+  const list = items.value;
+  const next = orderByKeys(list, order ?? [], keyFor);
+  if (next.every((item: any, i: any) => item === list[i])) return;
+  const animate = useAnimation && instance != null;
+  if (animate) instance.captureAnimationState();
+  items.value = next;
+  if (animate) {
+    const sortable = instance;
+    afterFlush(() => sortable.animateAll());
+  }
 }
 // option(name) reads a live SortableJS option; option(name, value) sets one — the
 // runtime escape hatch for any SortableJS option beyond the curated props.
@@ -1173,6 +1194,7 @@ onMounted(() => {
     }
   });
   instance = sortable.instance;
+  appliedOptions = props.options;
   const listEl = listElRef.value;
   const stopNative = (ev: any) => {
     if (ev.target === listEl) ev.stopPropagation();
@@ -1271,6 +1293,30 @@ watch(() => props.disabled, (v: any) => {
   instance?.option('disabled', v);
   setOverride('disabled', v);
 }, { flush: 'post' });
+watch(() => props.animation, (v: any) => instance?.option('animation', v), { flush: 'post' });
+watch(() => props.options, () => {
+  if (!instance) return;
+  const next = props.options;
+  const base = {
+    animation: props.animation,
+    disabled: props.disabled,
+    group: resolveGroup() ?? null,
+    handle: props.handle,
+    ghostClass: props.ghostClass,
+    chosenClass: props.chosenClass,
+    dragClass: props.dragClass,
+    filter: props.filter,
+    swapThreshold: props.swapThreshold,
+    easing: props.easing,
+    sort: true,
+    draggable: ROW_DRAGGABLE
+  };
+  const applied = reapplyOptions(instance, appliedOptions, next, base);
+  appliedOptions = next;
+  for (const key of applied as any) {
+    if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.option(key));
+  }
+}, { flush: 'post' });
 watch(() => [props.disabled, props.disableKeyboard, props.options, optionOverrides.value], () => {
   if (!keyboardEnabled()) keyboardTurnedOff();
 }, { flush: 'post' });
@@ -1311,13 +1357,20 @@ defineExpose({ getInstance, toArray, sort, option });
 </script>
 
 <style scoped>
+@media (prefers-color-scheme: dark) {
+  .rozie-sortable-item:focus-visible { outline-color: var(--rozie-sortable-list-ring, #8ab4f8); }
+  .rozie-sortable-item-lifted {
+    background: rgba(138, 180, 248, 0.12);
+    box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #8ab4f8) inset;
+  }
+}
 .rozie-sortable-wrap { display: block; }
 .rozie-sortable-list { display: block; }
 .rozie-sortable-item { display: block; outline: none; }
-.rozie-sortable-item:focus { outline: 2px solid rgba(0, 102, 204, 0.6); outline-offset: -2px; }
+.rozie-sortable-item:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #0b57d0); outline-offset: -2px; }
 .rozie-sortable-item-lifted {
-  background: rgba(0, 102, 204, 0.08);
-  box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.4) inset;
+  background: rgba(11, 87, 208, 0.08);
+  box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #0b57d0) inset;
 }
 .rozie-sortable-aria-live {
   position: absolute;

@@ -34,7 +34,7 @@
               "type": {
                 "text": "string | ((...args: any[]) => any)"
               },
-              "attribute": "itemkey",
+              "attribute": "item-key",
               "default": "null"
             },
             {
@@ -60,7 +60,7 @@
             {
               "kind": "field",
               "name": "animation",
-              "description": "Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.",
+              "description": "Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).",
               "type": {
                 "text": "number"
               },
@@ -84,23 +84,23 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "disablekeyboard",
+              "attribute": "disable-keyboard",
               "default": "false"
             },
             {
               "kind": "field",
               "name": "keyboardTrigger",
-              "description": "Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as \"Reorder Hero banner\") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.",
+              "description": "Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as \"Reorder Hero banner\") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed as `SortableKeyboardTrigger` (`'row' | 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`.",
               "type": {
-                "text": "string"
+                "text": "SortableKeyboardTrigger"
               },
-              "attribute": "keyboardtrigger",
+              "attribute": "keyboard-trigger",
               "default": "\"row\""
             },
             {
               "kind": "field",
               "name": "options",
-              "description": "Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.",
+              "description": "Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. Runtime-updatable: when `options` changes, each key whose value changed is reapplied via `instance.option(key, v)` (no remount), so mouse and keyboard obey the same values; a key you drop goes back to its named prop (or, for `sort` and `draggable`, the component default), and any other dropped key keeps its last value until you set it. `forceFallback` is still read only at construction.",
               "type": {
                 "text": "Record<string, any>"
               },
@@ -114,7 +114,7 @@
               "type": {
                 "text": "((...args: any[]) => any)"
               },
-              "attribute": "labelfor",
+              "attribute": "label-for",
               "default": "null"
             },
             {
@@ -124,7 +124,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "ghostclass",
+              "attribute": "ghost-class",
               "default": "null"
             },
             {
@@ -134,7 +134,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "chosenclass",
+              "attribute": "chosen-class",
               "default": "null"
             },
             {
@@ -144,7 +144,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "dragclass",
+              "attribute": "drag-class",
               "default": "null"
             },
             {
@@ -174,7 +174,7 @@
               "type": {
                 "text": "boolean"
               },
-              "attribute": "forcefallback",
+              "attribute": "force-fallback",
               "default": "false"
             },
             {
@@ -184,13 +184,13 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "swapthreshold",
+              "attribute": "swap-threshold",
               "default": "1"
             },
             {
               "kind": "field",
               "name": "cloneable",
-              "description": "High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.",
+              "description": "High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged, and takes nothing back: no row can be dropped or keyboard-hopped into it (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.",
               "type": {
                 "text": "boolean"
               },
@@ -204,7 +204,7 @@
               "type": {
                 "text": "string | any[] | Record<string, any>"
               },
-              "attribute": "listclass",
+              "attribute": "list-class",
               "default": "\"\""
             },
             {
@@ -214,7 +214,7 @@
               "type": {
                 "text": "string | any[] | Record<string, any> | ((...args: any[]) => any)"
               },
-              "attribute": "itemclass",
+              "attribute": "item-class",
               "default": "\"\""
             },
             {
@@ -224,15 +224,15 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "listlabel",
+              "attribute": "list-label",
               "default": "null"
             },
             {
               "kind": "field",
               "name": "orientation",
-              "description": "Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say \"Use the left and right arrow keys to move\" (`role=\"list\"` has no `aria-orientation`).",
+              "description": "Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say \"Use the left and right arrow keys to move\" (`role=\"list\"` has no `aria-orientation`). Typed as `SortableOrientation` (`'vertical' | 'horizontal'`).",
               "type": {
-                "text": "string"
+                "text": "SortableOrientation"
               },
               "attribute": "orientation",
               "default": "\"vertical\""
@@ -244,7 +244,7 @@
               "type": {
                 "text": "number"
               },
-              "attribute": "pagestep",
+              "attribute": "page-step",
               "default": "5"
             },
             {
@@ -254,7 +254,7 @@
               "type": {
                 "text": "string"
               },
-              "attribute": "keyboardinstructions",
+              "attribute": "keyboard-instructions",
               "default": "null"
             },
             {
@@ -274,7 +274,7 @@
               "type": {
                 "text": "string | Record<string, any> | ((...args: any[]) => any)"
               },
-              "attribute": "itemstyle",
+              "attribute": "item-style",
               "default": "null"
             },
             {
@@ -309,7 +309,7 @@
               "default": "[]"
             },
             {
-              "name": "itemkey",
+              "name": "item-key",
               "description": "The per-row key the framework reconciler tracks each item by across a reorder — either a property name (e.g. `itemKey=\"id\"` reads `item.id`) or an `(item, index) => key` function. With neither, id-less object items get a stable synthetic key via an internal `WeakMap` (survives reorder by object identity); primitive items fall back to index — pass a function for reorderable duplicate primitives.",
               "type": {
                 "text": "string | ((...args: any[]) => any)"
@@ -337,7 +337,7 @@
             },
             {
               "name": "animation",
-              "description": "Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.",
+              "description": "Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).",
               "type": {
                 "text": "number"
               },
@@ -354,7 +354,7 @@
               "default": "false"
             },
             {
-              "name": "disablekeyboard",
+              "name": "disable-keyboard",
               "description": "Opt out of keyboard reordering (Space lift / Arrow move / Shift+Arrow hop between lists / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no `tabindex`) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. Turning it on while a row is lifted ends the lift where the row is.",
               "type": {
                 "text": "boolean"
@@ -363,17 +363,17 @@
               "default": "false"
             },
             {
-              "name": "keyboardtrigger",
-              "description": "Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as \"Reorder Hero banner\") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.",
+              "name": "keyboard-trigger",
+              "description": "Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as \"Reorder Hero banner\") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed as `SortableKeyboardTrigger` (`'row' | 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`.",
               "type": {
-                "text": "string"
+                "text": "SortableKeyboardTrigger"
               },
               "fieldName": "keyboardTrigger",
               "default": "\"row\""
             },
             {
               "name": "options",
-              "description": "Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.",
+              "description": "Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. Runtime-updatable: when `options` changes, each key whose value changed is reapplied via `instance.option(key, v)` (no remount), so mouse and keyboard obey the same values; a key you drop goes back to its named prop (or, for `sort` and `draggable`, the component default), and any other dropped key keeps its last value until you set it. `forceFallback` is still read only at construction.",
               "type": {
                 "text": "Record<string, any>"
               },
@@ -381,7 +381,7 @@
               "default": "{}"
             },
             {
-              "name": "labelfor",
+              "name": "label-for",
               "description": "Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer during keyboard drag. Defaults to `item.label`; without a `label` field, the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`.",
               "type": {
                 "text": "((...args: any[]) => any)"
@@ -390,7 +390,7 @@
               "default": "null"
             },
             {
-              "name": "ghostclass",
+              "name": "ghost-class",
               "description": "Class name applied to the drop-placeholder (ghost) element while dragging. Forwarded live via `instance.option`, so toggling it at runtime takes effect without a remount.",
               "type": {
                 "text": "string"
@@ -399,7 +399,7 @@
               "default": "null"
             },
             {
-              "name": "chosenclass",
+              "name": "chosen-class",
               "description": "Class name applied to the currently-chosen item while dragging. Forwarded live via `instance.option` (no remount needed to change it).",
               "type": {
                 "text": "string"
@@ -408,7 +408,7 @@
               "default": "null"
             },
             {
-              "name": "dragclass",
+              "name": "drag-class",
               "description": "Class name applied to the dragging element. Only takes effect in fallback mode (`forceFallback: true`). Forwarded live via `instance.option`.",
               "type": {
                 "text": "string"
@@ -435,7 +435,7 @@
               "default": "null"
             },
             {
-              "name": "forcefallback",
+              "name": "force-fallback",
               "description": "Force SortableJS's mouse-event drag path over HTML5 DnD — useful for touch devices, consistent cross-browser behavior, and synthetic test drivers (and `dragClass` only applies in this mode). **Construction-time only**: SortableJS reads it once at construction, so re-key the `<SortableList>` to toggle it at runtime.",
               "type": {
                 "text": "boolean"
@@ -444,7 +444,7 @@
               "default": "false"
             },
             {
-              "name": "swapthreshold",
+              "name": "swap-threshold",
               "description": "SortableJS swap threshold (0..1) — a lower value makes rows swap earlier as the dragged item overlaps a neighbor. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed.",
               "type": {
                 "text": "number"
@@ -454,7 +454,7 @@
             },
             {
               "name": "cloneable",
-              "description": "High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.",
+              "description": "High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged, and takes nothing back: no row can be dropped or keyboard-hopped into it (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.",
               "type": {
                 "text": "boolean"
               },
@@ -462,7 +462,7 @@
               "default": "false"
             },
             {
-              "name": "listclass",
+              "name": "list-class",
               "description": "Extra class(es) merged onto the list container (the SortableJS root) alongside the base `rozie-sortable-list` class. Accepts a `String`, `Array`, or `Object` (Vue-style class binding), normalized identically across all six targets — the hook for bridging a CSS framework (`.list-group`) or a flex/grid parent onto the component.",
               "type": {
                 "text": "string | any[] | Record<string, any>"
@@ -471,7 +471,7 @@
               "default": "\"\""
             },
             {
-              "name": "itemclass",
+              "name": "item-class",
               "description": "Extra class(es) merged onto every item row alongside the base `rozie-sortable-item` class. Accepts a `String`, `Array`, or `Object` (Vue-style class binding) applied uniformly, OR an `(item, index) => class` function for per-row classes evaluated at render time. Normalized identically across all six targets.",
               "type": {
                 "text": "string | any[] | Record<string, any> | ((...args: any[]) => any)"
@@ -480,7 +480,7 @@
               "default": "\"\""
             },
             {
-              "name": "listlabel",
+              "name": "list-label",
               "description": "The list's human name, such as `\"Top sidebar\"`. Sets `aria-label` on the list container (`role=\"list\"`) and names the list in keyboard announcements when a row moves between lists (`Moved Hero banner to Top sidebar, position 1 of 4`, `Dropped Hero banner in Top sidebar at position 3 of 4`, `No list after Top sidebar`). Pass the same words as the zone's visible heading. With no label, announcements fall back to a neutral `list 2 of 3`, counting the mounted lists of the same group in hop (source) order.",
               "type": {
                 "text": "string"
@@ -490,15 +490,15 @@
             },
             {
               "name": "orientation",
-              "description": "Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say \"Use the left and right arrow keys to move\" (`role=\"list\"` has no `aria-orientation`).",
+              "description": "Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say \"Use the left and right arrow keys to move\" (`role=\"list\"` has no `aria-orientation`). Typed as `SortableOrientation` (`'vertical' | 'horizontal'`).",
               "type": {
-                "text": "string"
+                "text": "SortableOrientation"
               },
               "fieldName": "orientation",
               "default": "\"vertical\""
             },
             {
-              "name": "pagestep",
+              "name": "page-step",
               "description": "How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.",
               "type": {
                 "text": "number"
@@ -507,7 +507,7 @@
               "default": "5"
             },
             {
-              "name": "keyboardinstructions",
+              "name": "keyboard-instructions",
               "description": "Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: \"Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.\" (with `orientation: 'horizontal'`, \"the left and right arrow keys\"; a `sort: false` list says only \"Press Space or Enter to pick up, and again to drop. Press Escape to cancel.\"). When the list has a group (`group` or `options.group`) the default adds \"Hold Shift with an arrow key to move to another list.\"",
               "type": {
                 "text": "string"
@@ -525,7 +525,7 @@
               "default": "null"
             },
             {
-              "name": "itemstyle",
+              "name": "item-style",
               "description": "Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.",
               "type": {
                 "text": "string | Record<string, any> | ((...args: any[]) => any)"

@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { clsx, parseInlineStyle, rozieAttr, rozieDisplay, useControllableState } from '@rozie/runtime-react';
 import './SortableList.css';
-import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
+import { ROW_DRAGGABLE, orderByKeys, reapplyOptions, useSortableJS } from './internal/useSortableJS';
+import { afterFlush, canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
 import { announcementText, defaultInstructions, fallbackLabel } from './internal/announcements';
 
 /** The kind of message the list speaks during keyboard reordering (a key of the `announcements` prop). */
@@ -26,6 +26,10 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
+export type SortableKeyboardTrigger = 'row' | 'handle';
+/** Which arrow keys move a lifted row within the list (the `orientation` prop). */
+export type SortableOrientation = 'vertical' | 'horizontal';
 
 interface ChildrenCtx { item: any; index: any; instructionsId: any; }
 
@@ -51,7 +55,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   group?: (string) | null;
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
    */
   animation?: number;
   /**
@@ -63,11 +67,11 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   disableKeyboard?: boolean;
   /**
-   * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.
+   * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed as `SortableKeyboardTrigger` (`'row' | 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`.
    */
-  keyboardTrigger?: string;
+  keyboardTrigger?: SortableKeyboardTrigger;
   /**
-   * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.
+   * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. Runtime-updatable: when `options` changes, each key whose value changed is reapplied via `instance.option(key, v)` (no remount), so mouse and keyboard obey the same values; a key you drop goes back to its named prop (or, for `sort` and `draggable`, the component default), and any other dropped key keeps its last value until you set it. `forceFallback` is still read only at construction.
    */
   options?: Record<string, any>;
   /**
@@ -103,7 +107,7 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   swapThreshold?: number;
   /**
-   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
+   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged, and takes nothing back: no row can be dropped or keyboard-hopped into it (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
    */
   cloneable?: boolean;
   /**
@@ -119,9 +123,9 @@ interface SortableListProps extends Omit<import('react').ComponentPropsWithoutRe
    */
   listLabel?: (string) | null;
   /**
-   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`).
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`). Typed as `SortableOrientation` (`'vertical' | 'horizontal'`).
    */
-  orientation?: string;
+  orientation?: SortableOrientation;
   /**
    * How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.
    */
@@ -160,7 +164,7 @@ export interface SortableListHandle {
 
 const SortableList = forwardRef<SortableListHandle, SortableListProps>(function SortableList(_props: SortableListProps, ref): JSX.Element {
   const __defaultOptions = useState(() => (() => ({}))())[0];
-  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'announcements' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; disableKeyboard: boolean; keyboardTrigger: string; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); listLabel: (string) | null; orientation: string; pageStep: number; keyboardInstructions: (string) | null; announcements: (Announcements) | null; itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
+  const props: Omit<SortableListProps, 'itemKey' | 'handle' | 'group' | 'animation' | 'disabled' | 'disableKeyboard' | 'keyboardTrigger' | 'options' | 'labelFor' | 'ghostClass' | 'chosenClass' | 'dragClass' | 'filter' | 'easing' | 'forceFallback' | 'swapThreshold' | 'cloneable' | 'listClass' | 'itemClass' | 'listLabel' | 'orientation' | 'pageStep' | 'keyboardInstructions' | 'announcements' | 'itemStyle'> & { itemKey: (string | ((...args: any[]) => any)) | null; handle: (string) | null; group: (string) | null; animation: number; disabled: boolean; disableKeyboard: boolean; keyboardTrigger: SortableKeyboardTrigger; options: Record<string, any>; labelFor: ((...args: any[]) => any) | null; ghostClass: (string) | null; chosenClass: (string) | null; dragClass: (string) | null; filter: (string) | null; easing: (string) | null; forceFallback: boolean; swapThreshold: number; cloneable: boolean; listClass: string | any[] | Record<string, any>; itemClass: string | any[] | Record<string, any> | ((...args: any[]) => any); listLabel: (string) | null; orientation: SortableOrientation; pageStep: number; keyboardInstructions: (string) | null; announcements: (Announcements) | null; itemStyle: (string | Record<string, any> | ((...args: any[]) => any)) | null } = {
     ..._props,
     itemKey: _props.itemKey ?? null,
     handle: _props.handle ?? null,
@@ -195,6 +199,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   })();
   const entry = useRef<any>(null);
   const instance = useRef<any>(null);
+  const appliedOptions = useRef<any>(null);
   const unhookNativeEvents = useRef<any>(null);
   const lastSpoken = useRef('');
   const unregisterEntry = useRef<any>(null);
@@ -260,7 +265,10 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const _watch10First = useRef(true);
   const _watch11First = useRef(true);
   const _watch12First = useRef(true);
+  const _watch13First = useRef(true);
+  const _watch14First = useRef(true);
 
+  // The `options` object SortableJS was last given (see the `options` watcher).
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
@@ -332,7 +340,8 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }, [_rozieProp_itemKey]);
   // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
   // prop that REPLACES a string `group` with SortableJS's
-  // `{ name, pull: 'clone', put: true }` clone-mode object form. When
+  // `{ name, pull: 'clone', put: false }` clone-mode object form (a palette
+  // takes nothing back, by mouse or keyboard). When
   // `cloneable:false`, pass `$props.group` through verbatim. When
   // `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
   // list without a group name is not meaningful (no peer list can join the
@@ -341,7 +350,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   const resolveGroup = useCallback(() => props.cloneable && typeof props.group === 'string' ? {
     name: props.group,
     pull: 'clone' as const,
-    put: true as const
+    put: false as const
   } : props.group ?? undefined, [props.cloneable, props.group]);
   // The group SortableJS actually runs with: `options.group` lands after the
   // named props in the merge, so it wins. Keyboard hops follow the same rules
@@ -1151,14 +1160,28 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   function getInstance() {
     return instance.current;
   }
-  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
-  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
-  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
+  // toArray()/sort() use the rows' data-id keys — every row carries
+  // :data-id="keyFor(item, index)", so toArray() returns the current key order
+  // (set itemKey for stable object-list keys).
   function toArray() {
     return instance.current ? instance.current.toArray() : [];
   }
+  // sort(order) reorders the bound items by those keys and writes them back
+  // (the framework re-renders the rows; SortableJS never moves them behind the
+  // model). Listed keys come first, in order; the rest follow in their order. No
+  // event fires: it is the consumer's own call. With `useAnimation` (and a
+  // non-zero `animation`) the rows slide from where they were.
   function sort(order: any, useAnimation = true) {
-    instance.current?.sort(order, useAnimation);
+    const list = items;
+    const next = orderByKeys(list, order ?? [], keyFor);
+    if (next.every((item: any, i: any) => item === list[i])) return;
+    const animate = useAnimation && instance.current != null;
+    if (animate) instance.current.captureAnimationState();
+    setItems(next);
+    if (animate) {
+      const sortable = instance.current;
+      afterFlush(() => sortable.animateAll());
+    }
   }
   // option(name) reads a live SortableJS option; option(name, value) sets one — the
   // runtime escape hatch for any SortableJS option beyond the curated props.
@@ -1280,6 +1303,7 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
       }
     });
     instance.current = sortable.instance;
+    appliedOptions.current = _optionsRef.current;
     const listEl$local = listEl.current;
     const stopNative = (ev: any) => {
       if (ev.target === listEl$local) ev.stopPropagation();
@@ -1380,59 +1404,88 @@ const SortableList = forwardRef<SortableListHandle, SortableListProps>(function 
   }, [props.disabled]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (_watch1First.current) { _watch1First.current = false; return; }
+    const v = props.animation;
+    instance.current?.option('animation', v);
+  }, [props.animation]);
+  useEffect(() => {
+    if (_watch2First.current) { _watch2First.current = false; return; }
+    if (!instance.current) return;
+    const next = props.options;
+    const base = {
+      animation: props.animation,
+      disabled: props.disabled,
+      group: resolveGroup() ?? null,
+      handle: props.handle,
+      ghostClass: props.ghostClass,
+      chosenClass: props.chosenClass,
+      dragClass: props.dragClass,
+      filter: props.filter,
+      swapThreshold: props.swapThreshold,
+      easing: props.easing,
+      sort: true,
+      draggable: ROW_DRAGGABLE
+    };
+    const applied = reapplyOptions(instance.current, appliedOptions.current, next, base);
+    appliedOptions.current = next;
+    for (const key of applied as any) {
+      if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.current.option(key));
+    }
+  }, [props.options]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (_watch3First.current) { _watch3First.current = false; return; }
     if (!keyboardEnabled()) keyboardTurnedOff();
   }, [optionOverrides, props.disableKeyboard, props.disabled, props.options]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch2First.current) { _watch2First.current = false; return; }
+    if (_watch4First.current) { _watch4First.current = false; return; }
     instance.current?.option('group', resolveGroup());
   }, [props.group]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch3First.current) { _watch3First.current = false; return; }
+    if (_watch5First.current) { _watch5First.current = false; return; }
     instance.current?.option('group', resolveGroup());
   }, [props.cloneable]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch4First.current) { _watch4First.current = false; return; }
+    if (_watch6First.current) { _watch6First.current = false; return; }
     const v = props.swapThreshold;
     instance.current?.option('swapThreshold', v);
   }, [props.swapThreshold]);
   useEffect(() => {
-    if (_watch5First.current) { _watch5First.current = false; return; }
+    if (_watch7First.current) { _watch7First.current = false; return; }
     const v = props.handle;
     instance.current?.option('handle', v);
     warnIfHandleMissing();
   }, [props.handle]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch6First.current) { _watch6First.current = false; return; }
+    if (_watch8First.current) { _watch8First.current = false; return; }
     warnIfHandleMissing();
   }, [props.keyboardTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch7First.current) { _watch7First.current = false; return; }
+    if (_watch9First.current) { _watch9First.current = false; return; }
     const v = props.ghostClass;
     instance.current?.option('ghostClass', v);
   }, [props.ghostClass]);
   useEffect(() => {
-    if (_watch8First.current) { _watch8First.current = false; return; }
+    if (_watch10First.current) { _watch10First.current = false; return; }
     const v = props.chosenClass;
     instance.current?.option('chosenClass', v);
   }, [props.chosenClass]);
   useEffect(() => {
-    if (_watch9First.current) { _watch9First.current = false; return; }
+    if (_watch11First.current) { _watch11First.current = false; return; }
     const v = props.dragClass;
     instance.current?.option('dragClass', v);
   }, [props.dragClass]);
   useEffect(() => {
-    if (_watch10First.current) { _watch10First.current = false; return; }
+    if (_watch12First.current) { _watch12First.current = false; return; }
     const v = props.filter;
     instance.current?.option('filter', v);
     setOverride('filter', v);
   }, [props.filter]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (_watch11First.current) { _watch11First.current = false; return; }
+    if (_watch13First.current) { _watch13First.current = false; return; }
     const v = props.easing;
     instance.current?.option('easing', v);
   }, [props.easing]);
   useEffect(() => {
-    if (_watch12First.current) { _watch12First.current = false; return; }
+    if (_watch14First.current) { _watch14First.current = false; return; }
     const lift = registry.lift;
     if (lift == null || lift.holder !== entry.current) return;
     const i = registry.indexOfLift();

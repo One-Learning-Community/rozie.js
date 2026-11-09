@@ -7,9 +7,10 @@
   resets it to empty.
 
   SortableJS wiring (via SortableList's `cloneable: true` prop):
-    - Palette → group becomes `{ name: 'palette-canvas', pull: 'clone', put: true }`
+    - Palette → group becomes `{ name: 'palette-canvas', pull: 'clone', put: false }`
     - Canvas  → group is the plain string `'palette-canvas'` (no clone)
-    - Both share the group name so cross-list drag works in both directions
+    - Both share the group name, so rows go palette → canvas; the palette
+      takes nothing back (`put: false`), by mouse or keyboard
 
   Every drop gives the copy a fresh id in the canvas's `end` handler (the
   documented clone recipe): `end` fires from the list the row ends up in,
@@ -102,7 +103,7 @@ $onMount(() => seedPalette());
 <div class="sortable-clone-demo">
   <header>
     <h3>Clone-mode drag</h3>
-    <p class="hint">Drag widgets from the <em>palette</em> onto the <em>canvas</em>. Each drag deposits a copy — the palette stays intact. Drop a widget back onto the palette (or shuffle within either list) to see the symmetric paths.</p>
+    <p class="hint">Drag widgets from the <em>palette</em> onto the <em>canvas</em>. Each drag deposits a copy — the palette stays intact and takes nothing back. Shuffle within either list to reorder.</p>
   </header>
 
   <div class="grid">
@@ -129,6 +130,9 @@ $onMount(() => seedPalette());
         </template>
       </SortableList>
       <p class="footnote">Source list never shrinks.</p>
+      <ol hidden class="state-list state-palette">
+        <li r-for="w in $data.palette" :key="w.id">{{ w.id }}</li>
+      </ol>
     </section>
 
     <section class="pane canvas-pane">

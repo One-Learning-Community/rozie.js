@@ -340,4 +340,63 @@ for (const target of TARGETS) {
       expect(errors).toEqual([]);
     },
   );
+
+  // `cloneable` lowers to `put: false`: a palette takes nothing back, by
+  // pointer or by keyboard (audit B5). One copy goes onto the canvas, then the
+  // canvas row is dragged onto the palette and hopped toward it.
+  for (const burst of [false, true]) {
+    const tag = burst ? ', back-to-back (no waits)' : '';
+    runner(
+      `sortable-drag-cross [${target}]: cloneable palette rejects a pointer drop and a keyboard hop${tag}`,
+      async ({ page }) => {
+        await page.goto(`/?example=SortableListClone&target=${target}`);
+        const mount = page.getByTestId('rozie-mount');
+        await expect(mount).toBeVisible();
+        const paletteList = mount.locator('[class*="palette-pane"] [role="list"]');
+        const palette = paletteList.locator(`:scope > ${ITEM}`);
+        const canvasList = mount.locator('[class*="canvas-pane"] [role="list"]');
+        const canvas = canvasList.locator(`:scope > ${ITEM}`);
+        const paletteIds = () => texts(mount.locator('[class*="state-palette"] li'));
+        const canvasIds = () => texts(mount.locator('[class*="state-canvas"] li'));
+        const PALETTE = ['button', 'input', 'card', 'heading'];
+        await expect(palette).toHaveCount(4);
+        const drag = target === 'lit' ? synthesizeDrag : nativeDrag;
+        await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
+        await expect.poll(canvasIds).toEqual(['button-1']);
+        await expect(canvas).toHaveCount(1);
+        const logBefore = (await texts(mount.locator(LOG_LI))).length;
+
+        // Pointer: the canvas row dropped onto the palette stays on the canvas.
+        await drag(page, { sourceHandle: canvas.nth(0).locator(GRIP).first(), target: palette.nth(1) });
+        await page.waitForTimeout(200);
+        await expect.poll(paletteIds).toEqual(PALETTE);
+        await expect.poll(() => paneLabels(palette)).toEqual(['Button', 'Input', 'Card', 'Heading']);
+        await expect.poll(canvasIds).toEqual(['button-1']);
+        await expect(canvas).toHaveCount(1);
+        const afterPointer = (await texts(mount.locator(LOG_LI))).slice(logBefore);
+        expect(afterPointer.filter((e) => e.startsWith('palette:add') || e.startsWith('canvas:remove'))).toEqual([]);
+
+        // Keyboard: Shift+ArrowUp from the canvas finds no list before it.
+        const canvasLive = mount.locator('[class*="canvas-pane"] [data-rozie-sortable-aria-live]');
+        await canvas.nth(0).focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowUp', 'Space']) await page.keyboard.press(key);
+          await expect(canvasLive).toHaveText(/^Dropped Button at position 1 of 1/);
+        } else {
+          await page.keyboard.press('Space');
+          await expect(canvasLive).toHaveText(/^Lifted Button/);
+          await page.keyboard.press('Shift+ArrowUp');
+          await expect(canvasLive).toHaveText(/^No list before /);
+          await page.keyboard.press('Space');
+          await expect(canvasLive).toHaveText(/^Dropped Button at position 1 of 1/);
+        }
+        await expect.poll(paletteIds).toEqual(PALETTE);
+        await expect(palette).toHaveCount(4);
+        await expect.poll(canvasIds).toEqual(['button-1']);
+        await expect(canvas).toHaveCount(1);
+        const log = await texts(mount.locator(LOG_LI));
+        expect(log.filter((e) => e.startsWith('palette:add') || e.startsWith('canvas:remove'))).toEqual([]);
+      },
+    );
+  }
 }

@@ -346,6 +346,83 @@ for (const target of TARGETS) {
     await expectOrder(mount, items, SEED);
   });
 
+  // `options` changed after mount reaches SortableJS (no remount), so the
+  // mouse obeys it like the keyboard does; dropping the key restores it.
+  runner(`sortable-keyboard-keys [${target}]: options.sort false at runtime stops a pointer reorder`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    await clickKeepingFocus(mount, 'options-sort-off');
+    await expect(items.nth(1)).toHaveAccessibleDescription(NOT_SORTABLE_INSTRUCTIONS);
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(0).locator('[class*="label"]'),
+      target: items.nth(2),
+    });
+    await page.waitForTimeout(200);
+    await expectOrder(mount, items, SEED);
+    expect((await texts(mount.locator(LOG_LI))).filter((e) => e.startsWith('reorder:'))).toEqual([]);
+    // Back to `{}`: SortableJS sorts again.
+    await clickKeepingFocus(mount, 'options-clear');
+    await expect(items.nth(1)).toHaveAccessibleDescription(INSTRUCTIONS);
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(0).locator('[class*="label"]'),
+      target: items.nth(2),
+    });
+    await expectOrder(mount, items, ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry']);
+    await assertInvariant(mount);
+  });
+
+  runner(`sortable-keyboard-keys [${target}]: options.disabled at runtime stops a pointer drag`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    await clickKeepingFocus(mount, 'options-disabled');
+    await expect(items.first()).not.toHaveAttribute('tabindex', /.*/);
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(0).locator('[class*="label"]'),
+      target: items.nth(2),
+    });
+    await page.waitForTimeout(200);
+    await expectOrder(mount, items, SEED);
+    await expect(mount.locator(LOG_LI)).toHaveCount(0);
+  });
+
+  runner(`sortable-keyboard-keys [${target}]: changing animation after mount reaches SortableJS`, async ({ page }) => {
+    const { mount } = await open(page);
+    await clickKeepingFocus(mount, 'read-animation');
+    await expect(mount.getByTestId('animation')).toHaveText('150');
+    await clickKeepingFocus(mount, 'animation-0');
+    await page.waitForTimeout(50);
+    await clickKeepingFocus(mount, 'read-animation');
+    await expect(mount.getByTestId('animation')).toHaveText('0');
+  });
+
+  // The imperative sort() reorders the bound array (the framework re-renders);
+  // keys it doesn't list keep their order after the listed ones.
+  runner(`sortable-keyboard-keys [${target}]: sort() reorders the bound array`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    await clickKeepingFocus(mount, 'sort-cae');
+    const want = ['Cherry', 'Apple', 'Elderberry', 'Banana', 'Date'];
+    await expectOrder(mount, items, want);
+    await expect(items).toHaveCount(SEED.length);
+    // The rows stay between the header and the footer.
+    // (On Lit the header / footer are `<slot>` children of the list.)
+    const kinds = await mount.locator(LIST).first().evaluate((list) =>
+      Array.from(list.children)
+        .map((c) => ((c.getAttribute('class') ?? '').includes('rozie-sortable-item') ? 'r' : 'o'))
+        .join(''),
+    );
+    expect(kinds).toMatch(/^o+r{5}o+$/);
+    // sort() is the consumer's own call: no event.
+    await page.waitForTimeout(100);
+    await expect(mount.locator(LOG_LI)).toHaveCount(0);
+    await assertInvariant(mount);
+    // The keyboard then moves rows of the new order.
+    await items.nth(0).focus();
+    await page.keyboard.press('Space');
+    await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Cherry, position 1 of 5');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await expectOrder(mount, items, ['Apple', 'Cherry', 'Elderberry', 'Banana', 'Date']);
+    await assertInvariant(mount);
+  });
+
   runner(`sortable-keyboard-keys [${target}]: keyboard end payload matches pointer`, async ({ page }) => {
     const { mount, items, aria } = await open(page);
     await items.nth(0).focus();

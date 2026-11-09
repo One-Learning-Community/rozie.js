@@ -84,7 +84,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableKeyboard` | `Boolean` | `false` |  |  |
-| `keyboardTrigger` | `String` | `"row"` |  |  |
+| `keyboardTrigger` | `SortableKeyboardTrigger` | `"row"` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |
@@ -98,7 +98,7 @@ The accessor contract: only real user interaction dirties the control — progra
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
 | `listLabel` | `String` | `null` |  |  |
-| `orientation` | `String` | `"vertical"` |  |  |
+| `orientation` | `SortableOrientation` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
 | `announcements` | `Announcements` | `null` |  |  |

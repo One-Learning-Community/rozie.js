@@ -42,7 +42,7 @@ export function Demo() {
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableKeyboard` | `Boolean` | `false` |  |  |
-| `keyboardTrigger` | `String` | `"row"` |  |  |
+| `keyboardTrigger` | `SortableKeyboardTrigger` | `"row"` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |
@@ -56,7 +56,7 @@ export function Demo() {
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
 | `listLabel` | `String` | `null` |  |  |
-| `orientation` | `String` | `"vertical"` |  |  |
+| `orientation` | `SortableOrientation` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
 | `announcements` | `Announcements` | `null` |  |  |

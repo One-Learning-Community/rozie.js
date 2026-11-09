@@ -43,7 +43,7 @@ const items = ref([
 | `animation` | `Number` | `150` |  |  |
 | `disabled` | `Boolean` | `false` |  |  |
 | `disableKeyboard` | `Boolean` | `false` |  |  |
-| `keyboardTrigger` | `String` | `"row"` |  |  |
+| `keyboardTrigger` | `SortableKeyboardTrigger` | `"row"` |  |  |
 | `options` | `Object` | `{}` |  |  |
 | `labelFor` | `Function` | `null` |  |  |
 | `ghostClass` | `String` | `null` |  |  |
@@ -57,7 +57,7 @@ const items = ref([
 | `listClass` | `String \| Array \| Object` | `""` |  |  |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` |  |  |
 | `listLabel` | `String` | `null` |  |  |
-| `orientation` | `String` | `"vertical"` |  |  |
+| `orientation` | `SortableOrientation` | `"vertical"` |  |  |
 | `pageStep` | `Number` | `5` |  |  |
 | `keyboardInstructions` | `String` | `null` |  |  |
 | `announcements` | `Announcements` | `null` |  |  |

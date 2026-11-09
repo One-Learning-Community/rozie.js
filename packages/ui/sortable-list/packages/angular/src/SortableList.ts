@@ -3,8 +3,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR } from '@angular/forms';
 import { RozieSlot, createRozieAttrApplier, createRozieHostAttrsReader, rozieAttr as __rozieAttr, rozieClass as __rozieClass, rozieDisplay as __rozieDisplay, rozieModel } from '@rozie/runtime-angular';
 
-import { useSortableJS } from './internal/useSortableJS';
-import { canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
+import { ROW_DRAGGABLE, orderByKeys, reapplyOptions, useSortableJS } from './internal/useSortableJS';
+import { afterFlush, canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
 import { announcementText, defaultInstructions, fallbackLabel } from './internal/announcements';
 
 /** The kind of message the list speaks during keyboard reordering (a key of the `announcements` prop). */
@@ -26,6 +26,10 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
+export type SortableKeyboardTrigger = 'row' | 'handle';
+/** Which arrow keys move a lifted row within the list (the `orientation` prop). */
+export type SortableOrientation = 'vertical' | 'horizontal';
 
 interface HeaderCtx {}
 
@@ -61,13 +65,20 @@ interface FooterCtx {}
   `,
   styles: [`
     :host(rozie-sortable-list) { display: contents; }
+    @media (prefers-color-scheme: dark) {
+      .rozie-sortable-item:focus-visible { outline-color: var(--rozie-sortable-list-ring, #8ab4f8); }
+      .rozie-sortable-item-lifted {
+        background: rgba(138, 180, 248, 0.12);
+        box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #8ab4f8) inset;
+      }
+    }
     .rozie-sortable-wrap { display: block; }
     .rozie-sortable-list { display: block; }
     .rozie-sortable-item { display: block; outline: none; }
-    .rozie-sortable-item:focus { outline: 2px solid rgba(0, 102, 204, 0.6); outline-offset: -2px; }
+    .rozie-sortable-item:focus-visible { outline: 2px solid var(--rozie-sortable-list-ring, #0b57d0); outline-offset: -2px; }
     .rozie-sortable-item-lifted {
-      background: rgba(0, 102, 204, 0.08);
-      box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.4) inset;
+      background: rgba(11, 87, 208, 0.08);
+      box-shadow: 0 0 0 3px var(--rozie-sortable-list-ring, #0b57d0) inset;
     }
     .rozie-sortable-aria-live {
       position: absolute;
@@ -112,7 +123,7 @@ export class SortableList {
    */
   group = input<(string) | null>(null);
   /**
-   * Reorder animation duration in milliseconds. `0` disables the animation. Runtime-updatable.
+   * Reorder animation duration in milliseconds. `0` disables the animation. Reapplied live via `instance.option('animation', v)` (no remount).
    */
   animation = input<number>(150);
   /**
@@ -124,11 +135,11 @@ export class SortableList {
    */
   disableKeyboard = input<boolean>(false);
   /**
-   * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`.
+   * Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move, Shift+Arrow hop and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed as `SortableKeyboardTrigger` (`'row' | 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`.
    */
-  keyboardTrigger = input<string>('row');
+  keyboardTrigger = input<SortableKeyboardTrigger>('row');
   /**
-   * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths.
+   * Verbatim SortableJS options pass-through for anything not covered by the named props. The named props win on key conflict but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. Runtime-updatable: when `options` changes, each key whose value changed is reapplied via `instance.option(key, v)` (no remount), so mouse and keyboard obey the same values; a key you drop goes back to its named prop (or, for `sort` and `draggable`, the component default), and any other dropped key keeps its last value until you set it. `forceFallback` is still read only at construction.
    */
   options = input<Record<string, any>>((() => ({}))());
   /**
@@ -164,7 +175,7 @@ export class SortableList {
    */
   swapThreshold = input<number>(1);
   /**
-   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
+   * High-level prop that REPLACES a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` clone-mode object form — the source deposits a COPY onto the destination and keeps its own array unchanged, and takes nothing back: no row can be dropped or keyboard-hopped into it (the palette → canvas pattern). With `group: null` it is a no-op (a clone-mode list with no group name has no peer to clone into). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount.
    */
   cloneable = input<boolean>(false);
   /**
@@ -180,9 +191,9 @@ export class SortableList {
    */
   listLabel = input<(string) | null>(null);
   /**
-   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`).
+   * Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move" (`role="list"` has no `aria-orientation`). Typed as `SortableOrientation` (`'vertical' | 'horizontal'`).
    */
-  orientation = input<string>('vertical');
+  orientation = input<SortableOrientation>('vertical');
   /**
    * How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain.
    */
@@ -239,32 +250,58 @@ export class SortableList {
   private __rozieWatchInitial_10 = true;
   private __rozieWatchInitial_11 = true;
   private __rozieWatchInitial_12 = true;
+  private __rozieWatchInitial_13 = true;
+  private __rozieWatchInitial_14 = true;
 
   constructor() {
     effect(() => { const __watchVal = (() => (this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       this.instance?.option('disabled', v);
       this.setOverride('disabled', v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => [(this.disabled() || this.__rozieCvaDisabled()), this.disableKeyboard(), this.options(), this.optionOverrides()])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.animation())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => this.instance?.option('animation', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.options())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => {
+      if (!this.instance) return;
+      const next = this.options();
+      const base = {
+        animation: this.animation(),
+        disabled: (this.disabled() || this.__rozieCvaDisabled()),
+        group: this.resolveGroup() ?? null,
+        handle: this.handle(),
+        ghostClass: this.ghostClass(),
+        chosenClass: this.chosenClass(),
+        dragClass: this.dragClass(),
+        filter: this.filter(),
+        swapThreshold: this.swapThreshold(),
+        easing: this.easing(),
+        sort: true,
+        draggable: ROW_DRAGGABLE
+      };
+      const applied = reapplyOptions(this.instance, this.appliedOptions, next, base);
+      this.appliedOptions = next;
+      for (const key of applied as any) {
+        if (this.KEYBOARD_OPTIONS.includes(key)) this.setOverride(key, this.instance.option(key));
+      }
+    })(); }); });
+    effect(() => { const __watchVal = (() => [(this.disabled() || this.__rozieCvaDisabled()), this.disableKeyboard(), this.options(), this.optionOverrides()])(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       if (!this.keyboardEnabled()) this.keyboardTurnedOff();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
-    effect(() => { const __watchVal = (() => this.cloneable())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
-    effect(() => { const __watchVal = (() => this.swapThreshold())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.handle())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
+    effect(() => { const __watchVal = (() => this.cloneable())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
+    effect(() => { const __watchVal = (() => this.swapThreshold())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.handle())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
       this.instance?.option('handle', v);
       this.warnIfHandleMissing();
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.keyboardTrigger())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } (() => this.warnIfHandleMissing())(); }); });
-    effect(() => { const __watchVal = (() => this.ghostClass())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.chosenClass())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.dragClass())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.filter())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } ((v: any) => {
+    effect(() => { const __watchVal = (() => this.keyboardTrigger())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.warnIfHandleMissing())(); }); });
+    effect(() => { const __watchVal = (() => this.ghostClass())(); untracked(() => { if (this.__rozieWatchInitial_9) { this.__rozieWatchInitial_9 = false; return; } ((v: any) => this.instance?.option('ghostClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.chosenClass())(); untracked(() => { if (this.__rozieWatchInitial_10) { this.__rozieWatchInitial_10 = false; return; } ((v: any) => this.instance?.option('chosenClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.dragClass())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } ((v: any) => this.instance?.option('dragClass', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.filter())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } ((v: any) => {
       this.instance?.option('filter', v);
       this.setOverride('filter', v);
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.easing())(); untracked(() => { if (this.__rozieWatchInitial_11) { this.__rozieWatchInitial_11 = false; return; } ((v: any) => this.instance?.option('easing', v))(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.items())(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
+    effect(() => { const __watchVal = (() => this.easing())(); untracked(() => { if (this.__rozieWatchInitial_13) { this.__rozieWatchInitial_13 = false; return; } ((v: any) => this.instance?.option('easing', v))(__watchVal); }); });
+    effect(() => { const __watchVal = (() => this.items())(); untracked(() => { if (this.__rozieWatchInitial_14) { this.__rozieWatchInitial_14 = false; return; } (() => {
       const lift = this.registry.lift;
       if (lift == null || lift.holder !== this.entry) return;
       const i = this.registry.indexOfLift();
@@ -283,6 +320,7 @@ export class SortableList {
   }
 
   ngAfterViewInit() {
+    const __options = this.options();
     this.warnIfHandleMissing();
     // Named `sortable` (not `handle`) to avoid shadowing `$props.handle`
     // when the options object below references it.
@@ -305,7 +343,7 @@ export class SortableList {
         forceFallback: this.forceFallback(),
         swapThreshold: this.swapThreshold(),
         easing: this.easing(),
-        ...this.options()
+        ...__options
       },
       // Lit lit-html `repeat` directive caches its part array by sentinel-
       // comment node identity; SortableJS's physical DOM mutation desyncs
@@ -365,6 +403,7 @@ export class SortableList {
       }
     });
     this.instance = sortable.instance;
+    this.appliedOptions = __options;
     const listEl = this.listEl()?.nativeElement;
     const stopNative = (ev: any) => {
       if (ev.target === listEl) ev.stopPropagation();
@@ -467,6 +506,8 @@ export class SortableList {
   }
 
   instance: any = null;
+  // The `options` object SortableJS was last given (see the `options` watcher).
+  appliedOptions: any = null;
   // Keyboard lift state lives in the shared registry (one active keyboard lift
   // per page, so a later task can hand a lifted row between lists).
   // `$data.liftedIndex` is only its mirror, for the lifted-row styling.
@@ -543,7 +584,8 @@ export class SortableList {
   };
   // Resolve the SortableJS `group` option: `cloneable` is a high-level Rozie
   // prop that REPLACES a string `group` with SortableJS's
-  // `{ name, pull: 'clone', put: true }` clone-mode object form. When
+  // `{ name, pull: 'clone', put: false }` clone-mode object form (a palette
+  // takes nothing back, by mouse or keyboard). When
   // `cloneable:false`, pass `$props.group` through verbatim. When
   // `cloneable:true` AND `$props.group` is null, leave it null — a clone-mode
   // list without a group name is not meaningful (no peer list can join the
@@ -552,7 +594,7 @@ export class SortableList {
   resolveGroup = () => this.cloneable() && typeof this.group() === 'string' ? {
     name: this.group(),
     pull: 'clone' as const,
-    put: true as const
+    put: false as const
   } : this.group() ?? undefined;
   // The group SortableJS actually runs with: `options.group` lands after the
   // named props in the merge, so it wins. Keyboard hops follow the same rules
@@ -1349,14 +1391,28 @@ export class SortableList {
   getInstance = () => {
     return this.instance;
   };
-  // toArray()/sort() operate on SortableJS's data-id ordering — every row carries
-  // :data-id="keyFor(item, index)", so toArray() returns the current key order and
-  // sort(order) reorders by those keys (set itemKey for stable object-list keys).
+  // toArray()/sort() use the rows' data-id keys — every row carries
+  // :data-id="keyFor(item, index)", so toArray() returns the current key order
+  // (set itemKey for stable object-list keys).
   toArray = () => {
     return this.instance ? this.instance.toArray() : [];
   };
+  // sort(order) reorders the bound items by those keys and writes them back
+  // (the framework re-renders the rows; SortableJS never moves them behind the
+  // model). Listed keys come first, in order; the rest follow in their order. No
+  // event fires: it is the consumer's own call. With `useAnimation` (and a
+  // non-zero `animation`) the rows slide from where they were.
   sort = (order: any, useAnimation: any = true) => {
-    this.instance?.sort(order, useAnimation);
+    const list = this.items();
+    const next = orderByKeys(list, order ?? [], this.keyFor);
+    if (next.every((item: any, i: any) => item === list[i])) return;
+    const animate = useAnimation && this.instance != null;
+    if (animate) this.instance.captureAnimationState();
+    this.items.set(next), this.__rozieCvaOnChange(next);
+    if (animate) {
+      const sortable = this.instance;
+      afterFlush(() => sortable.animateAll());
+    }
   };
   // option(name) reads a live SortableJS option; option(name, value) sets one — the
   // runtime escape hatch for any SortableJS option beyond the curated props.

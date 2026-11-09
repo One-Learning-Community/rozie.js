@@ -564,9 +564,43 @@ function renderDefault(expr: t.Expression | null, ann: PropTypeAnnotation): stri
   return 'undefined';
 }
 
-function emitNonModelProp(prop: PropDecl): string {
-  const litType = renderType(prop.typeAnnotation);
-  const reflect = isPrimitiveType(prop.typeAnnotation);
+/**
+ * `<types>` aliases whose every member is a string literal (`'row' | 'handle'`)
+ * or a number literal (`1 | 2`), mapped to the constructor their attribute
+ * converts with. A prop typed by one is a plain String / Number attribute on
+ * Lit (`keyboard-trigger="handle"`), not an Object one: Lit's Object converter
+ * runs `JSON.parse('handle')`, which throws, and the attribute is lost. The
+ * field's TS type keeps the alias.
+ */
+function literalUnionAliases(ir: IRComponent): Map<string, 'String' | 'Number'> {
+  const out = new Map<string, 'String' | 'Number'>();
+  for (const stmt of ir.types?.statements ?? []) {
+    const decl = t.isExportNamedDeclaration(stmt) ? stmt.declaration : stmt;
+    if (!decl || !t.isTSTypeAliasDeclaration(decl) || decl.typeParameters) continue;
+    const ann = decl.typeAnnotation;
+    const members = t.isTSUnionType(ann) ? ann.types : [ann];
+    const kinds = new Set(
+      members.map((m) =>
+        t.isTSLiteralType(m) && t.isStringLiteral(m.literal)
+          ? 'String'
+          : t.isTSLiteralType(m) && t.isNumericLiteral(m.literal)
+            ? 'Number'
+            : 'other',
+      ),
+    );
+    if (kinds.size === 1 && !kinds.has('other')) out.set(decl.id.name, [...kinds][0] as 'String' | 'Number');
+  }
+  return out;
+}
+
+function emitNonModelProp(prop: PropDecl, aliases: Map<string, 'String' | 'Number'> = new Map()): string {
+  // A literal-union alias converts like the constructor it stands for.
+  const attrAnn: PropTypeAnnotation =
+    prop.typeAnnotation.kind === 'identifier' && aliases.has(prop.typeAnnotation.name)
+      ? { ...prop.typeAnnotation, name: aliases.get(prop.typeAnnotation.name)! }
+      : prop.typeAnnotation;
+  const litType = renderType(attrAnn);
+  const reflect = isPrimitiveType(attrAnn);
   const reflectField = reflect ? ', reflect: true' : '';
   // `fieldSuffix` is either `: <type> = <default>` (real/zero-value default)
   // or `!: <type>` (required custom-typed prop with no synthesizable default).
@@ -1614,13 +1648,14 @@ export function emitScript(ir: IRComponent, opts: EmitScriptOpts): EmitScriptRes
   const fieldLines: string[] = [];
   const attrCallbackLines: string[] = [];
 
+  const aliases = literalUnionAliases(ir);
   for (const prop of ir.props) {
     if (prop.isModel) {
       const emit = emitModelProp(prop, ir.name);
       fieldLines.push(emit.fieldDecl);
       attrCallbackLines.push(emit.attrCallback);
     } else {
-      fieldLines.push(emitNonModelProp(prop));
+      fieldLines.push(emitNonModelProp(prop, aliases));
     }
   }
 

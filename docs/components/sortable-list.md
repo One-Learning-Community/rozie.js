@@ -72,10 +72,10 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `itemKey` | `String \| Function` | `null` | yes | Property name OR a `(item, index) => key` function for the per-row key. With neither, id-less object items get a stable synthetic key via an internal WeakMap; primitive items fall back to index — pass a function for reorderable duplicate primitives. Improves keyed-reconciler behavior on Vue / Svelte / React. |
 | `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
 | `group` | `String \| Object` | `null` | yes | SortableJS group name (cross-list drag) or full object form. Use `cloneable: true` to flip a string group into clone-mode. Lists sharing a group also exchange rows by keyboard (Shift+arrow while lifted) — see [Moving between lists by keyboard](#moving-between-lists-by-keyboard). |
-| `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. |
+| `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. Reapplied live via `instance.option('animation', v)`. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. Turning it on while a row is lifted ends the lift where the row is (`Lift ended`, and `end` fires). `options.disabled` and `option('disabled', v)` do the same. |
 | `disableKeyboard` | `Boolean` | `false` | yes | Opt out of keyboard reordering (Space lift / Arrow move / Esc cancel / Enter drop) while leaving pointer drag enabled. Rows drop out of the tab order (no tabindex) and the keydown handler no-ops. Keyboard access is gated on `!disabled && !disableKeyboard`. Turning it on while a row is lifted ends the lift where the row is. |
-| `keyboardTrigger` | `String` | `"row"` | yes | Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Any value other than `'handle'` behaves as `'row'`. See [Handle-only keyboard reordering](#handle-only-keyboard-reordering). |
+| `keyboardTrigger` | `SortableKeyboardTrigger` | `"row"` | yes | Which element drives keyboard reordering. `'row'` (default): rows are tab stops and the keys on the focused row drive reordering. `'handle'`: rows are NOT tab stops, and only keys pressed inside the element matched by `handle` (inside that row) drive the same Space/Enter lift-drop, Arrow move and Escape cancel flow; handled keys call preventDefault so a handle `<button>`'s click does not fire. The consumer owns the handle markup (recommended: a `<button>` with its own aria-label such as "Reorder Hero banner") and the component adds no tabindex or role to slot content. `'handle'` without `handle` turns keyboard reordering off and logs a console warning. `disabled`/`disableKeyboard` still apply. Typed `SortableKeyboardTrigger` (`'row' \| 'handle'`); at runtime any value other than `'handle'` behaves as `'row'`. See [Handle-only keyboard reordering](#handle-only-keyboard-reordering). |
 | `ghostClass` | `String` | `null` | yes | Class name applied to the drop-placeholder element. See [Custom ghost / chosen / drag styling](#custom-ghost-chosen-drag-styling). |
 | `chosenClass` | `String` | `null` | yes | Class name applied to the currently-chosen item. |
 | `dragClass` | `String` | `null` | yes | Class name applied to the dragging element. |
@@ -83,13 +83,13 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | `easing` | `String` | `null` | yes | CSS easing function for the animation (e.g. `'ease-in'`, `'cubic-bezier(0.4, 0, 0.2, 1)'`). |
 | `forceFallback` | `Boolean` | `false` | **NO** | Force SortableJS's mouse-event drag path (over HTML5 DnD). Useful for touch testing and consistent cross-browser behavior. **Construction-time only** — see [Remount on construction-time-only changes](#remount-on-construction-time-only-changes). |
 | `swapThreshold` | `Number` | `1` | yes | SortableJS swap-threshold (0..1). Lower = swap earlier. Reapplied live via `instance.option('swapThreshold', v)` — SortableJS reads it on every dragover, so no remount is needed. |
-| `cloneable` | `Boolean` | `false` | yes | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: true }` object form. See [Clone mode](#clone-mode). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount. |
-| `options` | `Object` | `{}` | partial | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. |
+| `cloneable` | `Boolean` | `false` | yes | High-level prop that replaces a string `group` with SortableJS's `{ name, pull: 'clone', put: false }` object form: the list deposits copies and takes nothing back, by mouse or keyboard. See [Clone mode](#clone-mode). Reapplied live — toggling `cloneable` (or changing `group`) recomputes the clone-mode shape and reapplies it via `instance.option('group', …)`, no remount. |
+| `options` | `Object` | `{}` | yes | Verbatim SortableJS options pass-through for anything not covered by the named props above. The named props win on key conflict, but `options` lands AFTER them in the merge so consumers can override defaults; handler keys (`onStart`, `onEnd`, `onUpdate`, `onAdd`, `onRemove`, `onClone`) are stripped — the helper owns those paths. When `options` changes, each key whose value changed is reapplied via `instance.option(key, v)`, no remount, so mouse and keyboard obey the same values. A key you drop goes back to its named prop (`sort` and `draggable` to the component default); any other dropped key keeps its last value until you set it. `forceFallback` is read only at construction. |
 | `labelFor` | `Function` | `null` | yes | Optional `(item, idx) => string` returning the screen-reader label for the aria-live announcer (keyboard-drag accessibility). Without it the announcer reads `item.label`, else the row's text, else `String(item)` for a primitive, else `item {position}`. |
 | `listClass` | `String \| Array \| Object` | `""` | yes | Extra class(es) merged onto the list container (the SortableJS root). Accepts a string, an array, or an object (Vue-style class binding), normalized via the cross-target class normalizer. Bridges `.list-group`, a flex/grid parent, or `:nth-child` styling. |
 | `itemClass` | `String \| Array \| Object \| Function` | `""` | yes | Extra class(es) merged onto every item row. Accepts a string, an array, an object (Vue-style class binding), or a `(item, index) => class` function for per-row classes, normalized via the cross-target class normalizer. Bridges `.list-group-item` and per-row layout/styling. |
 | `listLabel` | `String` | `null` | yes | The list's human name, such as `"Top sidebar"`. Sets `aria-label` on the list container (`role="list"`) and names the list in keyboard announcements. Pass the same words as the zone's visible heading. |
-| `orientation` | `String` | `"vertical"` | yes | Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move". |
+| `orientation` | `SortableOrientation` | `"vertical"` | yes | Which arrow keys move a lifted row within the list: `'vertical'` (default) uses ↑/↓, `'horizontal'` uses ←/→. A horizontal list's default spoken instructions say "Use the left and right arrow keys to move". Typed `SortableOrientation` (`'vertical' \| 'horizontal'`). |
 | `pageStep` | `Number` | `5` | yes | How many positions Page Up / Page Down move a lifted row. The move stops at the first or last position when fewer rows remain. |
 | `keyboardInstructions` | `String` | `null` | yes | Replaces the spoken keyboard instructions, read via `aria-describedby` when a row (row mode) or handle (handle mode, through the `instructionsId` slot prop) gets focus. See [Instructions](#instructions) for the default text. |
 | `announcements` | `Announcements` | `null` | yes | Rewords or translates what the list says during keyboard reordering: an object of optional functions, one per message kind, each taking a context and returning the text (`null` or `''` says nothing). Kinds without a function keep the default. Typed `Announcements` (exported with `AnnouncementKind` and `AnnouncementContext`). See [Announcements](#announcements). |
@@ -175,7 +175,7 @@ Beyond props and the two-way `items` array, the component exposes imperative met
 | --- | --- |
 | `getInstance` | Return the underlying SortableJS instance for direct API access — the raw-engine escape hatch (`save`, `closest`, … are one hop away). `null` before mount and after destroy. |
 | `toArray` | Return the current order as an array of `data-id` strings. Each row carries `data-id="<key>"` (the same [`itemKey`](#api)-derived key as the reconciler), so the array reflects the live key order. `[]` before mount. |
-| `sort` | Reorder the list by an array of `data-id` strings — `sort(order, useAnimation = true)`. |
+| `sort` | Reorder the bound `items` by an array of `data-id` keys — `sort(order, useAnimation = true)`. The listed keys come first, in that order; every other row follows in its current order. The new array is written back through the two-way `items` binding and your framework re-renders the rows (SortableJS never moves them behind the model). No event fires, since the call is your own. With `useAnimation` and a non-zero `animation`, the rows slide into place. |
 | `option` | Read or set a live SortableJS option — `option(name)` gets, `option(name, value)` sets. The runtime escape hatch for any SortableJS option beyond the curated props (and the construction-time-only ones, within SortableJS's own limits). |
 
 **React example:**
@@ -187,6 +187,7 @@ import { SortableList, type SortableListHandle } from '@rozie-ui/sortable-list-r
 const sl = useRef<SortableListHandle>(null);
 // <SortableList ref={sl} itemKey="id" ... />
 const order = sl.current?.toArray();      // current key order
+sl.current?.sort(['c', 'a']);             // c, a, then the rest in order
 sl.current?.option('disabled', true);     // disable at runtime
 const instance = sl.current?.getInstance(); // raw SortableJS instance
 ```
@@ -247,6 +248,8 @@ Two `<SortableList>` instances sharing a `group` name accept items between each 
 
 The canonical example is [`SortableListPairDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListPairDemo.rozie).
 
+An empty list needs height to receive a mouse drop: SortableJS finds the drop target by the pointer's position, and the list container has no height of its own once its last row has gone. Give it a `min-height` through `listClass` (for example a `.drop-zone { min-height: 3rem; }` class), or raise SortableJS's `emptyInsertThreshold` (the distance in px, default 5, at which an empty list takes the drop) through `options`. Keyboard hops reach an empty list regardless.
+
 ### Nested SortableList (Kanban)
 
 A `<SortableList>` can host another `<SortableList>` (or a wrapper component that owns one) inside its slot. The outer list uses one group name (`'columns'`); the inner lists use a different one (`'cards'`) so column-reorder and card-reorder don't bleed into each other.
@@ -277,11 +280,13 @@ The keyboard follows the same SortableJS rules as the mouse:
 | `options.sort: false` | No moves within the list: the arrow keys, Home, End, Page Up and Page Down move nothing, and each says `{label} can't be moved within {list}`. The default instructions leave out the move sentence. Hops to other lists still follow `pull` / `put`. |
 | `group` `pull` / `put` | Decide which lists a row can hop to (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)). |
 
-Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too; a change to the `options` prop object reaches the keyboard at once but SortableJS only at construction, so re-key the list to change it for both.
+Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too. A change to the `options` prop object is reapplied to SortableJS key by key (no remount), so mouse and keyboard always follow the same values.
 
 The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that `role="list"` element. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
 
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
+
+A focused row shows a 2px ring only for keyboard focus (`:focus-visible`), and the lifted row a 3px inset ring with a light tint. The ring is `#0b57d0` (`#8ab4f8` under `prefers-color-scheme: dark`), at least 3:1 against white, light grey and near-black row backgrounds. If your rows use another background (or a dark theme that isn't driven by `prefers-color-scheme`), set `--rozie-sortable-list-ring` to a color with 3:1 contrast against it. In handle mode the handle is your own element, so give it its own focus style.
 
 To customize the aria-live label per row, pass `:labelFor="(item) => item.title"`. By default the announcer reads `item.label`; without a `label` field it reads the row's text (whitespace collapsed, without nested lists or hidden content), else `String(item)` for a primitive, else `item {position}`. Pass `labelFor` when the row's text is not a good name (a row full of controls, say).
 
@@ -323,16 +328,7 @@ A list is a hop target only when all of these hold:
 
 Only one keyboard lift exists on a page at a time. Keys act on it from the lifted row (or its handle). Pressing Space or Enter on any other row, in the same group or another, drops the active lift and lifts that row; arrow keys on another row do nothing. One exception: right after a move, while focus is still returning to the lifted row, keys pressed on another row of the same group go to the lifted row, so a fast Space or Enter there only drops it. If a re-render drops focus to `<body>` mid-lift, the next keys still reach the lifted row; if you click somewhere else, keys are left alone.
 
-A `cloneable` palette resolves to `put: true`, so with keyboard hops it accepts rows from every list of its group, and from other groups too: Shift+↑ could move a live widget into the palette. A palette should take nothing back. Give it the object form with `put: false` instead of `cloneable`:
-
-```rozie
-<SortableList
-  r-model:items="$data.palette"
-  itemKey="id"
-  :options="{ group: { name: 'zones', pull: 'clone', put: false } }"
-  listLabel="Palette"
-/>
-```
+A `cloneable` palette resolves to `put: false`, so it is never a hop target: Shift+arrow from a neighbouring list skips it (and says `No list before {list}` when there is nothing else), as a mouse drop onto it is refused.
 
 Announcements: `Moved {label} to {list}, position {p} of {t}`, `Dropped {label} in {list} at position {p} of {t}` (whenever the row hopped, even if it hopped back into its origin), and `Cancelled. {label} returned to {list}, position {p} of {t}` (`Cancelled. {label} returned to position {p} of {t}` when the row never left its list). If the origin list has gone, is hidden, or has its keyboard turned off, the cancel reads `Cancelled. {label} stays in {list}, position {p} of {t}` and the row stays where it is; if a clone copy is cancelled after its palette unmounted, `Cancelled. {label} removed from {list}`. `{list}` is `listLabel`, or else `list {i} of {n}`, counting the lists of the same group in hop order. Pass the zone's visible heading text as `listLabel` so spoken names match what sighted users see. The full list, and how to change it, is under [Announcements](#announcements).
 
@@ -437,7 +433,7 @@ The rules:
 
 A `cloneable: true` source list deposits a COPY of the dragged item onto the destination instead of moving the original. The source's bound array stays unchanged. The classic use case is a palette → canvas pattern (drag widget templates from a palette onto a design canvas).
 
-`cloneable` sets `put: true`, so the palette also accepts rows dragged or keyboard-hopped into it. If the palette should take nothing back, pass the object form instead: `:options="{ group: { name: 'palette-canvas', pull: 'clone', put: false } }"` (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)).
+`cloneable` sets `put: false`: the palette takes nothing back, so a row dragged or keyboard-hopped toward it stays where it was. To let a clone source also receive rows, pass the object form yourself, e.g. `:options="{ group: { name: 'palette-canvas', pull: 'clone', put: true } }"` (`options.group` wins over `group` and `cloneable`).
 
 ```rozie
 <!-- Palette: clones outbound -->
@@ -479,7 +475,7 @@ Don't re-key in `add` (a keyboard hop fires `add` while the row is still lifted;
 
 Under the hood:
 
-1. `cloneable: true` + a string `group` lowers to SortableJS's `{ name: 'palette-canvas', pull: 'clone', put: true }` object form.
+1. `cloneable: true` + a string `group` lowers to SortableJS's `{ name: 'palette-canvas', pull: 'clone', put: false }` object form.
 2. The helper's `onClone` hook bridges the `__rozieItem` stash from the original DOM node to its clone so the destination's `onAdd` can recover the dragged item DATA.
 3. `handleCommit`'s source-side branch short-circuits on `e.pullMode === 'clone'` — no splice, no DOM-restore, no `remove` change. The palette's items array is unchanged.
 4. The destination's `onAdd` fires normally with `kind: 'add'` and the cloned item, and the destination then emits `end`.
@@ -558,7 +554,7 @@ This is a **construction-time-only** knob (SortableJS reads it once at `new Sort
 
 ### Animation tuning
 
-`animation` (ms) and `easing` (CSS easing string) are runtime-updatable. Pair with an `<input type="range">` for a live tuner; the canonical example is [`SortableListShowcaseDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListShowcaseDemo.rozie), which exposes every prop in a control panel.
+`animation` (ms) and `easing` (CSS easing string) are runtime-updatable: each change is reapplied via `instance.option()`. Pair with an `<input type="range">` for a live tuner; the canonical example is [`SortableListShowcaseDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListShowcaseDemo.rozie), which exposes every prop in a control panel.
 
 ### List and item class hooks
 
