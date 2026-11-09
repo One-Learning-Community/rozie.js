@@ -158,7 +158,7 @@ const props = withDefaults(
      */
     pageStep?: number;
     /**
-     * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (with `orientation: 'horizontal'`, "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."). When the list has a group (`group` or `options.group`) the default adds "Hold Shift with an arrow key to move to another list."
+     * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (with `orientation: 'horizontal'`, "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."). When another mounted list could take this list's rows (by the group rules of `group`, `options.group` or `option('group', v)`), the default adds "Hold Shift with an arrow key to move to another list." (updated as lists mount, unmount or change group).
      */
     keyboardInstructions?: string | null;
     /**
@@ -212,6 +212,7 @@ const liftedIndex = ref<any>(null);
 const ariaLiveText = ref('');
 const instructionsId = ref<any>(null);
 const optionOverrides = ref({});
+const hasHopPeer = ref(false);
 
 const listElRef = ref<HTMLElement>();
 
@@ -240,14 +241,15 @@ let unhookStrayKeys: any = null;
 const SORTABLE_DOM_EVENTS = ['choose', 'unchoose', 'start', 'end', 'add', 'update', 'sort', 'remove', 'filter', 'clone', 'change', 'select', 'deselect'];
 // role="list" takes no aria-orientation, so a horizontal list says which
 // arrow keys move in its instructions instead. A `sort: false` list leaves out
-// the move sentence, and a list with a group (the one SortableJS runs with,
-// `options.group` included) says how to hop.
+// the move sentence, and a list whose rows another mounted list could take
+// (by the group SortableJS runs with, `options.group` included) says how to
+// hop.
 const instructionsText = () => {
   if (props.keyboardInstructions != null) return props.keyboardInstructions;
   return defaultInstructions({
     horizontal: props.orientation === 'horizontal',
     sortable: liveOption('sort', true) !== false,
-    grouped: effectiveGroup() != null
+    grouped: effectiveGroup() != null && hasHopPeer.value
   });
 };
 // Instance-scoped synthetic-id store for id-less object items. Keyed by object
@@ -299,10 +301,13 @@ const resolveGroup = () => props.cloneable && typeof props.group === 'string' ? 
   pull: 'clone' as const,
   put: false as const
 } : props.group ?? undefined;
-// The group SortableJS actually runs with: `options.group` lands after the
-// named props in the merge, so it wins. Keyboard hops follow the same rules
-// as the mouse, so they read this one.
+// The group SortableJS actually runs with: a runtime `option('group', v)`,
+// else `options.group` (it lands after the named props in the merge), else
+// the `group` / `cloneable` props. Keyboard hops follow the same rules as the
+// mouse, so they read this one.
 const effectiveGroup = () => {
+  const ov: any = optionOverrides.value;
+  if (ov != null && Object.prototype.hasOwnProperty.call(ov, 'group')) return ov.group;
   const o: any = props.options;
   return o != null && o.group != null ? o.group : resolveGroup();
 };
@@ -380,8 +385,8 @@ const clearOverride = (name: any) => {
 };
 // Options whose runtime value (`option(name, v)`) is remembered, so a later
 // change of the matching prop doesn't overwrite it: the keyboard ones, plus
-// `animation` and `handle` (runtime override → `options` → prop).
-const TRACKED_OPTIONS = [...KEYBOARD_OPTIONS, 'animation', 'handle'];
+// `animation`, `handle` and `group` (runtime override → `options` → prop).
+const TRACKED_OPTIONS = [...KEYBOARD_OPTIONS, 'animation', 'handle', 'group'];
 const keyboardEnabled = () => !props.disableKeyboard && !liveOption('disabled', props.disabled);
 // The handle selector SortableJS runs with (`option('handle', v)`, else
 // `options.handle`, else the `handle` prop): the keyboard reads the same one.
@@ -484,6 +489,9 @@ const refocusRow = (item: any, idx: any) => {
   setTimeout(() => focusIt(true), 0);
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusIt(true));
 };
+// `el` in an event payload: the row element while it is in the page, else
+// null (a row that left with an unmounted list is no row of any list).
+const liveEl = (el: any) => el != null && el.isConnected ? el : null;
 // The row element carrying `data-id === key` among a list element's direct
 // children (skips nested-list rows and header/footer slot content).
 const rowByKey = (listEl: any, key: any) => {
@@ -612,7 +620,7 @@ const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: an
   const fire = (host: any) => host.emit(name, {
     interaction: 'keyboard',
     item: lift ? lift.item : null,
-    el: (lift && host === to ? rowByKey(host.el, lift.key) : null) ?? fallbackEl,
+    el: (lift && host === to ? rowByKey(host.el, lift.key) : null) ?? liveEl(fallbackEl),
     from: from.el,
     to: to.el,
     oldIndex,
@@ -1108,6 +1116,14 @@ const onStrayKey = (ev: any) => {
 // What stays here is purely declarative: which array to read, what to write
 // back, what to emit, and how to bridge `afterCommit` to the Lit-only
 // `$reconcileAfterDomMutation()` sigil.
+// `options.group` wins over `group` / `cloneable` (see effectiveGroup), for
+// the mouse as for the keyboard.
+// A group change can change which lists can take each other's rows: every
+// list rechecks its Shift instructions.
+const applyGroup = () => {
+  instance?.option('group', effectiveGroup());
+  registry.notifyPeers();
+};
 // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
 // consumer can't drive through props alone — exposed uniformly to all 6 targets.
 // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
@@ -1150,6 +1166,9 @@ function option(name: any, value: any) {
   instance.option(name, value);
   if (TRACKED_OPTIONS.includes(name)) setOverride(name, value);
   if (name === 'disabled' && value) keyboardTurnedOff();
+  // After the re-render, so every list reads the new group (React reads
+  // state as of its last render).
+  if (name === 'group') afterFlush(() => registry.notifyPeers());
   return value;
 }
 
@@ -1233,7 +1252,7 @@ onMounted(() => {
         host.emit('end', {
           interaction: 'pointer',
           item: d.item,
-          el: row ?? d.el,
+          el: row ?? liveEl(d.el),
           from: d.from,
           to: d.to,
           oldIndex: d.oldIndex,
@@ -1310,6 +1329,10 @@ onMounted(() => {
       if (i < 0 || i >= list.length) return null;
       return rowByKey(listEl, String(keyFor(list[i], i)));
     },
+    peersChanged: () => {
+      const v = entry != null && registry.hasHopPeer(entry);
+      if (hasHopPeer.value !== v) hasHopPeer.value = v;
+    },
     emit: (name: any, payload: any) => {
       if (name === 'add') emit('add', payload);else if (name === 'remove') emit('remove', payload);else if (name === 'reorder') emit('reorder', payload);else if (name === 'start') emit('start', payload);else if (name === 'end') emit('end', payload);
     }
@@ -1372,15 +1395,17 @@ watch(() => props.options, () => {
   appliedOptions = next;
   for (const key of applied as any) {
     // The keyboard reads the value SortableJS now runs with. A remembered
-    // runtime `animation` is superseded by the newer `options` value.
+    // runtime `animation` / `handle` / `group` is superseded by the newer
+    // `options` value.
     if (KEYBOARD_OPTIONS.includes(key)) setOverride(key, instance.option(key));else if (TRACKED_OPTIONS.includes(key)) clearOverride(key);
   }
+  if (applied.includes('group')) registry.notifyPeers();
 }, { flush: 'post' });
 watch(() => [props.disabled, props.disableKeyboard, props.options, optionOverrides.value], () => {
   if (!keyboardEnabled()) keyboardTurnedOff();
 }, { flush: 'post' });
-watch(() => props.group, () => instance?.option('group', effectiveGroup()), { flush: 'post' });
-watch(() => props.cloneable, () => instance?.option('group', effectiveGroup()), { flush: 'post' });
+watch(() => props.group, () => applyGroup(), { flush: 'post' });
+watch(() => props.cloneable, () => applyGroup(), { flush: 'post' });
 watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v), { flush: 'post' });
 watch(() => props.handle, (v: any) => {
   instance?.option('handle', liveOption('handle', v));

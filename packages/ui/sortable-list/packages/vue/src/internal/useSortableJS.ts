@@ -65,14 +65,20 @@ import SortableJS, { type Options as SortableOptions, type SortableEvent } from 
 import { afterFlush } from './keyboardRegistry';
 
 /**
- * Put `node` back into the SortableJS list `from` at `oldIndex`, which
- * SortableJS counts among that list's `draggable` matches only (non-draggable
- * children such as a header don't count). The selector is the list's own
- * (`Sortable.get(from).options.draggable`), else SortableJS's default (`li`
- * in a `<ul>` / `<ol>`, else any child). Past the last draggable sibling, the
- * node goes right after it.
+ * Put `node` back into the SortableJS list `from` where it was. SortableJS's
+ * plain `oldIndex` counts every element child of `from` but `<template>`s
+ * (a header or footer included), so the node goes back before the child now
+ * at that index. Without it (a fragile event), `oldDraggableIndex` counts
+ * only the list's `draggable` matches (`Sortable.get(from).options.draggable`,
+ * else SortableJS's default: `li` in a `<ul>` / `<ol>`, else any child); past
+ * the last draggable sibling the node goes right after it.
  */
-function putBack(node: HTMLElement, from: HTMLElement, oldIndex: number | undefined): void {
+function putBack(node: HTMLElement, from: HTMLElement, oldIndex: number | null | undefined, oldDraggableIndex: number | null | undefined): void {
+  if (typeof oldIndex === 'number' && oldIndex >= 0) {
+    const kids = Array.from(from.children).filter((c) => c !== node && c.tagName !== 'TEMPLATE');
+    from.insertBefore(node, kids[oldIndex] ?? null);
+    return;
+  }
   const inst = (SortableJS as unknown as { get?: (el: HTMLElement) => { options?: { draggable?: unknown } } | undefined }).get?.(from);
   const d = inst?.options?.draggable;
   let sel = typeof d === 'string' && d.trim() !== '' ? d.trim() : /^[uo]l$/i.test(from.nodeName) ? 'li' : '*';
@@ -86,7 +92,7 @@ function putBack(node: HTMLElement, from: HTMLElement, oldIndex: number | undefi
     }
   };
   const rows = Array.from(from.children).filter((c) => c !== node && matches(c));
-  const at = typeof oldIndex === 'number' && oldIndex >= 0 ? oldIndex : rows.length;
+  const at = typeof oldDraggableIndex === 'number' && oldDraggableIndex >= 0 ? oldDraggableIndex : rows.length;
   if (at < rows.length) from.insertBefore(node, rows[at]!);
   else if (rows.length > 0) from.insertBefore(node, rows[rows.length - 1]!.nextSibling);
   else from.appendChild(node);
@@ -193,12 +199,30 @@ function readStash<T>(item: unknown): T | undefined {
   return (item as Record<string, unknown>)[ROZIE_ITEM_STASH_KEY] as T | undefined;
 }
 
-/** SortableJS's draggable-relative index (item rows only), falling back to
- * the plain child index, else `-1`. */
-function draggableIndex(draggable: number | undefined, plain: number | undefined): number {
-  if (typeof draggable === 'number') return draggable;
+/** SortableJS's plain index (every element child of the list but
+ * `<template>`s and its clone, which are all item rows: `#header` / `#footer`
+ * render outside the list element), falling back to the draggable-relative
+ * one, else `-1`. The draggable index is not an item-row index when a custom
+ * `options.draggable` leaves rows out (it skips them). */
+function plainIndex(plain: number | null | undefined, draggable: number | null | undefined): number {
   if (typeof plain === 'number') return plain;
+  if (typeof draggable === 'number') return draggable;
   return -1;
+}
+
+/** The item-row index of `node` in `list`: its position among the list's
+ * `.rozie-sortable-item` children (SortableJS's hidden clone and `<template>`s
+ * left out), whatever `draggable` matches. `hint` when `node` isn't a child of
+ * `list`. */
+function rowIndex(list: HTMLElement | null | undefined, node: unknown, hint: number): number {
+  if (list == null || node == null || (node as Node).parentNode !== list) return hint;
+  const clone = (SortableJS as unknown as { clone?: unknown }).clone;
+  let i = 0;
+  for (const c of Array.from(list.children)) {
+    if (c === node) return i;
+    if (c !== clone && c.tagName !== 'TEMPLATE' && c.classList.contains('rozie-sortable-item')) i++;
+  }
+  return hint;
 }
 
 /** Try-catch wrapper for DOM operations that may throw on fragile event
@@ -226,10 +250,33 @@ export const ROW_DRAGGABLE = '.rozie-sortable-item';
 export const HELPER_OWNED_OPTION_KEYS: readonly string[] = ['onStart', 'onEnd', 'onUpdate', 'onAdd', 'onRemove', 'onClone'];
 
 /**
+ * Whether two option values are the same: identical, or plain objects /
+ * arrays with the same content (a consumer passing an inline
+ * `options={{ group: { … } }}` hands over a fresh object every render, and
+ * reapplying it would undo a runtime `option(name, v)`). Functions and other
+ * objects compare by identity.
+ */
+function sameOption(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a == null || b == null || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const plain = (o: object) => Array.isArray(o) || Object.getPrototypeOf(o) === Object.prototype || Object.getPrototypeOf(o) === null;
+  if (!plain(a) || !plain(b)) return false;
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (!sameOption((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+  }
+  return true;
+}
+
+/**
  * Reapply an `options` object that changed after construction to the live
  * SortableJS instance, so a pointer drag obeys the new value (SortableJS only
  * reads its constructor options once). Each key whose effective value
- * changed is set with `instance.option(key, value)`. The effective value is
+ * changed (by content, see `sameOption`) is set with `instance.option(key, value)`. The effective value is
  * the one in `options`, else `base[key]` (what the key means without
  * `options`: the named props and the helper's own defaults), so a key
  * dropped from `options` goes back to it. A dropped key with no base value
@@ -249,7 +296,7 @@ export function reapplyOptions(
   for (const key of new Set([...Object.keys(p), ...Object.keys(n)])) {
     if (HELPER_OWNED_OPTION_KEYS.includes(key)) continue;
     const v = valueIn(n, key);
-    if (v === undefined || v === valueIn(p, key)) continue;
+    if (v === undefined || sameOption(v, valueIn(p, key))) continue;
     instance.option(key, v);
     applied.push(key);
   }
@@ -268,15 +315,18 @@ export function orderByKeys<T>(items: readonly T[], order: readonly unknown[], k
     const key = String(k);
     if (!rank.has(key)) rank.set(key, rank.size);
   }
-  const listed: Array<{ item: T; at: number }> = [];
+  // One bucket per listed key (items may share a key), filled in item order.
+  const listed: T[][] = [];
   const rest: T[] = [];
   items.forEach((item, i) => {
     const at = rank.get(String(keyOf(item, i)));
     if (at === undefined) rest.push(item);
-    else listed.push({ item, at });
+    else (listed[at] ??= []).push(item);
   });
-  listed.sort((a, b) => a.at - b.at);
-  return [...listed.map((e) => e.item), ...rest];
+  const out: T[] = [];
+  for (const bucket of listed) if (bucket) for (const item of bucket) out.push(item);
+  for (const item of rest) out.push(item);
+  return out;
 }
 
 export function useSortableJS<T>(
@@ -307,14 +357,13 @@ export function useSortableJS<T>(
    * it on the destination side. */
   const handleStart = (e: SortableEvent): void => {
     const current = opts.items();
-    // The source index in this list (onStart fires from the source). Prefer the
-    // DRAGGABLE-relative index: with non-draggable element children present
-    // (rows left out by a consumer `options.draggable`), plain `e.oldIndex` counts
-    // all children and is offset — stashing `current[oldIndex]` would capture
-    // the WRONG item (the row after the one actually grabbed), and the
-    // identity-based commit lookup would then faithfully move that wrong item.
-    // `oldDraggableIndex` counts only the `.rozie-sortable-item` rows.
-    const fromIdx = draggableIndex(e.oldDraggableIndex, e.oldIndex);
+    // The source index in this list (onStart fires from the source): the
+    // dragged row's item-row index, read off the DOM. Not SortableJS's
+    // `oldDraggableIndex`: a consumer `options.draggable` that leaves rows out
+    // makes it skip them, and stashing `current[oldDraggableIndex]` would
+    // capture the WRONG item, which the identity-based commit lookup would
+    // then faithfully move.
+    const fromIdx = rowIndex(listEl, e.item, plainIndex(e.oldIndex, e.oldDraggableIndex));
     let data: T | undefined;
     if (fromIdx >= 0 && fromIdx < current.length) {
       data = current[fromIdx] as T;
@@ -354,8 +403,8 @@ export function useSortableJS<T>(
     // What the `end` callback reports (source side only). Filled in below as
     // the commit is worked out; the hints cover the early-return paths.
     const stashAtEntry = readStash<T>(e.item);
-    let endOld = draggableIndex(e.oldDraggableIndex, e.oldIndex);
-    let endNew = draggableIndex(e.newDraggableIndex, e.newIndex);
+    let endOld = plainIndex(e.oldIndex, e.oldDraggableIndex);
+    let endNew = rowIndex(e.to, e.item, plainIndex(e.newIndex, e.newDraggableIndex));
     let endItem: T | undefined = stashAtEntry;
     try {
       const fromUs = e.from === listEl;
@@ -378,16 +427,11 @@ export function useSortableJS<T>(
       // physically moves the same node between lists).
       const stashedItem = readStash<T>(e.item);
 
-      // Prefer the DRAGGABLE-relative indices. SortableJS computes plain
-      // `oldIndex`/`newIndex` via `index(dragEl)` — counting ALL element
-      // siblings — while `oldDraggableIndex`/`newDraggableIndex` use
-      // `index(dragEl, options.draggable)`, counting only the
-      // `.rozie-sortable-item` rows. When the list container also holds
-      // non-draggable element children, the plain indices are offset. (On Lit
-      // the `#header` / `#footer` `<slot>` elements used to be such children;
-      // they now render outside the list element.) The draggable indices stay
-      // item-relative everywhere; when no non-draggable children exist the two
-      // coincide.
+      // Item-row indices: the new one read off the DOM where the row is
+      // (`rowIndex`), else SortableJS's plain index, which counts every
+      // element child of the list (all item rows). SortableJS's
+      // `*DraggableIndex` skip rows a custom `options.draggable` leaves out,
+      // so they are only the last resort.
       const oldIndexHint = endOld;
       const newIndexHint = endNew;
 
@@ -500,7 +544,7 @@ export function useSortableJS<T>(
               node.remove();
               return;
             }
-            putBack(node, from, e.oldIndex);
+            putBack(node, from, e.oldIndex, e.oldDraggableIndex);
           });
           return;
         }

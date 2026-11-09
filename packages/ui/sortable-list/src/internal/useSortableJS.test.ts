@@ -99,6 +99,7 @@ function buildList(items: Array<{ id: string }>): HTMLElement {
   const el = document.createElement('div');
   for (const item of items) {
     const child = document.createElement('div');
+    child.className = 'rozie-sortable-item';
     child.setAttribute('data-id', item.id);
     el.appendChild(child);
   }
@@ -288,6 +289,8 @@ describe('useSortableJS', () => {
     const dragged = listEl.children[1] as HTMLElement;
     // Stash manually (simulating onStart having run with a valid oldIndex).
     (dragged as unknown as Record<string, unknown>).__rozieItem = items[1];
+    // SortableJS has moved the row to the end of the list.
+    listEl.appendChild(dragged);
     // Now fire onEnd with null oldIndex/newIndex.
     rec.options.onEnd?.({
       item: dragged,
@@ -332,6 +335,8 @@ describe('useSortableJS', () => {
     }) as typeof listEl.insertBefore;
 
     rec.options.onStart?.({ item: dragged, oldIndex: 1, from: listEl, to: listEl });
+    // SortableJS has moved the row to the end of the list.
+    listEl.appendChild(dragged);
     // Even with insertBefore throwing, the model writeback MUST still happen.
     expect(() => {
       rec.options.onEnd?.({
@@ -862,26 +867,35 @@ describe('end: after the write, once per drag', () => {
     expect(listEl.children.length).toBe(1);
   });
 
-  it('a foreign row goes back at its draggable index, past a non-draggable header child', async () => {
+  it('a foreign row goes back at its original DOM position, past non-draggable header and footer children', async () => {
+    // SortableJS's plain `oldIndex` counts every element child (not
+    // <template>); `oldDraggableIndex` counts the `draggable` rows only.
     const items: Item[] = [{ id: 'x' }];
     const listEl = buildList(items);
     const foreign = document.createElement('ul');
-    foreign.innerHTML = '<li class="hdr">H</li><li class="it">A</li><li class="it">B</li><li class="it">C</li>';
+    foreign.innerHTML = '<li class="hdr">H</li><li class="it">A</li><li class="it">B</li><li class="it">C</li><li class="hdr">F</li>';
     (foreign as unknown as { __mockSortable: unknown }).__mockSortable = { options: { draggable: '.it' } };
     useSortableJS<Item>(listEl, { items: () => items, onCommit: () => {} });
     const rec = getLastConstructed();
-    const dragged = foreign.children[2] as HTMLElement; // "B": draggable index 1
-    listEl.appendChild(dragged);
-    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({ item: dragged, oldIndex: 1, newIndex: 1, from: foreign, to: listEl });
+    const onAdd = (rec.options as { onAdd?: (e: unknown) => void }).onAdd!;
+    const labels = () => Array.from(foreign.children).map((c) => c.textContent);
+    for (const [label, oldIndex, oldDraggableIndex] of [
+      ['A', 1, 0],
+      ['B', 2, 1],
+      ['C', 3, 2],
+    ] as const) {
+      const dragged = Array.from(foreign.children).find((c) => c.textContent === label) as HTMLElement;
+      listEl.appendChild(dragged);
+      onAdd({ item: dragged, oldIndex, newIndex: 1, oldDraggableIndex, newDraggableIndex: 1, from: foreign, to: listEl });
+      await flushMicrotasks();
+      expect(labels(), label).toEqual(['H', 'A', 'B', 'C', 'F']);
+    }
+    // Without the plain index (a fragile event), the draggable index is used.
+    const b = foreign.children[2] as HTMLElement;
+    listEl.appendChild(b);
+    onAdd({ item: b, oldIndex: null, newIndex: 1, oldDraggableIndex: 1, from: foreign, to: listEl });
     await flushMicrotasks();
-    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['H', 'A', 'B', 'C']);
-    // The last draggable row goes back after its last draggable sibling.
-    const last = foreign.children[3] as HTMLElement; // "C": draggable index 2
-    foreign.insertAdjacentHTML('beforeend', '<li class="hdr">F</li>');
-    listEl.appendChild(last);
-    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({ item: last, oldIndex: 2, newIndex: 1, from: foreign, to: listEl });
-    await flushMicrotasks();
-    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['H', 'A', 'B', 'C', 'F']);
+    expect(labels()).toEqual(['H', 'A', 'B', 'C', 'F']);
   });
 
   it('start and end indices are item-row indices (non-draggable header child)', async () => {
@@ -915,6 +929,56 @@ describe('end: after the write, once per drag', () => {
     expect(starts[0]!.item?.id).toBe('a');
     expect(ends[0]!.oldIndex).toBe(0);
     expect(ends[0]!.newIndex).toBe(2);
+  });
+});
+
+describe('a custom options.draggable that leaves rows out', () => {
+  it('start, change and end report the item-row index and the item actually dragged', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const listEl = buildList(items);
+    const starts: Array<SortableDrag<Item>> = [];
+    const ends: Array<SortableDrag<Item>> = [];
+    const changes: Array<SortableChange<Item>> = [];
+    let committed: Item[] | null = null;
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: (next) => (committed = next),
+      options: { draggable: '[data-id="a"], [data-id="c"]' },
+      onStart: (info) => starts.push(info),
+      onEnd: (info) => ends.push(info),
+      onChange: (info) => changes.push(info),
+    });
+    const rec = getLastConstructed();
+    // "c": plain index 2; draggable index 1 (b is not draggable).
+    const dragged = listEl.children[2] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 2, oldDraggableIndex: 1, from: listEl, to: listEl });
+    expect(starts[0]!.item?.id).toBe('c');
+    expect(starts[0]!.oldIndex).toBe(2);
+    listEl.insertBefore(dragged, listEl.firstChild);
+    rec.options.onEnd?.({ item: dragged, oldIndex: 2, newIndex: 0, oldDraggableIndex: 1, newDraggableIndex: 0, from: listEl, to: listEl });
+    await flushMicrotasks();
+    expect(committed!.map((i) => i.id)).toEqual(['c', 'a', 'b']);
+    expect(changes[0]!.item?.id).toBe('c');
+    expect([changes[0]!.oldIndex, changes[0]!.newIndex]).toEqual([2, 0]);
+    expect(ends[0]!.item?.id).toBe('c');
+    expect([ends[0]!.oldIndex, ends[0]!.newIndex]).toEqual([2, 0]);
+  });
+
+  it('a drop into another list lands at its item-row index there', async () => {
+    const items: Item[] = [{ id: 'x' }, { id: 'y' }, { id: 'z' }];
+    const listEl = buildList(items);
+    let committed: Item[] | null = null;
+    useSortableJS<Item>(listEl, { items: () => items, onCommit: (next) => (committed = next), options: { draggable: '[data-id="x"]' } });
+    const rec = getLastConstructed();
+    const node = document.createElement('div');
+    node.className = 'rozie-sortable-item';
+    (node as unknown as { __rozieItem: Item }).__rozieItem = { id: 'n' };
+    const from = buildList([]);
+    // Dropped after "z": plain index 3, draggable index 1 (only "x" is draggable).
+    listEl.appendChild(node);
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({ item: node, oldIndex: 0, newIndex: 3, newDraggableIndex: 1, from, to: listEl });
+    await flushMicrotasks();
+    expect(committed!.map((i) => i.id)).toEqual(['x', 'y', 'z', 'n']);
   });
 });
 
@@ -983,6 +1047,21 @@ describe('reapplyOptions: a live `options` change reaches SortableJS', () => {
     expect(applied).toEqual(['sort', 'emptyInsertThreshold']);
   });
 
+  it('a value equal by content (a fresh inline object each render) is not reapplied', () => {
+    const inst = fakeInstance();
+    const fn = () => true;
+    const applied = reapplyOptions(
+      inst,
+      { group: { name: 'zones', pull: false, put: ['a', 'b'] }, filter: fn, scroll: true },
+      { group: { name: 'zones', pull: false, put: ['a', 'b'] }, filter: fn, scroll: true },
+      {},
+    );
+    expect(applied).toEqual([]);
+    expect(reapplyOptions(inst, { group: { name: 'zones', pull: false } }, { group: { name: 'zones', pull: true } }, {})).toEqual(['group']);
+    expect(reapplyOptions(inst, { group: { name: 'zones' } }, { group: { name: 'zones', put: false } }, {})).toEqual(['group']);
+    expect(reapplyOptions(inst, { filter: fn }, { filter: () => true }, {})).toEqual(['filter']);
+  });
+
   it('a key dropped from options goes back to its base value; one with no base is left alone', () => {
     const inst = fakeInstance();
     const applied = reapplyOptions(
@@ -1034,6 +1113,18 @@ describe('orderByKeys: the imperative sort() order', () => {
   it('keys compare as strings (data-id)', () => {
     const nums = [10, 20, 30];
     expect(orderByKeys(nums, ['30', 10], (n) => n)).toEqual([30, 10, 20]);
+  });
+
+  it('items sharing a key stay together, in their order; a large list sorts in linear time', () => {
+    const dup = [{ id: 'a', n: 1 }, { id: 'b', n: 2 }, { id: 'a', n: 3 }];
+    expect(orderByKeys(dup, ['a'], (i) => i.id).map((i) => i.n)).toEqual([1, 3, 2]);
+    const big = Array.from({ length: 200000 }, (_, i) => ({ id: String(i) }));
+    const reversed = big.map((i) => i.id).reverse();
+    const t = performance.now();
+    const out = orderByKeys(big, reversed, keyOf);
+    expect(performance.now() - t).toBeLessThan(2000);
+    expect(out[0]).toBe(big[big.length - 1]);
+    expect(out.length).toBe(big.length);
   });
 
   it('keeps the item values (identity), and an empty order keeps the list', () => {

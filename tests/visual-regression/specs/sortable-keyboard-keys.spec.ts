@@ -334,6 +334,54 @@ for (const target of TARGETS) {
     await assertInvariant(mount);
   });
 
+  // A custom `options.draggable` leaves Banana, Date and Elderberry out
+  // (only Apple and Cherry drag). Those rows are still item rows: every index
+  // counts them, by mouse as by keyboard, and the row dragged is the one that
+  // moves (SortableJS's own draggable index skips them).
+  runner(`sortable-keyboard-keys [${target}]: custom options.draggable: indices count every item row, mouse and keyboard`, async ({ page }) => {
+    const { mount, items } = await open(page);
+    await clickKeepingFocus(mount, 'draggable-ac');
+    await expect(items).toHaveCount(SEED.length);
+    await synthesizeDrag(page, {
+      sourceHandle: items.nth(2).locator('[class*="label"]'),
+      target: items.nth(0),
+    });
+    await expectOrder(mount, items, ['Cherry', 'Apple', 'Banana', 'Date', 'Elderberry']);
+    await expect
+      .poll(() => texts(mount.locator(LOG_LI)))
+      .toEqual(['start:pointer', 'reorder:pointer', 'end:pointer']);
+    await expect.poll(() => lastEnd(mount)).toEqual({
+      item: 'Cherry',
+      el: 'element',
+      from: 'Fruit',
+      to: 'Fruit',
+      oldIndex: 2,
+      newIndex: 0,
+      interaction: 'pointer',
+    });
+    // Keyboard: Banana (not draggable) doesn't lift; Apple (index 1 now) does.
+    await items.nth(2).focus();
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(100);
+    await expect(mount.locator(LIFTED)).toHaveCount(0);
+    await items.nth(1).focus();
+    await page.keyboard.press('Space');
+    await expect(mount.locator(ARIA_LIVE)).toHaveText('Lifted Apple, position 2 of 5');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Space');
+    await expectOrder(mount, items, ['Cherry', 'Banana', 'Apple', 'Date', 'Elderberry']);
+    await expect.poll(() => lastEnd(mount)).toEqual({
+      item: 'Apple',
+      el: 'element',
+      from: 'Fruit',
+      to: 'Fruit',
+      oldIndex: 1,
+      newIndex: 2,
+      interaction: 'keyboard',
+    });
+    await assertInvariant(mount);
+  });
+
   runner(`sortable-keyboard-keys [${target}]: pointer drop in place writes nothing`, async ({ page }) => {
     const { mount, items } = await open(page);
     // Released on its own row: `start` / `end` only, same index.

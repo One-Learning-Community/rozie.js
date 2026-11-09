@@ -138,7 +138,7 @@ Order and source:
 - `start` fires from the origin list.
 - `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists, by mouse or keyboard, emits `add` from the destination and then `remove` from the source (a keyboard cancel that hands the row back does the same: `add` from the origin, then `remove` from the list it leaves).
 - `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. An unmounted list never emits: if the list the row ended up in unmounts before its pending `end` runs (for example, one your `add` handler removes), the origin list (the one that emitted `start`) emits that `end`, with `to` still the unmounted list's element, so `start` and `end` still pair; only when the origin has unmounted too is no `end` emitted. A keyboard lift whose list unmounts mid-lift ends the same way.
-- `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end`, mouse or keyboard, comes before the next `start`.
+- `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end`, mouse or keyboard, comes before the next `start`. An `end` run early this way may still read the old order (see [Saving order](#saving-order)).
 - Drops from a SortableJS list that is not a `SortableList` into a `SortableList` aren't supported: the row goes back where it came from and nothing is emitted (no `add`, no `end`). Use a `SortableList` on both sides.
 - A mouse drop back where the row started writes nothing and fires no `reorder`; `start` and `end` still fire, with `oldIndex === newIndex`.
 - Keyboard `start` fires once on lift and `end` once on drop or cancel. Each keyboard move emits its own `reorder` (within a list) or `add` + `remove` (a hop between lists). The first hop out of a clone source emits only `add`, since the source keeps its row; a copy hopped back into its own palette emits only `remove`.
@@ -160,9 +160,11 @@ Order and source:
 const saveZone = (zone) => api.saveZone(zone, $data[zone].map((w) => w.id))
 ```
 
-If the destination unmounts before its `end` runs, the origin fires that `end` instead (`to` is the unmounted list's element); the destination's own handler never runs, so save the unmounted list from the code that removed it.
+If the destination unmounts before its `end` runs, the origin fires that `end` instead (`to` is the unmounted list's element, `el` is `null`); the destination's own handler never runs, so save the unmounted list from the code that removed it. A list that is only out of the page for a moment (moved in the DOM, or kept alive by Vue's `<KeepAlive>`) is still mounted and fires its own `end`.
 
-Lists nested inside rows (a grid widget's columns) are lists of their own: a drop into a column fires `end` from the column, not from the zone holding the grid row. (On Lit the zone's listeners also hear the column's events; see the known limitations under [Scope](#scope).)
+One timing edge: an `end` forced to run early because a new drag or lift started within a few milliseconds of the drop (scripted input, mostly) runs before the framework re-rendered, so its handler may read the old order (React: the state of the last render). If that matters to you, work out the new order from the payload (`item`, `from`, `to`, `oldIndex`, `newIndex`) rather than from your state.
+
+Lists nested inside rows (a grid widget's columns) are lists of their own: a drop into a column fires `end` from the column, not from the zone holding the grid row. The zone's own listeners don't hear the column's events, on any framework (Lit included: its events don't bubble).
 
 ### Slots
 
@@ -220,7 +222,7 @@ Beyond props and the two-way `items` array, the component exposes imperative met
 | `getInstance` | Return the underlying SortableJS instance for direct API access — the raw-engine escape hatch (`save`, `closest`, … are one hop away). `null` before mount and after destroy. |
 | `toArray` | Return the current order as an array of `data-id` strings. Each row carries `data-id="<key>"` (the same [`itemKey`](#api)-derived key as the reconciler), so the array reflects the live key order. `[]` before mount. |
 | `sort` | Reorder the bound `items` by an array of `data-id` keys — `sort(order, useAnimation = true)`. The listed keys come first, in that order; every other row follows in its current order. The new array is written back through the two-way `items` binding and your framework re-renders the rows (SortableJS never moves them behind the model). No event fires, since the call is your own. With `useAnimation` and a non-zero `animation`, the rows slide into place. |
-| `option` | Read or set a live SortableJS option — `option(name)` gets, `option(name, value)` sets. The runtime escape hatch for any SortableJS option beyond the curated props (and the construction-time-only ones, within SortableJS's own limits). |
+| `option` | Read or set a live SortableJS option — `option(name)` gets, `option(name, value)` sets. The runtime escape hatch for any SortableJS option beyond the curated props (and the construction-time-only ones, within SortableJS's own limits). `disabled`, `filter`, `draggable`, `sort`, `handle` and `group` set this way apply to the keyboard too, and a value set here wins over the matching prop and over `options` until `options` changes that key. |
 
 **React example:**
 
@@ -384,7 +386,7 @@ The hidden instructions text defaults to:
 
 > Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.
 
-With `orientation="horizontal"` it says "the left and right arrow keys". A `sort: false` list can't move rows within itself, so its text is "Press Space or Enter to pick up, and again to drop. Press Escape to cancel." When the list has a group (the `group` prop or `options.group`, the one SortableJS uses), " Hold Shift with an arrow key to move to another list." is added. Pass `keyboardInstructions` to replace all of it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit this works for rows rendered through `rozieSlots.default` (and for Rozie consumers), which live inside the shadow root; light-DOM markup can't reference an id across the shadow root, so give such a handle its own `aria-label` or description instead.
+With `orientation="horizontal"` it says "the left and right arrow keys". A `sort: false` list can't move rows within itself, so its text is "Press Space or Enter to pick up, and again to drop. Press Escape to cancel." When another mounted list could take this list's rows (by the group rules SortableJS uses: the `group` prop, `options.group` or `option('group', v)`), " Hold Shift with an arrow key to move to another list." is added; the text updates as lists mount, unmount or change group. (Hidden lists, and lists with their keyboard off, still count.) Pass `keyboardInstructions` to replace all of it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit this works for rows rendered through `rozieSlots.default` (and for Rozie consumers), which live inside the shadow root; light-DOM markup can't reference an id across the shadow root, so give such a handle its own `aria-label` or description instead.
 
 #### Announcements
 
@@ -675,10 +677,6 @@ Not supported yet:
 - **Extra SortableJS plugins** mounted with `Sortable.mount` (MultiDrag, Swap, and the like). The component handles SortableJS's events and writes the bound arrays itself, so a plugin that changes what a drop does isn't supported.
 - **A "move up / move down / move to list" button recipe** for pointer users who can't drag (WCAG 2.5.7). You can build one today with your own buttons that write the bound array; there is no ready-made recipe.
 - **TypeScript generics** for the item type: `item` in events is typed `unknown` (the handlers take a `SortablePayload`, exported from every package) and `item` in slots `any`.
-
-Known limitations:
-
-- A list with a `group` says the Shift sentence ("Hold Shift with an arrow key to move to another list.") in its default instructions even when no other list can be reached. Pass `keyboardInstructions` if that matters for your layout.
 
 ## Gotchas
 

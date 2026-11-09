@@ -68,6 +68,11 @@ export interface ListEntry {
   focusNear(index: number): void;
   rowEl(index: number): HTMLElement | null;
   emit(name: 'add' | 'remove' | 'reorder' | 'start' | 'end', payload: SortablePayload): void;
+  /**
+   * Called when the lists this one could hop a row into may have changed (a
+   * list registered or unregistered, or a list's group changed).
+   */
+  peersChanged?(): void;
 }
 
 export interface Lift {
@@ -102,6 +107,14 @@ export interface KeyboardRegistry {
   orderedLists(): ListEntry[];
   findHopTarget(from: ListEntry, dir: 1 | -1): ListEntry | null;
   listName(entry: ListEntry): string;
+  /**
+   * Whether another registered list could take a row hopped out of `entry`
+   * by its group rules (`canHop`). Visibility and keyboard state are left
+   * out: they change without notice.
+   */
+  hasHopPeer(entry: ListEntry): boolean;
+  /** Tell every list that the lists it could reach may have changed (a group changed). */
+  notifyPeers(): void;
   indexOfLift(): number;
   /**
    * Run `fire` (an `end` emit) in a task, after every write made so far and
@@ -110,11 +123,14 @@ export interface KeyboardRegistry {
    * emit from, chosen when it runs: `owner` (the list the row ended up in)
    * while it is mounted, else `fallback` (the list that emitted `start`)
    * while that one is, else nothing runs — an unmounted list never emits.
-   * "Mounted" is registered with its list element in the page (React runs
-   * the cleanup that unregisters after the commit that removed it). With
-   * neither given, `fire` runs with null.
+   * "Mounted" means registered: a list unregisters when it unmounts. A list
+   * that is registered but out of the page (deactivated by Vue's
+   * `<KeepAlive>`, or moved) is still mounted; since a framework may remove a
+   * list's element a task before the cleanup that unregisters it (React's
+   * passive effects), such a list gets one more flush to unregister before
+   * its end runs.
    */
-  deferEnd(fire: (host: ListEntry | null) => void, owner?: ListEntry | null, fallback?: ListEntry | null): void;
+  deferEnd(fire: (host: ListEntry) => void, owner: ListEntry | null, fallback?: ListEntry | null): void;
   /** Run every pending `end` now (before a new drag or lift emits `start`). */
   flushEnds(): void;
 }
@@ -370,12 +386,28 @@ export function canHop(from: GroupOption, to: GroupOption): { ok: boolean; copy:
 function createState(): Singleton {
   const entries = new Set<ListEntry>();
   const pendingEnds: Array<{
-    fire: (host: ListEntry | null) => void;
+    fire: (host: ListEntry) => void;
     owner: ListEntry | null;
     fallback: ListEntry | null;
+    /** True once this end has waited a flush for an out-of-page list to unregister. */
+    waited: boolean;
   }> = [];
-  const mounted = (e: ListEntry | null): e is ListEntry =>
-    e != null && entries.has(e) && (e.el == null || e.el.isConnected !== false);
+  // Run pending ends in order. `now` (a new drag or lift starting) runs them
+  // all; from a task, an end whose host would be a registered list that is
+  // out of the page waits one more flush first (see deferEnd).
+  const runEnds = (now: boolean) => {
+    while (pendingEnds.length > 0) {
+      const p = pendingEnds[0]!;
+      const host = entries.has(p.owner!) ? p.owner! : entries.has(p.fallback!) ? p.fallback! : null;
+      if (host != null && !now && !p.waited && host.el != null && host.el.isConnected === false) {
+        p.waited = true;
+        afterFlush(() => runEnds(false));
+        return;
+      }
+      pendingEnds.shift();
+      if (host != null) p.fire(host);
+    }
+  };
   const known = new WeakSet<HTMLElement>();
   const registry: KeyboardRegistry = {
     lift: null,
@@ -383,11 +415,22 @@ function createState(): Singleton {
     register(entry) {
       entries.add(entry);
       if (entry.el) known.add(entry.el);
+      registry.notifyPeers();
       return () => {
-        entries.delete(entry);
+        if (!entries.delete(entry)) return;
         if (registry.lift && registry.lift.holder === entry) registry.lift = null;
         if (registry.speaker === entry) registry.speaker = null;
+        registry.notifyPeers();
       };
+    },
+    hasHopPeer(entry) {
+      for (const e of entries) {
+        if (e !== entry && canHop(entry.group(), e.group()).ok) return true;
+      }
+      return false;
+    },
+    notifyPeers() {
+      for (const e of [...entries]) e.peersChanged?.();
     },
     has(entry) {
       return entries.has(entry);
@@ -445,20 +488,12 @@ function createState(): Singleton {
       l.index = i;
       return i;
     },
-    deferEnd(fire, owner = null, fallback = null) {
-      pendingEnds.push({ fire, owner, fallback });
-      afterFlush(() => registry.flushEnds());
+    deferEnd(fire, owner, fallback = null) {
+      pendingEnds.push({ fire, owner, fallback, waited: false });
+      afterFlush(() => runEnds(false));
     },
     flushEnds() {
-      while (pendingEnds.length > 0) {
-        const p = pendingEnds.shift()!;
-        if (p.owner == null && p.fallback == null) {
-          p.fire(null);
-          continue;
-        }
-        const host = mounted(p.owner) ? p.owner : mounted(p.fallback) ? p.fallback : null;
-        if (host != null) p.fire(host);
-      }
+      runEnds(true);
     },
   };
   return { registry, counter: 0 };

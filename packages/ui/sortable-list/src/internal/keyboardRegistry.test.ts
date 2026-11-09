@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect } from 'vitest';
 import {
+  afterFlush,
   canHop,
   composedCompare,
   getKeyboardRegistry,
@@ -226,14 +227,16 @@ describe('registry', () => {
   });
   it('deferEnd runs after a task queued before it; flushEnds runs pending ends once, now', async () => {
     const r = getKeyboardRegistry();
+    const ea = fakeEntry(el(), 'z');
+    reg(ea);
     const order: string[] = [];
     setTimeout(() => order.push('earlier task'), 0);
-    r.deferEnd(() => order.push('end1'));
-    r.deferEnd(() => order.push('end2'));
+    r.deferEnd(() => order.push('end1'), ea);
+    r.deferEnd(() => order.push('end2'), ea);
     expect(order).toEqual([]);
     await new Promise((res) => setTimeout(res, 5));
     expect(order).toEqual(['earlier task', 'end1', 'end2']);
-    r.deferEnd(() => order.push('end3'));
+    r.deferEnd(() => order.push('end3'), ea);
     r.flushEnds();
     expect(order.at(-1)).toBe('end3');
     await new Promise((res) => setTimeout(res, 5));
@@ -256,18 +259,56 @@ describe('registry', () => {
     r.flushEnds();
     expect(order).toEqual(['b']);
   });
-  it('an end whose list element has left the page is dropped (cleanup that unregisters may come later)', () => {
+  it('with neither a list nor a fallback, nothing runs', () => {
+    const r = getKeyboardRegistry();
+    const hosts: unknown[] = [];
+    r.deferEnd((h) => hosts.push(h), null, null);
+    r.flushEnds();
+    expect(hosts).toEqual([]);
+  });
+  it('a list that is out of the page but still registered (Vue KeepAlive, a DOM move) still emits its end', async () => {
     const r = getKeyboardRegistry();
     const a = el();
+    const b = el();
     const ea = fakeEntry(a, 'z');
+    const eb = fakeEntry(b, 'z');
     reg(ea);
-    const order: string[] = [];
-    r.deferEnd(() => order.push('a'), ea);
+    reg(eb);
+    const hosts: unknown[] = [];
+    r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
     a.remove();
+    await new Promise((res) => setTimeout(res, 30));
+    expect(hosts).toEqual(['a']);
+    // Run now (a new drag starting): registered is mounted.
+    r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
     r.flushEnds();
-    expect(order).toEqual([]);
+    expect(hosts).toEqual(['a', 'a']);
+    // Moved: out of the page and back in, before the task runs.
+    document.body.appendChild(a);
+    r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
+    a.remove();
+    document.body.appendChild(a);
+    await new Promise((res) => setTimeout(res, 30));
+    expect(hosts).toEqual(['a', 'a', 'a']);
   });
-    it('a pending end whose list is gone runs from its fallback (the origin) when that is still mounted', () => {
+  it('a list whose element left the page and that unregisters a flush later (React cleanup) hands its end to the fallback', async () => {
+    const r = getKeyboardRegistry();
+    const a = el();
+    const b = el();
+    const ea = fakeEntry(a, 'z');
+    const eb = fakeEntry(b, 'z');
+    const unA = reg(ea);
+    reg(eb);
+    const hosts: unknown[] = [];
+    r.deferEnd((h) => hosts.push(h === ea ? 'a' : h === eb ? 'b' : '?'), ea, eb);
+    a.remove();
+    // The unregister arrives in a task posted after the end's (its first
+    // check), before the one more flush the end waits.
+    afterFlush(() => unA());
+    await new Promise((res) => setTimeout(res, 40));
+    expect(hosts).toEqual(['b']);
+  });
+  it('a pending end whose list is gone runs from its fallback (the origin) when that is still mounted', () => {
     const r = getKeyboardRegistry();
     const a = el();
     const b = el();
@@ -281,12 +322,13 @@ describe('registry', () => {
     unA();
     r.flushEnds();
     expect(hosts).toEqual([eb]);
-    // Destination's element left the page (cleanup comes later).
+    // Destination left the page and unregistered.
     const c = el();
     const ec = fakeEntry(c, 'z');
-    reg(ec);
+    const unC = reg(ec);
     r.deferEnd((h) => hosts.push(h), ec, eb);
     c.remove();
+    unC();
     r.flushEnds();
     expect(hosts).toEqual([eb, eb]);
     // Both gone: nothing.
@@ -301,6 +343,43 @@ describe('registry', () => {
     r.deferEnd((h) => hosts.push(h), ed, eb);
     r.flushEnds();
     expect(hosts).toEqual([eb, eb, ed]);
+  });
+  it('hasHopPeer: another registered list this one could hop a row into', () => {
+    const r = getKeyboardRegistry();
+    const ea = fakeEntry(el(), 'z');
+    reg(ea);
+    expect(r.hasHopPeer(ea)).toBe(false);
+    const locked = fakeEntry(el(), { name: 'z', pull: false });
+    const unLocked = reg(locked);
+    // A pull: false list can hop nowhere; the plain list can hop into it.
+    expect(r.hasHopPeer(locked)).toBe(false);
+    expect(r.hasHopPeer(ea)).toBe(true);
+    unLocked();
+    expect(r.hasHopPeer(ea)).toBe(false);
+    const archive = fakeEntry(el(), { name: 'z', put: false });
+    reg(archive);
+    // Nothing can be put into a put: false list, but it can hop out.
+    expect(r.hasHopPeer(ea)).toBe(false);
+    expect(r.hasHopPeer(archive)).toBe(true);
+    expect(r.hasHopPeer(fakeEntry(el(), null))).toBe(false);
+  });
+  it('a list is told when the lists it could reach may have changed', () => {
+    const r = getKeyboardRegistry();
+    const calls: string[] = [];
+    const ea = fakeEntry(el(), 'z');
+    ea.peersChanged = () => calls.push('a');
+    reg(ea);
+    calls.length = 0;
+    const eb = fakeEntry(el(), 'z');
+    eb.peersChanged = () => calls.push('b');
+    const unB = reg(eb);
+    expect(calls.sort()).toEqual(['a', 'b']);
+    calls.length = 0;
+    r.notifyPeers();
+    expect(calls.sort()).toEqual(['a', 'b']);
+    calls.length = 0;
+    unB();
+    expect(calls).toEqual(['a']);
   });
   it('wasList() knows an element that was a registered list, after it unregisters', () => {
     const r = getKeyboardRegistry();

@@ -310,20 +310,21 @@ for (const target of TARGETS) {
   );
 
   // A row dragged in from a plain SortableJS list (not a SortableList) is not
-  // accepted: it goes back where it came from, and nothing is emitted.
+  // accepted: it goes back where it came from (its DOM position, past the
+  // foreign list's non-draggable header row), and nothing is emitted.
   runner(
     `sortable-drag-cross [${target}]: a drop from a non-SortableList list puts the row back and emits nothing`,
     async ({ page }) => {
       const { mount, errors } = await openZones(page);
       await mount.getByTestId('foreign-init').evaluate((b) => (b as HTMLElement).click());
       const foreign = mount.getByTestId('foreign').locator('li');
-      await expect(foreign).toHaveCount(2);
+      await expect(foreign).toHaveCount(4);
       await synthesizeDrag(page, {
-        sourceHandle: foreign.nth(0),
+        sourceHandle: foreign.nth(1),
         target: zoneRow(mount, 'Top sidebar', 'Search'),
       });
       await page.waitForTimeout(150);
-      await expect.poll(() => texts(foreign)).toEqual(['Foreign A', 'Foreign B']);
+      await expect.poll(() => texts(foreign)).toEqual(['Foreign header', 'Foreign A', 'Foreign B', 'Foreign C']);
       await expectZones(mount, {
         top: { name: 'Top sidebar', labels: ['Search', 'Newsletter', 'Tag cloud'] },
       });
@@ -350,6 +351,43 @@ for (const target of TARGETS) {
         .toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer', 'bottom:end:pointer']);
       await page.waitForTimeout(300);
       expect(await texts(mount.locator(LOG_LI))).toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer', 'bottom:end:pointer']);
+      // The row went with the unmounted list: `el` is null, never a detached
+      // element.
+      expect(JSON.parse((await mount.getByTestId('last-pointer-end').textContent()) || 'null')).toEqual({
+        item: 'Recent posts',
+        el: null,
+        interaction: 'pointer',
+      });
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // A runtime `option('group', v)` wins over `options.group` (and survives a
+  // later `cloneable` change): Locked's `options.group` forbids pulling, the
+  // runtime group allows it.
+  runner(
+    `sortable-drag-cross [${target}]: a runtime option('group') wins over options.group after a cloneable change`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await mount.getByTestId('locked-runtime-group').evaluate((b) => (b as HTMLElement).click());
+      await mount.getByTestId('locked-cloneable').evaluate((b) => (b as HTMLElement).click());
+      await page.waitForTimeout(100);
+      await synthesizeDrag(page, {
+        sourceHandle: zoneGrip(mount, 'Pinned notice'),
+        target: zoneRow(mount, 'Top sidebar', 'Search'),
+      });
+      await expectZones(mount, {
+        locked: { name: 'Locked', labels: [] },
+        top: { name: 'Top sidebar', labels: ['Pinned notice', 'Search', 'Newsletter', 'Tag cloud'] },
+      });
+      await expect
+        .poll(() => texts(mount.locator(LOG_LI)))
+        .toEqual(['locked:start:pointer', 'top:add:pointer', 'locked:remove:pointer', 'top:end:pointer']);
+      expect(JSON.parse((await mount.getByTestId('last-pointer-end').textContent()) || 'null')).toEqual({
+        item: 'Pinned notice',
+        el: 'element',
+        interaction: 'pointer',
+      });
       expect(errors).toEqual([]);
     },
   );

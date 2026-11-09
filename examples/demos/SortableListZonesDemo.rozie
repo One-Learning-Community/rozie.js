@@ -40,15 +40,24 @@
                                  `options.group`, `pull: false`, still wins),
     - `top-unmount-on-add`       makes Top sidebar's `add` handler unmount Top
                                  sidebar (its pending `end` must not fire),
-    - `foreign-init`             turns the `foreign` `<ul>` (Foreign A,
-                                 Foreign B) into a plain SortableJS list in
-                                 group `zones` (not a SortableList).
+    - `foreign-init`             turns the `foreign` `<ul>` (a non-draggable
+                                 `Foreign header` row, then Foreign A,
+                                 Foreign B, Foreign C) into a plain SortableJS
+                                 list in group `zones` (not a SortableList),
+                                 draggable `.foreign-item`,
+    - `locked-runtime-group`     calls Locked's `option('group', { name:
+                                 'zones' })` (a runtime override: it may be
+                                 pulled from now, over its `options.group`),
+    - `toggle-toolb`             unmounts / remounts Toolbar B (Toolbar A's
+                                 only peer).
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
   `{slug}:{event}:{interaction}`. The last keyboard `end` payload is shown in
   `<output data-testid="last-end">` as JSON ({ item, el, interaction }, with
-  `item` reported as the item's label and `el` as "element" or null).
+  `item` reported as the item's label and `el` as "element", "detached" (an
+  element no longer in the page) or null); the last pointer `end` likewise in
+  `<output data-testid="last-pointer-end">`.
   `<output data-testid="end-state">` shows the Palette, Top sidebar and Content
   labels as the last `end` handler read them (JSON).
 
@@ -78,6 +87,8 @@
   toolb: [],
   log: [],
   lastEnd: '',
+  lastPointerEnd: '',
+  toolbMounted: true,
   endState: '',
   trigger: 'handle',
   topMounted: true,
@@ -149,12 +160,14 @@ const record = (slug, name, e) => {
     const labels = (list) => list.map((it) => it.label)
     $data.endState = JSON.stringify({ palette: labels($data.palette), top: labels($data.top), content: labels($data.content) })
   }
-  if (name === 'end' && p != null && p.interaction === 'keyboard') {
-    $data.lastEnd = JSON.stringify({
+  if (name === 'end' && p != null) {
+    const summary = JSON.stringify({
       item: p.item != null && p.item.label != null ? p.item.label : null,
-      el: p.el == null ? null : 'element',
+      el: p.el == null ? null : p.el.isConnected ? 'element' : 'detached',
       interaction: p.interaction,
     })
+    if (p.interaction === 'keyboard') $data.lastEnd = summary
+    else $data.lastPointerEnd = summary
   }
 }
 
@@ -214,6 +227,14 @@ const setLockedCloneable = () => {
   $data.lockedCloneable = true
 }
 
+const setLockedRuntimeGroup = () => {
+  $refs.lockedList.option('group', { name: 'zones' })
+}
+
+const toggleToolb = () => {
+  $data.toolbMounted = !$data.toolbMounted
+}
+
 const setUnmountTopOnAdd = () => {
   $data.unmountTopOnAdd = true
 }
@@ -223,8 +244,8 @@ const setUnmountTopOnAdd = () => {
 const initForeign = () => {
   const el = $refs.foreign
   const Sortable = $refs.lockedList.getInstance().constructor
-  el.innerHTML = '<li class="foreign-item">Foreign A</li><li class="foreign-item">Foreign B</li>'
-  new Sortable(el, { group: 'zones', animation: 0 })
+  el.innerHTML = '<li class="foreign-header">Foreign header</li><li class="foreign-item">Foreign A</li><li class="foreign-item">Foreign B</li><li class="foreign-item">Foreign C</li>'
+  new Sortable(el, { group: 'zones', animation: 0, draggable: '.foreign-item' })
 }
 
 $onMount(() => seed())
@@ -247,6 +268,8 @@ $onMount(() => seed())
     <button type="button" data-testid="locked-cloneable" @click="setLockedCloneable">Locked: cloneable</button>
     <button type="button" data-testid="top-unmount-on-add" @click="setUnmountTopOnAdd">Top: unmount on add</button>
     <button type="button" data-testid="foreign-init" @click="initForeign">Foreign SortableJS list</button>
+    <button type="button" data-testid="locked-runtime-group" @click="setLockedRuntimeGroup">Locked: option('group')</button>
+    <button type="button" data-testid="toggle-toolb" @click="toggleToolb">Toggle toolbar B</button>
   </div>
 
   <section data-testid="zone-locked">
@@ -776,6 +799,7 @@ $onMount(() => seed())
   <section data-testid="zone-toolb">
     <h4>Toolbar B</h4>
     <SortableList
+      r-if="$data.toolbMounted"
       r-model:items="$data.toolb"
       :itemKey="$data.toolsIndexKeys ? indexKey : 'id'"
       group="tools"
@@ -806,6 +830,7 @@ $onMount(() => seed())
     <ul class="foreign-list" data-testid="foreign" ref="foreign" r-external></ul>
   </section>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
+  <output data-testid="last-pointer-end">{{ $data.lastPointerEnd }}</output>
   <output data-testid="end-state">{{ $data.endState }}</output>
   <ol class="event-log">
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>

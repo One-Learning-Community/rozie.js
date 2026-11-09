@@ -65,6 +65,7 @@ const SEED: Record<Slug, string[]> = {
 };
 const SEED_LABELS = Object.values(SEED).flat();
 
+const SHIFT_SENTENCE = ' Hold Shift with an arrow key to move to another list.';
 const TOP_INSTRUCTIONS =
   'Press Space to pick up this widget. Shift with an arrow key moves it to another zone.';
 const GROUP_INSTRUCTIONS =
@@ -622,6 +623,11 @@ for (const target of TARGETS) {
           'content:remove:keyboard',
           'content:end:keyboard',
         ]);
+        // The row went with the unmounted list: no element in the payload
+        // (never a detached one).
+        await expect
+          .poll(async () => JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null'))
+          .toEqual({ item: 'Hero banner', el: null, interaction: 'keyboard' });
         await expect(mount.locator(LIFTED)).toHaveCount(0);
         await assertNothingDisappeared(mount);
         expect(errors).toEqual([]);
@@ -1195,6 +1201,63 @@ for (const target of TARGETS) {
         await expect.poll(() => liveTexts(mount)).toEqual(['Cancelled. Italic returned to position 1 of 2']);
         await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
         await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+  }
+
+  // The Shift sentence is said only when another mounted list could take the
+  // row: Locked (`pull: false`) can hop nowhere; Toolbar A's only peer is
+  // Toolbar B, so the sentence goes when Toolbar B unmounts and comes back
+  // with it.
+  runner(
+    `sortable-keyboard-cross-list [${target}]: the Shift sentence only when another list could take the row`,
+    async ({ page }) => {
+      const { mount, errors } = await open(page);
+      await expect(grip(mount, 'Pinned notice')).toHaveAccessibleDescription(GROUP_INSTRUCTIONS.replace(SHIFT_SENTENCE, ''));
+      await expect(grip(mount, 'Old promo')).toHaveAccessibleDescription(GROUP_INSTRUCTIONS);
+      await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
+      await clickKeepingFocus(mount, 'toggle-toolb');
+      await expect(mount.locator('[role="list"][aria-label="Toolbar B"]')).toHaveCount(0);
+      await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS.replace(SHIFT_SENTENCE, ''));
+      await clickKeepingFocus(mount, 'toggle-toolb');
+      await expect(grip(mount, 'Link')).toBeVisible();
+      await expect(grip(mount, 'Bold')).toHaveAccessibleDescription(HORIZONTAL_GROUP_INSTRUCTIONS);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // A runtime `option('group', v)` wins over `options.group` and the named
+  // props, for the keyboard as for the mouse, and a later `cloneable` change
+  // keeps it. Locked's `options.group` forbids pulling; the runtime group
+  // allows it: Shift+↓ hops Pinned notice past the Palette (`put: false`)
+  // into Top sidebar.
+  for (const burst of [false, true]) {
+    runner(
+      `sortable-keyboard-cross-list [${target}]: a runtime option('group') wins over options.group and survives a cloneable change${burst ? ', back-to-back (no waits)' : ''}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await clickKeepingFocus(mount, 'locked-runtime-group');
+        await clickKeepingFocus(mount, 'locked-cloneable');
+        await page.waitForTimeout(100);
+        await expect(grip(mount, 'Pinned notice')).toHaveAccessibleDescription(GROUP_INSTRUCTIONS);
+        await grip(mount, 'Pinned notice').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowDown', 'Space']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Pinned notice, position 1 of 1']);
+          await page.keyboard.press('Shift+ArrowDown');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Moved Pinned notice to Top sidebar, position 1 of 4']);
+          await page.keyboard.press('Space');
+        }
+        await expect.poll(() => state(mount, 'top')).toEqual(['Pinned notice', ...SEED.top]);
+        await expect.poll(() => state(mount, 'locked')).toEqual([]);
+        await expect
+          .poll(() => texts(mount.locator(LOG_LI)))
+          .toEqual(['locked:start:keyboard', 'top:add:keyboard', 'locked:remove:keyboard', 'top:end:keyboard']);
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
         await assertNothingDisappeared(mount);
         expect(errors).toEqual([]);
       },

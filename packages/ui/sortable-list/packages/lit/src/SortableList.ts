@@ -189,7 +189,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: Number, reflect: true, attribute: 'page-step' }) pageStep: number = 5;
   /**
-   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (with `orientation: 'horizontal'`, "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."). When the list has a group (`group` or `options.group`) the default adds "Hold Shift with an arrow key to move to another list."
+   * Replaces the spoken keyboard instructions. The text sits in a hidden element referenced by `aria-describedby` from each tabbable row (row mode) or from the consumer's handle via the `instructionsId` slot prop (handle mode). Default: "Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel." (with `orientation: 'horizontal'`, "the left and right arrow keys"; a `sort: false` list says only "Press Space or Enter to pick up, and again to drop. Press Escape to cancel."). When another mounted list could take this list's rows (by the group rules of `group`, `options.group` or `option('group', v)`), the default adds "Hold Shift with an arrow key to move to another list." (updated as lists mount, unmount or change group).
    */
   @property({ type: String, reflect: true, attribute: 'keyboard-instructions' }) keyboardInstructions: string | null = null;
   /**
@@ -206,6 +206,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
   private _ariaLiveText = signal('');
   private _instructionsId = signal<any>(null);
   private _optionOverrides = signal<any>({});
+  private _hasHopPeer = signal(false);
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
 private __rozieWatchPrev_3: unknown;
 private __rozieWatchInitial_3 = true;
@@ -284,6 +285,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push((() => {
@@ -413,7 +415,7 @@ private __rozieFirstUpdateDone = false;
           host.emit('end', {
             interaction: 'pointer',
             item: d.item,
-            el: row ?? d.el,
+            el: row ?? this.liveEl(d.el),
             from: d.from,
             to: d.to,
             oldIndex: d.oldIndex,
@@ -490,6 +492,10 @@ private __rozieFirstUpdateDone = false;
         if (i < 0 || i >= list.length) return null;
         return this.rowByKey(listEl, String(this.keyFor(list[i], i)));
       },
+      peersChanged: () => {
+        const v = this.entry != null && this.registry.hasHopPeer(this.entry);
+        if (this._hasHopPeer.value !== v) this._hasHopPeer.value = v;
+      },
       emit: (name: any, payload: any) => {
         if (name === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
           detail: payload,
@@ -560,15 +566,17 @@ private __rozieFirstUpdateDone = false;
       this.appliedOptions = next;
       for (const key of applied as any) {
         // The keyboard reads the value SortableJS now runs with. A remembered
-        // runtime `animation` is superseded by the newer `options` value.
+        // runtime `animation` / `handle` / `group` is superseded by the newer
+        // `options` value.
         if (this.KEYBOARD_OPTIONS.includes(key)) this.setOverride(key, this.instance.option(key));else if (this.TRACKED_OPTIONS.includes(key)) this.clearOverride(key);
       }
+      if (applied.includes('group')) this.registry.notifyPeers();
     })(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled') || changedProperties.has('disableKeyboard') || changedProperties.has('options'))) { const __watchVal = untracked(() => [this.disabled, this.disableKeyboard, this.options, this._optionOverrides.value]); if (!Object.is(__watchVal, this.__rozieWatchPrev_3)) { this.__rozieWatchPrev_3 = __watchVal; untracked(() => (() => {
       if (!this.keyboardEnabled()) this.keyboardTurnedOff();
     })()); } }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.effectiveGroup()))(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.effectiveGroup()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.applyGroup())(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.applyGroup())(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('swapThreshold'))) { const __watchVal = (() => this.swapThreshold)(); ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => {
       this.instance?.option('handle', this.liveOption('handle', v));
@@ -653,14 +661,15 @@ private __rozieFirstUpdateDone = false;
 
   // role="list" takes no aria-orientation, so a horizontal list says which
   // arrow keys move in its instructions instead. A `sort: false` list leaves out
-  // the move sentence, and a list with a group (the one SortableJS runs with,
-  // `options.group` included) says how to hop.
+  // the move sentence, and a list whose rows another mounted list could take
+  // (by the group SortableJS runs with, `options.group` included) says how to
+  // hop.
   instructionsText = () => {
   if (this.keyboardInstructions != null) return this.keyboardInstructions;
   return defaultInstructions({
     horizontal: this.orientation === 'horizontal',
     sortable: this.liveOption('sort', true) !== false,
-    grouped: this.effectiveGroup() != null
+    grouped: this.effectiveGroup() != null && this._hasHopPeer.value
   });
 };
 
@@ -717,10 +726,13 @@ private __rozieFirstUpdateDone = false;
   put: false as const
 } : this.group ?? undefined;
 
-  // The group SortableJS actually runs with: `options.group` lands after the
-  // named props in the merge, so it wins. Keyboard hops follow the same rules
-  // as the mouse, so they read this one.
+  // The group SortableJS actually runs with: a runtime `option('group', v)`,
+  // else `options.group` (it lands after the named props in the merge), else
+  // the `group` / `cloneable` props. Keyboard hops follow the same rules as the
+  // mouse, so they read this one.
   effectiveGroup = () => {
+  const ov: any = this._optionOverrides.value;
+  if (ov != null && Object.prototype.hasOwnProperty.call(ov, 'group')) return ov.group;
   const o: any = this.options;
   return o != null && o.group != null ? o.group : this.resolveGroup();
 };
@@ -807,8 +819,8 @@ private __rozieFirstUpdateDone = false;
 
   // Options whose runtime value (`option(name, v)`) is remembered, so a later
   // change of the matching prop doesn't overwrite it: the keyboard ones, plus
-  // `animation` and `handle` (runtime override → `options` → prop).
-  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation', 'handle'];
+  // `animation`, `handle` and `group` (runtime override → `options` → prop).
+  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation', 'handle', 'group'];
 
   keyboardEnabled = () => !this.disableKeyboard && !this.liveOption('disabled', this.disabled);
 
@@ -918,6 +930,10 @@ private __rozieFirstUpdateDone = false;
   setTimeout(() => focusIt(true), 0);
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => focusIt(true));
 };
+
+  // `el` in an event payload: the row element while it is in the page, else
+  // null (a row that left with an unmounted list is no row of any list).
+  liveEl = (el: any) => el != null && el.isConnected ? el : null;
 
   // The row element carrying `data-id === key` among a list element's direct
   // children (skips nested-list rows and header/footer slot content).
@@ -1052,7 +1068,7 @@ private __rozieFirstUpdateDone = false;
   const fire = (host: any) => host.emit(name, {
     interaction: 'keyboard',
     item: lift ? lift.item : null,
-    el: (lift && host === to ? this.rowByKey(host.el, lift.key) : null) ?? fallbackEl,
+    el: (lift && host === to ? this.rowByKey(host.el, lift.key) : null) ?? this.liveEl(fallbackEl),
     from: from.el,
     to: to.el,
     oldIndex,
@@ -1559,6 +1575,15 @@ private __rozieFirstUpdateDone = false;
   // What stays here is purely declarative: which array to read, what to write
   // back, what to emit, and how to bridge `afterCommit` to the Lit-only
   // `$reconcileAfterDomMutation()` sigil.
+  // `options.group` wins over `group` / `cloneable` (see effectiveGroup), for
+  // the mouse as for the keyboard.
+  // A group change can change which lists can take each other's rows: every
+  // list rechecks its Shift instructions.
+  applyGroup = () => {
+  this.instance?.option('group', this.effectiveGroup());
+  this.registry.notifyPeers();
+};
+
   // Imperative handle (Phase 21 $expose). The SortableJS imperative surface a
   // consumer can't drive through props alone — exposed uniformly to all 6 targets.
   // Each guards the pre-mount/destroyed `instance = null`. Collision-clear: none of
@@ -1604,6 +1629,9 @@ private __rozieFirstUpdateDone = false;
     this.instance.option(name, value);
     if (this.TRACKED_OPTIONS.includes(name)) this.setOverride(name, value);
     if (name === 'disabled' && value) this.keyboardTurnedOff();
+    // After the re-render, so every list reads the new group (React reads
+    // state as of its last render).
+    if (name === 'group') afterFlush(() => this.registry.notifyPeers());
     return value;
   }
 
