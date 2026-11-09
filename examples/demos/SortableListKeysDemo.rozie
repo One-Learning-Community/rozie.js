@@ -13,7 +13,8 @@
   `end` payload is shown in `<output data-testid="last-end">` as JSON
   ({ item, el, from, to, oldIndex, newIndex, interaction }, with `item` as
   the item's label, `el` as "element" or null and `from` / `to` as the list's
-  aria-label).
+  aria-label). `<output data-testid="end-order">` shows the ids of the bound
+  `items` as an `end` handler read them.
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -34,6 +35,7 @@
   items: [],
   log: [],
   lastEnd: '',
+  endOrder: '',
 }
 </data>
 
@@ -62,6 +64,10 @@ const payloadOf = (e) => {
 const record = (name, e) => {
   $data.log = [...$data.log, name + ':' + interactionOf(e)]
   const p = payloadOf(e)
+  if (name === 'end') {
+    // What a consumer `end` handler sees in its own bound array.
+    $data.endOrder = $data.items.map((i) => i.id).join(',')
+  }
   if (name === 'end' && p != null) {
     $data.lastEnd = JSON.stringify({
       item: p.item != null && p.item.label != null ? p.item.label : null,
@@ -116,6 +122,7 @@ $onMount(() => {
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
   </ol>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
+  <output data-testid="end-order">{{ $data.endOrder }}</output>
 </div>
 </template>
 

@@ -172,31 +172,41 @@ for (const target of TARGETS) {
 
 // `end` fires after the bound array is written (audit E1): the demo's `end`
 // handler copies the ids of its bound `items` into a hidden readout, which must
-// already show the new order. Driven with a real mouse drag (`nativeDrag`): a
-// script-dispatched drop makes React render the write only after `end` (see
-// host/dragEvent.ts), which is not what a user's drop does.
+// already show the new order. Two drag drivers per target:
+//   - `synthesizeDrag` dispatches the drop from a script: the drop's microtasks
+//     run after the script returns, with no `window.event`, so React schedules
+//     the write's render in a later task. `end` runs in a task after that one.
+//   - `nativeDrag` drags with the real mouse (trusted events).
+// The drivers land Apple at different rows (row 3's lower half vs. just
+// past row 2), so each pins its own exact order.
+const DRIVERS = [
+  { name: 'script-dispatched drop', drag: synthesizeDrag, ids: 'b,c,a,d,e', labels: ['Banana', 'Cherry', 'Apple', 'Date', 'Elderberry'] },
+  { name: 'native mouse drop', drag: nativeDrag, ids: 'b,a,c,d,e', labels: ['Banana', 'Apple', 'Cherry', 'Date', 'Elderberry'] },
+] as const;
+
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
   );
   const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
 
-  runner(`sortable-drag [${target}]: end handler sees the new order`, async ({ page }) => {
-    await page.goto(`/?example=SortableList&target=${target}`);
-    const mount = page.getByTestId('rozie-mount');
-    await expect(mount).toBeVisible();
-    const items = mount.locator(ITEM);
-    await expect(items).toHaveCount(SEED_ITEM_COUNT);
-    await nativeDrag(page, {
-      sourceHandle: items.nth(0).locator(GRIP).first(),
-      target: items.nth(2),
+  for (const driver of DRIVERS) {
+    runner(`sortable-drag [${target}]: end handler sees the new order (${driver.name})`, async ({ page }) => {
+      await page.goto(`/?example=SortableList&target=${target}`);
+      const mount = page.getByTestId('rozie-mount');
+      await expect(mount).toBeVisible();
+      const items = mount.locator(ITEM);
+      await expect(items).toHaveCount(SEED_ITEM_COUNT);
+      await driver.drag(page, {
+        sourceHandle: items.nth(0).locator(GRIP).first(),
+        target: items.nth(2),
+      });
+      await expect.poll(() => displayedLabels(items)).toEqual([...driver.labels]);
+      await expect
+        .poll(async () => (await mount.locator(`${STATE_LI} code`).allTextContents()).join(','))
+        .toBe(driver.ids);
+      // The `end` handler read that same new order.
+      await expect(mount.getByTestId('end-order')).toHaveText(driver.ids);
     });
-    const ids = () => mount.locator(`${STATE_LI} code`).allTextContents();
-    // The drag moved Apple, and the bound state shows it.
-    await expect.poll(async () => (await ids()).join(',')).not.toBe('a,b,c,d,e');
-    const order = (await ids()).join(',');
-    expect([...order.split(',')].sort().join(',')).toBe('a,b,c,d,e');
-    // The `end` handler read that same new order.
-    await expect(mount.getByTestId('end-order')).toHaveText(order);
-  });
+  }
 }

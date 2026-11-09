@@ -61,8 +61,6 @@ const seedPalette = () => {
   $data.palette = PALETTE_TEMPLATES.map((t) => ({ ...t }))
 }
 
-const TEMPLATE_IDS = PALETTE_TEMPLATES.map((t) => t.id)
-
 // Lit delivers a child $emit as a CustomEvent with the payload in `detail`;
 // the other targets hand over the payload itself.
 const payloadOf = (e) => {
@@ -75,17 +73,22 @@ const record = (slug, name, e) => {
   $data.log = [...$data.log, slug + ':' + name + ':' + (p != null && p.interaction != null ? p.interaction : '?')]
 }
 
-// The canvas's `end`: a copy that just arrived from the palette still has
-// its template id; give it a fresh one so every canvas row has its own key.
+// The documented clone recipe (docs/components/sortable-list.md, Clone mode),
+// verbatim: a copy that just arrived from the palette still has the palette
+// item's id; give it a fresh one so every canvas row has its own key.
 const onCanvasEnd = (e) => {
-  record('canvas', 'end', e)
-  const i = $data.canvas.findIndex((w) => TEMPLATE_IDS.includes(w.id))
+  if (e.from === e.to) return // a reorder within the canvas
+  const i = $data.canvas.findIndex((w) => w.id === e.item.id)
   if (i < 0) return
-  const n = $data.nextDropId
-  $data.nextDropId = n + 1
   const next = [...$data.canvas]
-  next[i] = { ...next[i], id: next[i].id + '-' + n }
+  next[i] = { ...next[i], id: next[i].id + '-' + $data.nextDropId }
+  $data.nextDropId = $data.nextDropId + 1
   $data.canvas = next
+}
+
+const canvasEnd = (ev) => {
+  record('canvas', 'end', ev)
+  onCanvasEnd(payloadOf(ev))
 }
 
 const clearCanvas = () => {
@@ -140,7 +143,7 @@ $onMount(() => seedPalette());
         :handle="$classSelector('grip')"
         @start="record('canvas', 'start', $event)"
         @reorder="record('canvas', 'reorder', $event)"
-        @end="onCanvasEnd($event)"
+        @end="canvasEnd($event)"
         @add="record('canvas', 'add', $event)"
         @remove="record('canvas', 'remove', $event)"
       >

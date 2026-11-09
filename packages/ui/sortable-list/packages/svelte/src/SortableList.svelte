@@ -457,7 +457,7 @@ const loseLift = (unmounting = false) => {
     speak(h, 'Lift ended');
     h.focusNear(lift.index ?? lift.origin.index);
   }
-  h.emit('end', {
+  const payload = {
     interaction: 'keyboard',
     item: lift.item,
     el: null,
@@ -465,18 +465,24 @@ const loseLift = (unmounting = false) => {
     to: h.el,
     oldIndex: lift.origin.index,
     newIndex: -1
-  });
+  };
+  // Like every `end`, in a task after the writes. An unmounting list emits it
+  // now: a later emit from an unmounted component would not be delivered.
+  if (unmounting) h.emit('end', payload);else registry.deferEnd(() => h.emit('end', payload));
 };
 // Keyboard `start` / `end` (the same payload as every other event): `item` is
 // the item value, `el` its row element. `start` fires from the origin list
 // (`from`), `end` from the list the row ends up in (`to`). `el` is the row in
 // that list when it is rendered, else `fallbackEl` (the row element the move
-// started from, before a target re-rendered). `end` is emitted after
+// started from, before a target re-rendered). `end` is called after
 // `registry.lift` is cleared, so a consumer `end` handler that writes the
-// items (re-keying a clone copy) is not mistaken for a lost lift.
+// items (re-keying a clone copy) is not mistaken for a lost lift, and it is
+// emitted in a task (`registry.deferEnd`), after the writes AND the re-render
+// they schedule: a consumer `end` handler reads the new state on every target
+// (React included, whose handler closure is the one from the latest render).
 const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl = null) => {
   const host = name === 'start' ? from : to;
-  host.emit(name, {
+  const fire = () => host.emit(name, {
     interaction: 'keyboard',
     item: lift ? lift.item : null,
     el: (lift ? rowByKey(host.el, lift.key) : null) ?? fallbackEl,
@@ -485,6 +491,7 @@ const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: an
     oldIndex,
     newIndex
   });
+  if (name === 'end') registry.deferEnd(fire);else fire();
 };
 // Move the lifted row to `toIndex` (clamped) within the list holding it.
 // Works through the registry entry, so it acts on the current holder.
@@ -660,7 +667,10 @@ const endLift = (kind: any) => {
   if (h !== origin.list && !registry.has(origin.list) && lift.copy) {
     // A clone copy is removed on cancel even when its source list has
     // unmounted (the source never gave its item up). Focus moves to the
-    // neighbouring row, if any.
+    // neighbouring row, if any. The lift ends BEFORE the write: the copy is
+    // leaving on purpose, and a target whose items watcher runs synchronously
+    // on the write (Solid) must not take it for a lost lift (a second `end`).
+    registry.lift = null;
     const rest = [...items];
     rest.splice(at, 1);
     h.write(rest);
@@ -680,16 +690,16 @@ const endLift = (kind: any) => {
       h.focusRow(rest[k], k);
     }
     // The copy is gone, so there is no row: `el: null`.
-    registry.lift = null;
-    h.emit('end', {
+    const fromEl = origin.list.el;
+    registry.deferEnd(() => h.emit('end', {
       interaction: 'keyboard',
       item,
       el: null,
-      from: origin.list.el,
+      from: fromEl,
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
-    });
+    }));
     return;
   }
   if (h !== origin.list && (!registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -776,6 +786,9 @@ const endLift = (kind: any) => {
 // Lift the row at `index` of this list.
 const startLift = (index: any) => {
   if (!entry) return;
+  // A previous drag's or lift's `end` that is still pending fires first, so
+  // every `end` comes before the next `start`.
+  registry.flushEnds();
   const item = items[index];
   registry.lift = {
     holder: entry,
@@ -1016,6 +1029,8 @@ onMount(() => {
     onStart: (d: any) => {
       // A pointer drag ends any active keyboard lift first.
       if (registry.lift != null) endLift('drop');
+      // That lift's `end` (pending until a task) comes before this `start`.
+      registry.flushEnds();
       onstart?.({
         interaction: 'pointer',
         item: d.item,
@@ -1027,7 +1042,8 @@ onMount(() => {
         originalEvent: d.event
       });
     },
-    // Runs once per drag, after every list involved has written its items.
+    // Runs once per drag, in a task after every list involved has written its
+    // items and the re-render those writes scheduled (see useSortableJS).
     // `end` comes from the list the row ended up in: the destination when it
     // is a SortableList, else (dropped outside, or into a SortableJS list
     // that isn't one of ours) this source list.

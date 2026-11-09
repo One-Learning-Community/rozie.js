@@ -62,6 +62,7 @@
  */
 
 import SortableJS, { type Options as SortableOptions, type SortableEvent } from 'sortablejs';
+import { afterFlush } from './keyboardRegistry';
 
 /** Symbol stashed on `e.item` between `onStart` and `onEnd` to ferry the
  * dragged item DATA (not just the DOM node) across cross-list moves and
@@ -128,10 +129,10 @@ export interface UseSortableJSOptions<T> {
   options?: SortableOptions;
   /** Optional: fires on drag start, from the source list. */
   onStart?: (info: SortableDrag<T>) => void;
-  /** Optional: fires once per drag, from the source list's helper, AFTER
-   * every list involved has run its `onCommit` / `afterCommit` / `onChange`
-   * (a microtask queued after the source's commit; the destination's commit
-   * was queued earlier, from its `onAdd`). The caller decides which list
+  /** Optional: fires once per drag, from the source list's helper, in a
+   * task AFTER every list involved has run its `onCommit` / `afterCommit` /
+   * `onChange` and the flushes those scheduled (see the `finally` in
+   * `handleCommit`). The caller decides which list
    * reports it (the one `info.to` belongs to). */
   onEnd?: (info: SortableDrag<T>) => void;
   /** Optional: fires once per commit with the disambiguated event kind. */
@@ -464,15 +465,16 @@ export function useSortableJS<T>(
       // BEFORE source `onEnd`, so the stash must remain readable on
       // `e.item` until the source side completes.
       //
-      // `onEnd` is chained AFTER this list's commit microtask (queued above,
-      // in the `try`). On a cross-list drag the destination's commit was
-      // queued even earlier, from its `onAdd`, so by the time `onEnd` runs
-      // every list involved has written its items and reported `reorder` /
-      // `add` / `remove`. It is queued from a microtask of its own (two hops),
-      // so the microtasks those commits queued run first too: a framework that
-      // flushes its update in a microtask (Vue, Svelte, React for an update
-      // made during a discrete event such as `drop`) has re-rendered, and a
-      // consumer `end` handler reads the new state.
+      // `onEnd` runs in a TASK (`afterFlush`: `setTimeout(0)`, then a posted
+      // message), scheduled from a microtask
+      // that runs after this list's commit microtask (queued above, in the
+      // `try`). On a cross-list drag the destination's commit was queued even
+      // earlier, from its `onAdd`. So by the time `onEnd` runs every list
+      // involved has written its items and reported `reorder` / `add` /
+      // `remove`, and any flush those writes scheduled — in a microtask (Vue,
+      // Svelte, React during a discrete event), a timer, or a posted message
+      // (React's scheduler otherwise) — has run: a consumer `end` handler
+      // reads the new state on every target.
       const fromUs = e.from === listEl;
       if (fromUs) {
         const item = e.item as unknown as Record<string, unknown> | null;
@@ -490,7 +492,7 @@ export function useSortableJS<T>(
         };
         if (opts.onEnd) {
           const onEnd = opts.onEnd;
-          queueMicrotask(() => queueMicrotask(() => onEnd(info)));
+          queueMicrotask(() => afterFlush(() => onEnd(info)));
         }
       }
     }

@@ -94,6 +94,14 @@ export interface KeyboardRegistry {
   findHopTarget(from: ListEntry, dir: 1 | -1): ListEntry | null;
   listName(entry: ListEntry): string;
   indexOfLift(): number;
+  /**
+   * Run `fire` (an `end` emit) in a task, after every write made so far and
+   * whatever framework flush those writes scheduled (`afterFlush`). Pending ends run in
+   * order; `flushEnds()` runs them now.
+   */
+  deferEnd(fire: () => void): void;
+  /** Run every pending `end` now (before a new drag or lift emits `start`). */
+  flushEnds(): void;
 }
 
 interface Singleton {
@@ -102,6 +110,29 @@ interface Singleton {
 }
 
 const KEY = Symbol.for('rozie.sortable-list.keyboard.v1');
+
+/**
+ * Run `fn` after the work a framework scheduled for writes made so far:
+ * microtasks (Vue, Svelte, React during a discrete event), timers, and
+ * posted messages (React's scheduler renders in a MessageChannel task). A
+ * `setTimeout(0)` alone runs before an earlier-posted message in Chrome, so it
+ * hops once more through a fresh MessageChannel: posted messages run in the
+ * order they were posted, so ours runs after one a framework posted first.
+ */
+export function afterFlush(fn: () => void): void {
+  setTimeout(() => {
+    if (typeof MessageChannel !== 'function') {
+      fn();
+      return;
+    }
+    const ch = new MessageChannel();
+    ch.port1.onmessage = () => {
+      ch.port1.close();
+      fn();
+    };
+    ch.port2.postMessage(null);
+  }, 0);
+}
 
 // Composed-tree parent: slot assignment, then light/shadow parent, then host.
 function composedParent(n: any): any {
@@ -234,6 +265,7 @@ export function canHop(from: GroupOption, to: GroupOption): { ok: boolean; copy:
 
 function createState(): Singleton {
   const entries = new Set<ListEntry>();
+  const pendingEnds: Array<() => void> = [];
   const registry: KeyboardRegistry = {
     lift: null,
     speaker: null,
@@ -297,6 +329,13 @@ function createState(): Singleton {
       }
       l.index = i;
       return i;
+    },
+    deferEnd(fire) {
+      pendingEnds.push(fire);
+      afterFlush(() => registry.flushEnds());
+    },
+    flushEnds() {
+      while (pendingEnds.length > 0) pendingEnds.shift()!();
     },
   };
   return { registry, counter: 0 };

@@ -116,8 +116,10 @@ beforeEach(() => {
  * sequencing — see useSortableJS.ts for the cross-instance
  * `Sortable.active` nulling hazard. */
 async function flushMicrotasks(): Promise<void> {
-  // `onEnd` is chained two microtask hops after the commit.
+  // `onEnd` runs in a task (setTimeout 0) scheduled after the commit.
   for (let i = 0; i < 6; i++) await Promise.resolve();
+  // `onEnd` waits a timer, then a posted message.
+  await new Promise((res) => setTimeout(res, 20));
 }
 
 describe('useSortableJS', () => {
@@ -860,5 +862,48 @@ describe('end: after the write, once per drag', () => {
     expect(starts[0]!.item?.id).toBe('a');
     expect(ends[0]!.oldIndex).toBe(0);
     expect(ends[0]!.newIndex).toBe(2);
+  });
+});
+
+describe('end: after framework flushes', () => {
+  it('a microtask, a timer and a posted message queued from inside onCommit all run before onEnd', async () => {
+    const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    const listEl = buildList(items);
+    const order: string[] = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => {
+        order.push('commit');
+        // A framework flushing its update in a microtask, and one flushing
+        // it in a task (React's scheduler, outside a discrete event).
+        queueMicrotask(() => order.push('flush:microtask'));
+        setTimeout(() => order.push('flush:task'), 0);
+        // React's scheduler posts its render as a MessageChannel message.
+        const ch = new MessageChannel();
+        ch.port1.onmessage = () => {
+          order.push('flush:message');
+          ch.port1.close();
+        };
+        ch.port2.postMessage(null);
+      },
+      onEnd: () => order.push('end'),
+    });
+    const rec = getLastConstructed();
+    const dragged = listEl.children[0] as HTMLElement;
+    rec.options.onStart?.({ item: dragged, oldIndex: 0, oldDraggableIndex: 0, from: listEl, to: listEl });
+    listEl.appendChild(dragged);
+    rec.options.onEnd?.({
+      item: dragged,
+      oldIndex: 0,
+      newIndex: 2,
+      oldDraggableIndex: 0,
+      newDraggableIndex: 2,
+      from: listEl,
+      to: listEl,
+    });
+    await new Promise((res) => setTimeout(res, 30));
+    expect(order).toContain('end');
+    expect(order.indexOf('end')).toBe(order.length - 1);
+    expect([...order].sort()).toEqual(['commit', 'end', 'flush:message', 'flush:microtask', 'flush:task']);
   });
 });

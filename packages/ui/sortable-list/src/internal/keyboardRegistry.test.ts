@@ -222,6 +222,21 @@ describe('registry', () => {
     unA();
     expect(r.entryFor(a)).toBeNull();
   });
+  it('deferEnd runs after a task queued before it; flushEnds runs pending ends once, now', async () => {
+    const r = getKeyboardRegistry();
+    const order: string[] = [];
+    setTimeout(() => order.push('earlier task'), 0);
+    r.deferEnd(() => order.push('end1'));
+    r.deferEnd(() => order.push('end2'));
+    expect(order).toEqual([]);
+    await new Promise((res) => setTimeout(res, 5));
+    expect(order).toEqual(['earlier task', 'end1', 'end2']);
+    r.deferEnd(() => order.push('end3'));
+    r.flushEnds();
+    expect(order.at(-1)).toBe('end3');
+    await new Promise((res) => setTimeout(res, 5));
+    expect(order.filter((o) => o === 'end3')).toHaveLength(1);
+  });
   it('has() tracks registration; unregister clears the speaker', () => {
     const ea = fakeEntry(el(), 'z');
     const r = getKeyboardRegistry();

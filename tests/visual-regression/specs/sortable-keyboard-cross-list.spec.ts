@@ -640,6 +640,10 @@ for (const target of TARGETS) {
       await expect
         .poll(async () => (await texts(mount.locator(LOG_LI))).slice(-2))
         .toEqual(['top:remove:keyboard', 'top:end:keyboard']);
+      // Exactly one `end` (a target whose items watcher runs synchronously on
+      // the copy's removal must not also report it as a lost lift).
+      await page.waitForTimeout(150);
+      expect((await texts(mount.locator(LOG_LI))).filter((e) => e.includes(':end:'))).toEqual(['top:end:keyboard']);
       await expect(mount.locator(LIFTED)).toHaveCount(0);
       await expect.poll(() => active(page), { timeout: 5000 }).not.toBe('<body>');
       await assertNothingDisappeared(mount);
@@ -734,6 +738,66 @@ for (const target of TARGETS) {
       await assertNothingDisappeared(mount);
     },
   );
+
+  // The `end` handler reads the bound arrays AFTER Escape's writes, in both
+  // lists (React's handler closure included: `end` runs after the re-render).
+  const endState = async (mount: Mount) =>
+    JSON.parse((await mount.getByTestId('end-state').textContent()) || 'null');
+
+  for (const burst of [false, true]) {
+    const tag = burst ? ', back-to-back (no waits)' : '';
+
+    runner(
+      `sortable-keyboard-cross-list [${target}]: end handler sees both lists after a hop is cancelled${tag}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await grip(mount, 'Tag cloud').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowDown', 'Escape']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await page.keyboard.press('Shift+ArrowDown');
+          await expect.poll(() => state(mount, 'content')).toEqual(['Tag cloud', ...SEED.content]);
+          await page.keyboard.press('Escape');
+        }
+        await expect
+          .poll(() => liveTexts(mount))
+          .toEqual(['Cancelled. Tag cloud returned to Top sidebar, position 3']);
+        await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+        await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
+        await expect
+          .poll(() => endState(mount))
+          .toEqual({ palette: SEED.palette, top: SEED.top, content: SEED.content });
+        await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('top:end:keyboard');
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+
+    runner(
+      `sortable-keyboard-cross-list [${target}]: end handler sees the clone copy removed on Escape${tag}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await grip(mount, 'Text block').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowDown', 'Escape']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await page.keyboard.press('Shift+ArrowDown');
+          await expect.poll(() => state(mount, 'top')).toEqual(['Text block', ...SEED.top]);
+          await page.keyboard.press('Escape');
+        }
+        await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+        await expect.poll(() => state(mount, 'palette')).toEqual(SEED.palette);
+        await expect
+          .poll(() => endState(mount))
+          .toEqual({ palette: SEED.palette, top: SEED.top, content: SEED.content });
+        await expect.poll(async () => (await texts(mount.locator(LOG_LI))).at(-1)).toBe('palette:end:keyboard');
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
+  }
 
   // KNOWN GAP on Lit (emitter behaviour, not this component): the Lit emitter
   // lowers every `$emit(name, x)` to

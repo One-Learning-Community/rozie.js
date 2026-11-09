@@ -388,4 +388,41 @@ for (const target of TARGETS) {
       await assertInvariant(mount);
     },
   );
+
+  // The `end` handler reads the bound array AFTER Escape wrote the restored
+  // order (React's handler closure included: `end` runs after the re-render).
+  runner(`sortable-keyboard-keys [${target}]: end handler sees the order Escape restored`, async ({ page }) => {
+    const { mount, items, aria } = await open(page);
+    await items.nth(0).focus();
+    await page.keyboard.press('Space');
+    await page.keyboard.press('ArrowDown');
+    await expect(aria).toHaveText('Moved Apple to position 2');
+    await page.keyboard.press('ArrowDown');
+    await expect(aria).toHaveText('Moved Apple to position 3');
+    await page.keyboard.press('Escape');
+    await expect(aria).toHaveText('Cancelled. Apple returned to position 1');
+    await expectOrder(mount, items, SEED);
+    await expect(mount.getByTestId('end-order')).toHaveText('a,b,c,d,e');
+    await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual([
+      'start:keyboard',
+      'reorder:keyboard',
+      'reorder:keyboard',
+      'reorder:keyboard',
+      'end:keyboard',
+    ]);
+    await assertInvariant(mount);
+  });
+
+  runner(
+    `sortable-keyboard-keys [${target}]: end handler sees the order Escape restored, back-to-back (no waits)`,
+    async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await items.nth(0).focus();
+      for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Escape']) await page.keyboard.press(key);
+      await expect(aria).toHaveText('Cancelled. Apple returned to position 1');
+      await expectOrder(mount, items, SEED);
+      await expect(mount.getByTestId('end-order')).toHaveText('a,b,c,d,e');
+      await assertInvariant(mount);
+    },
+  );
 }

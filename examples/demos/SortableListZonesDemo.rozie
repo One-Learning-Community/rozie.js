@@ -35,6 +35,8 @@
   `{slug}:{event}:{interaction}`. The last keyboard `end` payload is shown in
   `<output data-testid="last-end">` as JSON ({ item, el, interaction }, with
   `item` reported as the item's label and `el` as "element" or null).
+  `<output data-testid="end-state">` shows the Palette, Top sidebar and Content
+  labels as the last `end` handler read them (JSON).
 
   NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
 -->
@@ -62,6 +64,7 @@
   toolb: [],
   log: [],
   lastEnd: '',
+  endState: '',
   trigger: 'handle',
   topMounted: true,
   topHidden: false,
@@ -122,6 +125,11 @@ const interactionOf = (e) => {
 const record = (slug, name, e) => {
   $data.log = [...$data.log, slug + ':' + name + ':' + interactionOf(e)]
   const p = payloadOf(e)
+  if (name === 'end') {
+    // What a consumer `end` handler sees in its bound arrays.
+    const labels = (list) => list.map((it) => it.label)
+    $data.endState = JSON.stringify({ palette: labels($data.palette), top: labels($data.top), content: labels($data.content) })
+  }
   if (name === 'end' && p != null && p.interaction === 'keyboard') {
     $data.lastEnd = JSON.stringify({
       item: p.item != null && p.item.label != null ? p.item.label : null,
@@ -741,6 +749,7 @@ $onMount(() => seed())
     </ol>
   </section>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
+  <output data-testid="end-state">{{ $data.endState }}</output>
   <ol class="event-log">
     <li r-for="entry, index in $data.log" :key="index">{{ entry }}</li>
   </ol>

@@ -125,7 +125,9 @@ Order and source:
 
 - `start` fires from the origin list.
 - `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists emits `add` from the destination and then `remove` from the source.
-- `end` fires once per drag or lift, after those writes and events, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. So an `end` handler sees the new order in the bound array: `save(items)` works there, for mouse and keyboard alike.
+- `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source.
+- `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end` comes before the next `start`.
+- A drop from a SortableJS list that is not a `SortableList` into a `SortableList` emits `add` from the destination but no `end`: the drag belongs to the foreign list, which ends it.
 - A mouse drop back where the row started writes nothing and fires no `reorder`; `start` and `end` still fire, with `oldIndex === newIndex`.
 - Keyboard `start` fires once on lift and `end` once on drop or cancel. Each keyboard move emits its own `reorder` (within a list) or `remove` + `add` (a hop between lists).
 - When a lift is lost because the consumer took the lifted item out of the bound array mid-lift, `end` still fires, with `item` set to the lifted value and `el: null`.
@@ -388,13 +390,16 @@ Every copy of a palette item is the same value, so two drops of one widget would
 ```js
 const onCanvasEnd = (e) => {
   if (e.from === e.to) return // a reorder within the canvas
-  const i = $data.canvas.indexOf(e.item)
+  const i = $data.canvas.findIndex((w) => w.id === e.item.id)
   if (i < 0) return
   const next = [...$data.canvas]
-  next[i] = { ...e.item, id: e.item.id + '-' + $data.nextId++ }
+  next[i] = { ...next[i], id: next[i].id + '-' + $data.nextDropId }
+  $data.nextDropId = $data.nextDropId + 1
   $data.canvas = next
 }
 ```
+
+The copy is the one canvas row still carrying the palette item's id. (On Lit the handler receives a `CustomEvent`; read the payload from its `detail`.) [`SortableListCloneDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListCloneDemo.rozie) uses this exact handler.
 
 Don't re-key in `add` (a keyboard hop fires `add` while the row is still lifted; see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)).
 

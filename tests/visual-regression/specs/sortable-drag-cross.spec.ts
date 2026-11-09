@@ -306,11 +306,13 @@ for (const target of TARGETS) {
       const rowKeys = () =>
         canvas.evaluateAll((rows) => rows.map((r) => r.getAttribute('data-id') ?? ''));
 
-      // React drags with a real mouse: after a script-dispatched drop React
-      // renders the canvas write only after `end`, so the handler would read
-      // the previous render's canvas (see host/dragEvent.ts). A real drop
-      // renders first. The other targets read fresh state either way.
-      const drag = target === 'react' ? nativeDrag : synthesizeDrag;
+      // A real mouse drag everywhere except Lit. KNOWN GAP on Lit (Task 6): a
+      // native drop onto the EMPTY canvas list never lands. On Lit the list's
+      // `#header` / `#footer` `<slot>`s (`display: contents`) are element
+      // children of the list, so SortableJS's `_detectNearestEmptySortable` /
+      // `lastChild` don't see it as an empty list to drop into. The
+      // script-dispatched drop targets the list element directly and lands.
+      const drag = target === 'lit' ? synthesizeDrag : nativeDrag;
       // First copy onto the empty canvas, then a second copy of the same
       // widget onto it.
       await drag(page, { sourceHandle: palette.nth(0).locator(GRIP).first(), target: canvasList });
