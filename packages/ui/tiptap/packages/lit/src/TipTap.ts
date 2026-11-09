@@ -591,7 +591,7 @@ private portals = {
     // focusEditor() or any other verb.
     const needsFloating = !!(this.floatingMenu !== undefined);
     const needsImage = !!this.uploadImage;
-    const needsCount = this.maxLength != null || !!(this._hasSlotCount || this.count !== undefined);
+    const needsCount = this.maxLength != null || !!(this._hasSlotCount || this.count !== undefined || this.rozieSlots?.["count"] !== undefined);
     const construct = (floatingMod: any, imageMod: any, countMod: any) => {
       const FloatingMenu = floatingMod ? floatingMod.FloatingMenu : null;
       const Image = imageMod ? imageMod.Image : null;
@@ -945,7 +945,7 @@ private portals = {
     <button type="button" aria-label="Redo" @click=${this.redo} data-rozie-s-2aeee876>↻</button>
   </div>` : nothing}${this.editable && this.toolbar !== undefined ? html`<div class="rozie-tiptap-toolbar rozie-tiptap-toolbar--slot" data-rozie-ref="toolbarEl" data-rozie-s-2aeee876></div>` : nothing}<div class="rozie-tiptap-content" data-placeholder=${this.placeholder} data-rozie-ref="editorEl" data-rozie-s-2aeee876></div>
   
-  ${this.maxLength != null || this._hasSlotCount || this.count !== undefined ? html`<div class="rozie-tiptap-count" data-rozie-s-2aeee876>
+  ${this.maxLength != null || this._hasSlotCount || this.count !== undefined || this.rozieSlots?.["count"] !== undefined ? html`<div class="rozie-tiptap-count" data-rozie-s-2aeee876>
     ${this.rozieSlots?.['count'] !== undefined ? this.rozieSlots?.['count']!({characters: this._count.value.characters, words: this._count.value.words, maxLength: this.maxLength, over: this.maxLength != null && this._count.value.characters > this.maxLength}) : this.count !== undefined ? this.count({characters: this._count.value.characters, words: this._count.value.words, maxLength: this.maxLength, over: this.maxLength != null && this._count.value.characters > this.maxLength}) : html`<slot name="count" data-rozie-params=${(() => { try { return JSON.stringify({characters: this._count.value.characters, words: this._count.value.words, maxLength: this.maxLength, over: this.maxLength != null && this._count.value.characters > this.maxLength}); } catch { return '{}'; } })()}>
       <span class="${Object.entries({ "rozie-tiptap-count-value": true, over: this.maxLength != null && this._count.value.characters > this.maxLength }).filter(([, v]) => v).map(([k]) => k).join(' ')}" data-rozie-s-2aeee876>${rozieDisplay(this._count.value.characters)} / ${this.maxLength}</span>
     </slot>`}

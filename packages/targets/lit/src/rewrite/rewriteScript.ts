@@ -489,7 +489,10 @@ export function rewriteScript(
   // The producer's `_hasSlot<X>` light-DOM detector never flips for property
   // fills, so the `$slots.X` presence check must union both signals.
   const scopedSlotNames = new Set(
-    ir.slots.filter((s) => s.isPortal !== true && s.params.length > 0).map((s) => s.name),
+    ir.slots
+      .filter((s) => s.isPortal !== true && s.params.length > 0)
+      // Keyed like `$slots.<member>` reads it: the default slot is 'default'.
+      .map((s) => (s.name === '' ? 'default' : s.name)),
   );
   const portalSlotNames = new Set(
     ir.slots.filter((s) => s.isPortal === true).map((s) => portalKey(s)),
@@ -736,11 +739,24 @@ export function rewriteScript(
         // `<template #X="{ p }">` consumer fills (ec24d26). Emit the union so
         // the gate flips for BOTH light-DOM legacy fills and property fills.
         if (scopedSlotNames.has(prop.name)) {
+          // Filled through light DOM, the named property a Rozie consumer
+          // sets (`__rozieDefaultSlot__` for the default slot), or the
+          // `rozieSlots` record a non-Rozie consumer sets (key 'default' for
+          // the default slot) — the producer renders from all three.
+          const fillProp = prop.name === 'default' ? '__rozieDefaultSlot__' : prop.name;
           path.replaceWith(
             t.logicalExpression(
               '||',
-              thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`),
-              t.binaryExpression('!==', thisDot(prop.name), t.identifier('undefined')),
+              t.logicalExpression(
+                '||',
+                thisDot(`_hasSlot${slotFieldSuffix(prop.name)}`),
+                t.binaryExpression('!==', thisDot(fillProp), t.identifier('undefined')),
+              ),
+              t.binaryExpression(
+                '!==',
+                t.optionalMemberExpression(thisDot('rozieSlots'), t.stringLiteral(prop.name), true, true),
+                t.identifier('undefined'),
+              ),
             ),
           );
           path.skip();
