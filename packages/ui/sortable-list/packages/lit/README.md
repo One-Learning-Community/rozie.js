@@ -26,9 +26,11 @@ el.items = [
   { id: '1', label: 'Apple' },
   { id: '2', label: 'Banana' },
 ];
-// Row content: a function from each row's { item, index, instructionsId }
-// to a lit template.
-el.__rozieDefaultSlot__ = ({ item }) => html`<span>${item.label}</span>`;
+// Row content: `rozieSlots.default` maps each row's
+// { item, index, instructionsId } to a lit template.
+el.rozieSlots = {
+  default: ({ item }) => html`<span>${item.label}</span>`,
+};
 // `items` is two-way: the reordered array arrives in `items-change`.
 el.addEventListener('items-change', (e) => {
   el.items = (e as CustomEvent<unknown[]>).detail;
@@ -101,7 +103,7 @@ el.option('disabled', true);
 
 ## Slots
 
-Rows render from the `__rozieDefaultSlot__` property: a function from `{ item, index, instructionsId }` to a lit template, called once per row. Its markup renders inside the element's shadow root, so page CSS does not reach it: style it inside the template. Fill `header` / `footer` with light-DOM children carrying `slot="header"` / `slot="footer"`.
+Rows render from `rozieSlots.default`: set the element's `rozieSlots` property to an object whose `default` is a function from `{ item, index, instructionsId }` to a lit template, called once per row. Its markup renders inside the element's shadow root, so page CSS does not reach it (style it inside the template), and a handle in it can use `instructionsId` for `aria-describedby`. Fill `header` / `footer` with light-DOM children carrying `slot="header"` / `slot="footer"`.
 
 | Slot | Params |
 | --- | --- |

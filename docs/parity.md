@@ -301,14 +301,16 @@ Every qualifying slot fill — scoped, dynamically named, or matched against a
 producer's dynamic-name family (`SlotDecl.dynamicNameExpr` / `namePrefix`, see
 [Producer-side dynamic slot names](#dynamic-slot-names-r5-—-per-target-consumer-side-divergences))
 — now contributes one entry to a single <span v-pre>`.rozieSlots=${{ ... }}`</span> object literal on
-the producer's tag, collected in source order. The producer's own dispatch tries,
-in order:
+the producer's tag, collected in source order. For every slot that passes scope params (portal slots excepted), the producer's
+own dispatch tries, in order:
 
-1. **Record lookup** — `this.rozieSlots?.[key]?.(scope)`, tried first.
-2. **Named function property** — the pre-existing per-slot `@property` receiver, for
-   an ordinary statically-named scoped slot that never needed the record.
-3. **Native `<slot>` fallback** — for a fill with no scope and no dynamic name, or
-   when a consumer left a family member unfilled.
+1. **Record lookup** — `this.rozieSlots?.[key]`, tried first. The key is the slot's
+   name (`'default'` for the default slot), or the runtime name of a dynamic slot.
+2. **Named function property** — the per-slot `@property` receiver
+   (`this.<name>`, `this.__rozieDefaultSlot__` for the default slot) that a Rozie
+   consumer's identifier-named fill sets. Dynamic and non-identifier names have none.
+3. **Native `<slot>` fallback** — when neither is set (a paramless slot is always
+   a plain `<slot>`).
 
 The **legacy `data-rozie-params` + `observeRozieSlotCtx` light-DOM path is retained
 unchanged** — a *paramless* dynamic fill (a runtime name with no scoped context to
@@ -340,6 +342,9 @@ const el = document.querySelector('my-table')!;
     html`<strong>${scope.value}</strong>`,
 };
 ```
+
+The same record fills ordinary named and default scoped slots:
+``el.rozieSlots = { default: ({ item }) => html`<span>${item.label}</span>` }``.
 
 Each key is a scope-taking function — no serialization, no attribute observer, no
 JSON round-trip. This is the direct form of the `slots`/`snippets`/`templates` props

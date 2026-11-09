@@ -14,8 +14,8 @@
  *              leaf passes (a plain `item` value); the row text renders.
  *   - lit:     the tag the snippet queries is the leaf's `@customElement`, each
  *              property it sets is a public leaf property, each event it
- *              listens for is one the leaf dispatches, and it sets the row
- *              renderer the leaf calls per row.
+ *              listens for is one the leaf dispatches, and it fills rows
+ *              through `rozieSlots.default`, which the leaf calls per row.
  *
  * Also checked per README: the peer line names every framework peer in the
  * leaf's package.json, and the events table names each event the way that
@@ -151,9 +151,11 @@ describe('README quick-starts work against the leaf', () => {
       ...[...src.matchAll(/eventName: '([\w-]+)'/g)].map((m) => m[1]),
     ]);
     for (const [, e] of code.matchAll(/addEventListener\('([\w-]+)'/g)) expect([...events]).toContain(e);
-    // Rows get content: the leaf renders `__rozieDefaultSlot__(ctx)` per row.
-    expect(src).toMatch(/this\.__rozieDefaultSlot__\(\{item: item/);
-    expect(set).toContain('__rozieDefaultSlot__');
+    // Rows get content: the leaf tries `rozieSlots['default'](ctx)` first per row.
+    expect(src).toMatch(/this\.rozieSlots\?\.\['default'\] !== undefined \? this\.rozieSlots\?\.\['default'\]!\(\{item: item/);
+    expect(set).toContain('rozieSlots');
+    expect(code).toMatch(/el\.rozieSlots = \{\s*default: \(\{ item \}\) =>/);
+    expect(code).not.toContain('__rozieDefaultSlot__');
     expect(() => ts.transpileModule(code, { reportDiagnostics: true })).not.toThrow();
   });
 });

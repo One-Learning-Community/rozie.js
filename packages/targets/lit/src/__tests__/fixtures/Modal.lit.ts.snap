@@ -149,16 +149,16 @@ private __rozieWatchInitial_0 = true;
 ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { if ($event.target !== $event.currentTarget) return; this.closeOnBackdrop && this.close(); }} data-rozie-ref="backdropEl" data-rozie-s-fc45feb2>
   <div class="modal-dialog" role="dialog" aria-modal="true" aria-label=${rozieAttr(this.title || undefined)} tabindex="-1" data-rozie-ref="dialogEl" data-rozie-s-fc45feb2>
     ${this.title || this._hasSlotHeader || this.header !== undefined ? html`<header data-rozie-s-fc45feb2>
-      ${this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}>
+      ${this.rozieSlots?.['header'] !== undefined ? this.rozieSlots?.['header']!({close: this.close}) : this.header !== undefined ? this.header({close: this.close}) : html`<slot name="header" @rozie-header-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}>
         <h2 data-rozie-s-fc45feb2>${this.title}</h2>
       </slot>`}
       <button class="close-btn" aria-label="Close" @click=${this.close} data-rozie-s-fc45feb2>×</button>
     </header>` : nothing}<div class="modal-body" data-rozie-s-fc45feb2>
-      ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
+      ${this.rozieSlots?.['default'] !== undefined ? this.rozieSlots?.['default']!({close: this.close}) : this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
     </div>
 
     ${this._hasSlotFooter || this.footer !== undefined ? html`<footer data-rozie-s-fc45feb2>
-      ${this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
+      ${this.rozieSlots?.['footer'] !== undefined ? this.rozieSlots?.['footer']!({close: this.close}) : this.footer !== undefined ? this.footer({close: this.close}) : html`<slot name="footer" @rozie-footer-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
     </footer>` : nothing}</div>
 </div>` : nothing}`;
   }

@@ -101,9 +101,17 @@ export function buildRozieSlotsRecordType(slots: SlotDecl[]): string {
   // React's `refineSlotTypes.ts#buildSlotsRecordType` identical fix.
   for (const s of slots) {
     if (s.dynamicNameExpr !== undefined) continue;
-    if (s.name === '' || isSlotNameIdentifier(s.name)) continue;
+    // Identifier-named and default scoped slots are record keys too (the
+    // producer tries `rozieSlots['<name>']` / `rozieSlots['default']` first),
+    // so they get a named entry as well: without one, a fill's scope is not
+    // contextually typed once family index signatures are present.
+    const isStaticNamed = s.name === '' || isSlotNameIdentifier(s.name);
+    if (isStaticNamed && (s.params.length === 0 || s.isPortal === true)) continue;
+    const key = s.name === '' ? 'default' : s.name;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
     const scopeType = slotScopeTypeObject(s.params, s.paramTypes, s.paramTypesAuthored === true);
-    members.push(`'${escapeSingleQuotedKey(s.name)}'?: (scope: ${scopeType}) => unknown;`);
+    members.push(`'${escapeSingleQuotedKey(key)}'?: (scope: ${scopeType}) => unknown;`);
   }
   for (const s of dynamicSlots) {
     if (s.namePrefix === undefined || s.namePrefix.length === 0) continue;

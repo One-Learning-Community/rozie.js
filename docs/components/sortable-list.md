@@ -167,9 +167,9 @@ From a framework package, fill it the framework's way:
 | Svelte | `{#snippet children({ item })}` | `{#snippet header()}` / `{#snippet footer()}` |
 | Angular | `<ng-template #defaultSlot let-item="item">` | `<ng-template #header>` / `<ng-template #footer>` |
 | Solid | `children` function: `{({ item }) => …}` (`item` is the value, not an accessor) | `headerSlot` / `footerSlot` props |
-| Lit | the `__rozieDefaultSlot__` property: `({ item }) => html\`…\`` | light-DOM children with `slot="header"` / `slot="footer"` |
+| Lit | the `rozieSlots` property: ``el.rozieSlots = { default: ({ item }) => html`…` }`` | light-DOM children with `slot="header"` / `slot="footer"` |
 
-On Lit, rows rendered through `__rozieDefaultSlot__` live inside the element's shadow root, so page CSS doesn't reach them; style them inside the template.
+On Lit, rows rendered through `rozieSlots.default` live inside the element's shadow root, so page CSS doesn't reach them; style them inside the template. (Rozie consumers compiled to Lit fill the slot their own way; the result is the same.)
 
 #### `#header` / `#footer` slots
 
@@ -364,7 +364,7 @@ The hidden instructions text defaults to:
 
 > Press Space or Enter to pick up, and again to drop. Use the up and down arrow keys to move, Home and End to jump to the start or end, Page Up and Page Down to move several places, and Escape to cancel.
 
-With `orientation="horizontal"` it says "the left and right arrow keys". A `sort: false` list can't move rows within itself, so its text is "Press Space or Enter to pick up, and again to drop. Press Escape to cancel." When the list has a group (the `group` prop or `options.group`, the one SortableJS uses), " Hold Shift with an arrow key to move to another list." is added. Pass `keyboardInstructions` to replace all of it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit this works for rows rendered through the `__rozieDefaultSlot__` property, which live inside the shadow root; light-DOM markup can't reference an id across the shadow root, so give such a handle its own `aria-label` or description instead.
+With `orientation="horizontal"` it says "the left and right arrow keys". A `sort: false` list can't move rows within itself, so its text is "Press Space or Enter to pick up, and again to drop. Press Escape to cancel." When the list has a group (the `group` prop or `options.group`, the one SortableJS uses), " Hold Shift with an arrow key to move to another list." is added. Pass `keyboardInstructions` to replace all of it. In row mode each tabbable row references it with `aria-describedby`. In handle mode, bind the default slot's `instructionsId` to the handle button's `aria-describedby` (see the example below). On Lit this works for rows rendered through `rozieSlots.default` (and for Rozie consumers), which live inside the shadow root; light-DOM markup can't reference an id across the shadow root, so give such a handle its own `aria-label` or description instead.
 
 #### Announcements
 
@@ -416,7 +416,7 @@ const announcements = {
 </template>
 ```
 
-In a TypeScript consumer, annotate it to get the context typed: `const announcements: Announcements = { … }` (React: `import { SortableList, type Announcements } from '@rozie-ui/sortable-list-react'`). Inline, `announcements={{ moved: ({ label }) => … }}` is typed from the prop.
+In a TypeScript consumer, annotate it to get the context typed: `const announcements: Announcements = { … }` (React: `import { SortableList, type Announcements } from '@rozie-ui/sortable-list-react'`). Inline, <span v-pre>`announcements={{ moved: ({ label }) => … }}`</span> is typed from the prop.
 
 The label is computed only when the text uses it, so `labelFor` is not called for a message that doesn't name the row. For `liftEnded` the row has left the list, so a `label` read there comes from the item and its last known index.
 
@@ -449,7 +449,7 @@ The rules:
 - Handled keys call `preventDefault`, so the handle button's own click does not fire.
 - Focus returns to the moved row's handle after each move, on every framework.
 - You own the handle markup and its accessible name. The component adds no `tabindex` or `role` to slot content.
-- The default slot receives `instructionsId`, the id of the hidden instructions element. Bind it as the handle's `aria-describedby` so screen readers read the keys on focus. It is `null` until the list has mounted (the id is assigned then, so server-rendered markup and the first browser render agree); `aria-describedby` bound to `null` renders no attribute. On Lit this works for rows rendered through the `__rozieDefaultSlot__` property (how Rozie consumers and the Lit quick start render), which live inside the list's shadow root; markup placed in the element's light DOM can't reference an id across the shadow boundary.
+- The default slot receives `instructionsId`, the id of the hidden instructions element. Bind it as the handle's `aria-describedby` so screen readers read the keys on focus. It is `null` until the list has mounted (the id is assigned then, so server-rendered markup and the first browser render agree); `aria-describedby` bound to `null` renders no attribute. On Lit this works for rows rendered through `rozieSlots.default` (the Lit quick start) and for Rozie consumers, whose rows live inside the list's shadow root; markup placed in the element's light DOM can't reference an id across the shadow boundary.
 - Without a `handle` selector, keyboard reordering is off (and the list is not a keyboard hop target) and a console warning is logged. There is no silent fallback to row mode.
 - `disabled` and `disableKeyboard` still turn keyboard reordering off.
 
@@ -653,6 +653,11 @@ Not supported yet:
 - **Extra SortableJS plugins** mounted with `Sortable.mount` (MultiDrag, Swap, and the like). The component handles SortableJS's events and writes the bound arrays itself, so a plugin that changes what a drop does isn't supported.
 - **A "move up / move down / move to list" button recipe** for pointer users who can't drag (WCAG 2.5.7). You can build one today with your own buttons that write the bound array; there is no ready-made recipe.
 - **TypeScript generics** for the item type: `item` in events and slots is typed `any`.
+
+Known limitations:
+
+- A list with a `group` says the Shift sentence ("Hold Shift with an arrow key to move to another list.") in its default instructions even when no other list can be reached. Pass `keyboardInstructions` if that matters for your layout.
+- On Lit, the component's events bubble and cross shadow roots, so a listener on an outer list also hears the `reorder` / `add` / `remove` / `start` / `end` events of a list nested inside its rows. In the outer handler, ignore events where `e.composedPath()[0] !== e.currentTarget` (`e.target` alone is retargeted to the outer element). This may change before 1.0.
 
 ## Gotchas
 

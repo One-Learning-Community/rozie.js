@@ -24,6 +24,14 @@ const baseModules = import.meta.glob('../../../examples/{Counter,SearchInput,Dro
 const demoModules = import.meta.glob('../../../examples/demos/*.rozie');
 
 async function main(): Promise<void> {
+  // The plain-HTML README quick start for @rozie-ui/sortable-list-lit runs on
+  // its own page (it registers <rozie-sortable-list> from the published leaf,
+  // which must not meet the host's compiled SortableList).
+  if (new URLSearchParams(location.search).get('page') === 'lit-quickstart') {
+    const { mountLitQuickstart } = await import('./lit-quickstart-host');
+    await mountLitQuickstart();
+    return;
+  }
   const { example } = parseQuery();
   const demoKey = `../../../examples/demos/${example}Demo.rozie`;
   const baseKey = `../../../examples/${example}.rozie`;

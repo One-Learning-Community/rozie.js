@@ -61,7 +61,7 @@ const items = ref([
 </script>
 
 <SortableList bind:items itemKey="id">
-  {#snippet default({ item })}
+  {#snippet children({ item })}
     <span>{item.label}</span>
   {/snippet}
 </SortableList>
@@ -77,7 +77,7 @@ import { SortableList } from '@rozie-ui/sortable-list-angular';
   imports: [SortableList],
   template: `
     <rozie-sortable-list [items]="items" (itemsChange)="items = $event" itemKey="id">
-      <ng-template #default let-item="item">
+      <ng-template #defaultSlot let-item="item">
         <span>{{ item.label }}</span>
       </ng-template>
     </rozie-sortable-list>
@@ -102,25 +102,32 @@ export function Demo() {
   ]);
   return (
     <SortableList items={items()} onItemsChange={setItems} itemKey="id">
-      {({ item }) => <span>{item().label}</span>}
+      {({ item }) => <span>{item.label}</span>}
     </SortableList>
   );
 }
 ```
 
 ```ts [Lit]
-import '@rozie-ui/sortable-list-lit';
+import { html } from 'lit';
+import '@rozie-ui/sortable-list-lit'; // registers <rozie-sortable-list>
+import type { SortableList } from '@rozie-ui/sortable-list-lit';
 
-// <sortable-list> is a custom element. Bind `items` as a property and
-// listen for the `items-change` event to receive the reordered array.
-const el = document.querySelector('sortable-list');
+// The page holds <rozie-sortable-list></rozie-sortable-list>.
+const el = document.querySelector<SortableList>('rozie-sortable-list')!;
+el.itemKey = 'id';
 el.items = [
   { id: '1', label: 'Apple' },
   { id: '2', label: 'Banana' },
 ];
-el.itemKey = 'id';
+// Row content: `rozieSlots.default` maps each row's
+// { item, index, instructionsId } to a lit template.
+el.rozieSlots = {
+  default: ({ item }) => html`<span>${item.label}</span>`,
+};
+// `items` is two-way: the reordered array arrives in `items-change`.
 el.addEventListener('items-change', (e) => {
-  el.items = e.detail;
+  el.items = (e as CustomEvent<unknown[]>).detail;
 });
 ```
 

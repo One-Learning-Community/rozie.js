@@ -8643,6 +8643,9 @@ importers:
       '@rozie-ui/popover-vue':
         specifier: workspace:*
         version: link:../../packages/ui/popover/packages/vue
+      '@rozie-ui/sortable-list-lit':
+        specifier: workspace:*
+        version: link:../../packages/ui/sortable-list/packages/lit
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7
         version: 7.1.2(svelte@5.55.5(@typescript-eslint/types@8.59.2))(vite@8.1.0(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(less@4.4.2)(sass@1.97.3)(terser@5.46.2))

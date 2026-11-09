@@ -106,6 +106,7 @@
     "@rozie-ui/popover-solid": "workspace:*",
     "@rozie-ui/popover-svelte": "workspace:*",
     "@rozie-ui/popover-vue": "workspace:*",
+    "@rozie-ui/sortable-list-lit": "workspace:*",
     "@sveltejs/vite-plugin-svelte": "^7",
     "@vitejs/plugin-react": "^6",
     "@vitejs/plugin-vue": "^6",

@@ -314,24 +314,24 @@ export default class Slider extends SignalWatcher(LitElement) {
   ${this.normalizedMarks().length > 0 ? html`<div class="rozie-slider-marks" aria-hidden="true" data-rozie-s-4e6f0be6>
     
     ${repeat<any>(this.normalizedMarks(), (mark, _idx) => mark.value, (mark, _idx) => html`<div class="rozie-slider-mark" style=${styleMap({ left: this.pct(mark.value) + '%' })} data-rozie-s-4e6f0be6>
-      ${this.mark !== undefined ? this.mark({value: mark.value, label: mark.label, position: this.pct(mark.value)}) : html`<slot name="mark" data-rozie-params=${(() => { try { return JSON.stringify({value: mark.value, label: mark.label, position: this.pct(mark.value)}); } catch { return '{}'; } })()}>
+      ${this.rozieSlots?.['mark'] !== undefined ? this.rozieSlots?.['mark']!({value: mark.value, label: mark.label, position: this.pct(mark.value)}) : this.mark !== undefined ? this.mark({value: mark.value, label: mark.label, position: this.pct(mark.value)}) : html`<slot name="mark" data-rozie-params=${(() => { try { return JSON.stringify({value: mark.value, label: mark.label, position: this.pct(mark.value)}); } catch { return '{}'; } })()}>
         <span class="rozie-slider-mark-label" data-rozie-s-4e6f0be6>${rozieDisplay(mark.label)}</span>
       </slot>`}
     </div>`)}
   </div>` : nothing}${this.showValue && !this.range ? html`<div class="rozie-slider-bubbles" aria-hidden="true" data-rozie-s-4e6f0be6>
     <div class="rozie-slider-bubble" style=${styleMap({ left: 'var(--rozie-slider-fill-end)' })} data-rozie-s-4e6f0be6>
-      ${this.bubble !== undefined ? this.bubble({value: this.singleValue()}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.singleValue()}); } catch { return '{}'; } })()}>
+      ${this.rozieSlots?.['bubble'] !== undefined ? this.rozieSlots?.['bubble']!({value: this.singleValue()}) : this.bubble !== undefined ? this.bubble({value: this.singleValue()}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.singleValue()}); } catch { return '{}'; } })()}>
         <span class="rozie-slider-bubble-text" data-rozie-s-4e6f0be6>${rozieDisplay(this.display(this.singleValue()))}</span>
       </slot>`}
     </div>
   </div>` : nothing}${this.showValue && this.range ? html`<div class="rozie-slider-bubbles" aria-hidden="true" data-rozie-s-4e6f0be6>
     <div class="rozie-slider-bubble" style=${styleMap({ left: 'var(--rozie-slider-fill-start)' })} data-rozie-s-4e6f0be6>
-      ${this.bubble !== undefined ? this.bubble({value: this.rangePair()[0]}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.rangePair()[0]}); } catch { return '{}'; } })()}>
+      ${this.rozieSlots?.['bubble'] !== undefined ? this.rozieSlots?.['bubble']!({value: this.rangePair()[0]}) : this.bubble !== undefined ? this.bubble({value: this.rangePair()[0]}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.rangePair()[0]}); } catch { return '{}'; } })()}>
         <span class="rozie-slider-bubble-text" data-rozie-s-4e6f0be6>${rozieDisplay(this.display(this.rangePair()[0]))}</span>
       </slot>`}
     </div>
     <div class="rozie-slider-bubble" style=${styleMap({ left: 'var(--rozie-slider-fill-end)' })} data-rozie-s-4e6f0be6>
-      ${this.bubble !== undefined ? this.bubble({value: this.rangePair()[1]}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.rangePair()[1]}); } catch { return '{}'; } })()}>
+      ${this.rozieSlots?.['bubble'] !== undefined ? this.rozieSlots?.['bubble']!({value: this.rangePair()[1]}) : this.bubble !== undefined ? this.bubble({value: this.rangePair()[1]}) : html`<slot name="bubble" data-rozie-params=${(() => { try { return JSON.stringify({value: this.rangePair()[1]}); } catch { return '{}'; } })()}>
         <span class="rozie-slider-bubble-text" data-rozie-s-4e6f0be6>${rozieDisplay(this.display(this.rangePair()[1]))}</span>
       </slot>`}
     </div>

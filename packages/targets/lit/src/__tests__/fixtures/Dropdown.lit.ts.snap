@@ -127,11 +127,11 @@ private __rozieWatchInitial_0 = true;
     return html`
 <div class="dropdown" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-6d6bd882>
   <div @click=${this.toggle} data-rozie-ref="triggerEl" data-rozie-s-6d6bd882>
-    ${this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)}></slot>`}
+    ${this.rozieSlots?.['trigger'] !== undefined ? this.rozieSlots?.['trigger']!({open: this.open, toggle: this.toggle}) : this.trigger !== undefined ? this.trigger({open: this.open, toggle: this.toggle}) : html`<slot name="trigger" data-rozie-params=${(() => { try { return JSON.stringify({open: this.open}); } catch { return '{}'; } })()} @rozie-trigger-toggle=${($event: CustomEvent) => ((this.toggle) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>
 
   ${this.open ? html`<div class="dropdown-panel" role="menu" data-rozie-ref="panelEl" data-rozie-s-6d6bd882>
-    ${this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
+    ${this.rozieSlots?.['default'] !== undefined ? this.rozieSlots?.['default']!({close: this.close}) : this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({close: this.close}) : html`<slot @rozie-default-close=${($event: CustomEvent) => ((this.close) as (...args: any[]) => any)($event.detail)}></slot>`}
   </div>` : nothing}</div>
 `;
   }

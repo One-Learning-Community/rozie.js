@@ -440,7 +440,7 @@ private __rozieFirstUpdateDone = false;
       <div class="rozie-embla__container" data-rozie-s-4143c216>
         
         ${repeat<any>(this.slides, (slide, i) => this.keyFor(slide, i), (slide, i) => html`<div class="rozie-embla__slide" data-rozie-s-4143c216>
-          ${this.slide !== undefined ? this.slide({slide: slide, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: slide, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(slide)}</slot>`}
+          ${this.rozieSlots?.['slide'] !== undefined ? this.rozieSlots?.['slide']!({slide: slide, index: i}) : this.slide !== undefined ? this.slide({slide: slide, index: i}) : html`<slot name="slide" data-rozie-params=${(() => { try { return JSON.stringify({slide: slide, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(slide)}</slot>`}
         </div>`)}
         
         <slot></slot>
@@ -455,7 +455,7 @@ private __rozieFirstUpdateDone = false;
     <div class="rozie-embla__thumbs-viewport" data-rozie-ref="thumbsViewportEl" data-rozie-s-4143c216>
       <div class="rozie-embla__thumbs-container" data-rozie-s-4143c216>
         ${repeat<any>(this.slides, (item, i) => this.keyFor(item, i), (item, i) => html`<div class="${Object.entries({ "rozie-embla__thumb": true, 'is-selected': i === this._selected.value }).filter(([, v]) => v).map(([k]) => k).join(' ')}" @click=${($event: MouseEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.selectThumb(i); }} data-rozie-s-4143c216>
-          ${this.thumb !== undefined ? this.thumb({slide: item, index: i}) : html`<slot name="thumb" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
+          ${this.rozieSlots?.['thumb'] !== undefined ? this.rozieSlots?.['thumb']!({slide: item, index: i}) : this.thumb !== undefined ? this.thumb({slide: item, index: i}) : html`<slot name="thumb" data-rozie-params=${(() => { try { return JSON.stringify({slide: item, index: i}); } catch { return '{}'; } })()}>${rozieDisplay(item)}</slot>`}
         </div>`)}
       </div>
     </div>

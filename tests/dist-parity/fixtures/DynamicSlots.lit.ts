@@ -55,7 +55,7 @@ export default class DynamicSlots extends SignalWatcher(LitElement) {
   // named function-prop / <slot> fallback (AC-9). Attribute
   // deserialization is disabled — this is a function-valued record,
   // never reflected to/from an HTML attribute.
-  @property({ attribute: false }) rozieSlots?: { 'cell-total'?: (scope: { value: any }) => unknown; [key: `cell-${string}`]: (scope: { row: any; value: any }) => unknown; } & Record<string, (scope: any) => unknown>;
+  @property({ attribute: false }) rozieSlots?: { 'cell-total'?: (scope: { value: any }) => unknown; 'headerCell'?: (scope: { title: any }) => unknown; [key: `cell-${string}`]: (scope: { row: any; value: any }) => unknown; } & Record<string, (scope: any) => unknown>;
 
   private _disconnectCleanups: Array<() => void> = [];
   // Re-parenting guard: set true once the deferred teardown has actually
@@ -154,7 +154,7 @@ export default class DynamicSlots extends SignalWatcher(LitElement) {
   </slot>`}
 
   
-  ${this.headerCell !== undefined ? this.headerCell({title: this.heading}) : html`<slot name="headerCell" data-rozie-params=${(() => { try { return JSON.stringify({title: this.heading}); } catch { return '{}'; } })()}>
+  ${this.rozieSlots?.['headerCell'] !== undefined ? this.rozieSlots?.['headerCell']!({title: this.heading}) : this.headerCell !== undefined ? this.headerCell({title: this.heading}) : html`<slot name="headerCell" data-rozie-params=${(() => { try { return JSON.stringify({title: this.heading}); } catch { return '{}'; } })()}>
     <h2 data-rozie-s-96693586>${this.heading}</h2>
   </slot>`}
 

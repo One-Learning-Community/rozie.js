@@ -14,12 +14,17 @@
 "@rozie-ui/fullcalendar-lit": patch
 "@rozie-ui/number-field-lit": patch
 "@rozie-ui/otp-lit": patch
+"@rozie-ui/pagination-lit": patch
 "@rozie-ui/pdf-lit": patch
 "@rozie-ui/popover-lit": patch
 "@rozie-ui/rete-lit": patch
 "@rozie-ui/select-lit": patch
+"@rozie-ui/slider-lit": patch
+"@rozie-ui/switch-lit": patch
+"@rozie-ui/tags-lit": patch
 "@rozie-ui/text-field-lit": patch
 "@rozie-ui/tiptap-lit": patch
+"@rozie-ui/toast-lit": patch
 "@rozie-ui/wavesurfer-lit": patch
 ---
 
@@ -27,4 +32,6 @@ Lit: a component that is removed from the page and added back works again. Its m
 
 Lit: a prop typed with a `<types>` alias made only of string literals (or only of number literals) is now a plain reflected attribute, so `<my-el mode="compact">` works in HTML. It used to be an `Object` property whose attribute value was parsed as JSON, which failed and left the prop `null`.
 
-The `@rozie-ui/*-lit` packages listed here are rebuilt with the first fix; none of them has a string-union prop.
+Lit: a plain-HTML or Lit consumer (not compiled by Rozie) can fill ANY slot that passes params through the element's `rozieSlots` property, keyed by the slot name (`default` for the default slot): ``el.rozieSlots = { default: ({ item }) => html`<span>${item.label}</span>` }``. The record was only read for dynamically named slots and names that are not identifiers, so an entry for an ordinary scoped slot was silently ignored. It is now tried first for every scoped slot (portal slots excepted); a Rozie consumer's fill and the native `<slot>` fallback work as before.
+
+The `@rozie-ui/*-lit` packages listed here are rebuilt with one or both of the first and third fixes; none of them has a string-union prop.

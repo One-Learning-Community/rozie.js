@@ -2371,11 +2371,10 @@ function emitSlot(
   //     quoted literal (T-79-07 lockstep escaping via `slotRecordKey.ts`).
   //     `emitSlotDecl.ts` mints no named property for this shape either, so
   //     this chain is ALSO record → slot-element only.
-  //   - an identifier-named or default slot never sets `recordAccessKey` —
-  //     its dispatch stays the pre-Plan-09 named-property ternary,
-  //     byte-identical (AC-9's "record wins" only matters where a record
-  //     entry can actually exist, which family-matching + R12 restrict to
-  //     the two shapes above).
+  //   - an identifier-named or default slot never sets `recordAccessKey`:
+  //     a SCOPED one dispatches below through the record (keyed on its name,
+  //     `'default'` for the default slot), then its named property, then the
+  //     slot element; a paramless one stays a plain `<slot>`.
   const isDynamicSlot = node.dynamicNameExpr !== undefined;
   const isNonIdentifierStatic = name !== '' && !isSlotNameIdentifier(name);
   let dynamicNameAttrExpr: string | null = null;
@@ -2441,7 +2440,14 @@ function emitSlot(
       .map((a) => `${a.name}: ${rewriteTemplateExpression(a.expression, ir)}`)
       .join(', ');
     const propRef = name === '' ? '__rozieDefaultSlot__' : name;
-    return `\${this.${propRef} !== undefined ? this.${propRef}({${scopeEntries}}) : html\`${slotElement}\`}`;
+    // The `rozieSlots` record is tried first for these slots too (the key is
+    // the slot name, `'default'` for the default slot), so a non-Rozie Lit
+    // consumer can fill any scoped slot with
+    // `el.rozieSlots = { default: (scope) => html\`…\` }` — the third-party
+    // fill API docs/parity.md documents. Rozie consumers set the named
+    // property, which stays the second step.
+    const recordKey = renderRecordKey(name === '' ? 'default' : name);
+    return `\${this.rozieSlots?.[${recordKey}] !== undefined ? this.rozieSlots?.[${recordKey}]!({${scopeEntries}}) : this.${propRef} !== undefined ? this.${propRef}({${scopeEntries}}) : html\`${slotElement}\`}`;
   }
 
   return slotElement;
