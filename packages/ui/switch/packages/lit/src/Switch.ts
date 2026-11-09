@@ -171,8 +171,8 @@ export default class Switch extends SignalWatcher(LitElement) {
     detail: {
       checked: v
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

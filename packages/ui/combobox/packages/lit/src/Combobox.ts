@@ -1872,8 +1872,8 @@ private __rozieFirstUpdateDone = false;
       detail: {
         query: q
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     // D-20: after `create` fires, local UI state behaves like a pick — the
     // effective close-on-select applies, and the query clears in `multiple`
@@ -1909,8 +1909,8 @@ private __rozieFirstUpdateDone = false;
         option: opt.option,
         selected: !wasSelected
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     return;
   }
@@ -1925,8 +1925,8 @@ private __rozieFirstUpdateDone = false;
       option: opt.option,
       selected: true
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -2085,8 +2085,8 @@ private __rozieFirstUpdateDone = false;
         selected: true,
         text: committed[i]
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };
@@ -2116,8 +2116,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       query: q
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -2136,8 +2136,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       query: ''
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -2489,8 +2489,8 @@ private __rozieFirstUpdateDone = false;
       option: null,
       selected: false
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

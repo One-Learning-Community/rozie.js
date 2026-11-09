@@ -452,8 +452,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       value: e && e.target ? e.target.value : this.currentText()
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -468,8 +468,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       value: e.target ? e.target.value : this.currentText()
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

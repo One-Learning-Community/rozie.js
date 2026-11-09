@@ -17,9 +17,11 @@
 "@rozie-ui/pagination-lit": patch
 "@rozie-ui/pdf-lit": patch
 "@rozie-ui/popover-lit": patch
+"@rozie-ui/resizable-lit": patch
 "@rozie-ui/rete-lit": patch
 "@rozie-ui/select-lit": patch
 "@rozie-ui/slider-lit": patch
+"@rozie-ui/sortable-list-lit": patch
 "@rozie-ui/switch-lit": patch
 "@rozie-ui/tags-lit": patch
 "@rozie-ui/text-field-lit": patch
@@ -34,4 +36,6 @@ Lit: a prop typed with a `<types>` alias made only of string literals (or only o
 
 Lit: a plain-HTML or Lit consumer (not compiled by Rozie) can fill ANY slot that passes params through the element's `rozieSlots` property, keyed by the slot name (`default` for the default slot): ``el.rozieSlots = { default: ({ item }) => html`<span>${item.label}</span>` }``. The record was only read for dynamically named slots and names that are not identifiers, so an entry for an ordinary scoped slot was silently ignored. It is now tried first for every scoped slot (portal slots excepted), and a component's `$slots.<name>` check counts a record fill as filled, so content gated by `r-if="$slots.<name>"` (for example command-palette's `icon` / `actions` / `trailing` row slots) renders for a record-only fill. A Rozie consumer's fill and the native `<slot>` fallback work as before.
 
-The `@rozie-ui/*-lit` packages listed here are rebuilt with one or both of the first and third fixes; none of them has a string-union prop.
+Changed — Lit: a component's events no longer bubble or cross shadow roots, as on the other targets. `$emit('name', payload)` now dispatches `new CustomEvent('name', { detail: payload, bubbles: false, composed: false })` on the element. A listener on the element itself (`@name=${…}` in a Lit template, `el.addEventListener('name', …)`, a Rozie consumer's `@name`) works as before. A listener on an ancestor element, or outside the shadow root the element sits in, no longer hears it: listen on the element itself. This also means an outer `@rozie-ui/sortable-list` no longer hears the `start` / `add` / `remove` / `reorder` / `end` events of a list nested inside its rows, so the `e.composedPath()[0]` check is no longer needed. Model `*-change` events already behaved this way.
+
+The `@rozie-ui/*-lit` packages listed here are rebuilt with one or more of these fixes; none of them has a string-union prop.

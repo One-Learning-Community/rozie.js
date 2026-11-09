@@ -10,9 +10,9 @@
 //     `items-change`;
 //   - in handle mode, a handle rendered by `rozieSlots.default` can point
 //     `aria-describedby` at `instructionsId` (same shadow root);
-//   - the documented nested-list limitation: an outer list's listener hears an
-//     inner list's events, and `e.composedPath()[0] !== e.currentTarget`
-//     tells them apart (`e.target` is retargeted to the outer element).
+//   - nested lists: an inner list's events stay on the inner element (Lit
+//     component events do not bubble), so the outer list's listener hears
+//     nothing while the inner list's own listener hears the lift.
 import { test, expect, type Page } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -95,7 +95,7 @@ test('a handle rendered by rozieSlots.default can reference instructionsId', asy
   await expect.poll(() => rowTexts(page)).toEqual(['⋮⋮Apple', '⋮⋮Banana']);
 });
 
-test('nested lists: composedPath()[0] tells an inner list event from the outer list’s own', async ({ page }) => {
+test('nested lists: an inner list event does not reach the outer list’s listener', async ({ page }) => {
   await open(page);
   const seen = await page.evaluate(async () => {
     const html = (window as any).__litHtml;
@@ -104,21 +104,23 @@ test('nested lists: composedPath()[0] tells an inner list event from the outer l
       default: ({ item }: any) =>
         html`<span>${item.label}</span><rozie-sortable-list .itemKey=${'id'} .items=${[{ id: 'a', label: 'Inner A' }, { id: 'b', label: 'Inner B' }]} .rozieSlots=${{ default: ({ item: x }: any) => html`<span>${x.label}</span>` }}></rozie-sortable-list>`,
     };
-    const log: Array<{ own: boolean; targetIsOuter: boolean }> = [];
-    outer.addEventListener('start', (e: Event) => {
-      log.push({ own: e.composedPath()[0] === e.currentTarget, targetIsOuter: e.target === outer });
-    });
-    (window as any).__nestedLog = log;
+    const outerLog: string[] = [];
+    const innerLog: string[] = [];
+    for (const name of ['start', 'reorder', 'end']) outer.addEventListener(name, () => outerLog.push(name));
+    (window as any).__outerLog = outerLog;
+    (window as any).__innerLog = innerLog;
     await outer.updateComplete;
     const inner: any = outer.shadowRoot.querySelector('rozie-sortable-list');
     await inner.updateComplete;
+    for (const name of ['start', 'reorder', 'end']) inner.addEventListener(name, () => innerLog.push(name));
     (inner.shadowRoot.querySelector('.rozie-sortable-item') as HTMLElement).focus();
     return true;
   });
   expect(seen).toBe(true);
   await page.keyboard.press('Space'); // lift in the INNER list
-  await expect.poll(() => page.evaluate(() => (window as any).__nestedLog.length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => (window as any).__innerLog.length)).toBeGreaterThanOrEqual(1);
   await page.keyboard.press('Escape');
-  const log = await page.evaluate(() => (window as any).__nestedLog);
-  expect(log[0]).toEqual({ own: false, targetIsOuter: true });
+  await expect.poll(() => page.evaluate(() => (window as any).__innerLog.includes('end'))).toBe(true);
+  expect(await page.evaluate(() => (window as any).__innerLog[0])).toBe('start');
+  expect(await page.evaluate(() => (window as any).__outerLog)).toEqual([]);
 });

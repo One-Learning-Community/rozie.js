@@ -408,8 +408,8 @@ private __rozieFirstUpdateDone = false;
     if (this.reconciling) return;
     this.dispatchEvent(new CustomEvent("region-created", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     this.writeBackRegions();
   });
@@ -417,8 +417,8 @@ private __rozieFirstUpdateDone = false;
     if (this.reconciling) return;
     this.dispatchEvent(new CustomEvent("region-updated", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     this.writeBackRegions();
   });
@@ -426,16 +426,16 @@ private __rozieFirstUpdateDone = false;
     if (this.reconciling) return;
     this.dispatchEvent(new CustomEvent("region-removed", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     this.writeBackRegions();
   });
   plugin.on('region-clicked', (region: any) => {
     this.dispatchEvent(new CustomEvent("region-clicked", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   });
   // Playback entered/left a region — pure notifications (no writeback), so they
@@ -444,15 +444,15 @@ private __rozieFirstUpdateDone = false;
   plugin.on('region-in', (region: any) => {
     this.dispatchEvent(new CustomEvent("region-in", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   });
   plugin.on('region-out', (region: any) => {
     this.dispatchEvent(new CustomEvent("region-out", {
       detail: this.serializeRegion(region),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   });
 };
@@ -546,24 +546,24 @@ private __rozieFirstUpdateDone = false;
     }
     this.dispatchEvent(new CustomEvent("ready", {
       detail: duration,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   });
   this.ws.on('play', () => this.dispatchEvent(new CustomEvent("playing", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('pause', () => this.dispatchEvent(new CustomEvent("paused", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('finish', () => this.dispatchEvent(new CustomEvent("finished", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('timeupdate', (t: any) => {
     // Echo the live position into the two-way model, then emit. The reverse
@@ -571,29 +571,29 @@ private __rozieFirstUpdateDone = false;
     this._currentTimeControllable.write(t);
     this.dispatchEvent(new CustomEvent("timeupdate", {
       detail: t,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   });
   this.ws.on('seeking', (t: any) => this.dispatchEvent(new CustomEvent("seeking", {
     detail: t,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('interaction', (t: any) => this.dispatchEvent(new CustomEvent("interaction", {
     detail: t,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('loading', (percent: any) => this.dispatchEvent(new CustomEvent("loading", {
     detail: percent,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
   this.ws.on('error', (err: any) => this.dispatchEvent(new CustomEvent("error", {
     detail: err,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   })));
 
   // ── regions plugin events ───────────────────────────────────────────────────

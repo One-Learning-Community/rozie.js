@@ -48,8 +48,8 @@ export default class RefEmitDedup extends SignalWatcher(LitElement) {
   go(): void {
     this.dispatchEvent(new CustomEvent("save", {
       detail: this._n.value,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 

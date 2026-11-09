@@ -263,8 +263,8 @@ private __rozieFirstUpdateDone = false;
             value: dateStr,
             selectedDates
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       onReady: (d: any, s: any) => this.dispatchEvent(new CustomEvent("ready", {
@@ -272,41 +272,41 @@ private __rozieFirstUpdateDone = false;
           value: s,
           selectedDates: d
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onOpen: () => this.dispatchEvent(new CustomEvent("open", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onClose: () => this.dispatchEvent(new CustomEvent("close", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onMonthChange: () => this.dispatchEvent(new CustomEvent("month-change", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onYearChange: () => this.dispatchEvent(new CustomEvent("year-change", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onValueUpdate: (d: any, s: any) => this.dispatchEvent(new CustomEvent("value-update", {
         detail: {
           value: s,
           selectedDates: d
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       })),
       onDayCreate: (_d: any, _s: any, _fp: any, dayElem: any) => this.dispatchEvent(new CustomEvent("day-create", {
         detail: dayElem,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }))
     });
     if (this.disabled) this.instance.input.disabled = true;

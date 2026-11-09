@@ -329,8 +329,8 @@ export default class Pagination extends SignalWatcher(LitElement) {
     detail: {
       page: target
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

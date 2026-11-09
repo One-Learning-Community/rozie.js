@@ -260,8 +260,8 @@ export default class NumberField extends SignalWatcher(LitElement) {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

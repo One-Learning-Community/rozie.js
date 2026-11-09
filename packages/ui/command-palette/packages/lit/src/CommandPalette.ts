@@ -1362,8 +1362,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       item,
       depth: nextStack.length
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   // command-palette-13-empty-home-view-first: an item carrying a non-empty
   // defaultItems is seeded 'ready' by pushFrame — skip the initial
@@ -1400,8 +1400,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
   this.reopenComboboxPopup();
   this.dispatchEvent(new CustomEvent("back", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -1439,8 +1439,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
     restoreQuery = popped.restoreQuery == null ? '' : popped.restoreQuery;
     this.dispatchEvent(new CustomEvent("back", {
       detail: undefined,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
   this._levelStack.value = stack;
@@ -1550,8 +1550,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       item,
       path
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   // Clear the internal selection so re-selecting the same command re-fires.
   this._activeValue.value = null;
@@ -2033,8 +2033,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       path,
       args
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this._activeValue.value = null;
   this.closeArgsSurface();
@@ -2091,8 +2091,8 @@ ${this.open ? html`<span data-rozie-portal-anchor="__roziePortal0" hidden></span
       item,
       action
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.closeActionMenu();
   if (this.closeOnAction) this.closePalette();

@@ -604,8 +604,8 @@ to[data-rozie-s-12d4265c] { transform: rotate(360deg); }
       toast: entry,
       reason
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this._toasts.value = this._toasts.value.map((t: any) => t.id === id ? {
     ...t,

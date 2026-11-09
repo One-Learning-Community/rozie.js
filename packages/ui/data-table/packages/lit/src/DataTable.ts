@@ -1527,8 +1527,8 @@ private __rozieCtxProvider_data_table_columns = new ContextProvider(this, { cont
         this.lastViewState = vs;
         this.dispatchEvent(new CustomEvent<DataTableViewState>("view-state-change", {
           detail: vs,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       }
     };
@@ -2776,8 +2776,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._sortingControllable.write(next); // two-way emit if bound (no-op-diff if not)
   this.dispatchEvent(new CustomEvent<SortingState>("sort-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2806,8 +2806,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   // sort-change, rowSelection→selection-change); `expanded`→`expand-change` follows suit.
   this.dispatchEvent(new CustomEvent<ExpandedState>("expand-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2830,8 +2830,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._groupingControllable.write(next); // two-way emit if bound (no-op-diff if not)
   this.dispatchEvent(new CustomEvent<GroupingState>("group-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2848,8 +2848,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     detail: {
       globalFilter: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2867,8 +2867,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
     detail: {
       columnFilters: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2882,8 +2882,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._paginationControllable.write(next);
   this.dispatchEvent(new CustomEvent<PaginationState>("page-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2898,8 +2898,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._rowSelectionControllable.write(next);
   this.dispatchEvent(new CustomEvent<RowSelectionState>("selection-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2914,8 +2914,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._columnVisibilityControllable.write(next);
   this.dispatchEvent(new CustomEvent<VisibilityState>("visibility-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2930,8 +2930,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._columnSizingControllable.write(next);
   this.dispatchEvent(new CustomEvent<ColumnSizingState>("resize-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2946,8 +2946,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._columnOrderControllable.write(next);
   this.dispatchEvent(new CustomEvent<ColumnOrderState>("reorder-change", {
     detail: next,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -2973,8 +2973,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
   this._columnPinningControllable.write(clean);
   this.dispatchEvent(new CustomEvent<ColumnPinningState>("pin-change", {
     detail: clean,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.programmatic--;
 };
@@ -3112,8 +3112,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       canUndo: this.canUndo(),
       canRedo: this.canRedo()
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -3739,8 +3739,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       start,
       end
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -6562,8 +6562,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         colIndex: nextCol,
         isHeader: false
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };
@@ -6773,8 +6773,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       index,
       trigger
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -7081,8 +7081,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         colIndex: col,
         isHeader: false
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     if (focusOnBody && !editFollowPending) this.focusCellWhenReady(nextRow, col);
     return;
@@ -7105,8 +7105,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         colIndex: col,
         isHeader: true
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     if (focusOnBody || editFollowPending) this.recoverGridFocus('__header', col, level);
     return;
@@ -7393,8 +7393,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       anchor,
       focus
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -7833,8 +7833,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       try {
         this.dispatchEvent(new CustomEvent<DataTableCellEditCommitPayload>("cell-edit-commit", {
           detail: committed[i],
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       } catch (err: any) {
         console.error('[rozie-data-table] paste failed partway: a cell-edit-commit listener threw. The ' + 'model was already written; the remaining cells still notify.', err);
@@ -8862,8 +8862,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         oldValue,
         newValue
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
   this.endEdit();
@@ -9011,8 +9011,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
       oldValue,
       newValue
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   // Follow the toggled row's focus through a boolean sort/filter relocation AND a
   // fine-grained keyed-row replace (Solid) — the SAME recovery commitEdit relies on; even
@@ -9245,8 +9245,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         rowId,
         changes
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
   this.endRowEdit();
@@ -9998,8 +9998,8 @@ ${this.groupable ? html`<div class="rdt-group-bar-host" data-rozie-s-d5dcab4c>
         rowIndex: absRow,
         colIndex: c
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };

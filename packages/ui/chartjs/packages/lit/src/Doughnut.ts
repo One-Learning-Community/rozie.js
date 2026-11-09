@@ -299,8 +299,8 @@ private portals = {
       elements: nearest,
       chart
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   const dataset = chart.getElementsAtEventForMode(e, 'dataset', {
     intersect: true
@@ -313,8 +313,8 @@ private portals = {
         datasetIndex: dataset[0].datasetIndex,
         chart
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };
@@ -328,8 +328,8 @@ private portals = {
       elements: activeEls,
       chart
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

@@ -165,8 +165,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   this._draft.value = '';
   this.dispatchEvent(new CustomEvent("add", {
     detail: text,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -177,8 +177,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   } : i));
   this.dispatchEvent(new CustomEvent("toggle", {
     detail: id,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -191,8 +191,8 @@ form[data-rozie-s-52bec3de] { display: flex; gap: 0.25rem; margin-block: 0.5rem;
   this._itemsControllable.write(this.items.filter((i: any) => i.id !== id));
   this.dispatchEvent(new CustomEvent("remove", {
     detail: id,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

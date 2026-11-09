@@ -167,8 +167,8 @@ ${this.open ? html`<div class="modal-backdrop" @click=${($event: MouseEvent & { 
   this._openControllable.write(false);
   this.dispatchEvent(new CustomEvent("close", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

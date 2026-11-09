@@ -86,8 +86,8 @@ export default class Captcha extends SignalWatcher(LitElement) {
           provider: this.provider,
           error: err
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     });
   }
@@ -139,8 +139,8 @@ export default class Captcha extends SignalWatcher(LitElement) {
         token: response,
         provider: this.provider
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   },
   'expired-callback': () => {
@@ -149,8 +149,8 @@ export default class Captcha extends SignalWatcher(LitElement) {
       detail: {
         provider: this.provider
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   },
   'error-callback': () => {
@@ -159,8 +159,8 @@ export default class Captcha extends SignalWatcher(LitElement) {
       detail: {
         provider: this.provider
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   },
   ...this.options

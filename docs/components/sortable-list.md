@@ -679,7 +679,6 @@ Not supported yet:
 Known limitations:
 
 - A list with a `group` says the Shift sentence ("Hold Shift with an arrow key to move to another list.") in its default instructions even when no other list can be reached. Pass `keyboardInstructions` if that matters for your layout.
-- On Lit, the component's events bubble and cross shadow roots, so a listener on an outer list also hears the `reorder` / `add` / `remove` / `start` / `end` events of a list nested inside its rows. In the outer handler, ignore events where `e.composedPath()[0] !== e.currentTarget` (`e.target` alone is retargeted to the outer element). This may change before 1.0.
 
 ## Gotchas
 

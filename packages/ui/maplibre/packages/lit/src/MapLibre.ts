@@ -488,81 +488,81 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     // and `bearing`, not `move`/`rotate`), so those continuous events stay.
     this.instance.on('load', (e: any) => this.dispatchEvent(new CustomEvent("load", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('idle', (e: any) => this.dispatchEvent(new CustomEvent("idle", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('move', (e: any) => this.dispatchEvent(new CustomEvent("move", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('rotate', (e: any) => this.dispatchEvent(new CustomEvent("rotate", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('dragstart', (e: any) => this.dispatchEvent(new CustomEvent("dragstart", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('drag', (e: any) => this.dispatchEvent(new CustomEvent("drag", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('dragend', (e: any) => this.dispatchEvent(new CustomEvent("dragend", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('click', (e: any) => this.dispatchEvent(new CustomEvent("click", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('dblclick', (e: any) => this.dispatchEvent(new CustomEvent("dblclick", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('contextmenu', (e: any) => this.dispatchEvent(new CustomEvent("contextmenu", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('mousemove', (e: any) => this.dispatchEvent(new CustomEvent("mousemove", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('error', (e: any) => this.dispatchEvent(new CustomEvent("error", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('styledata', (e: any) => this.dispatchEvent(new CustomEvent("styledata", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.instance.on('sourcedata', (e: any) => this.dispatchEvent(new CustomEvent("sourcedata", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
 
     // ─── camera-lifecycle + two-way echo (echo-guarded) ─────────────────────
     this.instance.on('moveend', (e: any) => {
       this.dispatchEvent(new CustomEvent("moveend", {
         detail: e,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (e.rozieProgrammatic) return;
       const c = this.instance.getCenter();
@@ -574,8 +574,8 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     this.instance.on('zoomend', (e: any) => {
       this.dispatchEvent(new CustomEvent("zoomend", {
         detail: e,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (e.rozieProgrammatic) return;
       const z = this.instance.getZoom();
@@ -584,8 +584,8 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     this.instance.on('rotateend', (e: any) => {
       this.dispatchEvent(new CustomEvent("rotateend", {
         detail: e,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (e.rozieProgrammatic) return;
       const b = this.instance.getBearing();
@@ -594,8 +594,8 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     this.instance.on('pitchend', (e: any) => {
       this.dispatchEvent(new CustomEvent("pitchend", {
         detail: e,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (e.rozieProgrammatic) return;
       const p = this.instance.getPitch();
@@ -1049,13 +1049,13 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
     if (this.featureListeners.has(id)) continue;
     const enter = (e: any) => this.dispatchEvent(new CustomEvent("mouseenter", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     const leave = (e: any) => this.dispatchEvent(new CustomEvent("mouseleave", {
       detail: this.payload(e),
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     this.instance.on('mouseenter', id, enter);
     this.instance.on('mouseleave', id, leave);

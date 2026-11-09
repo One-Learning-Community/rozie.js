@@ -68,8 +68,8 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
         detail: {
           error: err
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     });
   }
@@ -122,8 +122,8 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
           token: tok,
           action: a
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       return tok;
     }).catch((err: any) => {
@@ -131,8 +131,8 @@ export default class RecaptchaV3 extends SignalWatcher(LitElement) {
         detail: {
           error: err
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       throw err;
     });

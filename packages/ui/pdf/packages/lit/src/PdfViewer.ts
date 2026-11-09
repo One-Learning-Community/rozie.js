@@ -163,8 +163,8 @@ private __rozieFirstUpdateDone = false;
         detail: {
           page: v
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (!this.renderAllPages) this.renderView();
     })(__watchVal); }); }));
@@ -402,8 +402,8 @@ private __rozieFirstUpdateDone = false;
       width: Math.floor(viewport.width),
       height: Math.floor(viewport.height)
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   return pageDiv;
 };
@@ -474,8 +474,8 @@ private __rozieFirstUpdateDone = false;
     } catch (e: any) {
       if (token === this.renderToken) this.dispatchEvent(new CustomEvent("error", {
         detail: e,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     }
   }
@@ -483,8 +483,8 @@ private __rozieFirstUpdateDone = false;
   if (this.renderAllPages) this.setupScrollSpy();
   this.dispatchEvent(new CustomEvent("pagesrendered", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -512,8 +512,8 @@ private __rozieFirstUpdateDone = false;
         detail: {
           reason
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     };
     // download progress in bytes; `total` may be 0/undefined when the server sends
@@ -523,8 +523,8 @@ private __rozieFirstUpdateDone = false;
         loaded: p && p.loaded,
         total: p && p.total
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     const pdf = await this.loadingTask.promise;
     // stale (a newer load bumped the token + destroyed this task) — drop it.
@@ -535,16 +535,16 @@ private __rozieFirstUpdateDone = false;
       detail: {
         numPages: pdf.numPages
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     await this.renderView();
   } catch (e: any) {
     // a destroyed task rejects its promise — suppress the abort for stale loads.
     if (token === this.renderToken) this.dispatchEvent(new CustomEvent("error", {
       detail: e,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };
@@ -694,8 +694,8 @@ private __rozieFirstUpdateDone = false;
           matches: 0,
           current: 0
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       return 0;
     }
@@ -729,8 +729,8 @@ private __rozieFirstUpdateDone = false;
         matches: this.findMatches.length,
         current: this.findMatches.length ? 1 : 0
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     return this.findMatches.length;
   }
@@ -746,8 +746,8 @@ private __rozieFirstUpdateDone = false;
         matches: this.findMatches.length,
         current: this.findIndex + 1
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 
@@ -762,8 +762,8 @@ private __rozieFirstUpdateDone = false;
         matches: this.findMatches.length,
         current: this.findIndex + 1
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 
@@ -778,8 +778,8 @@ private __rozieFirstUpdateDone = false;
         matches: 0,
         current: 0
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 

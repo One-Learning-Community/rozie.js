@@ -801,8 +801,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       open: false
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -815,8 +815,8 @@ private __rozieFirstUpdateDone = false;
       value: empty,
       option: null
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -915,8 +915,8 @@ private __rozieFirstUpdateDone = false;
         value: next,
         option: opt
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   } else {
     this._valueControllable.write(v);
@@ -925,8 +925,8 @@ private __rozieFirstUpdateDone = false;
         value: v,
         option: opt
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     if (this.closeOnSelect) {
       this.close();
@@ -1150,8 +1150,8 @@ private __rozieFirstUpdateDone = false;
     detail: {
       open: true
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -2262,8 +2262,8 @@ private __rozieFirstUpdateDone = false;
       value: next,
       option: null
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

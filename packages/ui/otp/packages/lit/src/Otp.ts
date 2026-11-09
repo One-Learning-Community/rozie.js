@@ -181,15 +181,15 @@ export default class Otp extends SignalWatcher(LitElement) {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   if (emits.complete) this.dispatchEvent(new CustomEvent("complete", {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

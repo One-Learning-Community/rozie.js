@@ -264,8 +264,8 @@ export default class Tags extends SignalWatcher(LitElement) {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -338,8 +338,8 @@ export default class Tags extends SignalWatcher(LitElement) {
         value: added[i],
         tokens: snapshots[i]
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
   return {
@@ -366,8 +366,8 @@ export default class Tags extends SignalWatcher(LitElement) {
       index: idx,
       tokens: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

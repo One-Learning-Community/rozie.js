@@ -757,8 +757,8 @@ private portals = {
           this.refreshLink();
           this.dispatchEvent(new CustomEvent<string>("update", {
             detail: next,
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         },
         onSelectionUpdate: () => {
@@ -766,14 +766,14 @@ private portals = {
           this.refreshLink();
           this.dispatchEvent(new CustomEvent("selection-update", {
             detail: undefined,
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         },
         onFocus: () => this.dispatchEvent(new CustomEvent("focus", {
           detail: undefined,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         })),
         onBlur: ({
           event
@@ -788,8 +788,8 @@ private portals = {
           if (!(to instanceof Node && this.linkEditorEl && this.linkEditorEl.contains(to))) this.openFlag = false;
           this.dispatchEvent(new CustomEvent("blur", {
             detail: undefined,
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         }
       });
@@ -862,8 +862,8 @@ private portals = {
       }
       this.dispatchEvent(new CustomEvent<Editor>("ready", {
         detail: this.editor,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     };
 
@@ -886,8 +886,8 @@ private portals = {
             extension: name,
             error: err
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       }
       return null;

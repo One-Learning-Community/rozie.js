@@ -323,8 +323,13 @@ describe('rewriteScript — sigil rewrites', () => {
     const out = rewrite("$emit('save', payload);", ir);
     expect(out).toContain('this.dispatchEvent(new CustomEvent("save"');
     expect(out).toContain('detail: payload');
-    expect(out).toContain('bubbles: true');
-    expect(out).toContain('composed: true');
+    // Component events stay on the element, as on the other five targets:
+    // a nested component's event never reaches an ancestor's same-named
+    // listener and never crosses a shadow root.
+    expect(out).toContain('bubbles: false');
+    expect(out).toContain('composed: false');
+    expect(out).not.toContain('bubbles: true');
+    expect(out).not.toContain('composed: true');
   });
 
   it("$emit('n') with zero args → detail: undefined", () => {

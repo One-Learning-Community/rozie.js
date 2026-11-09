@@ -13,7 +13,7 @@
  *   - `$slotted.X`        → `this._slotXAssigned.value` (quick 260807-cor D4
  *                            — LIVE only when the component reads the sigil;
  *                            gated by emitSlotDecl.ts's collectSlottedReads)
- *   - `$emit('name', x)`  → `this.dispatchEvent(new CustomEvent('kebab-name', { detail: x, bubbles: true, composed: true }))`
+ *   - `$emit('name', x)`  → `this.dispatchEvent(new CustomEvent('kebab-name', { detail: x, bubbles: false, composed: false }))`
  *                            (event name is kebab-cased at dispatch — D-01, quick 260811-nre)
  *   - `$el`               → `this`
  *
@@ -1145,13 +1145,22 @@ export function rewriteScript(
         const restArgs = args.slice(1);
         const detail =
           restArgs.length === 0 ? t.identifier('undefined') : (restArgs[0] as t.Expression);
-        // new CustomEvent('name', { detail, bubbles: true, composed: true })
+        // new CustomEvent('name', { detail, bubbles: false, composed: false })
+        //
+        // A component event stays on the element that emits it, as on the
+        // other five targets: listeners on the element itself (Lit
+        // `@name=${…}`, `addEventListener`, Rozie consumers) hear it at
+        // target; an ancestor's same-named listener does not (a nested
+        // sortable-list's `reorder` used to reach the outer list's
+        // `@reorder`), and it never crosses a shadow root. Model
+        // `<prop>-change` events (createLitControllableProperty) already
+        // dispatch the same way.
         const customEvent = t.newExpression(t.identifier('CustomEvent'), [
           t.stringLiteral(eventName),
           t.objectExpression([
             t.objectProperty(t.identifier('detail'), detail),
-            t.objectProperty(t.identifier('bubbles'), t.booleanLiteral(true)),
-            t.objectProperty(t.identifier('composed'), t.booleanLiteral(true)),
+            t.objectProperty(t.identifier('bubbles'), t.booleanLiteral(false)),
+            t.objectProperty(t.identifier('composed'), t.booleanLiteral(false)),
           ]),
         ]);
         // Typed public surface P1 — `new CustomEvent<P>(…)` for a declared payload

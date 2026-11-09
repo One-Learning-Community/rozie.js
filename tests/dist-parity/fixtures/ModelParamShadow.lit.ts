@@ -56,8 +56,8 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
     detail: {
       token
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -74,8 +74,8 @@ export default class ModelParamShadow extends SignalWatcher(LitElement) {
     detail: {
       token: label
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

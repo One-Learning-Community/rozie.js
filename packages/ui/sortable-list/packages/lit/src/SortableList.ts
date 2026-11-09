@@ -363,16 +363,16 @@ private __rozieFirstUpdateDone = false;
         };
         if (c.kind === 'reorder') this.dispatchEvent(new CustomEvent<SortablePayload>("reorder", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (c.kind === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (c.kind === 'remove') this.dispatchEvent(new CustomEvent<SortablePayload>("remove", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       onStart: (d: any) => {
@@ -391,8 +391,8 @@ private __rozieFirstUpdateDone = false;
             newIndex: d.newIndex,
             originalEvent: d.event
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       // `end` comes from the list the row ended up in: the destination when it
@@ -493,24 +493,24 @@ private __rozieFirstUpdateDone = false;
       emit: (name: any, payload: any) => {
         if (name === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (name === 'remove') this.dispatchEvent(new CustomEvent<SortablePayload>("remove", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (name === 'reorder') this.dispatchEvent(new CustomEvent<SortablePayload>("reorder", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (name === 'start') this.dispatchEvent(new CustomEvent<SortablePayload>("start", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));else if (name === 'end') this.dispatchEvent(new CustomEvent<SortablePayload>("end", {
           detail: payload,
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       }
     };

@@ -1032,8 +1032,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     detail: {
       value: iso
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -1069,8 +1069,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
           end: ''
         }
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   } else {
     // Anchor set, end empty, span not blocked → complete the range (ordered by normalizeRange).
@@ -1085,15 +1085,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
       detail: {
         value: next
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
     this.dispatchEvent(new CustomEvent("range-complete", {
       detail: {
         value: next
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };
@@ -1384,8 +1384,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
               end: ''
             }
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       }
     }
@@ -1490,15 +1490,15 @@ export default class DatePicker extends SignalWatcher(LitElement) {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.dispatchEvent(new CustomEvent("range-complete", {
     detail: {
       value: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -1586,8 +1586,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
           end: ''
         }
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   } else {
     if (this.selected() === '') return;
@@ -1596,8 +1596,8 @@ export default class DatePicker extends SignalWatcher(LitElement) {
       detail: {
         value: ''
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }));
   }
 };

@@ -564,8 +564,8 @@ private portals = {
             jsEvent: info.jsEvent,
             el: info.el
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       dateClick: (info: any) => {
@@ -577,8 +577,8 @@ private portals = {
             dayEl: info.dayEl,
             jsEvent: info.jsEvent
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       eventDrop: (info: any) => {
@@ -589,8 +589,8 @@ private portals = {
             delta: info.delta,
             revert: info.revert
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       select: (info: any) => {
@@ -602,8 +602,8 @@ private portals = {
             endStr: info.endStr,
             allDay: info.allDay
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       eventResize: (info: any) => {
@@ -615,8 +615,8 @@ private portals = {
             endDelta: info.endDelta,
             revert: info.revert
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       datesSet: (info: any) => {
@@ -626,8 +626,8 @@ private portals = {
             end: info.end,
             view: info.view.type
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       eventMouseEnter: (info: any) => {
@@ -637,8 +637,8 @@ private portals = {
             jsEvent: info.jsEvent,
             el: info.el
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       eventMouseLeave: (info: any) => {
@@ -648,8 +648,8 @@ private portals = {
             jsEvent: info.jsEvent,
             el: info.el
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       unselect: (info: any) => {
@@ -657,8 +657,8 @@ private portals = {
           detail: {
             jsEvent: info.jsEvent
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       loading: (isLoading: any) => {
@@ -668,8 +668,8 @@ private portals = {
           detail: {
             isLoading
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       eventsSet: (events: any) => {
@@ -679,8 +679,8 @@ private portals = {
           detail: {
             events: events.map(this.eventRef)
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
       },
       viewDidMount: (info: any) => {

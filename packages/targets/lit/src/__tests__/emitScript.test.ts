@@ -190,8 +190,9 @@ describe('emitScript — Lit class-body assembly', () => {
   it('rewrites $emit("name", x) → this.dispatchEvent(new CustomEvent(...))', () => {
     const code = compile('SearchInput');
     expect(code).toContain('this.dispatchEvent(new CustomEvent(');
-    expect(code).toContain('bubbles: true');
-    expect(code).toContain('composed: true');
+    expect(code).toContain('bubbles: false');
+    expect(code).toContain('composed: false');
+    expect(code).not.toContain('bubbles: true');
   });
 
   it('emits attributeChangedCallback for model-prop attribute-change wiring', () => {

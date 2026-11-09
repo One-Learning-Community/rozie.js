@@ -186,6 +186,10 @@ describe('rewriteTemplateExpression — Lit sigil matrix', () => {
     const out = rewriteTemplateExpression(expr, ir);
     expect(out).toContain('this.dispatchEvent(new CustomEvent("save"');
     expect(out).toContain('detail: payload');
+    // Component events stay on the element (no bubbling, no shadow crossing).
+    expect(out).toContain('bubbles: false');
+    expect(out).toContain('composed: false');
+    expect(out).not.toContain('bubbles: true');
   });
 
   it("$emit('n') with zero args → detail: undefined", () => {

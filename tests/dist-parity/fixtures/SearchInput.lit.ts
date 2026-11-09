@@ -75,8 +75,8 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
   onSearch = () => {
   if (this.isValid) this.dispatchEvent(new CustomEvent("search", {
     detail: this._query.value,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -84,8 +84,8 @@ input[data-rozie-s-8bbc4a60] { padding: 0.25rem 0.5rem; }
   this._query.value = '';
   this.dispatchEvent(new CustomEvent("clear", {
     detail: undefined,
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

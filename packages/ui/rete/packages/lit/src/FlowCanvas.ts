@@ -1205,8 +1205,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
                   y: pos.y
                 }
               },
-              bubbles: true,
-              composed: true
+              bubbles: false,
+              composed: false
             }));
           }
         }
@@ -1599,8 +1599,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           name,
           detail
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       const entry = {
         element,
@@ -2237,8 +2237,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
                 ...conn,
                 reason: 'type-mismatch'
               },
-              bubbles: true,
-              composed: true
+              bubbles: false,
+              composed: false
             }));
             return undefined; // ← CANCEL: type mismatch
           }
@@ -2250,8 +2250,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
               ...conn,
               reason: 'can-connect'
             },
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
           return undefined; // ← CANCEL: Signal.emit halts, addConnection returns false
         }
@@ -2272,8 +2272,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           // keep the discrete event too (back-compat).
           this.dispatchEvent(new CustomEvent("connection-created", {
             detail: this.serializeConn(context.data),
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         }
       } else if (context.type === 'connectionremoved') {
@@ -2286,8 +2286,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             detail: {
               id: context.data.id
             },
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         }
       }
@@ -2300,8 +2300,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           detail: {
             id: context.data.id
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
         // T1.3 — pointer-DOWN: stash the PRE-drag graph snapshot (before any movement). It
         // is committed to history on the first `nodetranslated` (only if a drag follows;
@@ -2364,8 +2364,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
               x: pos.x,
               y: pos.y
             },
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         }
         // a node moved → its minimap rect moves (works during a programmatic translate too).
@@ -2380,8 +2380,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             x: context.data.position.x,
             y: context.data.position.y
           },
-          bubbles: true,
-          composed: true
+          bubbles: false,
+          composed: false
         }));
         // the viewport window moved → redraw the minimap viewport rect + mask.
         if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();
@@ -2414,8 +2414,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
             detail: {
               id: ctx && ctx.id ? ctx.id : null
             },
-            bubbles: true,
-            composed: true
+            bubbles: false,
+            composed: false
           }));
         }
       }
@@ -3083,8 +3083,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
           name,
           detail
         },
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     };
     if (this.nodeToolbar && this._refToolbarEl) {
@@ -4526,15 +4526,15 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     detail: {
       id
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   this.dispatchEvent(new CustomEvent("edge-selected", {
     detail: {
       id
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
@@ -4690,8 +4690,8 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
     detail: {
       ids
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
   // the selected set changed → repaint the minimap (selected nodes are highlighted).
   if (this.scheduleMinimapRedraw) this.scheduleMinimapRedraw();

@@ -872,16 +872,9 @@ for (const target of TARGETS) {
     );
   }
 
-  // KNOWN GAP on Lit (emitter behaviour, not this component): the Lit emitter
-  // lowers every `$emit(name, x)` to
-  // `this.dispatchEvent(new CustomEvent(name, { detail: x, bubbles: true, composed: true }))`
-  // (packages/targets/lit/src/rewrite/rewriteScript.ts and
-  // rewriteTemplateExpression.ts), so an inner list's events bubble out of the
-  // inner host and an ancestor list's listeners on the same event name catch
-  // them. The other five targets deliver `$emit` to the direct consumer only.
-  // Fixing it belongs in the emitter; this stays fixme on Lit until then.
-  const nestedRunner = target === 'lit' ? test.fixme : runner;
-  nestedRunner(
+  // Lit too: component events stay on the element that emits them (no
+  // bubbling, no shadow-root crossing), as on the other five targets.
+  runner(
     `sortable-keyboard-cross-list [${target}]: a nested inner list's events do not reach the outer list's listeners`,
     async ({ page }) => {
       const { mount, errors } = await open(page);

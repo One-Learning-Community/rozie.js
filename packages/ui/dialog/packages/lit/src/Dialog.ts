@@ -311,8 +311,8 @@ private __rozieWatchInitial_0 = true;
     detail: {
       reason
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 

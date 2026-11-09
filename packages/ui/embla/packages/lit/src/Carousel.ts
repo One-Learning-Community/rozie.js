@@ -317,28 +317,28 @@ private __rozieFirstUpdateDone = false;
       this._selectedIndexControllable.write(i);
       this.dispatchEvent(new CustomEvent("select", {
         detail: i,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       this.syncNav();
     });
     this.embla.on('settle', () => this.dispatchEvent(new CustomEvent("settle", {
       detail: undefined,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     this.embla.on('reInit', () => {
       this.dispatchEvent(new CustomEvent("re-init", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       this.syncNav();
     });
     this.embla.on('pointerDown', () => this.dispatchEvent(new CustomEvent("pointer-down", {
       detail: undefined,
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })));
     // Embla caches SLIDE sizes at init. If a slide's CSS (or a root width applied via
     // attribute fallthrough) settles a frame after $onMount, the snap COUNT measured

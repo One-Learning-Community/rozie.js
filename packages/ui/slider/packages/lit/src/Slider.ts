@@ -459,8 +459,8 @@ export default class Slider extends SignalWatcher(LitElement) {
   detail: {
     value
   },
-  bubbles: true,
-  composed: true
+  bubbles: false,
+  composed: false
 }));
 
   // Single-mode commit: capture the fresh number, write the scalar, emit. Never

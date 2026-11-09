@@ -11,6 +11,7 @@ Rozie compiles Vue/Alpine-flavored `.rozie` source to idiomatic Lit 3.2+ Web Com
 - `r-external` + `$reconcileAfterDomMutation()` are the escape hatch when an engine mutates DOM under lit-html's `repeat` cache.
 - `r-bind="$attrs"` auto-fallthrough handles consumer-passed attributes; native `addEventListener` cleanup is the compiler's job, not yours.
 - `model: true` props compile to a property/attribute pair with a `*-change` `CustomEvent` — the canonical Lit two-way pattern, no boilerplate.
+- `$emit('name', payload)` dispatches a `name` `CustomEvent` (payload in `e.detail`) on the element itself. It does not bubble or cross shadow roots, as on the other targets, so listen on the element (`@name=${…}` or `addEventListener`), not on an ancestor.
 
 You write one `.rozie` component. The compiled `.ts` is a `LitElement` subclass that registers a custom element. It drops into any HTML page, any framework, any island, exactly like a hand-written Lit component — because that's what it is.
 

@@ -259,30 +259,30 @@ private __rozieFirstUpdateDone = false;
       this.cropReady = true;
       this.dispatchEvent(new CustomEvent("ready", {
         detail: undefined,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
     },
     cropstart: (e: any) => this.dispatchEvent(new CustomEvent("cropstart", {
       detail: {
         action: e.detail && e.detail.action
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })),
     cropmove: (e: any) => this.dispatchEvent(new CustomEvent("cropmove", {
       detail: {
         action: e.detail && e.detail.action
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })),
     cropend: (e: any) => this.dispatchEvent(new CustomEvent("cropend", {
       detail: {
         action: e.detail && e.detail.action
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     })),
     // continuous crop → emit + drive the two-way model (guarded reverse $watch).
     crop: (e: any) => {
@@ -293,8 +293,8 @@ private __rozieFirstUpdateDone = false;
       if (!this.cropReady) return;
       this.dispatchEvent(new CustomEvent("crop", {
         detail: e.detail,
-        bubbles: true,
-        composed: true
+        bubbles: false,
+        composed: false
       }));
       if (e.detail) this._dataControllable.write(e.detail);
     },
@@ -303,8 +303,8 @@ private __rozieFirstUpdateDone = false;
         ratio: e.detail && e.detail.ratio,
         oldRatio: e.detail && e.detail.oldRatio
       },
-      bubbles: true,
-      composed: true
+      bubbles: false,
+      composed: false
     }))
   };
   this.instance = new CropperEngine(this.imgEl, cfg);

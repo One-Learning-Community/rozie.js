@@ -8,7 +8,7 @@
  *   - `$data.X`          → `this._X.value`
  *   - `$refs.X`          → `this._refX`
  *   - `$slots.X`         → `this._hasSlot<Suffix>`
- *   - `$emit('n', x)`    → `this.dispatchEvent(new CustomEvent('kebab-n', { detail: x, bubbles: true, composed: true }))`
+ *   - `$emit('n', x)`    → `this.dispatchEvent(new CustomEvent('kebab-n', { detail: x, bubbles: false, composed: false }))`
  *                          (event name is kebab-cased at dispatch — D-01, quick 260811-nre)
  *   - bare computed name → `this.<name>` (computed getters are class methods)
  *
@@ -420,8 +420,8 @@ export function rewriteTemplateExpression(
         t.stringLiteral(eventName),
         t.objectExpression([
           t.objectProperty(t.identifier('detail'), detail),
-          t.objectProperty(t.identifier('bubbles'), t.booleanLiteral(true)),
-          t.objectProperty(t.identifier('composed'), t.booleanLiteral(true)),
+          t.objectProperty(t.identifier('bubbles'), t.booleanLiteral(false)),
+          t.objectProperty(t.identifier('composed'), t.booleanLiteral(false)),
         ]),
       ]);
       // Typed public surface P1 — same `CustomEvent<P>` typing as rewriteScript.

@@ -246,8 +246,8 @@ export default class Resizable extends SignalWatcher(LitElement) {
     detail: {
       size: next
     },
-    bubbles: true,
-    composed: true
+    bubbles: false,
+    composed: false
   }));
 };
 
