@@ -1,5 +1,15 @@
 # @rozie/runtime-angular
 
+## 0.10.3
+
+### Patch Changes
+
+- 54962c5: Angular: an object or nested array inside a `:class` list is now applied, matching the other targets. `:class="['card', { active: isActive }]"`, or a list holding a prop whose value is an object or array, used to lose those classes on Angular, because Angular's own `[class]` binding only takes plain strings inside a list (and `[ngClass]` rejected them). Such values are now flattened to one class string by the new `rozieClass` helper in `@rozie/runtime-angular`. Plain strings, plain `{ ... }` objects and lists of plain strings bind as before.
+
+  `@rozie-ui/sortable-list-angular`: an object or array `itemClass` / `listClass` (for example `{ 'is-flagged': true }`) now lands on the rows and the list.
+
+- 983dd15: Fast key presses no longer drop updates on Angular. A two-way (`model: true`) prop that the consumer binds read the old value until Angular's next change detection, a task after the write, and keyboard events run before it. A component that reads its value and writes the next one (number-field ArrowUp, sortable-list ArrowDown) built each press on the stale value: ten quick ArrowUp presses on a number field moved it by one, and sortable-list keyboard reordering moved the wrong row. A write is now held until the consumer answers; any value the consumer sends wins at once, and a refused write still goes back to the consumer's value one task later.
+
 ## 0.10.2
 
 ### Patch Changes

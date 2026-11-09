@@ -1,5 +1,12 @@
 # @rozie-ui/dialog-svelte
 
+## 0.2.6
+
+### Patch Changes
+
+- 6dcbd3e: A `<form method="dialog">` placed inside the dialog now closes it on Lit. The native `<dialog>` lives in the element's shadow root and the form is slotted light DOM, so the browser found no ancestor dialog and the submit did nothing. Dialog now handles the submit itself (submitter `value` becomes `returnValue`, a `preventDefault()`ed submit is left alone, and a form inside a nested dialog closes only that dialog). On the other five targets the behaviour is unchanged: the same handler runs, and the browser's own close then finds the dialog already closed.
+  - @rozie/runtime-svelte@0.10.3
+
 ## 0.2.5
 
 ### Patch Changes
