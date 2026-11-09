@@ -1,5 +1,6 @@
 ---
 "@rozie/core": patch
+"@rozie/runtime-lit": patch
 "@rozie-ui/captcha-lit": patch
 "@rozie-ui/chartjs-lit": patch
 "@rozie-ui/codemirror-lit": patch
