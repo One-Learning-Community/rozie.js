@@ -234,6 +234,7 @@ export default class Pagination extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

@@ -790,6 +790,7 @@ private __rozieWatchInitial_0 = true;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.open)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((isOpen: any) => {

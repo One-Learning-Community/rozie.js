@@ -40,6 +40,7 @@ export default class SlotConditionalSlotInElseifChain extends SignalWatcher(LitE
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

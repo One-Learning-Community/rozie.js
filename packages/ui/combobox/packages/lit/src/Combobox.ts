@@ -625,6 +625,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.value)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } (() => {

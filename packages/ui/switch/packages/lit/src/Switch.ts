@@ -123,6 +123,7 @@ export default class Switch extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

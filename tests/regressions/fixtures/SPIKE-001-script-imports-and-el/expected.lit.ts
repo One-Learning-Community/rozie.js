@@ -41,6 +41,7 @@ export default class SpikeImportEl extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push((() => this.instance?.destroy()));

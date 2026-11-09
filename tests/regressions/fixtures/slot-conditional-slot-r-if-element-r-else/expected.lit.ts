@@ -40,6 +40,7 @@ export default class SlotConditionalSlotRIfElementRElse extends SignalWatcher(Li
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

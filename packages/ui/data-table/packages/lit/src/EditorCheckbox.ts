@@ -55,6 +55,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     if (this.autofocus) this._refInputEl?.focus();
   }
 

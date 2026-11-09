@@ -341,6 +341,7 @@ private portals = {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
     this._armListeners();

@@ -132,6 +132,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => {
       cancelled = true;
       this.renderToken++;

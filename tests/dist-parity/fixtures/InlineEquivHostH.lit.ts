@@ -23,6 +23,7 @@ export default class InlineEquivHostH extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.editTransitionH = 2;
   }
 

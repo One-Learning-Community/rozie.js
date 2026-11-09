@@ -149,6 +149,7 @@ private get canvas() { return this.__rozieCtxConsumer_rete_canvas.value; }
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this.cv = this.canvas;

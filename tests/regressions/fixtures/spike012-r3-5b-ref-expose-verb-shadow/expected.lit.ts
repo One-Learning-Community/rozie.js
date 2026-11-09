@@ -23,6 +23,7 @@ export default class RefExposeVerbShadow extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     void (this._refBox as HTMLElement);
   }
 

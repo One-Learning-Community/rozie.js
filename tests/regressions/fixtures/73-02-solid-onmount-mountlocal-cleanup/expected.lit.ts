@@ -24,6 +24,7 @@ export default class OnMountMountLocalCleanup extends SignalWatcher(LitElement) 
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => clearInterval(timer)));
 
     const timer = setInterval(() => {

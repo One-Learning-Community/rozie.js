@@ -273,6 +273,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push((() => {

@@ -23,6 +23,7 @@ export default class RefEmitDedup extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     void (this._refSave as HTMLElement);
   }
 

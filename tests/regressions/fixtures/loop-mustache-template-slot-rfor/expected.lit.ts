@@ -55,6 +55,7 @@ export default class LoopMustacheTemplateSlotRfor extends SignalWatcher(LitEleme
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

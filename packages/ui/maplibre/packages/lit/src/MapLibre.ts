@@ -343,6 +343,7 @@ private __rozieCtxProvider_maplibre_layers = new ContextProvider(this, { context
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
     this._armListeners();

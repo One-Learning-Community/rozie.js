@@ -532,6 +532,7 @@ export default class DatePicker extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     const nextViewIso = this.viewMonthGrid();

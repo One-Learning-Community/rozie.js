@@ -31,6 +31,7 @@ export default class Spike012R5C3 extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

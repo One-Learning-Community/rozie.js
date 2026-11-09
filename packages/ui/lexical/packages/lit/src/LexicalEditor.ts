@@ -131,6 +131,7 @@ private __rozieCtxProvider_rozie_lexical_editor = new ContextProvider(this, { co
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
 
     this._disconnectCleanups.push((() => {

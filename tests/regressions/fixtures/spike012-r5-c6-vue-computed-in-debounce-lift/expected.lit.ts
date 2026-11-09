@@ -28,6 +28,7 @@ export default class ComputedInDebounceLift extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

@@ -122,6 +122,7 @@ export default class NumberField extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => {
       this.stopHold();
       this.scrubbing = false;

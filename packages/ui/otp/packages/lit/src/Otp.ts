@@ -98,6 +98,7 @@ export default class Otp extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     if (this.autoFocus) this.focusIndex(this.firstEmptyIndex());
   }
 

@@ -35,6 +35,7 @@ export default class EngineDomEscape extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     // Tiny inline "engine" that appends a `.cm-editor` element the author cannot
     // reach with scoped CSS (no Rozie scope attribute is stamped onto it). The
     // :root { } engine rule is the only mechanism that styles it across targets.

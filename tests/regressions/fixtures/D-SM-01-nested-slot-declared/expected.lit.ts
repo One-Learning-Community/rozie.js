@@ -53,6 +53,7 @@ export default class NestedSlotDeclared extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

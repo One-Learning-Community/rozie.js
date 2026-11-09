@@ -32,6 +32,7 @@ export default class ClassSelectorProbe extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._ready.value = true;
   }
 

@@ -23,6 +23,7 @@ export default class RefConstShadow extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._n.value = (this._refBox as HTMLElement).childElementCount + this.box;
   }
 

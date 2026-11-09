@@ -24,6 +24,7 @@ export default class OnMountArrowCleanup extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => window.removeEventListener('resize', this.onResize)));
 
     window.addEventListener('resize', this.onResize);

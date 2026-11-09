@@ -51,6 +51,7 @@ private get injectedType() { return this.__rozieCtxConsumer_rete_nodeType.value;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.nt = this.injectedType;
 
     // register this typed port against the enclosing node TYPE's schema; the canvas's

@@ -93,6 +93,7 @@ private get registry() { return this.__rozieCtxConsumer_data_table_columns.value
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.reg = this.registry;
 
     this._disconnectCleanups.push((() => {

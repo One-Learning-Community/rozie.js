@@ -57,6 +57,7 @@ private get layers() { return this.__rozieCtxConsumer_maplibre_layers.value; }
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.reg = this.layers;
     this.ctx = this.srcCtx;
 

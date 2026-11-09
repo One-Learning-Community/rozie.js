@@ -24,6 +24,7 @@ export default class RefShadowsDataKey extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._n.value = (this._refBox as HTMLElement).childElementCount + this._box.value;
   }
 

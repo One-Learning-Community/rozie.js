@@ -153,6 +153,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => {
       if (this.ws) this.ws.destroy();
     }));

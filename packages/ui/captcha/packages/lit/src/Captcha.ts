@@ -62,6 +62,7 @@ export default class Captcha extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => {
       disposed = true;
       if (this.widgetId == null || !this.api) return;

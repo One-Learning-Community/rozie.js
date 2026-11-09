@@ -23,6 +23,7 @@ export default class RefSuffixCollision extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._n.value = (this._refBox as HTMLElement).childElementCount + this.boxRef;
   }
 

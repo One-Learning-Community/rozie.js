@@ -52,6 +52,7 @@ export default class NamedSlotsFixture extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._armListeners();
   }
 

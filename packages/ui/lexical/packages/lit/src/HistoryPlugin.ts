@@ -39,6 +39,7 @@ private get editorCtx() { return this.__rozieCtxConsumer_rozie_lexical_editor.va
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.ctx = this.editorCtx;
 
     this._disconnectCleanups.push((() => {

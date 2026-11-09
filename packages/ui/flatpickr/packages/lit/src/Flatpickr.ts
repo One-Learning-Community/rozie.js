@@ -172,6 +172,7 @@ private __rozieFirstUpdateDone = false;
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this._disconnectCleanups.push((() => this.instance?.destroy()));
 
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.date)(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {

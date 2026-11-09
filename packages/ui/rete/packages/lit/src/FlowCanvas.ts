@@ -684,6 +684,7 @@ private __rozieCtxProvider_rete_canvas = new ContextProvider(this, { context: __
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     adoptDocumentStyles(this);
 
     this._armListeners();

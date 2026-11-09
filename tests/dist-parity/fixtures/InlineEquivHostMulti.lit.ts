@@ -24,6 +24,7 @@ export default class InlineEquivHostMulti extends SignalWatcher(LitElement) {
   }
 
   firstUpdated(): void {
+    this._rozieTornDown = false;
     this.editTransitionM = 2;
   }
 
