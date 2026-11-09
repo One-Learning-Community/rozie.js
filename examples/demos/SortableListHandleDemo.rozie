@@ -17,7 +17,10 @@
     - the `<ol class="state-list">` sidecar showing the bound array order,
     - a second, deliberately misconfigured list (`handle-missing-list`) that
       sets keyboardTrigger="handle" WITHOUT a `handle` selector: keyboard
-      reordering must be off and a console warning logged.
+      reordering must be off and a console warning logged,
+    - a third list (`options-handle-list`) whose handle selector comes from
+      `options.handle` only (no `handle` prop): the keyboard follows it like
+      the prop (no warning, keys read from the handle).
 
   NOT a screenshot cell (deliberately absent from matrix.spec.ts EXAMPLES).
 -->
@@ -34,6 +37,7 @@
 {
   items: [],
   other: [],
+  viaOptions: [],
   handleClicks: 0,
   disableKeyboard: false,
 }
@@ -52,12 +56,21 @@ const SEED_OTHER = () => [
   { id: 'm2', label: 'Misconfigured two' },
 ]
 
+const SEED_VIA_OPTIONS = () => [
+  { id: 'o1', label: 'Options one' },
+  { id: 'o2', label: 'Options two' },
+  { id: 'o3', label: 'Options three' },
+]
+
+const handleOptions = { handle: '.grip' }
+
 const onHandleClick = () => {
   $data.handleClicks = $data.handleClicks + 1
 }
 
 $onMount(() => {
   $data.items = SEED()
+  $data.viaOptions = SEED_VIA_OPTIONS()
   $data.other = SEED_OTHER()
 })
 </script>
@@ -108,6 +121,21 @@ $onMount(() => {
         </span>
       </template>
     </SortableList>
+  </section>
+
+  <h4>Handle from options.handle</h4>
+  <section data-testid="options-handle-list">
+    <SortableList r-model:items="$data.viaOptions" itemKey="id" keyboardTrigger="handle" :options="handleOptions">
+      <template #default="{ item, instructionsId }">
+        <span class="row">
+          <button type="button" class="grip" :aria-label="'Reorder ' + item.label" :aria-describedby="instructionsId">⋮⋮</button>
+          <span class="label">{{ item.label }}</span>
+        </span>
+      </template>
+    </SortableList>
+    <ol class="options-state">
+      <li r-for="item in $data.viaOptions" :key="item.id">{{ item.label }}</li>
+    </ol>
   </section>
 </div>
 </template>

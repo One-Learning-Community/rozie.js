@@ -32,11 +32,17 @@
                                  a consumer minting ids in `add` would do),
     - `mode-row`                 switches every list to keyboardTrigger 'row'.
     - `top-no-sort`              sets Top sidebar's `options` to
-                                 `{ sort: false }` (SortableJS reads options
-                                 at construction: remount Top with
-                                 `toggle-top` twice to apply it),
+                                 `{ sort: false }` (applied live, by mouse and
+                                 keyboard alike),
     - `tools-index-keys`         keys both toolbars by index, so their rows
                                  share keys (`0`, `1`, …) across the lists.
+    - `locked-cloneable`         turns on Locked's `cloneable` prop (its
+                                 `options.group`, `pull: false`, still wins),
+    - `top-unmount-on-add`       makes Top sidebar's `add` handler unmount Top
+                                 sidebar (its pending `end` must not fire),
+    - `foreign-init`             turns the `foreign` `<ul>` (Foreign A,
+                                 Foreign B) into a plain SortableJS list in
+                                 group `zones` (not a SortableList).
 
   Every list has its own state sidecar `<ol class="state-list state-{slug}">`
   and every emitted event lands in `<ol class="event-log">` as
@@ -80,6 +86,8 @@
   added: 0,
   topOptions: {},
   toolsIndexKeys: false,
+  lockedCloneable: false,
+  unmountTopOnAdd: false,
 }
 </data>
 
@@ -134,6 +142,7 @@ const interactionOf = (e) => {
 
 const record = (slug, name, e) => {
   $data.log = [...$data.log, slug + ':' + name + ':' + interactionOf(e)]
+  if (slug === 'top' && name === 'add' && $data.unmountTopOnAdd) $data.topMounted = false
   const p = payloadOf(e)
   if (name === 'end') {
     // What a consumer `end` handler sees in its bound arrays.
@@ -201,6 +210,23 @@ const setToolsIndexKeys = () => {
 
 const indexKey = (item, index) => index
 
+const setLockedCloneable = () => {
+  $data.lockedCloneable = true
+}
+
+const setUnmountTopOnAdd = () => {
+  $data.unmountTopOnAdd = true
+}
+
+// A plain SortableJS list (not a SortableList) in group `zones`. The Sortable
+// constructor comes from a SortableList's own instance.
+const initForeign = () => {
+  const el = $refs.foreign
+  const Sortable = $refs.lockedList.getInstance().constructor
+  el.innerHTML = '<li class="foreign-item">Foreign A</li><li class="foreign-item">Foreign B</li>'
+  new Sortable(el, { group: 'zones', animation: 0 })
+}
+
 $onMount(() => seed())
 </script>
 
@@ -218,14 +244,19 @@ $onMount(() => seed())
     <button type="button" data-testid="mode-row" @click="setRowMode">Row mode</button>
     <button type="button" data-testid="top-no-sort" @click="setTopNoSort">Top: sort false</button>
     <button type="button" data-testid="tools-index-keys" @click="setToolsIndexKeys">Toolbars: index keys</button>
+    <button type="button" data-testid="locked-cloneable" @click="setLockedCloneable">Locked: cloneable</button>
+    <button type="button" data-testid="top-unmount-on-add" @click="setUnmountTopOnAdd">Top: unmount on add</button>
+    <button type="button" data-testid="foreign-init" @click="initForeign">Foreign SortableJS list</button>
   </div>
 
   <section data-testid="zone-locked">
     <h4>Locked (pull: false)</h4>
     <SortableList
+      ref="lockedList"
       r-model:items="$data.locked"
       itemKey="id"
       group="zones"
+      :cloneable="$data.lockedCloneable"
       :options="{ group: { name: 'zones', pull: false } }"
       listLabel="Locked"
       :keyboardTrigger="$data.trigger"
@@ -769,6 +800,10 @@ $onMount(() => seed())
     <ol class="state-list state-toolb">
       <li r-for="item, index in $data.toolb" :key="item.id">{{ item.label }}</li>
     </ol>
+  </section>
+  <section data-testid="zone-foreign">
+    <h4>Foreign (plain SortableJS)</h4>
+    <ul class="foreign-list" data-testid="foreign" ref="foreign" r-external></ul>
   </section>
   <output data-testid="last-end">{{ $data.lastEnd }}</output>
   <output data-testid="end-state">{{ $data.endState }}</output>

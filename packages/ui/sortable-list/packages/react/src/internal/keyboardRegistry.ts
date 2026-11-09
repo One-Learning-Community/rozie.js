@@ -94,6 +94,8 @@ export interface KeyboardRegistry {
   has(entry: ListEntry): boolean;
   /** The registered entry whose list element is `el`, else null. */
   entryFor(el: HTMLElement): ListEntry | null;
+  /** Whether `el` is (or was, before it unmounted) a SortableList's list element. */
+  wasList(el: HTMLElement): boolean;
   lift: Lift | null;
   /** The list whose aria-live region spoke last (cleared when another speaks). */
   speaker: ListEntry | null;
@@ -102,11 +104,14 @@ export interface KeyboardRegistry {
   listName(entry: ListEntry): string;
   indexOfLift(): number;
   /**
-   * Run `fire` (an `end` emit) in a task, after every write made so far and
-   * whatever framework flush those writes scheduled (`afterFlush`). Pending ends run in
-   * order; `flushEnds()` runs them now.
+   * Run `fire` (an `end` emit from `owner`) in a task, after every write made
+   * so far and whatever framework flush those writes scheduled
+   * (`afterFlush`). Pending ends run in order; `flushEnds()` runs them now.
+   * An unmounted list emits nothing: when `owner` unregisters first, or its
+   * list element has left the page by the time the end runs, its pending ends
+   * are dropped, and none is queued for an owner that isn't registered.
    */
-  deferEnd(fire: () => void): void;
+  deferEnd(fire: () => void, owner?: ListEntry | null): void;
   /** Run every pending `end` now (before a new drag or lift emits `start`). */
   flushEnds(): void;
 }
@@ -234,26 +239,35 @@ function safeMatches(el: Element, sel: string): boolean {
   }
 }
 
-// The row's slot roots: its direct element children, with a <slot> (Lit)
-// replaced by the elements assigned to it.
+// The row's slot root: the one element its content is rendered in, when that
+// element covers the row — the row's single element child, with no text (other
+// than whitespace) beside it. A <slot> (Lit) is read through the nodes assigned
+// to it. A row with several top-level elements, or text beside an element
+// (`{{ label }} <button class="js-remove">`), has no slot root: none of its
+// elements covers the row.
 function slotRoots(row: Element): Element[] {
-  const out: Element[] = [];
-  for (const c of Array.from(row.children)) {
-    if (c.tagName === 'SLOT' && typeof (c as HTMLSlotElement).assignedElements === 'function') {
-      out.push(...(c as HTMLSlotElement).assignedElements({ flatten: true }));
+  const nodes: Node[] = [];
+  for (const c of Array.from(row.childNodes)) {
+    if (c.nodeType === 1 && (c as Element).tagName === 'SLOT' && typeof (c as HTMLSlotElement).assignedNodes === 'function') {
+      nodes.push(...(c as HTMLSlotElement).assignedNodes({ flatten: true }));
     } else {
-      out.push(c);
+      nodes.push(c);
     }
   }
-  return out;
+  const elements: Element[] = [];
+  for (const n of nodes) {
+    if (n.nodeType === 1) elements.push(n as Element);
+    else if (n.nodeType === 3 && (n.textContent ?? '').trim() !== '') return [];
+  }
+  return elements.length === 1 ? elements : [];
 }
 
 // SortableJS filters a press with `closest(pressedElement, filter, list)`. A
 // key press has no pressed element inside the row, so it counts as a press on
 // the row itself, which a filter can mark directly or through the element the
-// row's content is rendered in (its slot root, which covers the row). A
-// control nested deeper (a `.js-remove` button, an `input`) blocks only presses
-// on it, so it does not block the row.
+// row's content is rendered in (its slot root, which covers the row). Any other
+// control (a `.js-remove` button, an `input`), nested or beside other content,
+// blocks only presses on it, so it does not block the row.
 function rowHas(row: Element, sel: string): boolean {
   if (safeMatches(row, sel)) return true;
   return slotRoots(row).some((r) => safeMatches(r, sel));
@@ -352,14 +366,19 @@ export function canHop(from: GroupOption, to: GroupOption): { ok: boolean; copy:
 
 function createState(): Singleton {
   const entries = new Set<ListEntry>();
-  const pendingEnds: Array<() => void> = [];
+  const pendingEnds: Array<{ fire: () => void; owner: ListEntry | null }> = [];
+  const known = new WeakSet<HTMLElement>();
   const registry: KeyboardRegistry = {
     lift: null,
     speaker: null,
     register(entry) {
       entries.add(entry);
+      if (entry.el) known.add(entry.el);
       return () => {
         entries.delete(entry);
+        for (let i = pendingEnds.length - 1; i >= 0; i--) {
+          if (pendingEnds[i]!.owner === entry) pendingEnds.splice(i, 1);
+        }
         if (registry.lift && registry.lift.holder === entry) registry.lift = null;
         if (registry.speaker === entry) registry.speaker = null;
       };
@@ -370,6 +389,9 @@ function createState(): Singleton {
     entryFor(el) {
       for (const e of entries) if (e.el === el) return e;
       return null;
+    },
+    wasList(el) {
+      return el != null && known.has(el);
     },
     orderedLists() {
       return [...entries].sort((x, y) => composedCompare(x.el, y.el));
@@ -417,12 +439,20 @@ function createState(): Singleton {
       l.index = i;
       return i;
     },
-    deferEnd(fire) {
-      pendingEnds.push(fire);
+    deferEnd(fire, owner = null) {
+      if (owner != null && !entries.has(owner)) return;
+      pendingEnds.push({ fire, owner });
       afterFlush(() => registry.flushEnds());
     },
     flushEnds() {
-      while (pendingEnds.length > 0) pendingEnds.shift()!();
+      while (pendingEnds.length > 0) {
+        const p = pendingEnds.shift()!;
+        // A list whose element has left the page has unmounted, even if its
+        // framework runs the cleanup that unregisters it later (React runs
+        // effect cleanups after the commit that removed the element).
+        if (p.owner != null && p.owner.el != null && p.owner.el.isConnected === false) continue;
+        p.fire();
+      }
     },
   };
   return { registry, counter: 0 };

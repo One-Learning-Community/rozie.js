@@ -859,5 +859,44 @@ for (const target of TARGETS) {
         await expect.poll(() => displayedLabels(rows)).toEqual(seed);
       },
     );
+
+    // SortableJS's own filter pattern with a row template that has no
+    // wrapper element: a label beside a `.js-remove` button, or a label beside
+    // an `<input>`. The filtered control blocks presses on itself only, so
+    // every row still lifts by keyboard.
+    for (const shape of ['remove', 'input'] as const) {
+      runner(
+        `sortable-keyboard-keys [${target}]: multi-root rows with a top-level filtered control (${shape}) still lift by keyboard${tag}`,
+        async ({ page }) => {
+          await open(page);
+          await clickKeepingFocus(page.getByTestId('rozie-mount'), `multi-${shape}`);
+          const extra = page.getByTestId('rozie-mount').locator('[class*="extra-list"]');
+          const rows = extra.locator(ITEM);
+          await expect(rows).toHaveCount(3);
+          const extraState = page.getByTestId('rozie-mount').locator('[class*="extra-state"] li');
+          await expect.poll(() => texts(extraState)).toEqual(['Red', 'Green', 'Blue']);
+          await expect(rows.first()).toHaveAttribute('tabindex', '0');
+          await rows.nth(0).focus();
+          const live = extra.locator(ARIA_LIVE);
+          if (burst) {
+            for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+          } else {
+            await page.keyboard.press('Space');
+            await expect(live).toHaveText('Lifted Red, position 1 of 3');
+            await page.keyboard.press('ArrowDown');
+            await expect(live).toHaveText('Moved Red to position 2 of 3');
+            await page.keyboard.press('ArrowDown');
+            await page.keyboard.press('Space');
+          }
+          await expect(live).toHaveText('Dropped Red at position 3 of 3');
+          await expect.poll(() => texts(extraState)).toEqual(['Green', 'Blue', 'Red']);
+          await expect(extra.locator(LIFTED)).toHaveCount(0);
+          // Every item exactly once, in state and in the rendered rows.
+          await expect
+            .poll(async () => (await rows.evaluateAll((els) => els.map((e) => (e.textContent ?? '').replace('✕', '').trim()))).sort())
+            .toEqual(['Blue', 'Green', 'Red']);
+        },
+      );
+    }
   }
 }

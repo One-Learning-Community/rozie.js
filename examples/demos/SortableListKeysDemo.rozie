@@ -39,6 +39,12 @@
     - `options-animation-0` sets the `options` prop to `{ animation: 0 }`,
       `animation-300` sets the `animation` prop to 300, and
       `option-animation-50` calls the imperative `option('animation', 50)`.
+    - `multi-remove` / `multi-input` show a SECOND list (`extra-list`, items
+      Red / Green / Blue, state in `<ol class="extra-state">`) whose row
+      template has no wrapper element: SortableJS's own filter pattern, a
+      label beside a `.js-remove` button with `filter: '.js-remove'`, or a
+      label `<span>` beside an `<input>` with `filter: 'input'`. Every row
+      there still lifts by keyboard (the control blocks presses on itself).
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -67,6 +73,8 @@
   announcements: null,
   animation: 150,
   animationRead: '',
+  multiRoot: null,
+  extraItems: [],
 }
 </data>
 
@@ -185,6 +193,15 @@ const sortCAE = () => {
   $refs.list.sort(['c', 'a', 'e'])
 }
 
+const showMultiRoot = (shape) => {
+  $data.extraItems = [
+    { id: 'r', label: 'Red' },
+    { id: 'g', label: 'Green' },
+    { id: 'b', label: 'Blue' },
+  ]
+  $data.multiRoot = shape
+}
+
 const prependItem = () => {
   $data.items = [{ id: 'z', label: 'Zucchini' }, ...$data.items]
 }
@@ -216,6 +233,8 @@ $onMount(() => {
     <button type="button" data-testid="animation-300" @click="animation300">animation 300</button>
     <button type="button" data-testid="option-animation-50" @click="optionAnimation50">option('animation', 50)</button>
     <button type="button" data-testid="sort-cae" @click="sortCAE">sort(['c', 'a', 'e'])</button>
+    <button type="button" data-testid="multi-remove" @click="showMultiRoot('remove')">Multi-root rows (.js-remove)</button>
+    <button type="button" data-testid="multi-input" @click="showMultiRoot('input')">Multi-root rows (input)</button>
   </div>
   <SortableList
     ref="list"
@@ -246,6 +265,20 @@ $onMount(() => {
       <div class="list-footer">End of list</div>
     </template>
   </SortableList>
+
+  <div r-if="$data.multiRoot === 'remove'" class="extra-list">
+    <SortableList r-model:items="$data.extraItems" itemKey="id" filter=".js-remove" listLabel="Colours">
+      <template #default="{ item }">{{ item.label }} <button type="button" class="js-remove" tabindex="-1">✕</button></template>
+    </SortableList>
+  </div>
+  <div r-if="$data.multiRoot === 'input'" class="extra-list">
+    <SortableList r-model:items="$data.extraItems" itemKey="id" filter="input" listLabel="Colours">
+      <template #default="{ item }"><span class="extra-label">{{ item.label }}</span><input type="text" tabindex="-1" :aria-label="item.label" /></template>
+    </SortableList>
+  </div>
+  <ol class="extra-state">
+    <li r-for="item in $data.extraItems" :key="item.id">{{ item.label }}</li>
+  </ol>
 
   <ol class="state-list">
     <li r-for="item, index in $data.items" :key="item.id">

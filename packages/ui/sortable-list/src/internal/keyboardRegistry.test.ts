@@ -239,6 +239,43 @@ describe('registry', () => {
     await new Promise((res) => setTimeout(res, 5));
     expect(order.filter((o) => o === 'end3')).toHaveLength(1);
   });
+  it('unregistering a list drops its pending ends (an unmounted list emits nothing); others still run', async () => {
+    const r = getKeyboardRegistry();
+    const ea = fakeEntry(el(), 'z');
+    const eb = fakeEntry(el(), 'z');
+    const unA = reg(ea);
+    reg(eb);
+    const order: string[] = [];
+    r.deferEnd(() => order.push('a'), ea);
+    r.deferEnd(() => order.push('b'), eb);
+    unA();
+    await new Promise((res) => setTimeout(res, 5));
+    expect(order).toEqual(['b']);
+    // A list that was never registered, or is gone, gets no end queued.
+    r.deferEnd(() => order.push('a-late'), ea);
+    r.flushEnds();
+    expect(order).toEqual(['b']);
+  });
+  it('an end whose list element has left the page is dropped (cleanup that unregisters may come later)', () => {
+    const r = getKeyboardRegistry();
+    const a = el();
+    const ea = fakeEntry(a, 'z');
+    reg(ea);
+    const order: string[] = [];
+    r.deferEnd(() => order.push('a'), ea);
+    a.remove();
+    r.flushEnds();
+    expect(order).toEqual([]);
+  });
+    it('wasList() knows an element that was a registered list, after it unregisters', () => {
+    const r = getKeyboardRegistry();
+    const a = el();
+    const un = reg(fakeEntry(a, 'z'));
+    expect(r.wasList(a)).toBe(true);
+    un();
+    expect(r.wasList(a)).toBe(true);
+    expect(r.wasList(el())).toBe(false);
+  });
   it('has() tracks registration; unregister clears the speaker', () => {
     const ea = fakeEntry(el(), 'z');
     const r = getKeyboardRegistry();
@@ -353,6 +390,39 @@ describe('rowLiftable (keyboard honours filter / draggable like SortableJS)', ()
     const row = l.children[0] as HTMLElement;
     for (const filter of ['.js-remove, .js-edit', 'input']) {
       expect(rowLiftable(row, { filter, draggable: undefined, sortable: null })).toBe(true);
+    }
+  });
+
+  it('a multi-root row (text or elements beside the control) has no slot root: a top-level filtered control does not block the row', () => {
+    const l = list(
+      '<div class="rozie-sortable-item">Hero banner <button class="js-remove">x</button></div>' +
+        '<div class="rozie-sortable-item"><span>Hero</span><input /></div>' +
+        '<div class="rozie-sortable-item"><span>Hero</span> <button class="js-remove">x</button></div>',
+    );
+    const rows = Array.from(l.children) as HTMLElement[];
+    for (const filter of ['.js-remove', 'input']) {
+      expect(rows.map((r) => rowLiftable(r, { filter, draggable: undefined, sortable: null }))).toEqual([true, true, true]);
+    }
+  });
+
+  it('a lone wrapper with only whitespace (and comments) beside it is still the slot root', () => {
+    const l = list('<div class="rozie-sortable-item">\n  <!--x--><div class="row js-remove">a</div>\n</div>');
+    expect(rowLiftable(l.children[0] as HTMLElement, { filter: '.js-remove', draggable: undefined, sortable: null })).toBe(false);
+  });
+
+  it('through a <slot>: assigned text or a second element beside the control means no slot root', () => {
+    for (const [content, liftable] of [
+      ['Hero banner <button class="js-remove">x</button>', true],
+      ['<span>Hero</span><button class="js-remove">x</button>', true],
+      [' <div class="js-remove">a</div> ', false],
+    ] as const) {
+      const host = el();
+      cleanups.push(() => host.remove());
+      host.innerHTML = content;
+      const shadow = host.attachShadow({ mode: 'open' });
+      shadow.innerHTML = '<div class="rozie-sortable-list"><div class="rozie-sortable-item"><slot></slot></div></div>';
+      const row = shadow.querySelector('.rozie-sortable-item') as HTMLElement;
+      expect(rowLiftable(row, { filter: '.js-remove', draggable: undefined, sortable: null })).toBe(liftable);
     }
   });
 

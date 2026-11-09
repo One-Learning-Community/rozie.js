@@ -21,6 +21,25 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** The payload every `start` / `end` / `reorder` / `add` / `remove` event carries, for pointer and keyboard alike. */
+export interface SortablePayload {
+  /** Which input made the change. */
+  interaction: 'pointer' | 'keyboard';
+  /** The item's data value (never an element). */
+  item: unknown;
+  /** The row element; null when there is none (a lost lift, a removed clone copy). */
+  el: HTMLElement | null;
+  /** The list element the row came from. */
+  from: HTMLElement;
+  /** The list element the row went to. */
+  to: HTMLElement;
+  /** Item-row index in `from`; -1 for `add`. */
+  oldIndex: number;
+  /** Item-row index in `to`; -1 for `remove` and a lost lift. */
+  newIndex: number;
+  /** Pointer only: the raw SortableJS event. */
+  originalEvent?: unknown;
+}
 /** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
 export type SortableKeyboardTrigger = 'row' | 'handle';
 /** Which arrow keys move a lifted row within the list (the `orientation` prop). */
@@ -40,7 +59,7 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    */
   itemKey?: (string | ((...args: any[]) => any)) | null;
   /**
-   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
+   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it. `options.handle` and `option('handle', v)` win over this prop, for the keyboard (`keyboardTrigger: 'handle'`) as for the mouse.
    */
   handle?: (string) | null;
   /**
@@ -84,7 +103,7 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    */
   dragClass?: (string) | null;
   /**
-   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element, or its slot root: the row template's single element when nothing else sits beside it) cannot be lifted with Space/Enter; any other matching control (a `.js-remove` button, an `input`) blocks only presses on itself. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
   filter?: (string) | null;
   /**
@@ -137,11 +156,11 @@ export interface SortableListProps extends Omit<import('react').ComponentPropsWi
    * Per-row inline style applied to the `.rozie-sortable-item` wrapper. Accepts a CSS `String`, a flat style object (`Record<string, string | number>`), or an `(item, index) => string | object` function for per-row styling. Because it lands on the wrapper — the direct child of the list container — it can drive CSS-grid placement (`grid-column` / `grid-row` / `align-self`) when `listClass` sets `display: grid`. Normalized per target; `null` / empty drops the attribute.
    */
   itemStyle?: (string | Record<string, unknown> | ((...args: any[]) => any)) | null;
-  onReorder?: (...args: any[]) => void;
-  onAdd?: (...args: any[]) => void;
-  onRemove?: (...args: any[]) => void;
-  onStart?: (...args: any[]) => void;
-  onEnd?: (...args: any[]) => void;
+  onReorder?: (payload: SortablePayload) => void;
+  onAdd?: (payload: SortablePayload) => void;
+  onRemove?: (payload: SortablePayload) => void;
+  onStart?: (payload: SortablePayload) => void;
+  onEnd?: (payload: SortablePayload) => void;
   renderHeader?: () => ReactNode;
   children?: ReactNode | ((params: { item: unknown; index: unknown; instructionsId: unknown }) => ReactNode);
   renderFooter?: () => ReactNode;

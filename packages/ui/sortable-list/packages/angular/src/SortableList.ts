@@ -26,6 +26,25 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** The payload every `start` / `end` / `reorder` / `add` / `remove` event carries, for pointer and keyboard alike. */
+export interface SortablePayload {
+  /** Which input made the change. */
+  interaction: 'pointer' | 'keyboard';
+  /** The item's data value (never an element). */
+  item: unknown;
+  /** The row element; null when there is none (a lost lift, a removed clone copy). */
+  el: HTMLElement | null;
+  /** The list element the row came from. */
+  from: HTMLElement;
+  /** The list element the row went to. */
+  to: HTMLElement;
+  /** Item-row index in `from`; -1 for `add`. */
+  oldIndex: number;
+  /** Item-row index in `to`; -1 for `remove` and a lost lift. */
+  newIndex: number;
+  /** Pointer only: the raw SortableJS event. */
+  originalEvent?: unknown;
+}
 /** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
 export type SortableKeyboardTrigger = 'row' | 'handle';
 /** Which arrow keys move a lifted row within the list (the `orientation` prop). */
@@ -109,7 +128,7 @@ export class SortableList {
    */
   itemKey = input<(string | ((...args: any[]) => any)) | null>(null);
   /**
-   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
+   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it. `options.handle` and `option('handle', v)` win over this prop, for the keyboard (`keyboardTrigger: 'handle'`) as for the mouse.
    */
   handle = input<(string) | null>(null);
   /**
@@ -153,7 +172,7 @@ export class SortableList {
    */
   dragClass = input<(string) | null>(null);
   /**
-   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element, or its slot root: the row template's single element when nothing else sits beside it) cannot be lifted with Space/Enter; any other matching control (a `.js-remove` button, an `input`) blocks only presses on itself. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
   filter = input<(string) | null>(null);
   /**
@@ -211,11 +230,11 @@ export class SortableList {
   instructionsId = signal<any>(null);
   optionOverrides = signal({});
   listEl = viewChild<ElementRef<HTMLDivElement>>('listEl');
-  reorder = output<unknown>();
-  add = output<unknown>();
-  remove = output<unknown>();
-  start = output<unknown>();
-  end = output<unknown>();
+  reorder = output<SortablePayload>();
+  add = output<SortablePayload>();
+  remove = output<SortablePayload>();
+  start = output<SortablePayload>();
+  end = output<SortablePayload>();
   @ContentChild('header', { read: TemplateRef }) headerTpl?: TemplateRef<HeaderCtx>;
   @ContentChild('defaultSlot', { read: TemplateRef }) defaultTpl?: TemplateRef<DefaultCtx>;
   @ContentChild('footer', { read: TemplateRef }) footerTpl?: TemplateRef<FooterCtx>;
@@ -282,11 +301,11 @@ export class SortableList {
     effect(() => { const __watchVal = (() => [(this.disabled() || this.__rozieCvaDisabled()), this.disableKeyboard(), this.options(), this.optionOverrides()])(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => {
       if (!this.keyboardEnabled()) this.keyboardTurnedOff();
     })(); }); });
-    effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
-    effect(() => { const __watchVal = (() => this.cloneable())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
+    effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } (() => this.instance?.option('group', this.effectiveGroup()))(); }); });
+    effect(() => { const __watchVal = (() => this.cloneable())(); untracked(() => { if (this.__rozieWatchInitial_5) { this.__rozieWatchInitial_5 = false; return; } (() => this.instance?.option('group', this.effectiveGroup()))(); }); });
     effect(() => { const __watchVal = (() => this.swapThreshold())(); untracked(() => { if (this.__rozieWatchInitial_6) { this.__rozieWatchInitial_6 = false; return; } ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.handle())(); untracked(() => { if (this.__rozieWatchInitial_7) { this.__rozieWatchInitial_7 = false; return; } ((v: any) => {
-      this.instance?.option('handle', v);
+      this.instance?.option('handle', this.liveOption('handle', v));
       this.warnIfHandleMissing();
     })(__watchVal); }); });
     effect(() => { const __watchVal = (() => this.keyboardTrigger())(); untracked(() => { if (this.__rozieWatchInitial_8) { this.__rozieWatchInitial_8 = false; return; } (() => this.warnIfHandleMissing())(); }); });
@@ -353,7 +372,7 @@ export class SortableList {
       // item-row indices and the raw SortableJS event as `originalEvent`.
       onChange: (c: any) => {
         const payload = {
-          interaction: 'pointer',
+          interaction: 'pointer' as const,
           item: c.item,
           el: c.el,
           from: c.from,
@@ -380,11 +399,20 @@ export class SortableList {
           originalEvent: d.event
         });
       },
-      // Runs once per drag, in a task after every list involved has written its
-      // items and the re-render those writes scheduled (see useSortableJS).
       // `end` comes from the list the row ended up in: the destination when it
       // is a SortableList, else (dropped outside, or into a SortableJS list
-      // that isn't one of ours) this source list.
+      // that isn't one of ours) this source list. It goes through the
+      // registry's `deferEnd`, like a keyboard `end`: it fires in a task after
+      // every list involved has written its items and the re-render those
+      // writes scheduled, before the next drag's or lift's `start`, and not at
+      // all if that list unmounts first. A destination that already unmounted
+      // (in its own `add` handler, say) gets no `end`, and no other list emits
+      // it instead.
+      scheduleEnd: (d: any, fire: any) => {
+        const dest = this.registry.entryFor(d.to);
+        if (dest == null && d.to !== d.from && this.registry.wasList(d.to)) return;
+        this.registry.deferEnd(fire, dest ?? this.entry);
+      },
       onEnd: (d: any) => {
         const dest = this.registry.entryFor(d.to) ?? this.entry;
         if (dest == null) return;
@@ -403,6 +431,18 @@ export class SortableList {
     });
     this.instance = sortable.instance;
     this.appliedOptions = __options;
+    // Runtime `option(name, v)` values this list remembers (Lit keeps them when
+    // the element is moved in the DOM and mounts again) apply to the new
+    // SortableJS instance too, so mouse and keyboard keep agreeing. Empty on a
+    // first mount.
+    // Runtime `option(name, v)` values this list remembers (Lit keeps them when
+    // the element is moved in the DOM and mounts again) apply to the new
+    // SortableJS instance too, so mouse and keyboard keep agreeing. Empty on a
+    // first mount.
+    const remembered: any = this.optionOverrides();
+    if (remembered != null) {
+      for (const name of Object.keys(remembered) as any) this.instance.option(name, remembered[name]);
+    }
     const listEl = this.listEl()?.nativeElement;
     const stopNative = (ev: any) => {
       if (ev.target === listEl) ev.stopPropagation();
@@ -439,7 +479,7 @@ export class SortableList {
       group: () => this.effectiveGroup(),
       label: () => this.listLabel(),
       // A handle-mode list without a handle selector has its keyboard off.
-      keyboardEnabled: () => this.keyboardEnabled() && !(this.handleMode() && this.handle() == null),
+      keyboardEnabled: () => this.keyboardEnabled() && !(this.handleMode() && this.handleSelector() == null),
       items: () => this.items(),
       keyOf: (item: any, i: any) => String(this.keyFor(item, i)),
       labelOf: (item: any, i: any, row: HTMLElement | null = null) => String(this.labelOf(item, i, row)),
@@ -672,9 +712,12 @@ export class SortableList {
   };
   // Options whose runtime value (`option(name, v)`) is remembered, so a later
   // change of the matching prop doesn't overwrite it: the keyboard ones, plus
-  // `animation` (runtime override → `options` → prop).
-  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation'];
+  // `animation` and `handle` (runtime override → `options` → prop).
+  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation', 'handle'];
   keyboardEnabled = () => !this.disableKeyboard() && !this.liveOption('disabled', (this.disabled() || this.__rozieCvaDisabled()));
+  // The handle selector SortableJS runs with (`option('handle', v)`, else
+  // `options.handle`, else the `handle` prop): the keyboard reads the same one.
+  handleSelector = () => this.liveOption('handle', this.handle());
   // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
   // from the consumer's handle element instead. Any other value is 'row' mode.
   handleMode = () => this.keyboardTrigger() === 'handle';
@@ -684,7 +727,7 @@ export class SortableList {
   // one the keyboard is OFF (see the onRowKeyDown gate) — never a silent fallback
   // to row mode, which would re-introduce the tab stops the consumer opted out of.
   warnIfHandleMissing = () => {
-    if (this.handleMode() && this.handle() == null) {
+    if (this.handleMode() && this.handleSelector() == null) {
       console.warn('[rozie-sortable-list] keyboardTrigger is "handle" but no handle selector is set, so keyboard reordering is off. Pass a handle selector (e.g. handle=".grip") or use keyboardTrigger "row".');
     }
   };
@@ -698,7 +741,7 @@ export class SortableList {
   // .rozie-sortable-item met first means the key came from a NESTED list's row,
   // which must not reorder this (outer) list.
   isHandleKeyOrigin = ($event: any) => {
-    const sel = this.handle();
+    const sel = this.handleSelector();
     if (sel == null) return false;
     const row = $event.currentTarget;
     let n: any = $event.target;
@@ -741,7 +784,7 @@ export class SortableList {
   // happens here, synchronously, inside an event handler — which is safe.
   refocusRow = (item: any, idx: any) => {
     const listEl = this.listEl()?.nativeElement;
-    const sel = this.handle();
+    const sel = this.handleSelector();
     const useHandle = this.handleMode();
     const key = String(this.keyFor(item, idx));
     // While this refocus is outstanding, a key that falls to <body> belongs to
@@ -790,7 +833,7 @@ export class SortableList {
   // three passes as refocusRow, for targets that commit late.
   focusNearRow = (index: number, key: string | null = null) => {
     const listEl = this.listEl()?.nativeElement;
-    const sel = this.handle();
+    const sel = this.handleSelector();
     const useHandle = this.handleMode();
     const focusIt = () => {
       if (!listEl) return;
@@ -879,7 +922,7 @@ export class SortableList {
     };
     // Like every `end`, in a task after the writes. An unmounting list emits it
     // now: a later emit from an unmounted component would not be delivered.
-    if (unmounting) h.emit('end', payload);else this.registry.deferEnd(() => h.emit('end', payload));
+    if (unmounting) h.emit('end', payload);else this.registry.deferEnd(() => h.emit('end', payload), h);
   };
   // Keyboard `start` / `end` (the same payload as every other event): `item` is
   // the item value, `el` its row element. `start` fires from the origin list
@@ -891,6 +934,8 @@ export class SortableList {
   // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
   // they schedule: a consumer `end` handler reads the new state on every target
   // (React included, whose handler closure is the one from the latest render).
+  // A list that unmounts before then emits nothing (its pending `end` is
+  // dropped).
   keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl: HTMLElement | null = null) => {
     const host = name === 'start' ? from : to;
     const fire = () => host.emit(name, {
@@ -902,7 +947,7 @@ export class SortableList {
       oldIndex,
       newIndex
     });
-    if (name === 'end') this.registry.deferEnd(fire);else fire();
+    if (name === 'end') this.registry.deferEnd(fire, host);else fire();
   };
   // Move the lifted row to `toIndex` (clamped) within the list holding it.
   // Works through the registry entry, so it acts on the current holder. `dir`
@@ -952,9 +997,10 @@ export class SortableList {
   };
   // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
   // also reach by mouse, in composed-tree source order. One hand-off: the source
-  // writes its items without the row and emits `remove`, the destination writes
-  // them with it and emits `add`, and the destination becomes the holder. A
-  // forward hop lands first, a backward hop lands last.
+  // writes its items without the row, the destination writes them with it, and
+  // the destination becomes the holder. As with the mouse, the destination
+  // emits `add` first, then the source emits `remove`. A forward hop lands
+  // first, a backward hop lands last.
   hop = (dir: any) => {
     const lift = this.registry.lift;
     if (!lift) return;
@@ -1024,21 +1070,13 @@ export class SortableList {
       const rest = [...fromItems];
       rest.splice(i, 1);
       from.write(rest);
-      from.emit('remove', {
-        interaction: 'keyboard',
-        item: data,
-        el,
-        from: from.el,
-        to: to.el,
-        oldIndex: i,
-        newIndex: -1
-      });
     }
     const next = [...toItems];
     next.splice(at, 0, data);
     to.write(next);
     // The destination has not rendered its new row yet: `el` is the row the
-    // move started from.
+    // move started from. `add` (destination) before `remove` (source), as by
+    // mouse.
     to.emit('add', {
       interaction: 'keyboard',
       item: data,
@@ -1047,6 +1085,15 @@ export class SortableList {
       to: to.el,
       oldIndex: -1,
       newIndex: at
+    });
+    if (!cloneOut) from.emit('remove', {
+      interaction: 'keyboard',
+      item: data,
+      el,
+      from: from.el,
+      to: to.el,
+      oldIndex: i,
+      newIndex: -1
     });
     from.setLifted(null);
     to.setLifted(at);
@@ -1119,7 +1166,7 @@ export class SortableList {
         to: h.el,
         oldIndex: origin.index,
         newIndex: -1
-      }));
+      }), h);
       return;
     }
     if (h !== origin.list && (!this.registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -1174,19 +1221,11 @@ export class SortableList {
     const rest = [...items];
     rest.splice(at, 1);
     h.write(rest);
-    h.emit('remove', {
-      interaction: 'keyboard',
-      item,
-      el,
-      from: h.el,
-      to: home.el,
-      oldIndex: at,
-      newIndex: -1
-    });
     if (!lift.copy) {
       const next = [...homeItems];
       next.splice(back, 0, item);
       home.write(next);
+      // `add` (destination) before `remove` (source), as by mouse.
       home.emit('add', {
         interaction: 'keyboard',
         item,
@@ -1197,6 +1236,15 @@ export class SortableList {
         newIndex: back
       });
     }
+    h.emit('remove', {
+      interaction: 'keyboard',
+      item,
+      el,
+      from: h.el,
+      to: home.el,
+      oldIndex: at,
+      newIndex: -1
+    });
     h.setLifted(null);
     // `home` holds the lift during its write, so a target whose items watcher
     // runs synchronously on the write (Solid) highlighted the row there: clear it.
@@ -1269,7 +1317,7 @@ export class SortableList {
     //    that child would be hijacked for lift/drop instead of reaching the
     //    child.
     if (this.handleMode()) {
-      if (this.handle() == null || !this.isHandleKeyOrigin($event)) return;
+      if (this.handleSelector() == null || !this.isHandleKeyOrigin($event)) return;
     } else if ($event.target !== $event.currentTarget) {
       return;
     }

@@ -275,3 +275,44 @@ for (const target of TARGETS) {
     },
   );
 }
+
+// `options.handle` alone (no `handle` prop) gives the keyboard the same handle
+// as the mouse: keys on the handle lift and move the row, focus follows the
+// moved row's handle.
+for (const target of TARGETS) {
+  const built = existsSync(resolve(__dirname, `../dist/${target}/host/entry.${target}.html`));
+  const runner = !built || KNOWN_FAILING.has(target) ? test.fixme : test;
+  for (const burst of [false, true]) {
+    runner(
+      `sortable-keyboard-handle [${target}]: options.handle drives the keyboard like the handle prop${burst ? ', back-to-back (no waits)' : ''}`,
+      async ({ page }) => {
+        await page.goto(`/?example=SortableListHandle&target=${target}`);
+        const mount = page.getByTestId('rozie-mount');
+        const section = mount.getByTestId('options-handle-list');
+        const items = section.locator(ITEM);
+        await expect(items).toHaveCount(3);
+        const aria = section.locator(ARIA_LIVE);
+        const state = () => section.locator('[class*="options-state"] li').evaluateAll((els) => els.map((e) => (e.textContent ?? '').trim()));
+        await expect.poll(state).toEqual(['Options one', 'Options two', 'Options three']);
+        // The handle carries the instructions (the slot prop is set once mounted).
+        await expect(items.first().locator(GRIP)).toHaveAttribute('aria-describedby', /rozie-sortable-instructions-/);
+        await items.first().locator(GRIP).focus();
+        if (burst) {
+          for (const key of ['Space', 'ArrowDown', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect(aria).toHaveText('Lifted Options one, position 1 of 3');
+          await page.keyboard.press('ArrowDown');
+          await expect(aria).toHaveText('Moved Options one to position 2 of 3');
+          await page.keyboard.press('ArrowDown');
+          await page.keyboard.press('Space');
+        }
+        await expect(aria).toHaveText('Dropped Options one at position 3 of 3');
+        await expect.poll(state).toEqual(['Options two', 'Options three', 'Options one']);
+        await expect.poll(() => displayedLabels(items)).toEqual(['Options two', 'Options three', 'Options one']);
+        await expect(section.locator(LIFTED)).toHaveCount(0);
+        await expect.poll(() => deepestActive(page).then((a) => a.ariaLabel), { timeout: 5000 }).toBe('Reorder Options one');
+      },
+    );
+  }
+}

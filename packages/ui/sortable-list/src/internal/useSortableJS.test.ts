@@ -831,6 +831,34 @@ describe('end: after the write, once per drag', () => {
     expect(ends[0]!.item?.id).toBe('b');
   });
 
+  it('a row from a non-SortableList source goes back where it came from; nothing is written or emitted', async () => {
+    const items: Item[] = [{ id: 'x' }];
+    const listEl = buildList(items);
+    const foreign = document.createElement('ul');
+    foreign.innerHTML = '<li>A</li><li>B</li><li>C</li>';
+    const order: string[] = [];
+    useSortableJS<Item>(listEl, {
+      items: () => items,
+      onCommit: () => order.push('commit'),
+      onChange: (c) => order.push(c.kind),
+      onEnd: () => order.push('end'),
+    });
+    const rec = getLastConstructed();
+    const dragged = foreign.children[1] as HTMLElement; // "B", no __rozieItem stash
+    listEl.insertBefore(dragged, listEl.children[0] ?? null);
+    (rec.options as { onAdd?: (e: unknown) => void }).onAdd?.({
+      item: dragged,
+      oldIndex: 1,
+      newIndex: 0,
+      from: foreign,
+      to: listEl,
+    });
+    await flushMicrotasks();
+    expect(order).toEqual([]);
+    expect(Array.from(foreign.children).map((c) => c.textContent)).toEqual(['A', 'B', 'C']);
+    expect(listEl.children.length).toBe(1);
+  });
+
   it('start and end indices are item-row indices (non-draggable header child)', async () => {
     const items: Item[] = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     const listEl = buildList(items);

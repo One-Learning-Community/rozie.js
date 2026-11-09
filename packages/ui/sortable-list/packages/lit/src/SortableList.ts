@@ -27,10 +27,38 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** The payload every `start` / `end` / `reorder` / `add` / `remove` event carries, for pointer and keyboard alike. */
+export interface SortablePayload {
+  /** Which input made the change. */
+  interaction: 'pointer' | 'keyboard';
+  /** The item's data value (never an element). */
+  item: unknown;
+  /** The row element; null when there is none (a lost lift, a removed clone copy). */
+  el: HTMLElement | null;
+  /** The list element the row came from. */
+  from: HTMLElement;
+  /** The list element the row went to. */
+  to: HTMLElement;
+  /** Item-row index in `from`; -1 for `add`. */
+  oldIndex: number;
+  /** Item-row index in `to`; -1 for `remove` and a lost lift. */
+  newIndex: number;
+  /** Pointer only: the raw SortableJS event. */
+  originalEvent?: unknown;
+}
 /** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
 export type SortableKeyboardTrigger = 'row' | 'handle';
 /** Which arrow keys move a lifted row within the list (the `orientation` prop). */
 export type SortableOrientation = 'vertical' | 'horizontal';
+
+export interface RozieSortableListEventMap extends Omit<HTMLElementEventMap, 'reorder' | 'add' | 'remove' | 'start' | 'end' | 'items-change'> {
+  'reorder': CustomEvent<SortablePayload>;
+  'add': CustomEvent<SortablePayload>;
+  'remove': CustomEvent<SortablePayload>;
+  'start': CustomEvent<SortablePayload>;
+  'end': CustomEvent<SortablePayload>;
+  'items-change': CustomEvent<any[]>;
+}
 
 interface RozieDefaultSlotCtx {
   item: any;
@@ -77,7 +105,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: String, attribute: 'item-key' }) itemKey: string | (((...args: any[]) => any) | null) = null;
   /**
-   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
+   * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it. `options.handle` and `option('handle', v)` win over this prop, for the keyboard (`keyboardTrigger: 'handle'`) as for the mouse.
    */
   @property({ type: String, reflect: true }) handle: string | null = null;
   /**
@@ -121,7 +149,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'drag-class' }) dragClass: string | null = null;
   /**
-   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element, or its slot root: the row template's single element when nothing else sits beside it) cannot be lifted with Space/Enter; any other matching control (a `.js-remove` button, an `input`) blocks only presses on itself. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
   @property({ type: String, reflect: true }) filter: string | null = null;
   /**
@@ -324,7 +352,7 @@ private __rozieFirstUpdateDone = false;
       // item-row indices and the raw SortableJS event as `originalEvent`.
       onChange: (c: any) => {
         const payload = {
-          interaction: 'pointer',
+          interaction: 'pointer' as const,
           item: c.item,
           el: c.el,
           from: c.from,
@@ -333,15 +361,15 @@ private __rozieFirstUpdateDone = false;
           newIndex: c.newIndex,
           originalEvent: c.event
         };
-        if (c.kind === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
+        if (c.kind === 'reorder') this.dispatchEvent(new CustomEvent<SortablePayload>("reorder", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (c.kind === 'add') this.dispatchEvent(new CustomEvent("add", {
+        }));else if (c.kind === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (c.kind === 'remove') this.dispatchEvent(new CustomEvent("remove", {
+        }));else if (c.kind === 'remove') this.dispatchEvent(new CustomEvent<SortablePayload>("remove", {
           detail: payload,
           bubbles: true,
           composed: true
@@ -352,7 +380,7 @@ private __rozieFirstUpdateDone = false;
         if (this.registry.lift != null) this.endLift('drop');
         // That lift's `end` (pending until a task) comes before this `start`.
         this.registry.flushEnds();
-        this.dispatchEvent(new CustomEvent("start", {
+        this.dispatchEvent(new CustomEvent<SortablePayload>("start", {
           detail: {
             interaction: 'pointer',
             item: d.item,
@@ -367,11 +395,20 @@ private __rozieFirstUpdateDone = false;
           composed: true
         }));
       },
-      // Runs once per drag, in a task after every list involved has written its
-      // items and the re-render those writes scheduled (see useSortableJS).
       // `end` comes from the list the row ended up in: the destination when it
       // is a SortableList, else (dropped outside, or into a SortableJS list
-      // that isn't one of ours) this source list.
+      // that isn't one of ours) this source list. It goes through the
+      // registry's `deferEnd`, like a keyboard `end`: it fires in a task after
+      // every list involved has written its items and the re-render those
+      // writes scheduled, before the next drag's or lift's `start`, and not at
+      // all if that list unmounts first. A destination that already unmounted
+      // (in its own `add` handler, say) gets no `end`, and no other list emits
+      // it instead.
+      scheduleEnd: (d: any, fire: any) => {
+        const dest = this.registry.entryFor(d.to);
+        if (dest == null && d.to !== d.from && this.registry.wasList(d.to)) return;
+        this.registry.deferEnd(fire, dest ?? this.entry);
+      },
       onEnd: (d: any) => {
         const dest = this.registry.entryFor(d.to) ?? this.entry;
         if (dest == null) return;
@@ -390,6 +427,14 @@ private __rozieFirstUpdateDone = false;
     });
     this.instance = sortable.instance;
     this.appliedOptions = this.options;
+    // Runtime `option(name, v)` values this list remembers (Lit keeps them when
+    // the element is moved in the DOM and mounts again) apply to the new
+    // SortableJS instance too, so mouse and keyboard keep agreeing. Empty on a
+    // first mount.
+    const remembered: any = this._optionOverrides.value;
+    if (remembered != null) {
+      for (const name of Object.keys(remembered) as any) this.instance.option(name, remembered[name]);
+    }
     const listEl = this._refListEl;
     const stopNative = (ev: any) => {
       if (ev.target === listEl) ev.stopPropagation();
@@ -420,7 +465,7 @@ private __rozieFirstUpdateDone = false;
       group: () => this.effectiveGroup(),
       label: () => this.listLabel,
       // A handle-mode list without a handle selector has its keyboard off.
-      keyboardEnabled: () => this.keyboardEnabled() && !(this.handleMode() && this.handle == null),
+      keyboardEnabled: () => this.keyboardEnabled() && !(this.handleMode() && this.handleSelector() == null),
       items: () => this.items,
       keyOf: (item: any, i: any) => String(this.keyFor(item, i)),
       labelOf: (item: any, i: any, row: HTMLElement | null = null) => String(this.labelOf(item, i, row)),
@@ -448,23 +493,23 @@ private __rozieFirstUpdateDone = false;
         return this.rowByKey(listEl, String(this.keyFor(list[i], i)));
       },
       emit: (name: any, payload: any) => {
-        if (name === 'add') this.dispatchEvent(new CustomEvent("add", {
+        if (name === 'add') this.dispatchEvent(new CustomEvent<SortablePayload>("add", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (name === 'remove') this.dispatchEvent(new CustomEvent("remove", {
+        }));else if (name === 'remove') this.dispatchEvent(new CustomEvent<SortablePayload>("remove", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (name === 'reorder') this.dispatchEvent(new CustomEvent("reorder", {
+        }));else if (name === 'reorder') this.dispatchEvent(new CustomEvent<SortablePayload>("reorder", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (name === 'start') this.dispatchEvent(new CustomEvent("start", {
+        }));else if (name === 'start') this.dispatchEvent(new CustomEvent<SortablePayload>("start", {
           detail: payload,
           bubbles: true,
           composed: true
-        }));else if (name === 'end') this.dispatchEvent(new CustomEvent("end", {
+        }));else if (name === 'end') this.dispatchEvent(new CustomEvent<SortablePayload>("end", {
           detail: payload,
           bubbles: true,
           composed: true
@@ -524,11 +569,11 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled') || changedProperties.has('disableKeyboard') || changedProperties.has('options'))) { const __watchVal = untracked(() => [this.disabled, this.disableKeyboard, this.options, this._optionOverrides.value]); if (!Object.is(__watchVal, this.__rozieWatchPrev_3)) { this.__rozieWatchPrev_3 = __watchVal; untracked(() => (() => {
       if (!this.keyboardEnabled()) this.keyboardTurnedOff();
     })()); } }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.effectiveGroup()))(); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.effectiveGroup()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('swapThreshold'))) { const __watchVal = (() => this.swapThreshold)(); ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('handle'))) { const __watchVal = (() => this.handle)(); ((v: any) => {
-      this.instance?.option('handle', v);
+      this.instance?.option('handle', this.liveOption('handle', v));
       this.warnIfHandleMissing();
     })(__watchVal); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('keyboardTrigger'))) { const __watchVal = (() => this.keyboardTrigger)(); (() => this.warnIfHandleMissing())(); }
@@ -764,10 +809,14 @@ private __rozieFirstUpdateDone = false;
 
   // Options whose runtime value (`option(name, v)`) is remembered, so a later
   // change of the matching prop doesn't overwrite it: the keyboard ones, plus
-  // `animation` (runtime override → `options` → prop).
-  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation'];
+  // `animation` and `handle` (runtime override → `options` → prop).
+  TRACKED_OPTIONS = [...this.KEYBOARD_OPTIONS, 'animation', 'handle'];
 
   keyboardEnabled = () => !this.disableKeyboard && !this.liveOption('disabled', this.disabled);
+
+  // The handle selector SortableJS runs with (`option('handle', v)`, else
+  // `options.handle`, else the `handle` prop): the keyboard reads the same one.
+  handleSelector = () => this.liveOption('handle', this.handle);
 
   // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
   // from the consumer's handle element instead. Any other value is 'row' mode.
@@ -780,7 +829,7 @@ private __rozieFirstUpdateDone = false;
   // one the keyboard is OFF (see the onRowKeyDown gate) — never a silent fallback
   // to row mode, which would re-introduce the tab stops the consumer opted out of.
   warnIfHandleMissing = () => {
-  if (this.handleMode() && this.handle == null) {
+  if (this.handleMode() && this.handleSelector() == null) {
     console.warn('[rozie-sortable-list] keyboardTrigger is "handle" but no handle selector is set, so keyboard reordering is off. Pass a handle selector (e.g. handle=".grip") or use keyboardTrigger "row".');
   }
 };
@@ -795,7 +844,7 @@ private __rozieFirstUpdateDone = false;
   // .rozie-sortable-item met first means the key came from a NESTED list's row,
   // which must not reorder this (outer) list.
   isHandleKeyOrigin = ($event: any) => {
-  const sel = this.handle;
+  const sel = this.handleSelector();
   if (sel == null) return false;
   const row = $event.currentTarget;
   let n: any = $event.target;
@@ -839,7 +888,7 @@ private __rozieFirstUpdateDone = false;
   // happens here, synchronously, inside an event handler — which is safe.
   refocusRow = (item: any, idx: any) => {
   const listEl = this._refListEl;
-  const sel = this.handle;
+  const sel = this.handleSelector();
   const useHandle = this.handleMode();
   const key = String(this.keyFor(item, idx));
   // While this refocus is outstanding, a key that falls to <body> belongs to
@@ -890,7 +939,7 @@ private __rozieFirstUpdateDone = false;
   // three passes as refocusRow, for targets that commit late.
   focusNearRow = (index: number, key: string | null = null) => {
   const listEl = this._refListEl;
-  const sel = this.handle;
+  const sel = this.handleSelector();
   const useHandle = this.handleMode();
   const focusIt = () => {
     if (!listEl) return;
@@ -982,7 +1031,7 @@ private __rozieFirstUpdateDone = false;
   };
   // Like every `end`, in a task after the writes. An unmounting list emits it
   // now: a later emit from an unmounted component would not be delivered.
-  if (unmounting) h.emit('end', payload);else this.registry.deferEnd(() => h.emit('end', payload));
+  if (unmounting) h.emit('end', payload);else this.registry.deferEnd(() => h.emit('end', payload), h);
 };
 
   // Keyboard `start` / `end` (the same payload as every other event): `item` is
@@ -995,6 +1044,8 @@ private __rozieFirstUpdateDone = false;
   // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
   // they schedule: a consumer `end` handler reads the new state on every target
   // (React included, whose handler closure is the one from the latest render).
+  // A list that unmounts before then emits nothing (its pending `end` is
+  // dropped).
   keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl: HTMLElement | null = null) => {
   const host = name === 'start' ? from : to;
   const fire = () => host.emit(name, {
@@ -1006,7 +1057,7 @@ private __rozieFirstUpdateDone = false;
     oldIndex,
     newIndex
   });
-  if (name === 'end') this.registry.deferEnd(fire);else fire();
+  if (name === 'end') this.registry.deferEnd(fire, host);else fire();
 };
 
   // Move the lifted row to `toIndex` (clamped) within the list holding it.
@@ -1058,9 +1109,10 @@ private __rozieFirstUpdateDone = false;
 
   // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
   // also reach by mouse, in composed-tree source order. One hand-off: the source
-  // writes its items without the row and emits `remove`, the destination writes
-  // them with it and emits `add`, and the destination becomes the holder. A
-  // forward hop lands first, a backward hop lands last.
+  // writes its items without the row, the destination writes them with it, and
+  // the destination becomes the holder. As with the mouse, the destination
+  // emits `add` first, then the source emits `remove`. A forward hop lands
+  // first, a backward hop lands last.
   hop = (dir: any) => {
   const lift = this.registry.lift;
   if (!lift) return;
@@ -1130,21 +1182,13 @@ private __rozieFirstUpdateDone = false;
     const rest = [...fromItems];
     rest.splice(i, 1);
     from.write(rest);
-    from.emit('remove', {
-      interaction: 'keyboard',
-      item: data,
-      el,
-      from: from.el,
-      to: to.el,
-      oldIndex: i,
-      newIndex: -1
-    });
   }
   const next = [...toItems];
   next.splice(at, 0, data);
   to.write(next);
   // The destination has not rendered its new row yet: `el` is the row the
-  // move started from.
+  // move started from. `add` (destination) before `remove` (source), as by
+  // mouse.
   to.emit('add', {
     interaction: 'keyboard',
     item: data,
@@ -1153,6 +1197,15 @@ private __rozieFirstUpdateDone = false;
     to: to.el,
     oldIndex: -1,
     newIndex: at
+  });
+  if (!cloneOut) from.emit('remove', {
+    interaction: 'keyboard',
+    item: data,
+    el,
+    from: from.el,
+    to: to.el,
+    oldIndex: i,
+    newIndex: -1
   });
   from.setLifted(null);
   to.setLifted(at);
@@ -1226,7 +1279,7 @@ private __rozieFirstUpdateDone = false;
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
-    }));
+    }), h);
     return;
   }
   if (h !== origin.list && (!this.registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -1281,19 +1334,11 @@ private __rozieFirstUpdateDone = false;
   const rest = [...items];
   rest.splice(at, 1);
   h.write(rest);
-  h.emit('remove', {
-    interaction: 'keyboard',
-    item,
-    el,
-    from: h.el,
-    to: home.el,
-    oldIndex: at,
-    newIndex: -1
-  });
   if (!lift.copy) {
     const next = [...homeItems];
     next.splice(back, 0, item);
     home.write(next);
+    // `add` (destination) before `remove` (source), as by mouse.
     home.emit('add', {
       interaction: 'keyboard',
       item,
@@ -1304,6 +1349,15 @@ private __rozieFirstUpdateDone = false;
       newIndex: back
     });
   }
+  h.emit('remove', {
+    interaction: 'keyboard',
+    item,
+    el,
+    from: h.el,
+    to: home.el,
+    oldIndex: at,
+    newIndex: -1
+  });
   h.setLifted(null);
   // `home` holds the lift during its write, so a target whose items watcher
   // runs synchronously on the write (Solid) highlighted the row there: clear it.
@@ -1380,7 +1434,7 @@ private __rozieFirstUpdateDone = false;
   //    that child would be hijacked for lift/drop instead of reaching the
   //    child.
   if (this.handleMode()) {
-    if (this.handle == null || !this.isHandleKeyOrigin($event)) return;
+    if (this.handleSelector() == null || !this.isHandleKeyOrigin($event)) return;
   } else if ($event.target !== $event.currentTarget) {
     return;
   }
@@ -1554,6 +1608,17 @@ private __rozieFirstUpdateDone = false;
 
   get items(): any[] { return this._itemsControllable.read(); }
   set items(v: any[]) { this._itemsControllable.notifyPropertyWrite(v); }
+
+  addEventListener<K extends keyof RozieSortableListEventMap>(type: K, listener: (this: SortableList, ev: RozieSortableListEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions): void {
+    super.addEventListener(type, listener, options);
+  }
+  removeEventListener<K extends keyof RozieSortableListEventMap>(type: K, listener: (this: SortableList, ev: RozieSortableListEventMap[K]) => any, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject, options?: boolean | EventListenerOptions): void {
+    super.removeEventListener(type, listener, options);
+  }
 
   /**
    * Plan 14-05 — cross-framework attribute fallthrough source. Reads the

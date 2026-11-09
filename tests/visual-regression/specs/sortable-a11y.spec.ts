@@ -224,5 +224,25 @@ for (const target of TARGETS) {
         ]);
       expect(errors).toEqual([]);
     });
+
+    // A runtime `option()` set before the move applies to the SortableJS
+    // instance built on reconnect too, not only to the keyboard.
+    runner(`sortable-a11y [lit]: option('sort', false) survives a move in the DOM for the mouse`, async ({ page }) => {
+      const errors: string[] = [];
+      page.on('pageerror', (e) => errors.push(String(e)));
+      const { mount, items } = await openKeys(page);
+      await mount.getByTestId('sort-off').evaluate((b) => (b as HTMLElement).click());
+      await detachAndReattach(page);
+      await expect(items).toHaveCount(SEED.length);
+      await synthesizeDrag(page, {
+        sourceHandle: items.nth(0).locator('[class*="label"]'),
+        target: items.nth(2),
+      });
+      await page.waitForTimeout(150);
+      await expect.poll(() => labels(items)).toEqual(SEED);
+      await expect.poll(() => texts(mount.locator(STATE_LI))).toEqual(SEED);
+      expect((await texts(mount.locator(LOG_LI))).filter((e) => e.startsWith('reorder:'))).toEqual([]);
+      expect(errors).toEqual([]);
+    });
   }
 }

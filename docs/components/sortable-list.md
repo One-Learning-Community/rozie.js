@@ -70,7 +70,7 @@ To see what each target's emitted code looks like, visit the [SortableList examp
 | --- | --- | --- | :---: | --- |
 | `items` | `Array` | `[]` | yes (via `r-model`) | The bound items array. `model: true` — reorders write back through the two-way path. |
 | `itemKey` | `String \| Function` | `null` | yes | Property name OR a `(item, index) => key` function for the per-row key. With neither, id-less object items get a stable synthetic key via an internal WeakMap; primitive items fall back to index — pass a function for reorderable duplicate primitives. Improves keyed-reconciler behavior on Vue / Svelte / React. |
-| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. |
+| `handle` | `String` | `null` | yes | CSS selector identifying the per-row drag handle. A plain `.grip` works on every target — authored class names render literally everywhere (React included). [`$classSelector('grip')`](/guide/engine-wrappers#classselector-—-handing-a-class-name-to-a-vanilla-js-engine) is an optional, typo-checked way to author it. `options.handle` and `option('handle', v)` win over this prop, for the keyboard (`keyboardTrigger: 'handle'`) as for the mouse. |
 | `group` | `String` | `null` | yes | SortableJS group name (cross-list drag). For the object form (`{ name, pull, put }`), pass `options.group`, which wins over `group` and `cloneable`. Use `cloneable: true` to flip a string group into clone-mode. Lists sharing a group also exchange rows by keyboard (Shift+arrow while lifted) — see [Moving between lists by keyboard](#moving-between-lists-by-keyboard). |
 | `animation` | `Number` | `150` | yes | Animation duration in ms. `0` disables. Reapplied live via `instance.option('animation', v)`. `options.animation`, and a runtime `option('animation', v)`, win over this prop. |
 | `disabled` | `Boolean` | `false` | yes | Temporarily disable drag without unmounting. Also suppresses keyboard reordering — a disabled list is not sortable by any input, so rows lose their tabindex and the keydown handler no-ops. Turning it on while a row is lifted ends the lift where the row is (`Lift ended`, and `end` fires). `options.disabled` and `option('disabled', v)` do the same. |
@@ -136,13 +136,31 @@ Each framework binds the events and the two-way `items` array its own way:
 Order and source:
 
 - `start` fires from the origin list.
-- `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists emits `add` from the destination and then `remove` from the source.
-- `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source.
-- `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end` comes before the next `start`.
-- A drop from a SortableJS list that is not a `SortableList` into a `SortableList` emits `add` from the destination but no `end`: the drag belongs to the foreign list, which ends it.
+- `reorder` / `add` / `remove` fire once the list that emits them has written its bound array. A move between lists, by mouse or keyboard, emits `add` from the destination and then `remove` from the source (a keyboard cancel that hands the row back does the same: `add` from the origin, then `remove` from the list it leaves).
+- `end` fires once per drag or lift, from the list where the row ends up: the destination of a move between lists (a clone drop included), or the origin when the row is dropped back in place or outside any list. A mouse drop into a SortableJS list that is not a `SortableList` ends from the source. A list that unmounts before its pending `end` runs (for example, one your `add` handler removes) emits no `end`, and no other list emits it instead.
+- `end` runs in a task scheduled after every list involved has written its bound array and emitted `reorder` / `add` / `remove` (a `setTimeout(0)` followed by one posted message), so the re-render those writes schedule, whether in a microtask, a timer or a posted message, has run first. For user input (mouse or keyboard) an `end` handler therefore sees the new order in its bound array on all six targets: `save(items)` works there. One exception: a React consumer that applies `onItemsChange` inside `startTransition` lets React defer that render past `end`, and may still read the old state there. If another drag or lift starts before a pending `end` has run, that `end` fires first, so every `end`, mouse or keyboard, comes before the next `start`.
+- Drops from a SortableJS list that is not a `SortableList` into a `SortableList` aren't supported: the row goes back where it came from and nothing is emitted (no `add`, no `end`). Use a `SortableList` on both sides.
 - A mouse drop back where the row started writes nothing and fires no `reorder`; `start` and `end` still fire, with `oldIndex === newIndex`.
-- Keyboard `start` fires once on lift and `end` once on drop or cancel. Each keyboard move emits its own `reorder` (within a list) or `remove` + `add` (a hop between lists). The first hop out of a clone source emits only `add`, since the source keeps its row; a copy hopped back into its own palette emits only `remove`.
+- Keyboard `start` fires once on lift and `end` once on drop or cancel. Each keyboard move emits its own `reorder` (within a list) or `add` + `remove` (a hop between lists). The first hop out of a clone source emits only `add`, since the source keeps its row; a copy hopped back into its own palette emits only `remove`.
 - When a lift is lost because the consumer took the lifted item out of the bound array mid-lift, `end` still fires, with `item` set to the lifted value and `el: null`.
+
+#### Saving order
+
+`end` fires once, from the list the row ends up in, so on a move between lists the source fires `remove` and no `end`. A wrapper that saves each list from its own `end` handler (one per zone in a CMS, say) never saves the source after such a move, and if your backend stores each list's ordered ids, the item ends up saved in both lists. Either:
+
+- save the source in its `remove` handler (it has written its array by then) and the destination in its `end` handler, or
+- save every list the move touched from the destination's `end`, using `from` and `to` to tell which.
+
+```rozie
+<SortableList r-model:items="$data.top" group="zones" @remove="saveZone('top')" @end="saveZone('top')" />
+```
+
+```js
+// Saves one zone's order; called from that zone's `remove` and `end`.
+const saveZone = (zone) => api.saveZone(zone, $data[zone].map((w) => w.id))
+```
+
+Lists nested inside rows (a grid widget's columns) are lists of their own: a drop into a column fires `end` from the column, not from the zone holding the grid row. (On Lit the zone's listeners also hear the column's events; see the known limitations under [Scope](#scope).)
 
 ### Slots
 
@@ -297,7 +315,7 @@ The keyboard follows the same SortableJS rules as the mouse:
 
 | Option | Keyboard behaviour |
 | --- | --- |
-| `filter` (prop or `options.filter`) | A row the filter matches can't be lifted. A key press counts as a press on the row itself, so a selector is matched against the row element and its slot root (the element your row template renders, which covers the row), the elements a press on the row's body would hit. A control nested deeper that the filter matches (`filter: '.js-remove'`, `filter: 'input'`) blocks presses on that control only, as with the mouse, so the row still lifts. A function is called as SortableJS calls it, `filter({}, row, sortable)`, with a synthetic `{}` event; if it throws (for example by reading `evt.target`), the row is not filtered. Space or Enter on a filtered row does nothing and isn't prevented. |
+| `filter` (prop or `options.filter`) | A row the filter matches can't be lifted. A key press counts as a press on the row itself, so a selector is matched against the row element and its slot root (the element your row template renders, when it covers the row), the elements a press on the row's body would hit. Any other control the filter matches (`filter: '.js-remove'`, `filter: 'input'`), whether nested in a wrapper or beside other content at the row's top level, blocks presses on that control only, as with the mouse, so the row still lifts. Only a lone wrapper (the row template's single element, with no text beside it) counts as covering the row. A function is called as SortableJS calls it, `filter({}, row, sortable)`, with a synthetic `{}` event; if it throws (for example by reading `evt.target`), the row is not filtered. Space or Enter on a filtered row does nothing and isn't prevented. |
 | `options.draggable` | When set, only rows matching it can be lifted (a leading `>` is SortableJS's child syntax). |
 | `disabled` (prop, `options.disabled` or `option('disabled', v)`) | Turns keyboard reordering off. Turning it on while a row is lifted ends the lift where the row is: the list says `Lift ended` and `end` fires. In row mode the rows leave the tab order, so if one of them had focus, focus moves to the list itself (never `<body>`). |
 | `disableKeyboard` | Keyboard only: turns keyboard reordering off, ending a lift and moving focus the same way. |
@@ -445,6 +463,7 @@ Rows that contain inputs or other interactive content are awkward as keyboard ta
 The rules:
 
 - Rows are not tab stops. Tab moves handle, then the row's input, then the next row's handle.
+- The handle is the selector SortableJS runs with: the `handle` prop, or `options.handle` / `option('handle', v)`, which win over it.
 - Only keys pressed inside the handle count. They are the same keys as row mode (Space/Enter lift and drop, the arrow keys, Home/End, Page Up/Page Down, Shift+arrow hop, Escape cancel), with the same aria-live announcements. Typing into the row's input is left alone.
 - Handled keys call `preventDefault`, so the handle button's own click does not fire.
 - Focus returns to the moved row's handle after each move, on every framework.
@@ -493,7 +512,7 @@ const onCanvasEnd = (e) => {
 }
 ```
 
-The copy is the one canvas row still carrying the palette item's id. (On Lit the handler receives a `CustomEvent`; read the payload from its `detail`.) [`SortableListCloneDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListCloneDemo.rozie) uses this exact handler.
+The copy is the one canvas row still carrying the palette item's id. Until you re-key it, the copy is the palette's own item object: replace it with a new object (as above), don't mutate it, or the change shows in the palette too. That holds in `add` / `reorder` handlers as well (writing a zone id or an order onto the dropped item there would also change the palette item). (On Lit the handler receives a `CustomEvent`; read the payload from its `detail`.) [`SortableListCloneDemo`](https://github.com/One-Learning-Community/rozie.js/blob/main/examples/demos/SortableListCloneDemo.rozie) uses this exact handler.
 
 Don't re-key in `add` (a keyboard hop fires `add` while the row is still lifted; see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)).
 
@@ -648,11 +667,12 @@ When it changes, the framework reconciler unmounts the old `<SortableList>` and 
 
 Not supported yet:
 
+- **Drops from a SortableJS list that isn't a `SortableList`.** The row goes back where it came from and nothing is emitted.
 - **Two-dimensional keyboard movement.** In a grid layout the arrow keys still move a row one place forward or back in list order (`orientation` picks which pair of arrow keys); there is no up/down-a-row movement across columns.
 - **Right-to-left arrow mapping.** With `orientation="horizontal"`, ArrowLeft always moves toward the start of the list and ArrowRight toward the end, whatever the text direction.
 - **Extra SortableJS plugins** mounted with `Sortable.mount` (MultiDrag, Swap, and the like). The component handles SortableJS's events and writes the bound arrays itself, so a plugin that changes what a drop does isn't supported.
 - **A "move up / move down / move to list" button recipe** for pointer users who can't drag (WCAG 2.5.7). You can build one today with your own buttons that write the bound array; there is no ready-made recipe.
-- **TypeScript generics** for the item type: `item` in events and slots is typed `any`.
+- **TypeScript generics** for the item type: `item` in events is typed `unknown` (the handlers take a `SortablePayload`, exported from every package) and `item` in slots `any`.
 
 Known limitations:
 

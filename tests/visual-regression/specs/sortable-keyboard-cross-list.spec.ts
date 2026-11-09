@@ -234,7 +234,7 @@ for (const target of TARGETS) {
       await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Tag cloud');
       await expect
         .poll(() => texts(mount.locator(LOG_LI)))
-        .toEqual(['top:start:keyboard', 'top:remove:keyboard', 'content:add:keyboard']);
+        .toEqual(['top:start:keyboard', 'content:add:keyboard', 'top:remove:keyboard']);
       await assertNothingDisappeared(mount);
 
       await page.keyboard.press('Space');
@@ -421,6 +421,42 @@ for (const target of TARGETS) {
       await assertNothingDisappeared(mount);
     },
   );
+
+  // A move between lists emits `add` (destination) before `remove` (source),
+  // by keyboard as by mouse — the hop and the reverse hand-off of a cancel.
+  for (const burst of [false, true]) {
+    runner(
+      `sortable-keyboard-cross-list [${target}]: add before remove on a hop and on its cancel${burst ? ', back-to-back (no waits)' : ''}`,
+      async ({ page }) => {
+        const { mount } = await open(page);
+        await grip(mount, 'Tag cloud').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowDown', 'Escape']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await page.keyboard.press('Shift+ArrowDown');
+          await expect.poll(() => state(mount, 'content')).toEqual(['Tag cloud', ...SEED.content]);
+          await expect
+            .poll(() => texts(mount.locator(LOG_LI)))
+            .toEqual(['top:start:keyboard', 'content:add:keyboard', 'top:remove:keyboard']);
+          await page.keyboard.press('Escape');
+        }
+        await expect.poll(() => state(mount, 'top')).toEqual(SEED.top);
+        await expect.poll(() => state(mount, 'content')).toEqual(SEED.content);
+        await expect
+          .poll(() => texts(mount.locator(LOG_LI)))
+          .toEqual([
+            'top:start:keyboard',
+            'content:add:keyboard',
+            'top:remove:keyboard',
+            'top:add:keyboard',
+            'content:remove:keyboard',
+            'top:end:keyboard',
+          ]);
+        await assertNothingDisappeared(mount);
+      },
+    );
+  }
 
   runner(
     `sortable-keyboard-cross-list [${target}]: Escape on a clone copy removes it`,

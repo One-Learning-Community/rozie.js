@@ -135,6 +135,12 @@ export interface UseSortableJSOptions<T> {
    * `handleCommit`). The caller decides which list
    * reports it (the one `info.to` belongs to). */
   onEnd?: (info: SortableDrag<T>) => void;
+  /** Optional: how `onEnd` is put off until after the writes' flushes. Called
+   * from a microtask queued after every list's commit, with a callback that
+   * calls `onEnd`; the default runs it via `afterFlush`. SortableList passes
+   * one that goes through its keyboard registry's `deferEnd`, so a pending
+   * `end` (pointer or keyboard) always fires before the next `start`. */
+  scheduleEnd?: (info: SortableDrag<T>, fire: () => void) => void;
   /** Optional: fires once per commit with the disambiguated event kind. */
   onChange?: (info: SortableChange<T>) => void;
   /** Optional: called immediately after `onCommit`. Used on Lit to invoke
@@ -452,11 +458,21 @@ export function useSortableJS<T>(
         // (extreme fallback — should not happen in practice).
         moved = stashedItem;
         if (moved === undefined) {
-          // Without a moved item we have nothing to insert. Remove the
-          // SortableJS-inserted node so the framework re-render is clean.
+          // No item data travelled with the row: it came from a SortableJS
+          // list that isn't a SortableList (only a SortableList stashes its
+          // item on the dragged element). Such drops aren't supported, so the
+          // row goes back where it came from — in `e.from`, at `e.oldIndex` —
+          // and nothing is written or emitted. (A clone-mode source kept its
+          // original: the clone is just removed.)
           safeDom(() => {
-            const node = e.item as { remove?: () => void } | null;
-            node?.remove?.();
+            const node = e.item as unknown as HTMLElement;
+            const from = e.from as HTMLElement | null;
+            if (e.pullMode === 'clone' || from == null || from === listEl) {
+              node.remove();
+              return;
+            }
+            const at = typeof e.oldIndex === 'number' && e.oldIndex >= 0 ? e.oldIndex : from.children.length;
+            from.insertBefore(node, from.children[at] ?? null);
           });
           return;
         }
@@ -543,7 +559,8 @@ export function useSortableJS<T>(
         };
         if (opts.onEnd) {
           const onEnd = opts.onEnd;
-          queueMicrotask(() => afterFlush(() => onEnd(info)));
+          const schedule = opts.scheduleEnd ?? ((_info: SortableDrag<T>, fire: () => void) => afterFlush(fire));
+          queueMicrotask(() => schedule(info, () => onEnd(info)));
         }
       }
     }

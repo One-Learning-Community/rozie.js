@@ -35,6 +35,25 @@ export interface AnnouncementContext {
 }
 /** The `announcements` prop: one optional function per message kind; `null` or `''` says nothing. */
 export type Announcements = Partial<Record<AnnouncementKind, (ctx: AnnouncementContext) => string | null | undefined>>;
+/** The payload every `start` / `end` / `reorder` / `add` / `remove` event carries, for pointer and keyboard alike. */
+export interface SortablePayload {
+  /** Which input made the change. */
+  interaction: 'pointer' | 'keyboard';
+  /** The item's data value (never an element). */
+  item: unknown;
+  /** The row element; null when there is none (a lost lift, a removed clone copy). */
+  el: HTMLElement | null;
+  /** The list element the row came from. */
+  from: HTMLElement;
+  /** The list element the row went to. */
+  to: HTMLElement;
+  /** Item-row index in `from`; -1 for `add`. */
+  oldIndex: number;
+  /** Item-row index in `to`; -1 for `remove` and a lost lift. */
+  newIndex: number;
+  /** Pointer only: the raw SortableJS event. */
+  originalEvent?: unknown;
+}
 /** Which element drives keyboard reordering (the `keyboardTrigger` prop). */
 export type SortableKeyboardTrigger = 'row' | 'handle';
 /** Which arrow keys move a lifted row within the list (the `orientation` prop). */
@@ -55,7 +74,7 @@ const props = withDefaults(
      */
     itemKey?: string | ((...args: any[]) => any) | null;
     /**
-     * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it.
+     * CSS selector identifying the per-row drag handle, so a drag starts only from that element rather than anywhere in the row. Authored class names render literally on every target (React included), so a plain `.grip` works; `$classSelector('grip')` is an optional, typo-checked way to author it. `options.handle` and `option('handle', v)` win over this prop, for the keyboard (`keyboardTrigger: 'handle'`) as for the mouse.
      */
     handle?: string | null;
     /**
@@ -99,7 +118,7 @@ const props = withDefaults(
      */
     dragClass?: string | null;
     /**
-     * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+     * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element, or its slot root: the row template's single element when nothing else sits beside it) cannot be lifted with Space/Enter; any other matching control (a `.js-remove` button, an `input`) blocks only presses on itself. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
      */
     filter?: string | null;
     /**
@@ -176,11 +195,11 @@ const items = computed<any[]>({
 });
 
 const emit = defineEmits<{
-  reorder: [...args: any[]];
-  add: [...args: any[]];
-  remove: [...args: any[]];
-  start: [...args: any[]];
-  end: [...args: any[]];
+  reorder: [payload: SortablePayload];
+  add: [payload: SortablePayload];
+  remove: [payload: SortablePayload];
+  start: [payload: SortablePayload];
+  end: [payload: SortablePayload];
 }>();
 
 defineSlots<{
@@ -361,9 +380,12 @@ const clearOverride = (name: any) => {
 };
 // Options whose runtime value (`option(name, v)`) is remembered, so a later
 // change of the matching prop doesn't overwrite it: the keyboard ones, plus
-// `animation` (runtime override → `options` → prop).
-const TRACKED_OPTIONS = [...KEYBOARD_OPTIONS, 'animation'];
+// `animation` and `handle` (runtime override → `options` → prop).
+const TRACKED_OPTIONS = [...KEYBOARD_OPTIONS, 'animation', 'handle'];
 const keyboardEnabled = () => !props.disableKeyboard && !liveOption('disabled', props.disabled);
+// The handle selector SortableJS runs with (`option('handle', v)`, else
+// `options.handle`, else the `handle` prop): the keyboard reads the same one.
+const handleSelector = () => liveOption('handle', props.handle);
 // keyboardTrigger='handle' mode: rows are not tab stops and the keys are read
 // from the consumer's handle element instead. Any other value is 'row' mode.
 const handleMode = () => props.keyboardTrigger === 'handle';
@@ -373,7 +395,7 @@ const rowTabbable = () => keyboardEnabled() && !handleMode();
 // one the keyboard is OFF (see the onRowKeyDown gate) — never a silent fallback
 // to row mode, which would re-introduce the tab stops the consumer opted out of.
 const warnIfHandleMissing = () => {
-  if (handleMode() && props.handle == null) {
+  if (handleMode() && handleSelector() == null) {
     console.warn('[rozie-sortable-list] keyboardTrigger is "handle" but no handle selector is set, so keyboard reordering is off. Pass a handle selector (e.g. handle=".grip") or use keyboardTrigger "row".');
   }
 };
@@ -387,7 +409,7 @@ const warnIfHandleMissing = () => {
 // .rozie-sortable-item met first means the key came from a NESTED list's row,
 // which must not reorder this (outer) list.
 const isHandleKeyOrigin = ($event: any) => {
-  const sel = props.handle;
+  const sel = handleSelector();
   if (sel == null) return false;
   const row = $event.currentTarget;
   let n: any = $event.target;
@@ -430,7 +452,7 @@ const isHandleKeyOrigin = ($event: any) => {
 // happens here, synchronously, inside an event handler — which is safe.
 const refocusRow = (item: any, idx: any) => {
   const listEl = listElRef.value;
-  const sel = props.handle;
+  const sel = handleSelector();
   const useHandle = handleMode();
   const key = String(keyFor(item, idx));
   // While this refocus is outstanding, a key that falls to <body> belongs to
@@ -479,7 +501,7 @@ const rowByKey = (listEl: any, key: any) => {
 // three passes as refocusRow, for targets that commit late.
 const focusNearRow = (index: number, key: string | null = null) => {
   const listEl = listElRef.value;
-  const sel = props.handle;
+  const sel = handleSelector();
   const useHandle = handleMode();
   const focusIt = () => {
     if (!listEl) return;
@@ -568,7 +590,7 @@ const loseLift = (unmounting = false) => {
   };
   // Like every `end`, in a task after the writes. An unmounting list emits it
   // now: a later emit from an unmounted component would not be delivered.
-  if (unmounting) h.emit('end', payload);else registry.deferEnd(() => h.emit('end', payload));
+  if (unmounting) h.emit('end', payload);else registry.deferEnd(() => h.emit('end', payload), h);
 };
 // Keyboard `start` / `end` (the same payload as every other event): `item` is
 // the item value, `el` its row element. `start` fires from the origin list
@@ -580,6 +602,8 @@ const loseLift = (unmounting = false) => {
 // emitted in a task (`registry.deferEnd`), after the writes AND the re-render
 // they schedule: a consumer `end` handler reads the new state on every target
 // (React included, whose handler closure is the one from the latest render).
+// A list that unmounts before then emits nothing (its pending `end` is
+// dropped).
 const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: any, newIndex: any, fallbackEl: HTMLElement | null = null) => {
   const host = name === 'start' ? from : to;
   const fire = () => host.emit(name, {
@@ -591,7 +615,7 @@ const keyboardStartEnd = (name: any, lift: any, from: any, to: any, oldIndex: an
     oldIndex,
     newIndex
   });
-  if (name === 'end') registry.deferEnd(fire);else fire();
+  if (name === 'end') registry.deferEnd(fire, host);else fire();
 };
 // Move the lifted row to `toIndex` (clamped) within the list holding it.
 // Works through the registry entry, so it acts on the current holder. `dir`
@@ -641,9 +665,10 @@ const moveLiftTo = (toIndex: any, dir: any) => {
 };
 // Hop the lifted row to the next (`dir` 1) or previous (-1) list it could
 // also reach by mouse, in composed-tree source order. One hand-off: the source
-// writes its items without the row and emits `remove`, the destination writes
-// them with it and emits `add`, and the destination becomes the holder. A
-// forward hop lands first, a backward hop lands last.
+// writes its items without the row, the destination writes them with it, and
+// the destination becomes the holder. As with the mouse, the destination
+// emits `add` first, then the source emits `remove`. A forward hop lands
+// first, a backward hop lands last.
 const hop = (dir: any) => {
   const lift = registry.lift;
   if (!lift) return;
@@ -713,21 +738,13 @@ const hop = (dir: any) => {
     const rest = [...fromItems];
     rest.splice(i, 1);
     from.write(rest);
-    from.emit('remove', {
-      interaction: 'keyboard',
-      item: data,
-      el,
-      from: from.el,
-      to: to.el,
-      oldIndex: i,
-      newIndex: -1
-    });
   }
   const next = [...toItems];
   next.splice(at, 0, data);
   to.write(next);
   // The destination has not rendered its new row yet: `el` is the row the
-  // move started from.
+  // move started from. `add` (destination) before `remove` (source), as by
+  // mouse.
   to.emit('add', {
     interaction: 'keyboard',
     item: data,
@@ -736,6 +753,15 @@ const hop = (dir: any) => {
     to: to.el,
     oldIndex: -1,
     newIndex: at
+  });
+  if (!cloneOut) from.emit('remove', {
+    interaction: 'keyboard',
+    item: data,
+    el,
+    from: from.el,
+    to: to.el,
+    oldIndex: i,
+    newIndex: -1
   });
   from.setLifted(null);
   to.setLifted(at);
@@ -808,7 +834,7 @@ const endLift = (kind: any) => {
       to: h.el,
       oldIndex: origin.index,
       newIndex: -1
-    }));
+    }), h);
     return;
   }
   if (h !== origin.list && (!registry.has(origin.list) || !isRenderable(origin.list.el) || !origin.list.keyboardEnabled())) {
@@ -863,19 +889,11 @@ const endLift = (kind: any) => {
   const rest = [...items];
   rest.splice(at, 1);
   h.write(rest);
-  h.emit('remove', {
-    interaction: 'keyboard',
-    item,
-    el,
-    from: h.el,
-    to: home.el,
-    oldIndex: at,
-    newIndex: -1
-  });
   if (!lift.copy) {
     const next = [...homeItems];
     next.splice(back, 0, item);
     home.write(next);
+    // `add` (destination) before `remove` (source), as by mouse.
     home.emit('add', {
       interaction: 'keyboard',
       item,
@@ -886,6 +904,15 @@ const endLift = (kind: any) => {
       newIndex: back
     });
   }
+  h.emit('remove', {
+    interaction: 'keyboard',
+    item,
+    el,
+    from: h.el,
+    to: home.el,
+    oldIndex: at,
+    newIndex: -1
+  });
   h.setLifted(null);
   // `home` holds the lift during its write, so a target whose items watcher
   // runs synchronously on the write (Solid) highlighted the row there: clear it.
@@ -957,7 +984,7 @@ const onRowKeyDown = ($event: any, index: any) => {
   //    that child would be hijacked for lift/drop instead of reaching the
   //    child.
   if (handleMode()) {
-    if (props.handle == null || !isHandleKeyOrigin($event)) return;
+    if (handleSelector() == null || !isHandleKeyOrigin($event)) return;
   } else if ($event.target !== $event.currentTarget) {
     return;
   }
@@ -1158,7 +1185,7 @@ onMounted(() => {
     // item-row indices and the raw SortableJS event as `originalEvent`.
     onChange: (c: any) => {
       const payload = {
-        interaction: 'pointer',
+        interaction: 'pointer' as const,
         item: c.item,
         el: c.el,
         from: c.from,
@@ -1185,11 +1212,20 @@ onMounted(() => {
         originalEvent: d.event
       });
     },
-    // Runs once per drag, in a task after every list involved has written its
-    // items and the re-render those writes scheduled (see useSortableJS).
     // `end` comes from the list the row ended up in: the destination when it
     // is a SortableList, else (dropped outside, or into a SortableJS list
-    // that isn't one of ours) this source list.
+    // that isn't one of ours) this source list. It goes through the
+    // registry's `deferEnd`, like a keyboard `end`: it fires in a task after
+    // every list involved has written its items and the re-render those
+    // writes scheduled, before the next drag's or lift's `start`, and not at
+    // all if that list unmounts first. A destination that already unmounted
+    // (in its own `add` handler, say) gets no `end`, and no other list emits
+    // it instead.
+    scheduleEnd: (d: any, fire: any) => {
+      const dest = registry.entryFor(d.to);
+      if (dest == null && d.to !== d.from && registry.wasList(d.to)) return;
+      registry.deferEnd(fire, dest ?? entry);
+    },
     onEnd: (d: any) => {
       const dest = registry.entryFor(d.to) ?? entry;
       if (dest == null) return;
@@ -1208,6 +1244,14 @@ onMounted(() => {
   });
   instance = sortable.instance;
   appliedOptions = props.options;
+  // Runtime `option(name, v)` values this list remembers (Lit keeps them when
+  // the element is moved in the DOM and mounts again) apply to the new
+  // SortableJS instance too, so mouse and keyboard keep agreeing. Empty on a
+  // first mount.
+  const remembered: any = optionOverrides.value;
+  if (remembered != null) {
+    for (const name of Object.keys(remembered) as any) instance.option(name, remembered[name]);
+  }
   const listEl = listElRef.value;
   const stopNative = (ev: any) => {
     if (ev.target === listEl) ev.stopPropagation();
@@ -1238,7 +1282,7 @@ onMounted(() => {
     group: () => effectiveGroup(),
     label: () => props.listLabel,
     // A handle-mode list without a handle selector has its keyboard off.
-    keyboardEnabled: () => keyboardEnabled() && !(handleMode() && props.handle == null),
+    keyboardEnabled: () => keyboardEnabled() && !(handleMode() && handleSelector() == null),
     items: () => items.value,
     keyOf: (item: any, i: any) => String(keyFor(item, i)),
     labelOf: (item: any, i: any, row: HTMLElement | null = null) => String(labelOf(item, i, row)),
@@ -1334,11 +1378,11 @@ watch(() => props.options, () => {
 watch(() => [props.disabled, props.disableKeyboard, props.options, optionOverrides.value], () => {
   if (!keyboardEnabled()) keyboardTurnedOff();
 }, { flush: 'post' });
-watch(() => props.group, () => instance?.option('group', resolveGroup()), { flush: 'post' });
-watch(() => props.cloneable, () => instance?.option('group', resolveGroup()), { flush: 'post' });
+watch(() => props.group, () => instance?.option('group', effectiveGroup()), { flush: 'post' });
+watch(() => props.cloneable, () => instance?.option('group', effectiveGroup()), { flush: 'post' });
 watch(() => props.swapThreshold, (v: any) => instance?.option('swapThreshold', v), { flush: 'post' });
 watch(() => props.handle, (v: any) => {
-  instance?.option('handle', v);
+  instance?.option('handle', liveOption('handle', v));
   warnIfHandleMissing();
 }, { flush: 'post' });
 watch(() => props.keyboardTrigger, () => warnIfHandleMissing(), { flush: 'post' });

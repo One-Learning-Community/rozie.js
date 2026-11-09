@@ -191,6 +191,56 @@ async function expectZones(mount: Mount, want: Record<string, { name: string; la
   }
 }
 
+/**
+ * Synthetic HTML5 drag of `source` onto `target` (the same events as
+ * `synthesizeDrag`), but `drop` and `dragend` are dispatched in ONE in-page
+ * script, so the drop target may unmount right after. `after`, when given, is
+ * a key pressed on `keyEl` in that same script a few microtasks after the
+ * drop (no task in between).
+ */
+async function scriptedDrag(
+  page: import('@playwright/test').Page,
+  source: ReturnType<import('@playwright/test').Page['locator']>,
+  target: ReturnType<import('@playwright/test').Page['locator']>,
+  keyEl: ReturnType<import('@playwright/test').Page['locator']> | null = null,
+) {
+  await source.evaluate((handle) => {
+    const dt = new DataTransfer();
+    (window as any).__dt = dt;
+    const r = handle.getBoundingClientRect();
+    const o = { bubbles: true, cancelable: true, composed: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    handle.dispatchEvent(new PointerEvent('pointerdown', { ...o, button: 0, isPrimary: true, pointerId: 1 }));
+    handle.dispatchEvent(new MouseEvent('mousedown', { ...o, button: 0 }));
+    handle.dispatchEvent(new DragEvent('dragstart', { ...o, dataTransfer: dt }));
+  });
+  await page.waitForTimeout(60);
+  for (let i = 0; i < 3; i++) {
+    await target.evaluate((el, first) => {
+      const r = el.getBoundingClientRect();
+      const mk = (t: string) =>
+        new DragEvent(t, { bubbles: true, cancelable: true, composed: true, dataTransfer: (window as any).__dt, clientX: r.left + r.width / 2, clientY: r.bottom - 3 });
+      if (first) el.dispatchEvent(mk('dragenter'));
+      el.dispatchEvent(mk('dragover'));
+    }, i === 0);
+    await page.waitForTimeout(25);
+  }
+  const key = keyEl ? await keyEl.elementHandle() : null;
+  await target.evaluate(async (el, k) => {
+    const r = el.getBoundingClientRect();
+    const mk = (t: string) =>
+      new DragEvent(t, { bubbles: true, cancelable: true, composed: true, dataTransfer: (window as any).__dt, clientX: r.left + r.width / 2, clientY: r.bottom - 3 });
+    el.dispatchEvent(mk('drop'));
+    el.dispatchEvent(mk('dragend'));
+    if (k) {
+      // A few microtasks: the drop's writes and its `end` hand-off run, but
+      // no task does.
+      for (let i = 0; i < 20; i++) await new Promise<void>((res) => queueMicrotask(res));
+      (k as HTMLElement).dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true, composed: true }));
+    }
+  }, key);
+  await page.waitForTimeout(200);
+}
+
 for (const target of TARGETS) {
   const built = existsSync(
     resolve(__dirname, `../dist/${target}/host/entry.${target}.html`),
@@ -230,6 +280,92 @@ for (const target of TARGETS) {
       await page.waitForTimeout(150);
       expect((await texts(mount.locator(LOG_LI))).filter((e) => e.includes(':end:'))).toEqual([
         'bottom:end:pointer',
+      ]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // A list whose `options.group` forbids pulling (`pull: false`) keeps
+  // forbidding it after its `cloneable` prop changes: `options.group` wins for
+  // the mouse as for the keyboard.
+  runner(
+    `sortable-drag-cross [${target}]: options.group still wins after a cloneable change`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await mount.getByTestId('locked-cloneable').evaluate((b) => (b as HTMLElement).click());
+      await page.waitForTimeout(100);
+      await synthesizeDrag(page, {
+        sourceHandle: zoneGrip(mount, 'Pinned notice'),
+        target: zoneRow(mount, 'Top sidebar', 'Search'),
+      });
+      await page.waitForTimeout(150);
+      await expectZones(mount, {
+        locked: { name: 'Locked', labels: ['Pinned notice'] },
+        top: { name: 'Top sidebar', labels: ['Search', 'Newsletter', 'Tag cloud'] },
+      });
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log.filter((e) => e.startsWith('top:'))).toEqual([]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // A row dragged in from a plain SortableJS list (not a SortableList) is not
+  // accepted: it goes back where it came from, and nothing is emitted.
+  runner(
+    `sortable-drag-cross [${target}]: a drop from a non-SortableList list puts the row back and emits nothing`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await mount.getByTestId('foreign-init').evaluate((b) => (b as HTMLElement).click());
+      const foreign = mount.getByTestId('foreign').locator('li');
+      await expect(foreign).toHaveCount(2);
+      await synthesizeDrag(page, {
+        sourceHandle: foreign.nth(0),
+        target: zoneRow(mount, 'Top sidebar', 'Search'),
+      });
+      await page.waitForTimeout(150);
+      await expect.poll(() => texts(foreign)).toEqual(['Foreign A', 'Foreign B']);
+      await expectZones(mount, {
+        top: { name: 'Top sidebar', labels: ['Search', 'Newsletter', 'Tag cloud'] },
+      });
+      expect(await texts(mount.locator(LOG_LI))).toEqual([]);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // The destination unmounts in its own `add` handler: its pending `end` is
+  // dropped (an unmounted list emits nothing; Angular would log "Unexpected
+  // emit for destroyed OutputRef"), and no other list emits it instead.
+  runner(
+    `sortable-drag-cross [${target}]: no end from a destination that unmounted in its add handler`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await mount.getByTestId('top-unmount-on-add').evaluate((b) => (b as HTMLElement).click());
+      await scriptedDrag(page, zoneGrip(mount, 'Recent posts'), zoneRow(mount, 'Top sidebar', 'Search'));
+      await expect(mount.locator('[role="list"][aria-label="Top sidebar"]')).toHaveCount(0);
+      await expect.poll(async () => [...(await zoneState(mount, 'top'))].sort()).toEqual(['Newsletter', 'Recent posts', 'Search', 'Tag cloud']);
+      await expect.poll(() => zoneState(mount, 'bottom')).toEqual(['Contact']);
+      await page.waitForTimeout(300);
+      expect(await texts(mount.locator(LOG_LI))).toEqual(['bottom:start:pointer', 'top:add:pointer', 'bottom:remove:pointer']);
+      expect(errors).toEqual([]);
+    },
+  );
+
+  // A pending pointer `end` fires before the next `start`, even when a key
+  // lifts a row before the end's task runs (scripted input: the drop and the
+  // key run in one script, a few microtasks apart).
+  runner(
+    `sortable-drag-cross [${target}]: a pointer end comes before the next keyboard start`,
+    async ({ page }) => {
+      const { mount, errors } = await openZones(page);
+      await scriptedDrag(page, zoneGrip(mount, 'Search'), zoneRow(mount, 'Bottom sidebar', 'Recent posts'), zoneGrip(mount, 'Contact'));
+      await expect.poll(async () => (await texts(mount.locator(LOG_LI))).length).toBeGreaterThanOrEqual(5);
+      const log = await texts(mount.locator(LOG_LI));
+      expect(log.slice(0, 5)).toEqual([
+        'top:start:pointer',
+        'bottom:add:pointer',
+        'top:remove:pointer',
+        'bottom:end:pointer',
+        'bottom:start:keyboard',
       ]);
       expect(errors).toEqual([]);
     },
