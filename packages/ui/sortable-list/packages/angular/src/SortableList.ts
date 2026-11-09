@@ -127,7 +127,7 @@ export class SortableList {
    */
   dragClass = input<(string) | null>(null);
   /**
-   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row or anything inside it) cannot be lifted with Space/Enter. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
   filter = input<(string) | null>(null);
   /**
@@ -217,11 +217,10 @@ export class SortableList {
     effect(() => { const __watchVal = (() => (this.disabled() || this.__rozieCvaDisabled()))(); untracked(() => { if (this.__rozieWatchInitial_0) { this.__rozieWatchInitial_0 = false; return; } ((v: any) => {
       this.instance?.option('disabled', v);
       this.setOverride('disabled', v);
-      if (v) this.endLiftIfHeld();
     })(__watchVal); }); });
-    effect(() => { const __watchVal = (() => this.disableKeyboard())(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } ((v: any) => {
-      if (v) this.endLiftIfHeld();
-    })(__watchVal); }); });
+    effect(() => { const __watchVal = (() => [(this.disabled() || this.__rozieCvaDisabled()), this.disableKeyboard(), this.options(), this.optionOverrides()])(); untracked(() => { if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      if (!this.keyboardEnabled()) this.keyboardTurnedOff();
+    })(); }); });
     effect(() => { const __watchVal = (() => this.group())(); untracked(() => { if (this.__rozieWatchInitial_2) { this.__rozieWatchInitial_2 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
     effect(() => { const __watchVal = (() => this.cloneable())(); untracked(() => { if (this.__rozieWatchInitial_3) { this.__rozieWatchInitial_3 = false; return; } (() => this.instance?.option('group', this.resolveGroup()))(); }); });
     effect(() => { const __watchVal = (() => this.swapThreshold())(); untracked(() => { if (this.__rozieWatchInitial_4) { this.__rozieWatchInitial_4 = false; return; } ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }); });
@@ -247,6 +246,11 @@ export class SortableList {
         return;
       }
       if (this.liftedIndex() !== i) this.liftedIndex.set(i);
+      // Once the holder has rendered the lifted row, that is the lifted row
+      // element. After a hop this drops the source's old row, which the source
+      // may reuse for another item (index keys).
+      const row = this.entry.rowEl(i);
+      if (row != null) lift.liftedRowEl = row;
       this.focusNearRow(i, lift.key);
     })(); }); });
   }
@@ -339,8 +343,25 @@ export class SortableList {
       if (ev.target === listEl) ev.stopPropagation();
     };
     for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.addEventListener(name, stopNative);
+    // A focused row that stops being focusable (its tabindex goes when the
+    // keyboard turns off) is blurred at once, during the framework's DOM
+    // update, with focus going nowhere (`relatedTarget` null): it would land on
+    // <body>. Move it to the list instead.
+    // A focused row that stops being focusable (its tabindex goes when the
+    // keyboard turns off) is blurred at once, during the framework's DOM
+    // update, with focus going nowhere (`relatedTarget` null): it would land on
+    // <body>. Move it to the list instead.
+    const rowBlurred = (ev: any) => {
+      const row: any = ev.target;
+      if (ev.relatedTarget != null || row == null || row.parentNode !== listEl) return;
+      if (!row.classList.contains('rozie-sortable-item') || row.hasAttribute('tabindex') || !row.isConnected) return;
+      if (!listEl.hasAttribute('tabindex')) listEl.setAttribute('tabindex', '-1');
+      listEl.focus();
+    };
+    listEl?.addEventListener('focusout', rowBlurred);
     this.unhookNativeEvents = () => {
       for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.removeEventListener(name, stopNative);
+      listEl?.removeEventListener('focusout', rowBlurred);
     };
 
     // Register with the keyboard registry. Other instances call these methods
@@ -648,7 +669,11 @@ export class SortableList {
           if (target && typeof target.focus === 'function') {
             target.focus();
             const l = this.registry.lift;
-            if (l != null && l === pending && l.key === key) l.focusPending = false;
+            if (l != null && l === pending && l.key === key) {
+              l.focusPending = false;
+              // This row is the lifted row element now (see the items watcher).
+              l.liftedRowEl = row;
+            }
           }
           return;
         }
@@ -1061,6 +1086,25 @@ export class SortableList {
     const lift = this.registry.lift;
     if (lift != null && lift.holder === this.entry) this.endLift('off');
   };
+  // In row mode the rows leave the tab order when the keyboard turns off, and a
+  // focused element that stops being focusable drops focus to <body>. If one of
+  // this list's rows still has focus (a target whose watcher runs before its DOM
+  // update), move it to the list itself (out of the tab order), like an emptied
+  // list. Once the DOM update has run, the `focusout` listener added in $onMount
+  // does it instead.
+  keepFocusOffBody = () => {
+    const listEl = this.entry ? this.entry.el : null;
+    if (!listEl) return;
+    const root: any = listEl.getRootNode();
+    const a: any = root != null ? root.activeElement : null;
+    if (a == null || a.parentNode !== listEl || !a.classList.contains('rozie-sortable-item')) return;
+    if (!listEl.hasAttribute('tabindex')) listEl.setAttribute('tabindex', '-1');
+    listEl.focus();
+  };
+  keyboardTurnedOff = () => {
+    this.endLiftIfHeld();
+    this.keepFocusOffBody();
+  };
   // Lift the row at `index` of this list.
   startLift = (index: any) => {
     if (!this.entry) return;
@@ -1239,7 +1283,7 @@ export class SortableList {
     if (value === undefined) return this.instance.option(name);
     this.instance.option(name, value);
     if (this.KEYBOARD_OPTIONS.includes(name)) this.setOverride(name, value);
-    if (name === 'disabled' && value) this.endLiftIfHeld();
+    if (name === 'disabled' && value) this.keyboardTurnedOff();
     return value;
   };
 

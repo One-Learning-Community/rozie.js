@@ -227,29 +227,39 @@ function safeMatches(el: Element, sel: string): boolean {
   }
 }
 
-// The row, or an element inside it, matches `sel`. Walks slotted content
-// (Lit) and stops at the rows of a list nested inside this one.
+// The row's slot roots: its direct element children, with a <slot> (Lit)
+// replaced by the elements assigned to it.
+function slotRoots(row: Element): Element[] {
+  const out: Element[] = [];
+  for (const c of Array.from(row.children)) {
+    if (c.tagName === 'SLOT' && typeof (c as HTMLSlotElement).assignedElements === 'function') {
+      out.push(...(c as HTMLSlotElement).assignedElements({ flatten: true }));
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
+// SortableJS filters a press with `closest(pressedElement, filter, list)`. A
+// key press has no pressed element inside the row, so it counts as a press on
+// the row itself, which a filter can mark directly or through the element the
+// row's content is rendered in (its slot root, which covers the row). A
+// control nested deeper (a `.js-remove` button, an `input`) blocks only presses
+// on it, so it does not block the row.
 function rowHas(row: Element, sel: string): boolean {
-  const visit = (n: Element): boolean => {
-    if (n !== row && n.classList.contains('rozie-sortable-item')) return false;
-    if (safeMatches(n, sel)) return true;
-    const kids =
-      n.tagName === 'SLOT' && typeof (n as HTMLSlotElement).assignedElements === 'function'
-        ? (n as HTMLSlotElement).assignedElements({ flatten: true })
-        : Array.from(n.children);
-    for (const k of kids) if (visit(k)) return true;
-    return false;
-  };
-  return visit(row);
+  if (safeMatches(row, sel)) return true;
+  return slotRoots(row).some((r) => safeMatches(r, sel));
 }
 
 /**
  * Whether a keyboard lift may start on `row`, by the rules SortableJS applies
  * to a pointer press: the row must match `draggable` (when set; a leading `>`
  * is SortableJS's child syntax), and must not be filtered. A selector filter
- * is a comma-separated list checked against the row and everything inside it
- * (a press anywhere in the row would hit it). A function filter is called as
- * SortableJS calls it, with a synthetic `{}` event and the row.
+ * is a comma-separated list checked against the row and its slot roots (see
+ * rowHas). A function filter is called as SortableJS calls it, with a
+ * synthetic `{}` event and the row; if it throws (it read something the
+ * synthetic event lacks), the row is not filtered.
  */
 export function rowLiftable(row: HTMLElement, rules: LiftRules): boolean {
   const d = rules.draggable;
@@ -264,7 +274,13 @@ export function rowLiftable(row: HTMLElement, rules: LiftRules): boolean {
     if (!ok) return false;
   }
   const f = rules.filter;
-  if (typeof f === 'function') return !f.call(rules.sortable, {}, row, rules.sortable);
+  if (typeof f === 'function') {
+    try {
+      return !f.call(rules.sortable, {}, row, rules.sortable);
+    } catch {
+      return true;
+    }
+  }
   if (typeof f === 'string' && f.trim() !== '') {
     for (const part of f.split(',')) {
       const sel = part.trim();

@@ -4,7 +4,7 @@
   Locked items (🔒) cannot be dragged, by mouse or by keyboard. Implemented
   via the `filter` prop on SortableList — SortableJS skips drag initiation on
   any element matching the selector, and the keyboard won't lift a row that
-  matches it (the row or anything inside it). Other rows can still move past
+  matches it (the row or its slot root, here `.row`). Other rows can still move past
   a locked one, as with the mouse.
 
   CSS-class-as-selector caveat: the filter string is handed verbatim to

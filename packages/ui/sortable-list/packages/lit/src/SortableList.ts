@@ -96,7 +96,7 @@ export default class SortableList extends SignalWatcher(LitElement) {
    */
   @property({ type: String, reflect: true, attribute: 'drag-class' }) dragClass: string | null = null;
   /**
-   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row or anything inside it) cannot be lifted with Space/Enter. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
+   * CSS selector that prevents drag initiation on matching rows (locked items). SortableJS checks it at `mousedown`/`touchstart` and aborts the drag if it matches. The keyboard honours it too: a row that matches (the row element or its slot root, the element the row template renders) cannot be lifted with Space/Enter; a control nested deeper that matches blocks only presses on it. `options.filter` (which may also be a SortableJS filter function) takes precedence. A `data-*` attribute selector (e.g. `[data-locked]`) is the most robust choice across all targets.
    */
   @property({ type: String, reflect: true }) filter: string | null = null;
   /**
@@ -147,6 +147,8 @@ export default class SortableList extends SignalWatcher(LitElement) {
   private _ariaLiveText = signal('');
   private _optionOverrides = signal<any>({});
   @query('[data-rozie-ref="listEl"]') private _refListEl!: HTMLElement;
+private __rozieWatchPrev_1: unknown;
+private __rozieWatchInitial_1 = true;
 private __rozieWatchInitial_12 = true;
 private __rozieFirstUpdateDone = false;
 
@@ -237,6 +239,9 @@ private __rozieFirstUpdateDone = false;
       this.unhookStrayKeys = null;
     }));
 
+    this._disconnectCleanups.push(effect(() => { const __watchVal = (() => [this.disabled, this.disableKeyboard, this.options, this._optionOverrides.value])(); untracked(() => { this.__rozieWatchPrev_1 = __watchVal; if (this.__rozieWatchInitial_1) { this.__rozieWatchInitial_1 = false; return; } (() => {
+      if (!this.keyboardEnabled()) this.keyboardTurnedOff();
+    })(); }); }));
     this._disconnectCleanups.push(effect(() => { const __watchVal = (() => this.items)(); untracked(() => { if (this.__rozieWatchInitial_12) { this.__rozieWatchInitial_12 = false; return; } (() => {
       const lift = this.registry.lift;
       if (lift == null || lift.holder !== this.entry) return;
@@ -246,6 +251,11 @@ private __rozieFirstUpdateDone = false;
         return;
       }
       if (this._liftedIndex.value !== i) this._liftedIndex.value = i;
+      // Once the holder has rendered the lifted row, that is the lifted row
+      // element. After a hop this drops the source's old row, which the source
+      // may reuse for another item (index keys).
+      const row = this.entry.rowEl(i);
+      if (row != null) lift.liftedRowEl = row;
       this.focusNearRow(i, lift.key);
     })(); }); }));
 
@@ -350,8 +360,21 @@ private __rozieFirstUpdateDone = false;
       if (ev.target === listEl) ev.stopPropagation();
     };
     for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.addEventListener(name, stopNative);
+    // A focused row that stops being focusable (its tabindex goes when the
+    // keyboard turns off) is blurred at once, during the framework's DOM
+    // update, with focus going nowhere (`relatedTarget` null): it would land on
+    // <body>. Move it to the list instead.
+    const rowBlurred = (ev: any) => {
+      const row: any = ev.target;
+      if (ev.relatedTarget != null || row == null || row.parentNode !== listEl) return;
+      if (!row.classList.contains('rozie-sortable-item') || row.hasAttribute('tabindex') || !row.isConnected) return;
+      if (!listEl.hasAttribute('tabindex')) listEl.setAttribute('tabindex', '-1');
+      listEl.focus();
+    };
+    listEl?.addEventListener('focusout', rowBlurred);
     this.unhookNativeEvents = () => {
       for (const name of this.SORTABLE_DOM_EVENTS as any) listEl?.removeEventListener(name, stopNative);
+      listEl?.removeEventListener('focusout', rowBlurred);
     };
 
     // Register with the keyboard registry. Other instances call these methods
@@ -430,11 +453,10 @@ private __rozieFirstUpdateDone = false;
     if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled'))) { const __watchVal = (() => this.disabled)(); ((v: any) => {
       this.instance?.option('disabled', v);
       this.setOverride('disabled', v);
-      if (v) this.endLiftIfHeld();
     })(__watchVal); }
-    if (this.__rozieFirstUpdateDone && (changedProperties.has('disableKeyboard'))) { const __watchVal = (() => this.disableKeyboard)(); ((v: any) => {
-      if (v) this.endLiftIfHeld();
-    })(__watchVal); }
+    if (this.__rozieFirstUpdateDone && (changedProperties.has('disabled') || changedProperties.has('disableKeyboard') || changedProperties.has('options'))) { const __watchVal = untracked(() => [this.disabled, this.disableKeyboard, this.options, this._optionOverrides.value]); if (!Object.is(__watchVal, this.__rozieWatchPrev_1)) { this.__rozieWatchPrev_1 = __watchVal; untracked(() => (() => {
+      if (!this.keyboardEnabled()) this.keyboardTurnedOff();
+    })()); } }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('group'))) { const __watchVal = (() => this.group)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('cloneable'))) { const __watchVal = (() => this.cloneable)(); (() => this.instance?.option('group', this.resolveGroup()))(); }
     if (this.__rozieFirstUpdateDone && (changedProperties.has('swapThreshold'))) { const __watchVal = (() => this.swapThreshold)(); ((v: any) => this.instance?.option('swapThreshold', v))(__watchVal); }
@@ -744,7 +766,11 @@ private __rozieFirstUpdateDone = false;
         if (target && typeof target.focus === 'function') {
           target.focus();
           const l = this.registry.lift;
-          if (l != null && l === pending && l.key === key) l.focusPending = false;
+          if (l != null && l === pending && l.key === key) {
+            l.focusPending = false;
+            // This row is the lifted row element now (see the items watcher).
+            l.liftedRowEl = row;
+          }
         }
         return;
       }
@@ -1167,6 +1193,27 @@ private __rozieFirstUpdateDone = false;
   if (lift != null && lift.holder === this.entry) this.endLift('off');
 };
 
+  // In row mode the rows leave the tab order when the keyboard turns off, and a
+  // focused element that stops being focusable drops focus to <body>. If one of
+  // this list's rows still has focus (a target whose watcher runs before its DOM
+  // update), move it to the list itself (out of the tab order), like an emptied
+  // list. Once the DOM update has run, the `focusout` listener added in $onMount
+  // does it instead.
+  keepFocusOffBody = () => {
+  const listEl = this.entry ? this.entry.el : null;
+  if (!listEl) return;
+  const root: any = listEl.getRootNode();
+  const a: any = root != null ? root.activeElement : null;
+  if (a == null || a.parentNode !== listEl || !a.classList.contains('rozie-sortable-item')) return;
+  if (!listEl.hasAttribute('tabindex')) listEl.setAttribute('tabindex', '-1');
+  listEl.focus();
+};
+
+  keyboardTurnedOff = () => {
+  this.endLiftIfHeld();
+  this.keepFocusOffBody();
+};
+
   // Lift the row at `index` of this list.
   startLift = (index: any) => {
   if (!this.entry) return;
@@ -1353,7 +1400,7 @@ private __rozieFirstUpdateDone = false;
     if (value === undefined) return this.instance.option(name);
     this.instance.option(name, value);
     if (this.KEYBOARD_OPTIONS.includes(name)) this.setOverride(name, value);
-    if (name === 'disabled' && value) this.endLiftIfHeld();
+    if (name === 'disabled' && value) this.keyboardTurnedOff();
     return value;
   }
 

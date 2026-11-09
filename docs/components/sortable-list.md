@@ -269,10 +269,10 @@ The keyboard follows the same SortableJS rules as the mouse:
 
 | Option | Keyboard behaviour |
 | --- | --- |
-| `filter` (prop or `options.filter`) | A row the filter matches can't be lifted. A selector matches the row or anything inside it (a press anywhere in the row would hit it); a function is called as SortableJS calls it, `filter({}, row, sortable)`, with a synthetic `{}` event. Space or Enter on such a row does nothing and isn't prevented. |
+| `filter` (prop or `options.filter`) | A row the filter matches can't be lifted. A key press counts as a press on the row itself, so a selector is matched against the row element and its slot root (the element your row template renders, which covers the row), the elements a press on the row's body would hit. A control nested deeper that the filter matches (`filter: '.js-remove'`, `filter: 'input'`) blocks presses on that control only, as with the mouse, so the row still lifts. A function is called as SortableJS calls it, `filter({}, row, sortable)`, with a synthetic `{}` event; if it throws (for example by reading `evt.target`), the row is not filtered. Space or Enter on a filtered row does nothing and isn't prevented. |
 | `options.draggable` | When set, only rows matching it can be lifted (a leading `>` is SortableJS's child syntax). |
-| `disabled` (prop, `options.disabled` or `option('disabled', v)`) | Turns keyboard reordering off. Turning it on while a row is lifted ends the lift where the row is: the list says `Lift ended` and `end` fires. |
-| `disableKeyboard` | Keyboard only: turns keyboard reordering off, ending a lift the same way. |
+| `disabled` (prop, `options.disabled` or `option('disabled', v)`) | Turns keyboard reordering off. Turning it on while a row is lifted ends the lift where the row is: the list says `Lift ended` and `end` fires. In row mode the rows leave the tab order, so if one of them had focus, focus moves to the list itself (never `<body>`). |
+| `disableKeyboard` | Keyboard only: turns keyboard reordering off, ending a lift and moving focus the same way. |
 | `options.sort: false` | No moves within the list: the arrow keys, Home, End, Page Up and Page Down move nothing. Hops to other lists still follow `pull` / `put`. |
 | `group` `pull` / `put` | Decide which lists a row can hop to (see [Moving between lists by keyboard](#moving-between-lists-by-keyboard)). |
 

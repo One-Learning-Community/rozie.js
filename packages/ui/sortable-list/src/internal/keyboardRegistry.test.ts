@@ -334,7 +334,7 @@ describe('rowLiftable (keyboard honours filter / draggable like SortableJS)', ()
     expect(rowLiftable(l.children[0] as HTMLElement, { filter: null, draggable: undefined, sortable: null })).toBe(true);
   });
 
-  it('a selector filter matches the row itself or anything inside it', () => {
+  it('a selector filter matches the row itself or its slot root (the element covering the row)', () => {
     const l = list(
       '<div class="rozie-sortable-item locked">a</div>' +
         '<div class="rozie-sortable-item"><div class="row" data-locked="true"><span class="grip">g</span></div></div>' +
@@ -343,6 +343,33 @@ describe('rowLiftable (keyboard honours filter / draggable like SortableJS)', ()
     const rows = Array.from(l.children) as HTMLElement[];
     const opts = { filter: ".locked, [data-locked='true']", draggable: undefined, sortable: null };
     expect(rows.map((r) => rowLiftable(r, opts))).toEqual([false, false, true]);
+  });
+
+  it('a row whose only match is a control nested inside it stays liftable (SortableJS: closest from the pressed element)', () => {
+    const l = list(
+      '<div class="rozie-sortable-item"><div class="row"><span>a</span><button class="js-remove">x</button><input /></div></div>',
+    );
+    const row = l.children[0] as HTMLElement;
+    for (const filter of ['.js-remove, .js-edit', 'input']) {
+      expect(rowLiftable(row, { filter, draggable: undefined, sortable: null })).toBe(true);
+    }
+  });
+
+  it('a slot root is read through a <slot> (its assigned elements)', () => {
+    const host = el();
+    cleanups.push(() => host.remove());
+    host.innerHTML = '<div class="row" data-locked="true" slot="r0">a</div>';
+    const shadow = host.attachShadow({ mode: 'open' });
+    shadow.innerHTML = '<div class="rozie-sortable-list"><div class="rozie-sortable-item"><slot name="r0"></slot></div></div>';
+    const row = shadow.querySelector('.rozie-sortable-item') as HTMLElement;
+    expect(rowLiftable(row, { filter: '[data-locked="true"]', draggable: undefined, sortable: null })).toBe(false);
+  });
+
+  it('a function filter that throws (e.g. reads evt.target) means not filtered', () => {
+    const l = list('<div class="rozie-sortable-item">a</div>');
+    const row = l.children[0] as HTMLElement;
+    const filter = (evt: any) => evt.target.closest('.x') != null;
+    expect(rowLiftable(row, { filter, draggable: undefined, sortable: null })).toBe(true);
   });
 
   it("a selector filter ignores rows of a list nested inside the row", () => {

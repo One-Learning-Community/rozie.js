@@ -448,8 +448,8 @@ for (const target of TARGETS) {
 
     // Turning the keyboard off mid-lift ends the lift where the row is, with
     // `end` (once), whether through the prop or the imperative option().
-    for (const how of ['option', 'prop'] as const) {
-      const label = how === 'option' ? "option('disabled')" : 'disabled prop';
+    for (const how of ['option', 'prop', 'options'] as const) {
+      const label = how === 'option' ? "option('disabled')" : how === 'prop' ? 'disabled prop' : 'options.disabled';
       runner(`sortable-keyboard-keys [${target}]: ${label} mid-lift ends the lift${tag}`, async ({ page }) => {
         const { mount, items, aria } = await open(page);
         await items.nth(1).focus();
@@ -461,10 +461,16 @@ for (const target of TARGETS) {
           await page.keyboard.press('ArrowDown');
           await expect(aria).toHaveText('Moved Banana to position 3');
         }
-        await clickKeepingFocus(mount, how === 'option' ? 'disable-option' : 'disable-prop');
+        await clickKeepingFocus(
+          mount,
+          how === 'option' ? 'disable-option' : how === 'prop' ? 'disable-prop' : 'options-disabled',
+        );
         // (A prop reaches Angular a task late: a key pressed before it lands
         // still acts on the lift. Wait for the change, then press Escape.)
         await expect(aria).toHaveText('Lift ended');
+        // The row left the tab order: focus moved to the list, not <body>.
+        await page.waitForTimeout(150);
+        expect(await activeText(page)).not.toBe('<body>');
         // Escape after it does nothing (the lift is over, the keyboard is off).
         await page.keyboard.press('Escape');
         await expect(aria).toHaveText('Lift ended');
@@ -487,6 +493,85 @@ for (const target of TARGETS) {
         await assertInvariant(mount);
       });
     }
+
+
+    // The keyboard turned off with a row focused and nothing lifted: the row
+    // leaves the tab order, and focus moves to the list rather than <body>.
+    for (const how of ['disable-prop', 'disable-keyboard'] as const) {
+      runner(
+        `sortable-keyboard-keys [${target}]: ${how === 'disable-prop' ? 'disabled' : 'disableKeyboard'} with a row focused keeps focus off <body>${tag}`,
+        async ({ page }) => {
+          const { mount, items } = await open(page);
+          await items.nth(2).focus();
+          if (burst) {
+            await clickKeepingFocus(mount, how);
+          } else {
+            await expect.poll(() => activeText(page)).toBe('Cherry');
+            await clickKeepingFocus(mount, how);
+            await expect(items.nth(2)).not.toHaveAttribute('tabindex', /.*/);
+          }
+          await page.waitForTimeout(150);
+          await expect(items.first()).not.toHaveAttribute('tabindex', /.*/);
+          expect(await activeText(page)).not.toBe('<body>');
+          await page.keyboard.press('Space');
+          await page.waitForTimeout(100);
+          await expect(mount.locator(LOG_LI)).toHaveCount(0);
+          await expectOrder(mount, items, SEED);
+        },
+      );
+    }
+
+    // option('sort', false) at runtime: no in-list moves by keyboard.
+    runner(`sortable-keyboard-keys [${target}]: option('sort', false) stops in-list moves${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await clickKeepingFocus(mount, 'sort-off');
+      await items.nth(1).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowDown', 'End', 'Home', 'PageDown', 'Space']) await page.keyboard.press(key);
+      } else {
+        await page.keyboard.press('Space');
+        await expect(aria).toHaveText('Lifted Banana');
+        for (const key of ['ArrowDown', 'End', 'Home', 'PageDown']) await page.keyboard.press(key);
+        await page.waitForTimeout(100);
+        await expect(aria).toHaveText('Lifted Banana');
+        await page.keyboard.press('Space');
+      }
+      await expect(aria).toHaveText('Dropped Banana at position 2');
+      await expectOrder(mount, items, SEED);
+      await expect.poll(() => texts(mount.locator(LOG_LI))).toEqual(['start:keyboard', 'end:keyboard']);
+      await assertInvariant(mount);
+    });
+
+    // options.draggable: only matching rows lift by keyboard.
+    runner(`sortable-keyboard-keys [${target}]: a row not matching options.draggable cannot be lifted${tag}`, async ({ page }) => {
+      const { mount, items, aria } = await open(page);
+      await clickKeepingFocus(mount, 'draggable-ac');
+      await expect(items).toHaveCount(SEED.length);
+      await expect(items.nth(1)).toHaveAttribute('tabindex', '0');
+      await items.nth(1).focus();
+      if (burst) {
+        for (const key of ['Space', 'ArrowDown', 'Space']) await page.keyboard.press(key);
+      } else {
+        await page.keyboard.press('Space');
+        await page.waitForTimeout(100);
+        await expect(mount.locator(LIFTED)).toHaveCount(0);
+        await page.keyboard.press('ArrowDown');
+        await page.keyboard.press('Space');
+      }
+      await page.waitForTimeout(150);
+      await expect(aria).toHaveText('');
+      await expect(mount.locator(LOG_LI)).toHaveCount(0);
+      await expectOrder(mount, items, SEED);
+      // Cherry matches: it lifts and moves.
+      await items.nth(2).focus();
+      await page.keyboard.press('Space');
+      await expect(aria).toHaveText('Lifted Cherry');
+      await page.keyboard.press('ArrowUp');
+      await expect(aria).toHaveText('Moved Cherry to position 2');
+      await page.keyboard.press('Space');
+      await expectOrder(mount, items, ['Apple', 'Cherry', 'Banana', 'Date', 'Elderberry']);
+      await assertInvariant(mount);
+    });
 
     runner(
       `sortable-keyboard-keys [${target}]: lifted highlight follows the item after a consumer insert${tag}`,

@@ -18,7 +18,12 @@
   Controls (the spec clicks them without moving focus):
     - `disable-prop`   toggles the `disabled` prop,
     - `disable-option` calls the imperative `option('disabled', true)`,
-    - `prepend`        inserts a new first item (a consumer change mid-lift).
+    - `prepend`        inserts a new first item (a consumer change mid-lift),
+    - `disable-keyboard` toggles the `disableKeyboard` prop,
+    - `options-disabled` sets the `options` prop to `{ disabled: true }`,
+    - `sort-off`       calls the imperative `option('sort', false)`,
+    - `draggable-ac`   remounts the list with `options.draggable` matching
+                       only Apple's and Cherry's rows.
   The list also passes an object `itemClass` and an array-with-object
   `listClass`, so the spec can check those classes land on every target
   (Angular's native [class] used to drop objects nested in a class list).
@@ -41,6 +46,9 @@
   lastEnd: '',
   endOrder: '',
   disabled: false,
+  disableKeyboard: false,
+  listOptions: {},
+  listKey: 0,
 }
 </data>
 
@@ -94,6 +102,24 @@ const disableByOption = () => {
   $refs.list.option('disabled', true)
 }
 
+const toggleDisableKeyboard = () => {
+  $data.disableKeyboard = !$data.disableKeyboard
+}
+
+const disableByOptions = () => {
+  $data.listOptions = { disabled: true }
+}
+
+const sortOff = () => {
+  $refs.list.option('sort', false)
+}
+
+// SortableJS reads `options` at construction: remount the list with it.
+const draggableAC = () => {
+  $data.listOptions = { draggable: '[data-id="a"], [data-id="c"]' }
+  $data.listKey = $data.listKey + 1
+}
+
 const prependItem = () => {
   $data.items = [{ id: 'z', label: 'Zucchini' }, ...$data.items]
 }
@@ -110,12 +136,19 @@ $onMount(() => {
     <button type="button" data-testid="disable-prop" @click="toggleDisabled">Toggle disabled</button>
     <button type="button" data-testid="disable-option" @click="disableByOption">option('disabled', true)</button>
     <button type="button" data-testid="prepend" @click="prependItem">Prepend</button>
+    <button type="button" data-testid="disable-keyboard" @click="toggleDisableKeyboard">Toggle disableKeyboard</button>
+    <button type="button" data-testid="options-disabled" @click="disableByOptions">options.disabled</button>
+    <button type="button" data-testid="sort-off" @click="sortOff">option('sort', false)</button>
+    <button type="button" data-testid="draggable-ac" @click="draggableAC">options.draggable (Apple, Cherry)</button>
   </div>
   <SortableList
     ref="list"
+    :key="$data.listKey"
     r-model:items="$data.items"
     itemKey="id"
     :disabled="$data.disabled"
+    :disableKeyboard="$data.disableKeyboard"
+    :options="$data.listOptions"
     :itemClass="{ 'demo-item-flag': true, 'demo-item-off': false }"
     :listClass="['demo-list', { 'demo-list-flag': true }]"
     listLabel="Fruit"

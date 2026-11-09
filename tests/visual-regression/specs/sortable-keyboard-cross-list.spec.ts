@@ -1069,5 +1069,50 @@ for (const target of TARGETS) {
         expect(errors).toEqual([]);
       },
     );
+
+    // Index keys: after Bold hops out, Toolbar A may reuse Bold's old row
+    // element for Italic. Keys there are Italic's, not the lift's.
+    runner(
+      `sortable-keyboard-cross-list [${target}]: a reused row element after a hop is not the lifted row${tag}`,
+      async ({ page }) => {
+        const { mount, errors } = await open(page);
+        await clickKeepingFocus(mount, 'tools-index-keys');
+        await expect
+          .poll(() =>
+            mount
+              .getByTestId('zone-toola')
+              .locator(ITEM)
+              .evaluateAll((els) => els.map((el) => el.getAttribute('data-id'))),
+          )
+          .toEqual(['0', '1', '2']);
+        await grip(mount, 'Bold').focus();
+        if (burst) {
+          for (const key of ['Space', 'Shift+ArrowRight']) await page.keyboard.press(key);
+        } else {
+          await page.keyboard.press('Space');
+          await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Bold']);
+          await page.keyboard.press('Shift+ArrowRight');
+        }
+        await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
+        await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
+        await expect.poll(() => active(page), { timeout: 5000 }).toBe('Reorder Bold');
+        // Italic now sits at Toolbar A's row 0 (Bold's old position and key).
+        await grip(mount, 'Italic').focus();
+        await page.keyboard.press('ArrowRight');
+        await page.waitForTimeout(100);
+        await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
+        await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
+        await expect.poll(() => liveTexts(mount)).toEqual(['Moved Bold to Toolbar B, position 1']);
+        // Space there drops Bold and lifts Italic.
+        await page.keyboard.press('Space');
+        await expect.poll(() => liveTexts(mount)).toEqual(['Lifted Italic']);
+        await page.keyboard.press('Escape');
+        await expect.poll(() => liveTexts(mount)).toEqual(['Cancelled. Italic returned to position 1']);
+        await expect.poll(() => state(mount, 'toola')).toEqual(['Italic', 'Underline']);
+        await expect.poll(() => state(mount, 'toolb')).toEqual(['Bold', ...SEED.toolb]);
+        await assertNothingDisappeared(mount);
+        expect(errors).toEqual([]);
+      },
+    );
   }
 }
