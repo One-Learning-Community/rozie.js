@@ -1569,11 +1569,6 @@ $expose({ getInstance, toArray, sort, option })
 
 <template>
 <div class="rozie-sortable-wrap">
-  <!-- #header / #footer sit around the role="list" element, not inside it:
-       the list's children are its rows only (a list may own only listitems).
-       This also keeps an empty list empty for SortableJS (on Lit the slot
-       elements would otherwise be children of the list). -->
-  <slot name="header" />
   <div
     :class="['rozie-sortable-list', $props.listClass]"
     ref="listEl"
@@ -1582,6 +1577,10 @@ $expose({ getInstance, toArray, sort, option })
     role="list"
     :aria-label="$props.listLabel"
   >
+    <!-- #header / #footer render inside the list element, around the rows.
+         Only when filled: on Lit an unfilled <slot> is still an element child,
+         and SortableJS then never treats an empty list as empty. -->
+    <slot r-if="$slots.header" name="header" />
     <div
       r-for="item, index in $props.items"
       :key="keyFor(item, index)"
@@ -1595,8 +1594,8 @@ $expose({ getInstance, toArray, sort, option })
     >
       <slot :item="item" :index="index" :instructionsId="$data.instructionsId" />
     </div>
+    <slot r-if="$slots.footer" name="footer" />
   </div>
-  <slot name="footer" />
   <div
     class="rozie-sortable-aria-live"
     data-rozie-sortable-aria-live

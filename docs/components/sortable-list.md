@@ -195,7 +195,7 @@ On Lit, rows rendered through `rozieSlots.default` live inside the element's sha
 
 #### `#header` / `#footer` slots
 
-`#header` renders just before the list element and `#footer` just after it, inside the component's root. They are not part of the `role="list"` element (the SortableJS container), whose children are the item rows only. ARIA lets a list contain only list items, and screen readers count just the rows. Use them for a heading, a running total, an "Add item" button, or any chrome that should sit with the list but not take part in the drag order.
+`#header` renders inside the list element (the `role="list"` SortableJS container) before the rows, and `#footer` after them. They never take part in the drag order: only item rows can be dragged, and indices count item rows only. Use them for a heading, a running total, an "Add item" button, or any chrome that should sit inside the list box. They are not list items, so a strict accessibility checker (axe `aria-required-children`) reports them; keep them short, or render a long heading outside the component.
 
 ```rozie
 <SortableList r-model:items="$data.items" itemKey="id">
@@ -211,7 +211,7 @@ On Lit, rows rendered through `rozieSlots.default` live inside the element's sha
 </SortableList>
 ```
 
-Header and footer are outside the drop area: a row dropped on them doesn't land in the list. To draw one box around header, rows and footer, wrap the component in your own element and style that: `listClass` styles the rows' container only. An empty list takes a mouse drop only within its own area, so give it a `min-height` through `listClass` (see [Cross-list drag](#cross-list-drag)).
+Header and footer sit inside the list's box and its drop area. `listClass` styles the box that holds header, rows and footer. An empty list takes a mouse drop only within its own area, so give it a `min-height` through `listClass` (see [Cross-list drag](#cross-list-drag)).
 
 ### Imperative handle
 
@@ -328,7 +328,7 @@ The keyboard follows the same SortableJS rules as the mouse:
 
 Two rules can't be evaluated without a live drag, so the keyboard doesn't apply them: `options.onMove` (it gets the drag's DOM event and the hovered element) and function-valued `pull` / `put`. A list whose `pull` or `put` is a function is never a keyboard hop target; an `onMove` veto applies to mouse drags only. Other rows can still be moved past a filtered row, as with the mouse. Options set at runtime through `option(name, value)` (for `disabled`, `filter`, `draggable` and `sort`) apply to the keyboard too. A change to the `options` prop object is reapplied to SortableJS key by key (no remount), so mouse and keyboard always follow the same values. Keys are compared by content, so an inline `options` object rebuilt on every render is not a change; a function inside it (`filter`, `group.pull` / `group.put`) that is new each render is passed on to SortableJS, so the newest closure runs, unless a runtime `option(name, value)` is set for that key.
 
-The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders outside that element, so its children are the rows only. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
+The list container carries `role="list"` and `aria-label` from `listLabel`. (`role="list"` takes no `aria-orientation`, so a horizontal list says which keys to use in its instructions instead.) `#header` and `#footer` content renders inside that element, around the rows. Spoken instructions sit in a hidden element that each tabbable row references with `aria-describedby` (see [Instructions](#instructions) for the text). Pass `keyboardInstructions` to say it in your own words (for example "widget" instead of "row").
 
 After every keyboard move, focus returns to the moved row (or its handle in handle mode) on all six frameworks. The component looks the row up by key, so it finds it whether the framework kept the row element or re-created it.
 

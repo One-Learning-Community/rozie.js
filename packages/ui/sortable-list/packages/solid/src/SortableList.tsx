@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js';
-import { For, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
+import { For, Show, children, createEffect, createSignal, mergeProps, on, onCleanup, onMount, splitProps, untrack } from 'solid-js';
 import { __rozieInjectStyle, createControllableSignal, parseInlineStyle, rozieAttr, rozieClass, rozieDisplay } from '@rozie/runtime-solid';
 import { ROW_DRAGGABLE, orderByKeys, reapplyOptions, useSortableJS } from './internal/useSortableJS';
 import { afterFlush, canHop, getKeyboardRegistry, isRenderable, nextInstructionsId, rowLiftable } from './internal/keyboardRegistry';
@@ -1498,14 +1498,12 @@ export default function SortableList(_props: SortableListProps): JSX.Element {
   return (
     <>
     <div {...attrs} class={"rozie-sortable-wrap" + (((attrs as unknown as Record<string, unknown>).class as string | undefined) ? " " + ((attrs as unknown as Record<string, unknown>).class as string | undefined) : "")} data-rozie-s-0af24eae="">
-      
-      {(_props.headerSlot ?? _props.slots?.['header']?.({}))}
       <div class={rozieClass(['rozie-sortable-list', local.listClass])} ref={(el) => { listElRef = el as HTMLElement; }} part="list" role="list" aria-label={rozieAttr(local.listLabel)} data-rozie-s-0af24eae="">
-        <For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId() : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), liftedIndex() === index() ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
+        
+        {<Show when={(_props.headerSlot ?? _props.slots?.['header'])}>{(_props.headerSlot ?? _props.slots?.['header']?.({}))}</Show>}<For each={items()}>{(item, index) => <div data-id={rozieAttr(keyFor(item, index()))} role="listitem" aria-describedby={rozieAttr(rowTabbable() ? instructionsId() : null)} class={rozieClass(['rozie-sortable-item', itemClassFor(item, index()), liftedIndex() === index() ? 'rozie-sortable-item-lifted' : ''])} style={parseInlineStyle(itemStyleFor(item, index()))} tabIndex={rozieAttr(rowTabbable() ? 0 : null)} onKeyDown={($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => { onRowKeyDown($event, index()); }} data-rozie-s-0af24eae="">
           {typeof local.children === 'function' ? (local.children as (s: any) => any)({ item, get index() { return index(); }, get instructionsId() { return instructionsId(); } }) : resolved()}
         </div>}</For>
-      </div>
-      {(_props.footerSlot ?? _props.slots?.['footer']?.({}))}
+        {<Show when={(_props.footerSlot ?? _props.slots?.['footer'])}>{(_props.footerSlot ?? _props.slots?.['footer']?.({}))}</Show>}</div>
       <div class={"rozie-sortable-aria-live"} data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae="">{ariaLiveText()}</div>
       <span hidden={true} id={rozieAttr(instructionsId())} data-rozie-s-0af24eae="">{rozieDisplay(instructionsText())}</span>
     </div>

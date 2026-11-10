@@ -304,8 +304,8 @@ for (const target of TARGETS) {
     },
   );
 
-  // The list has a `#header` and a `#footer` (rendered outside the
-  // `role="list"` element on every target). Every payload's indices count
+  // The list has a `#header` and a `#footer` (rendered inside the
+  // `role="list"` element, around the rows). Every payload's indices count
   // item rows only, and pointer and keyboard payloads have the same shape.
   const lastEnd = async (mount: ReturnType<Page['getByTestId']>) =>
     JSON.parse((await mount.getByTestId('last-end').textContent()) || 'null');
@@ -482,13 +482,13 @@ for (const target of TARGETS) {
     const want = ['Cherry', 'Apple', 'Elderberry', 'Banana', 'Date'];
     await expectOrder(mount, items, want);
     await expect(items).toHaveCount(SEED.length);
-    // The list still holds the rows only (header and footer sit around it).
+    // The rows stay between the header and the footer.
     const kinds = await mount.locator(LIST).first().evaluate((list) =>
       Array.from(list.children)
         .map((c) => ((c.getAttribute('class') ?? '').includes('rozie-sortable-item') ? 'r' : 'o'))
         .join(''),
     );
-    expect(kinds).toBe('rrrrr');
+    expect(kinds).toMatch(/^o+r{5}o+$/);
     // sort() is the consumer's own call: no event.
     await page.waitForTimeout(100);
     await expect(mount.locator(LOG_LI)).toHaveCount(0);

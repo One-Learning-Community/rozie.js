@@ -68,16 +68,22 @@ interface FooterCtx {}
   template: `
 
     <div class="rozie-sortable-wrap" #rozieSpread_0 #rozieListenersTarget_1>
-      
-      <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
       <div [class]="rozieClass(['rozie-sortable-list', listClass()])" #listEl part="list" role="list" [attr.aria-label]="rozieAttr(listLabel())">
-        @for (item of items(); track keyFor(item, index); let index = $index) {
+        
+        @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    @if ((headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])) {
+    <ng-container *ngTemplateOutlet="(headerTpl ?? __rozieFillMap()['header'] ?? templates()?.['header'])" />
+    }
+    }@for (item of items(); track keyFor(item, index); let index = $index) {
     <div [class]="rozieClass(['rozie-sortable-item', itemClassFor(item, index), liftedIndex() === index ? 'rozie-sortable-item-lifted' : ''])" [style]="itemStyleFor(item, index)" [attr.data-id]="rozieAttr(keyFor(item, index))" role="listitem" [attr.tabindex]="rozieAttr(rowTabbable() ? 0 : null)" [attr.aria-describedby]="rozieAttr(rowTabbable() ? instructionsId() : null)" (keydown)="onRowKeyDown($event, index)">
           <ng-container *ngTemplateOutlet="(defaultTpl ?? __rozieFillMap()['defaultSlot'] ?? templates()?.['defaultSlot']); context: { $implicit: { item: item, index: index, instructionsId: instructionsId() }, item: item, index: index, instructionsId: instructionsId() }" />
         </div>
     }
-      </div>
-      <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />
+        @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+    @if ((footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])) {
+    <ng-container *ngTemplateOutlet="(footerTpl ?? __rozieFillMap()['footer'] ?? templates()?.['footer'])" />
+    }
+    }</div>
       <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText() }}</div>
       <span hidden="" [attr.id]="rozieAttr(instructionsId())">{{ rozieDisplay(instructionsText()) }}</span>
     </div>

@@ -12,8 +12,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  *   - the spoken-instructions id: one per list, referenced by the list's rows
  *     once mounted (it is assigned at mount, so server and first client render
  *     agree);
- *   - `#header` / `#footer` content is not part of the `role="list"` element:
- *     the list's children in the accessibility tree are its rows only;
+ *   - `#header` / `#footer` content renders inside the `role="list"` element,
+ *     header before the rows and footer after them;
  *   - Lit: a mounted `<rozie-sortable-list>` taken out of the page and put back
  *     still drags and reorders by keyboard, with each event once.
  *
@@ -121,22 +121,18 @@ for (const target of TARGETS) {
     await check();
   });
 
-  runner(`sortable-a11y [${target}]: header and footer do not break the list's children`, async ({ page }) => {
+  runner(`sortable-a11y [${target}]: header and footer render inside the list, around the rows`, async ({ page }) => {
     const { mount } = await openKeys(page);
     await expect(mount.locator('[class*="list-header"]')).toHaveText('Fruit (5)');
     await expect(mount.locator('[class*="list-footer"]')).toHaveText('End of list');
     const list = mount.getByRole('list', { name: 'Fruit' });
     await expect(list).toHaveCount(1);
     const snapshot = await list.ariaSnapshot();
-    const lines = snapshot.split('\n');
-    expect(lines[0]).toMatch(/^- list "Fruit"/);
-    // The list's direct children (one level of indent) are its rows only.
-    const children = lines.filter((l) => /^ {2}- /.test(l));
-    expect(children.length).toBe(SEED.length);
-    for (const line of children) expect(line).toMatch(/^ {2}- listitem\b/);
-    expect(snapshot).not.toContain('Fruit (5)');
-    expect(snapshot).not.toContain('End of list');
-    // Header first, footer last, around the list.
+    expect(snapshot.split('\n')[0]).toMatch(/^- list "Fruit"/);
+    expect(snapshot).toContain('Fruit (5)');
+    expect(snapshot).toContain('End of list');
+    expect(snapshot.split('\n').filter((l) => /^ {2}- listitem\b/.test(l)).length).toBe(SEED.length);
+    // Header first, then the rows, then the footer, all inside the list.
     const order = await mount.evaluate((root) => {
       const all: string[] = [];
       const walk = (n: Node) => {
@@ -144,6 +140,7 @@ for (const target of TARGETS) {
           const c = n.getAttribute('class') ?? '';
           if (c.includes('list-header')) all.push('header');
           else if (c.includes('list-footer')) all.push('footer');
+          else if (n.getAttribute('role') === 'listitem') all.push('row');
           else if (n.getAttribute('role') === 'list') all.push('list');
           if ((n as HTMLElement).shadowRoot) {
             // Lit: walk the composed tree (slotted light-DOM content where its slot sits).
@@ -159,7 +156,7 @@ for (const target of TARGETS) {
       walk(root);
       return all;
     });
-    expect(order).toEqual(['header', 'list', 'footer']);
+    expect(order).toEqual(['list', 'header', ...SEED.map(() => 'row'), 'footer']);
   });
 
   if (target === 'lit') {

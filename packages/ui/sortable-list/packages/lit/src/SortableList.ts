@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, queryAssignedElements, state } from 'lit/decorators.js';
 import { SignalWatcher, effect, signal, untracked } from '@lit-labs/preact-signals';
 import { RozieSlotDistributor, __rozieReconcileAfterDomMutation, createLitControllableProperty, rozieAttr, rozieClass, rozieDisplay, rozieListeners, rozieSpread, rozieStyle } from '@rozie/runtime-lit';
@@ -629,14 +629,12 @@ private __rozieFirstUpdateDone = false;
   render() {
     return html`
 <div class="rozie-sortable-wrap" ${rozieSpread(this.$attrs)} ${rozieListeners(this.$listeners)} data-rozie-s-0af24eae>
-  
-  <slot name="header"></slot>
   <div class="${(rozieClass(['rozie-sortable-list', this.listClass]))}" part="list" role="list" aria-label=${rozieAttr(this.listLabel)} data-rozie-ref="listEl" data-rozie-s-0af24eae>${keyed(this._rozieReconcileSeq ?? 0, html`
-    ${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this._instructionsId.value : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
+    
+    ${this._hasSlotHeader ? html`<slot name="header"></slot>` : nothing}${repeat<any>(this.items, (item, index) => this.keyFor(item, index), (item, index) => html`<div class="${(rozieClass(['rozie-sortable-item', this.itemClassFor(item, index), this._liftedIndex.value === index ? 'rozie-sortable-item-lifted' : '']))}" style=${rozieStyle(this.itemStyleFor(item, index))} data-id=${rozieAttr(this.keyFor(item, index))} role="listitem" tabindex=${rozieAttr(this.rowTabbable() ? 0 : null)} aria-describedby=${rozieAttr(this.rowTabbable() ? this._instructionsId.value : null)} @keydown=${($event: KeyboardEvent & { currentTarget: HTMLDivElement; target: HTMLDivElement }) => { this.onRowKeyDown($event, index); }} data-rozie-s-0af24eae>
       ${this.rozieSlots?.['default'] !== undefined ? this.rozieSlots?.['default']!({item: item, index: index, instructionsId: this._instructionsId.value}) : this.__rozieDefaultSlot__ !== undefined ? this.__rozieDefaultSlot__({item: item, index: index, instructionsId: this._instructionsId.value}) : html`<slot data-rozie-params=${(() => { try { return JSON.stringify({item: item, index: index, instructionsId: this._instructionsId.value}); } catch { return '{}'; } })()}></slot>`}
     </div>`)}
-  `)}</div>
-  <slot name="footer"></slot>
+    ${this._hasSlotFooter ? html`<slot name="footer"></slot>` : nothing}`)}</div>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true" data-rozie-s-0af24eae>${this._ariaLiveText.value}</div>
   <span hidden="" id=${rozieAttr(this._instructionsId.value)} data-rozie-s-0af24eae>${rozieDisplay(this.instructionsText())}</span>
 </div>

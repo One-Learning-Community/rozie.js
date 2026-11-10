@@ -212,10 +212,11 @@ function readStash<T>(item: unknown): T | undefined {
 }
 
 /** SortableJS's plain index (every element child of the list but
- * `<template>`s and its clone, which are all item rows: `#header` / `#footer`
- * render outside the list element), falling back to the draggable-relative
- * one, else `-1`. The draggable index is not an item-row index when a custom
- * `options.draggable` leaves rows out (it skips them). */
+ * `<template>`s and its clone), falling back to the draggable-relative one,
+ * else `-1`. A last-resort hint only: the plain index counts `#header` /
+ * `#footer` content too, and the draggable index skips rows a custom
+ * `options.draggable` leaves out. The real indices come from the stashed
+ * item's position in `items` and the row's place in the DOM (`rowIndex`). */
 function plainIndex(plain: number | null | undefined, draggable: number | null | undefined): number {
   if (typeof plain === 'number') return plain;
   if (typeof draggable === 'number') return draggable;
@@ -397,8 +398,8 @@ export function useSortableJS<T>(
 
   /** Item-scoped child lookup. The DOM-restore sites index ONLY the item rows
    * (`:scope > .rozie-sortable-item`), so the restore index stays
-   * item-relative whatever else is a child of the list element. (`#header` /
-   * `#footer` render outside it, around the `role="list"` element.) */
+   * item-relative whatever else is a child of the list element (`#header` /
+   * `#footer` content sits before and after the rows). */
   const itemChildAt = (i: number): Element | null =>
     Array.from(listEl.children).filter((c) => c.classList.contains('rozie-sortable-item'))[i] ?? null;
   // Build the explicit handler set — these always win over anything the
@@ -486,7 +487,7 @@ export function useSortableJS<T>(
 
       // Item-row indices: the new one read off the DOM where the row is
       // (`rowIndex`), else SortableJS's plain index, which counts every
-      // element child of the list (all item rows). SortableJS's
+      // element child of the list (header and footer content included). SortableJS's
       // `*DraggableIndex` skip rows a custom `options.draggable` leaves out,
       // so they are only the last resort.
       const oldIndexHint = endOld;

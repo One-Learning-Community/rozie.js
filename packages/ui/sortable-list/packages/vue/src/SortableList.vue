@@ -1,14 +1,12 @@
 <template>
 
 <div class="rozie-sortable-wrap" v-bind="$attrs">
-  
-  <slot name="header"></slot>
   <div :class="['rozie-sortable-list', props.listClass]" ref="listElRef" part="list" role="list" :aria-label="(props.listLabel) ?? undefined">
-    <div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : '']" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="(rowTabbable() ? 0 : undefined) ?? undefined" :aria-describedby="(rowTabbable() ? instructionsId : undefined) ?? undefined" @keydown="onRowKeyDown($event, index)">
+    
+    <template v-if="$slots.header"><slot name="header"></slot></template><div v-for="(item, index) in items" :key="keyFor(item, index)" :class="['rozie-sortable-item', itemClassFor(item, index), liftedIndex === index ? 'rozie-sortable-item-lifted' : '']" :style="itemStyleFor(item, index)" :data-id="keyFor(item, index)" role="listitem" :tabindex="(rowTabbable() ? 0 : undefined) ?? undefined" :aria-describedby="(rowTabbable() ? instructionsId : undefined) ?? undefined" @keydown="onRowKeyDown($event, index)">
       <slot :item="item" :index="index" :instructionsId="instructionsId"></slot>
     </div>
-  </div>
-  <slot name="footer"></slot>
+    <template v-if="$slots.footer"><slot name="footer"></slot></template></div>
   <div class="rozie-sortable-aria-live" data-rozie-sortable-aria-live="" aria-live="polite" aria-atomic="true">{{ ariaLiveText }}</div>
   <span hidden :id="instructionsId">{{ instructionsText() }}</span>
 </div>

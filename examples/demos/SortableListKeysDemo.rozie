@@ -9,7 +9,7 @@
       `${name}:${interaction}`.
   The list has both a `#header` and a `#footer`, so the spec can check that
   every event's `oldIndex` / `newIndex` counts item rows only (header and
-  footer render outside the list element on every target). The last
+  footer render inside the list element, around the rows). The last
   `end` payload is shown in `<output data-testid="last-end">` as JSON
   ({ item, el, from, to, oldIndex, newIndex, interaction }, with `item` as
   the item's label, `el` as "element" or null and `from` / `to` as the list's
