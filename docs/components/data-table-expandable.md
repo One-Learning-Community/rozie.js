@@ -3,7 +3,7 @@
 Set `expandable` to opt into expandable rows: a leading chevron expander column auto-injects (after the select column) and `getExpandedRowModel` activates. The default `false` is byte-identical-off. The two-way `expanded` slice is **multi-expand** (`{ [rowId]: true }`, or the `true` literal after `expandAll`), so several rows stay open at once. There are two expand modes:
 
 - **Detail panel** — with no `getSubRows`, an open row reveals a full-width `#detail` panel (scope `{ row }`) below it; render arbitrary content.
-- **Nested sub-rows** — supply `getSubRows(originalRow, index) => TData[]` and table-core flattens the hierarchy into depth-indented child rows.
+- **Nested sub-rows** — supply `getSubRows(originalRow, index) => TData[]` and table-core flattens the hierarchy into depth-indented child rows. Child rows are read-only: [editing](/components/data-table-editing) works on the top-level rows only.
 
 ```rozie
 <DataTable :data="$data.rows" expandable r-model:expanded="$data.expanded"
