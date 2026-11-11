@@ -928,6 +928,9 @@ export const EXAMPLES = [
   // separate so turning on grid mode's active-cell row-pin never widens DataTableLazy's own
   // exact rendered-row-bounds assertions (data-table-lazy.spec.ts).
   'DataTableLazyEdit',
+  // data-table 0.9.2 (audit C-01) — getSubRows tree with an editable column + grid mode
+  // (loader -> examples/demos/DataTableTreeEditDemo.rozie): a child-row edit must never write another record.
+  'DataTableTreeEdit',
   'DataTableColumnMgmt',
   'DataTableSticky',
   'DataTableBorders',
@@ -1857,6 +1860,7 @@ export const LIT_TAGS: Record<Example, string> = {
   DataTableRowActivate: 'rozie-data-table-row-activate',
   DataTableLazy: 'rozie-data-table-lazy',
   DataTableLazyEdit: 'rozie-data-table-lazy-edit',
+  DataTableTreeEdit: 'rozie-data-table-tree-edit',
   DataTableColumnMgmt: 'rozie-data-table-column-mgmt',
   DataTableSticky: 'rozie-data-table-sticky',
   DataTableBorders: 'rozie-data-table-borders',
@@ -2460,6 +2464,7 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   DataTableRowActivate: {},
   DataTableLazy: {},
   DataTableLazyEdit: {},
+  DataTableTreeEdit: {},
   DataTableColumnMgmt: {},
   DataTableSticky: {},
   DataTableBorders: {},

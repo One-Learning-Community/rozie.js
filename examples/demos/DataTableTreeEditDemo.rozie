@@ -1,0 +1,66 @@
+<!--
+  DataTableTreeEditDemo.rozie — data-table 0.9.2 (audit C-01).
+  A `getSubRows` tree whose `name` column is editable in interactionMode='grid'. A sub-row's
+  `original` is never an element of the top-level `data` array, so an edit on a child row
+  used to resolve its write index through sourceIndexOfRow's visible-index fallback and
+  overwrite whichever TOP-LEVEL record sat at that visible index. data-table-tree-edit-guard
+  .spec.ts asserts the top-level records are never touched by an edit on a child row, and
+  that no cell-edit-commit fires for a write that did not happen.
+-->
+<rozie name="DataTableTreeEditDemo">
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+<data>
+{
+  rows: [
+    { id: 'p0', name: 'Parent 0', children: [{ id: 'c0a', name: 'Child 0a' }, { id: 'c0b', name: 'Child 0b' }] },
+    { id: 'p1', name: 'Parent 1' },
+    { id: 'p2', name: 'Parent 2' },
+  ],
+  expanded: {},
+  commitCount: 0,
+  lastCommit: '',
+}
+</data>
+<script>
+const rowIdOf = (row) => row.id
+const getSubRows = (row) => row.children
+const onCellEditCommit = (payload) => {
+  $data.lastCommit = payload ? payload.rowId + ':' + payload.columnId + '=' + String(payload.newValue) : ''
+  $data.commitCount = $data.commitCount + 1
+}
+const modelReadout = () => JSON.stringify($data.rows.map((r) => ({ id: r.id, name: r.name, kids: (r.children || []).map((c) => c.name) })))
+</script>
+<template>
+<div class="dt-tree-edit-demo">
+  <span class="readout" data-testid="commit-count">{{ $data.commitCount }}</span>
+  <span class="readout" data-testid="last-commit">{{ $data.lastCommit }}</span>
+  <pre class="model" data-testid="model-readout">{{ modelReadout() }}</pre>
+  <section data-testid="tree-table">
+    <DataTable
+      interactionMode="grid"
+      r-model:data="$data.rows"
+      r-model:expanded="$data.expanded"
+      :expandable="true"
+      :getSubRows="getSubRows"
+      :getRowId="rowIdOf"
+      @cell-edit-commit="onCellEditCommit($event)"
+    >
+      <Column field="name" header="Name" :editable="true" editor="text" />
+    </DataTable>
+  </section>
+</div>
+</template>
+<style>
+.dt-tree-edit-demo {
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #1a1a1a;
+  padding: 1rem;
+  width: 460px;
+}
+</style>
+</rozie>

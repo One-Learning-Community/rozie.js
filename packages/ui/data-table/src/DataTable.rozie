@@ -2206,7 +2206,7 @@ let rangeDragUp = null
 let rangeDragMoved = false
 import { teardownRangeDrag, beginRangeDrag } from './dragSelect.rzts'
 
-import { commitEditToRange, activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
+import { commitEditToRange, activeCellColumnId, isActiveCellEditable, isEditing, cellAriaInvalid, runValidator, setInvalid, replaceRowValue, sourceIndexOfRow, rowIndexIsUnlocatable, editingColumnId, editingColumnField, editingCellValue, editingRowOriginal, editingRowId, focusEditorWhenReady, columnIdAt, cellValueAt, beginEdit, focusCellWhenReady, indexOfRowIn, endEdit, endRowEdit, editorAutofocusFor, coerceCellValue, commitEdit, toggleActiveBooleanCell, cancelEdit } from './editCellLifecycle.rzts'
 
 import { editableColumnsForRow, focusRowEditorAt, beginRowEdit, commitRow, cancelRow, replaceRowValues, nextEditableCell, prevEditableCell } from './editRowLifecycle.rzts'
 

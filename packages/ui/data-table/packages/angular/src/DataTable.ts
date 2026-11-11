@@ -7493,6 +7493,11 @@ export class DataTable {
       // replaceRowValue. Hoisted per-ROW exactly like rowGrouped above (the SAME single placement
       // closes pasteRange/cutRange/clearActiveRange/fillRange all at once).
       const rowPlaceholder = this.rowIsLazyPlaceholder((this.rows() || [])[r]);
+      // Audit C-01 (0.9.2): a getSubRows CHILD row's record is not in the top-level data array
+      // either (its `original` lives in its parent's children), so sourceIndexOfRow is -1 and a
+      // write could only land on a DIFFERENT top-level record. Skipped per ROW like the two above
+      // — one placement for paste/cut/clear/fill.
+      const rowUnlocatable = this.rowIndexIsUnlocatable(r);
       const cols = grid[gr] || [];
       for (let gc = 0; gc < cols.length; gc++) {
         const c = originCol + gc;
@@ -7502,7 +7507,7 @@ export class DataTable {
         // pasted" / "no cells pasted" announce keeps its existing semantics (never silently
         // under-reports M).
         total = total + 1;
-        if (rowGrouped || rowPlaceholder) continue;
+        if (rowGrouped || rowPlaceholder || rowUnlocatable) continue;
         const colId = this.columnIdAt(r, c);
         if (colId == null || !this.columnEditable(colId)) continue;
         const rowObj = this.rowOriginalAt(r);
@@ -8093,6 +8098,8 @@ export class DataTable {
     if (this.rowIndexIsGrouped(__activeRow)) return false;
     // A lazy placeholder (a row not loaded yet) has nothing to edit (quick 260925-dtl part 2).
     if (this.rowIsLazyPlaceholder((this.rows() || [])[__activeRow])) return false;
+    // A getSubRows child row's record is not in the top-level data array (audit C-01): no editor.
+    if (this.rowIndexIsUnlocatable(__activeRow)) return false;
     const colId = this.activeCellColumnId();
     return colId != null && this.columnEditable(colId);
   };
@@ -8155,15 +8162,28 @@ export class DataTable {
   };
   // Map a visible-model body-row index ($data.rows index) to its underlying currentData()
   // index via the row's original object identity (sorting/filtering/pagination may reorder
-  // the visible model away from the source array order). Falls back to the same index.
+  // the visible model away from the source array order). Returns -1 when the row's record is
+  // NOT an element of the top-level data array — a `getSubRows` child (its `original` lives in
+  // its parent's children array) or a lazy placeholder. It must NOT fall back to the visible
+  // index: that wrote the edit onto whichever DIFFERENT top-level record sat at that visible
+  // position (data-table 0.9.2, audit C-01). Every write funnel treats -1 as "no write".
   sourceIndexOfRow = (visibleRowIndex: any) => {
     const rowList = this.rows() || [];
     const row = rowList[visibleRowIndex];
-    if (!row) return visibleRowIndex;
-    const orig = row.original;
+    if (!row) return -1;
     const data = this.currentData() || [];
-    const idx = data.indexOf(orig);
-    return idx >= 0 ? idx : visibleRowIndex;
+    return data.indexOf(row.original);
+  };
+  // rowIndexIsUnlocatable: the row at this visible index EXISTS but its record cannot be
+  // located in the top-level data array (a getSubRows child row; see sourceIndexOfRow). Such a
+  // row can neither be written nor edited in this release — nested immutable writes into the
+  // consumer's sub-row arrays are not supported — so every edit-entry and write funnel skips it
+  // exactly like a group header or a lazy placeholder. A missing row (stale index) is NOT
+  // "unlocatable": the callers' own `!row` checks handle that.
+  rowIndexIsUnlocatable = (visibleRowIndex: any) => {
+    const row = (this.rows() || [])[visibleRowIndex];
+    if (!row) return false;
+    return (this.currentData() || []).indexOf(row.original) < 0;
   };
   // The column id / field (accessorKey) / current value / row object / row id for the cell
   // in EDIT — keyed off the authoritative editing pair ($data.editingRow/editingCol), NOT
@@ -8314,6 +8334,8 @@ export class DataTable {
     // does not run on that path at all.
     if (this.rowIndexIsGrouped(rowIndex)) return;
     if (this.rowIsLazyPlaceholder((this.rows() || [])[rowIndex])) return;
+    // Audit C-01: a getSubRows child row has no top-level record to write — never open its editor.
+    if (this.rowIndexIsUnlocatable(rowIndex)) return;
     const colId = this.columnIdAt(rowIndex, colIndex);
     if (colId == null || !this.columnEditable(colId)) return;
     // A new edit session starts — reset the sync idempotency latch so THIS session's eventual
@@ -8517,8 +8539,11 @@ export class DataTable {
     // it set at the top-of-function guard above and no-ops. Set on BOTH paths so a no-op commit
     // is just as re-entry-safe as a real one.
     this.committedThisSession = true;
-    if (changed) {
-      const srcIndex = this.sourceIndexOfRow(__editingRow);
+    // Audit C-01 defense-in-depth: a row whose record is not in the top-level data array is
+    // never written (and never reported as written) — beginEdit already refuses to open its editor.
+    const srcIndex = changed ? this.sourceIndexOfRow(__editingRow) : -1;
+    const wrote = changed && srcIndex >= 0;
+    if (wrote) {
       const next = replaceRowValue(this.currentData(), srcIndex, field, newValue);
       this.writeData(next);
       // Exactly one emit per commit, from this single call site (writeData does NOT emit).
@@ -8531,7 +8556,7 @@ export class DataTable {
     }
     this.endEdit();
     this.editTransition = false;
-    if (changed) {
+    if (wrote) {
       // Defer the focus return so the display↔editor re-render commits first (async on
       // React/Solid/Lit) — the cell is focusable with its roving tabindex only after the
       // editor unmounts and the display branch (+ tabindex) re-renders. Skipped on a
@@ -8638,6 +8663,8 @@ export class DataTable {
     // "no write ever targets a placeholder row" a property of the write funnel itself, not just of
     // its one caller).
     if (this.rowIsLazyPlaceholder(row)) return;
+    // Audit C-01: a getSubRows child row has no top-level record to write (no toggle, no emit).
+    if (this.rowIndexIsUnlocatable(__activeRow)) return;
     const colId = this.columnIdAt(__activeRow, __activeColIndex);
     if (colId == null || !this.columnEditable(colId)) return;
     const rowOriginal = row.original;
@@ -8785,6 +8812,9 @@ export class DataTable {
     // seed a row editor from a placeholder's undefined fields and commit through the same
     // sourceIndexOfRow fallback bug applyGridToRange's placeholder skip closes.
     if (this.rowIsLazyPlaceholder((__rows || [])[rowIndex])) return;
+    // Audit C-01: a getSubRows child row's record is not in the top-level data array, so a row
+    // edit could only write a DIFFERENT record — never open the row editor on it.
+    if (this.rowIndexIsUnlocatable(rowIndex)) return;
     const editable = this.editableColumnsForRow(rowIndex);
     if (editable.length === 0) return;
     // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
@@ -8893,9 +8923,12 @@ export class DataTable {
     // a no-op row-edit-commit. Gate the write/emit on `changes.length`; ALWAYS close the editor.
     const changed = changes.length > 0;
     this.editTransition = true;
-    if (changed) {
+    // Audit C-01 defense-in-depth: no write (and no row-edit-commit) for a row whose record is
+    // not in the top-level data array — beginRowEdit already refuses to open its editor.
+    const srcIndex = changed ? this.sourceIndexOfRow(rowIndex) : -1;
+    const wrote = changed && srcIndex >= 0;
+    if (wrote) {
       // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
-      const srcIndex = this.sourceIndexOfRow(rowIndex);
       const next = replaceRowValues(this.currentData(), srcIndex, fieldValues);
       this.writeData(next);
       // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
@@ -8906,7 +8939,7 @@ export class DataTable {
     }
     this.endRowEdit();
     this.editTransition = false;
-    if (changed) {
+    if (wrote) {
       // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
       // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
       // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave

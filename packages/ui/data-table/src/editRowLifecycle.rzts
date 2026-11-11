@@ -86,6 +86,9 @@ const beginRowEdit = (row) => {
   // seed a row editor from a placeholder's undefined fields and commit through the same
   // sourceIndexOfRow fallback bug applyGridToRange's placeholder skip closes.
   if (rowIsLazyPlaceholder(($data.rows || [])[rowIndex])) return
+  // Audit C-01: a getSubRows child row's record is not in the top-level data array, so a row
+  // edit could only write a DIFFERENT record — never open the row editor on it.
+  if (rowIndexIsUnlocatable(rowIndex)) return
   const editable = editableColumnsForRow(rowIndex)
   if (editable.length === 0) return
   // A new edit session starts — reset the sync idempotency latch (see editCellLifecycle.rzts).
@@ -187,9 +190,12 @@ const commitRow = () => {
   // a no-op row-edit-commit. Gate the write/emit on `changes.length`; ALWAYS close the editor.
   const changed = changes.length > 0
   editTransition = true
-  if (changed) {
+  // Audit C-01 defense-in-depth: no write (and no row-edit-commit) for a row whose record is
+  // not in the top-level data array — beginRowEdit already refuses to open its editor.
+  const srcIndex = changed ? sourceIndexOfRow(rowIndex) : -1
+  const wrote = changed && srcIndex >= 0
+  if (wrote) {
     // ONE fresh-array replace of the SINGLE row object with all field values applied at once.
-    const srcIndex = sourceIndexOfRow(rowIndex)
     const next = replaceRowValues(currentData(), srcIndex, fieldValues)
     writeData(next)
     // EXACTLY ONE emit per row commit, from THIS single call site (React multi-emit dedup, D-07).
@@ -197,7 +203,7 @@ const commitRow = () => {
   }
   endRowEdit()
   editTransition = false
-  if (changed) {
+  if (wrote) {
     // WR-01/B23 (review): a FULL-ROW commit can RELOCATE its row under an active sort/filter, exactly
     // like the single-cell commitEdit. Do NOT focus the FIXED old index — focusCellWhenReady(rowIndex,
     // col) would land on whatever DIFFERENT row now occupies the old index (or drop to <body>) AND leave
