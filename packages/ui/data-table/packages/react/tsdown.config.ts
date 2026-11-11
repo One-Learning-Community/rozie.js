@@ -25,5 +25,8 @@ export default defineConfig({
   // copy would defeat the peerDependency and double-load the primitive's own
   // module-scope state alongside any copy the consumer's app separately imports).
   external: ['react', 'react-dom', '@rozie/runtime-react', '@rozie-ui/popover-react', '@tanstack/table-core', /\.css$/],
-  copy: [{ from: 'src/DataTable.css', to: 'dist', flatten: true }],
+  copy: [
+    { from: 'src/DataTable.css', to: 'dist', flatten: true },
+    { from: 'src/GroupBar.css', to: 'dist', flatten: true },
+  ],
 });

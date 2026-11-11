@@ -27,5 +27,8 @@ export default defineConfig({
     'chart.js',
     /\.css$/,
   ],
-  copy: [{ from: 'src/Chart.css', to: 'dist', flatten: true }],
+  copy: [
+    { from: 'src/Chart.css', to: 'dist', flatten: true },
+    { from: 'src/Chart.global.css', to: 'dist', flatten: true },
+  ],
 });

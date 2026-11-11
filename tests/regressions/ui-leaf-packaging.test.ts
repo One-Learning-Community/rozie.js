@@ -170,3 +170,63 @@ describe('CSS-shipping leaves never declare sideEffects: false', () => {
     expect(shipsCss).toBe(false);
   });
 });
+
+/**
+ * (d) Every relative `.css` import a React leaf's source (and built dist)
+ * keeps must resolve to a file that ships in `dist/`.
+ *
+ * tsdown leaves `import './X.css'` verbatim (the leaf marks `/\.css$/`
+ * external), so the file must be `copy`'d into `dist/`. data-table 0.9.1,
+ * chartjs and codemirror each imported a CSS file the `copy` list omitted
+ * (`GroupBar.css`, `Chart.global.css`, `CodeMirror.global.css`): a consumer's
+ * bundler failed to resolve it. Fix the leaf's `tsdown.config.ts` `copy` list.
+ */
+describe('React leaves ship every relative css import in dist', () => {
+  const CSS_IMPORT = /import\s+['"]\.\/([A-Za-z0-9_.-]+\.css)['"]/g;
+  const reactLeaves = listLeaves().filter((l) => l.target === 'react');
+
+  function cssImportsIn(files: string[]): Set<string> {
+    const out = new Set<string>();
+    for (const f of files) {
+      for (const m of readFileSync(f, 'utf8').matchAll(CSS_IMPORT)) out.add(m[1]);
+    }
+    return out;
+  }
+
+  it('finds React leaves to check', () => {
+    expect(reactLeaves.length).toBeGreaterThan(20);
+  });
+
+  for (const leaf of reactLeaves) {
+    const cfgPath = join(leaf.dir, 'tsdown.config.ts');
+    const srcDir = join(leaf.dir, 'src');
+    if (!existsSync(cfgPath) || !existsSync(srcDir)) continue;
+
+    it(`${leaf.fam}-react: tsdown copy list covers every css imported by src`, () => {
+      const srcFiles = readdirSync(srcDir)
+        .filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))
+        .map((f) => join(srcDir, f));
+      const cfg = readFileSync(cfgPath, 'utf8');
+      const missing = [...cssImportsIn(srcFiles)].filter(
+        (css) => !cfg.includes(`'src/${css}'`) && !cfg.includes(`"src/${css}"`),
+      );
+      expect(missing, `css imported by src but not in tsdown copy: ${missing.join(', ')}`).toEqual([]);
+    });
+
+    it(`${leaf.fam}-react: every css specifier in built dist resolves inside dist`, () => {
+      const distDir = join(leaf.dir, 'dist');
+      if (!existsSync(distDir)) return; // unbuilt checkout: source-level check above still guards
+      const distFiles = readdirSync(distDir)
+        .filter((f) => f.endsWith('.mjs') || f.endsWith('.cjs'))
+        .map((f) => join(distDir, f));
+      const CJS_REQ = /require\(['"]\.\/([A-Za-z0-9_.-]+\.css)['"]\)/g;
+      const missing: string[] = [];
+      for (const f of distFiles) {
+        const text = readFileSync(f, 'utf8');
+        const specs = [...text.matchAll(CSS_IMPORT), ...text.matchAll(CJS_REQ)].map((m) => m[1]);
+        for (const css of specs) if (!existsSync(join(distDir, css))) missing.push(`${css} (from ${f})`);
+      }
+      expect(missing).toEqual([]);
+    });
+  }
+});

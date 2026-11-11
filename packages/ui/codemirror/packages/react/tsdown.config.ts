@@ -41,5 +41,8 @@ export default defineConfig({
     '@codemirror/theme-one-dark',
     /\.css$/,
   ],
-  copy: [{ from: 'src/CodeMirror.css', to: 'dist', flatten: true }],
+  copy: [
+    { from: 'src/CodeMirror.css', to: 'dist', flatten: true },
+    { from: 'src/CodeMirror.global.css', to: 'dist', flatten: true },
+  ],
 });
