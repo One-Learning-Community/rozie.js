@@ -6445,12 +6445,24 @@ const setInvalid = (msg: any) => {
 // its parent's children array) or a lazy placeholder. It must NOT fall back to the visible
 // index: that wrote the edit onto whichever DIFFERENT top-level record sat at that visible
 // position (data-table 0.9.2, audit C-01). Every write funnel treats -1 as "no write".
+//
+// An identity miss on a TOP-LEVEL row is not that case. Right after one of the table's own
+// writes, the data array already holds the row's fresh object while $data.rows is still the
+// pre-write snapshot on the targets that re-derive after the handler returns (Svelte, Angular):
+// Tab-commit-and-advance asks about the row it just wrote, inside the same handler. table-core
+// gives a top-level row `parentId === undefined` and `index` = its index in the data array
+// (createRow via getCoreRowModel's accessRows; grouping leaves both alone on leaf rows), and a
+// write never moves a record, so `row.index` still names it. Only a child row (`parentId` set)
+// or a lazy placeholder has no top-level record.
 const sourceIndexOfRow = (visibleRowIndex: any) => {
   const rowList = rows || [];
   const row = rowList[visibleRowIndex];
   if (!row) return -1;
   const data = currentData() || [];
-  return data.indexOf(row.original);
+  const idx = data.indexOf(row.original);
+  if (idx >= 0) return idx;
+  if (row.parentId != null || rowIsLazyPlaceholder(row)) return -1;
+  return typeof row.index === 'number' && row.index >= 0 && row.index < data.length ? row.index : -1;
 };
 // rowIndexIsUnlocatable: the row at this visible index EXISTS but its record cannot be
 // located in the top-level data array (a getSubRows child row; see sourceIndexOfRow). Such a
@@ -6461,7 +6473,7 @@ const sourceIndexOfRow = (visibleRowIndex: any) => {
 const rowIndexIsUnlocatable = (visibleRowIndex: any) => {
   const row = (rows || [])[visibleRowIndex];
   if (!row) return false;
-  return (currentData() || []).indexOf(row.original) < 0;
+  return sourceIndexOfRow(visibleRowIndex) < 0;
 };
 // The column id / field (accessorKey) / current value / row object / row id for the cell
 // in EDIT — keyed off the authoritative editing pair ($data.editingRow/editingCol), NOT
