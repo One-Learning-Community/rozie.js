@@ -6735,10 +6735,21 @@ const setInvalid = (msg: any) => {
 // writes, the data array already holds the row's fresh object while $data.rows is still the
 // pre-write snapshot on the targets that re-derive after the handler returns (Svelte, Angular):
 // Tab-commit-and-advance asks about the row it just wrote, inside the same handler. table-core
-// gives a top-level row `parentId === undefined` and `index` = its index in the data array
-// (createRow via getCoreRowModel's accessRows; grouping leaves both alone on leaf rows), and a
-// write never moves a record, so `row.index` still names it. Only a child row (`parentId` set)
-// or a lazy placeholder has no top-level record.
+// gives a top-level record row `index` = its index in the data array (createRow via
+// getCoreRowModel's accessRows; grouping keeps it), and a write never moves a record, so
+// `row.index` still names it. Only a getSubRows child, a group-header row or a lazy
+// placeholder has no top-level record.
+//
+// A child is NOT "parentId is set": the grouped row model sets `parentId` on every leaf row
+// inside a group too. It is "deeper than the grouping": getGroupedRowModel rewrites each
+// record row's depth to the number of active grouping columns, and a getSubRows child sits
+// below that (depth 0 with no grouping).
+const recordRowDepth = () => {
+  const ids = currentState().grouping || [];
+  if (!ids.length || !table) return 0;
+  const known = new Set(table.getAllFlatColumns().map((c: any) => c.id));
+  return ids.filter((id: any) => known.has(id)).length;
+};
 const sourceIndexOfRow = (visibleRowIndex: any) => {
   const rowList = rows.value || [];
   const row = rowList[visibleRowIndex];
@@ -6746,7 +6757,9 @@ const sourceIndexOfRow = (visibleRowIndex: any) => {
   const data = currentData() || [];
   const idx = data.indexOf(row.original);
   if (idx >= 0) return idx;
-  if (row.parentId != null || rowIsLazyPlaceholder(row)) return -1;
+  if (rowIsLazyPlaceholder(row)) return -1;
+  if (typeof row.getIsGrouped === 'function' && row.getIsGrouped()) return -1;
+  if ((row.depth || 0) > recordRowDepth()) return -1;
   return typeof row.index === 'number' && row.index >= 0 && row.index < data.length ? row.index : -1;
 };
 // rowIndexIsUnlocatable: the row at this visible index EXISTS but its record cannot be

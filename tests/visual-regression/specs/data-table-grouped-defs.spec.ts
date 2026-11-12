@@ -675,3 +675,33 @@ for (const target of TARGETS) {
     await expect(readout).toHaveText('region,age,status', { timeout: 15_000 });
   });
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// C7 (data-table 0.9.2 audit) — Tab-commit-and-advance on a LEAF row of a grouped table
+// opens the next cell's editor. table-core's grouped model sets `parentId` on every leaf
+// row inside a group, so a sub-row guard keyed on `parentId` alone read a grouped leaf as
+// a getSubRows child once the just-written row missed the identity check (Svelte/Angular
+// re-derive $data.rows after the handler) and refused to open the next editor.
+// ═══════════════════════════════════════════════════════════════════════════════════
+for (const target of TARGETS) {
+  runnerFor(target)(`grouped-defs C7 [${target}]: Tab after a commit on a grouped leaf row opens the next editor`, async ({
+    page,
+  }) => {
+    const { mount, container } = await gotoGroupEditGuard(page, target);
+    const leafRow = container.locator('tbody tr[data-group-leaf]').first();
+    await leafRow.locator('[data-col="product"][data-grid-cell]').click();
+    await page.keyboard.press('F2');
+    const editorInput = container.locator('[data-editing-cell]');
+    await expect(editorInput).toHaveCount(1, { timeout: 5_000 });
+    await expect(editorInput).toBeFocused({ timeout: 5_000 });
+    await page.keyboard.type('Zeta');
+    await page.keyboard.press('Tab');
+    await expect(mount.getByTestId('commit-count')).toHaveText('1', { timeout: 5_000 });
+    await expect(mount.getByTestId('model-readout')).toHaveText(
+      'Zeta:1|Pear:2|Plum:3|Fig:4|Date:5|Lime:6',
+      { timeout: 5_000 },
+    );
+    // The Tab advanced into the same row's `qty` cell, whose custom editor is now open.
+    await expect(container.getByTestId('qty-editor-wrap')).toHaveCount(1, { timeout: 5_000 });
+  });
+}
