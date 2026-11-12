@@ -1255,12 +1255,12 @@ const idRoot = () => props.idBase || autoId.value || 'rozie-combobox';
 const optId = (i: any) => idRoot() + '-opt-' + i;
 const listId = () => idRoot() + '-list';
 // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
-// SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
+// SHOWN — enabled, open, and (unless `hideEmpty`) has something to render. With `hideEmpty` an
 // open popup with no option rows AND no create row counts as hidden: the list
 // branches do not render, aria-expanded reports false, and Escape is left to the
-// host (B4). Without `hideEmpty` this is exactly `$data.isOpen` (byte-identical-off).
+// host (B4).
 const popupVisible = () => {
-  if (!isOpen.value) return false;
+  if (props.disabled || !isOpen.value) return false;
   if (!props.hideEmpty) return true;
   return navRows().length > 0;
 };
@@ -1374,7 +1374,7 @@ const chipRemoveLabel = (row: any) => 'Remove ' + String(row.label);
 // `@change` with BOTH the committed value AND the raw source `option` (CP reads
 // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
 const selectOption = (opt: any) => {
-  if (!opt) return;
+  if (props.disabled || !opt) return;
   if (opt.isMore) {
     expandGroup(opt.group);
     activeIndex.value = opt._i;

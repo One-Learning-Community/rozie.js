@@ -1725,12 +1725,12 @@ private __rozieFirstUpdateDone = false;
   listId = () => this.idRoot() + '-list';
 
   // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
-  // SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
+  // SHOWN — enabled, open, and (unless `hideEmpty`) has something to render. With `hideEmpty` an
   // open popup with no option rows AND no create row counts as hidden: the list
   // branches do not render, aria-expanded reports false, and Escape is left to the
-  // host (B4). Without `hideEmpty` this is exactly `$data.isOpen` (byte-identical-off).
+  // host (B4).
   popupVisible = () => {
-  if (!this._isOpen.value) return false;
+  if (this.disabled || !this._isOpen.value) return false;
   if (!this.hideEmpty) return true;
   return this.navRows().length > 0;
 };
@@ -1853,7 +1853,7 @@ private __rozieFirstUpdateDone = false;
   // `@change` with BOTH the committed value AND the raw source `option` (CP reads
   // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
   selectOption = (opt: any) => {
-  if (!opt) return;
+  if (this.disabled || !opt) return;
   if (opt.isMore) {
     this.expandGroup(opt.group);
     this._activeIndex.value = opt._i;

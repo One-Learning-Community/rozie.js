@@ -58,6 +58,7 @@ afterEach(() => {
  */
 function mountCombobox() {
   const value = ref<string | null>(null);
+  const disabled = ref(false);
   const handleRef = ref<ComboboxHandle | null>(null);
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -67,6 +68,7 @@ function mountCombobox() {
       h(Combobox, {
         ref: handleRef,
         value: value.value,
+        disabled: disabled.value,
         'onUpdate:value': (v: string | null) => {
           value.value = v;
         },
@@ -76,7 +78,7 @@ function mountCombobox() {
       }),
   });
   app.mount(host);
-  return { app, host, handle: () => handleRef.value as ComboboxHandle };
+  return { app, host, disabled, value, handle: () => handleRef.value as ComboboxHandle };
 }
 
 describe('Combobox pinOpen — imperative handle verb (behavioral)', () => {
@@ -88,6 +90,36 @@ describe('Combobox pinOpen — imperative handle verb (behavioral)', () => {
     await nextTick();
 
     expect(host.querySelectorAll('[role="option"]').length).toBe(4);
+    app.unmount();
+  });
+
+  it('cannot select an option when a pinned combobox becomes disabled', async () => {
+    const { app, host, handle, disabled, value } = mountCombobox();
+    const input = host.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+
+    input.dispatchEvent(new Event('focus'));
+    await nextTick();
+    handle().pinOpen(true);
+    await nextTick();
+
+    const option = host.querySelector<HTMLElement>('[role="option"]')!;
+    expect(option.textContent).toBe('Apple');
+
+    disabled.value = true;
+    input.dispatchEvent(new Event('blur'));
+    await nextTick();
+    option.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    expect(value.value).toBeNull();
+    expect(input.getAttribute('aria-expanded')).toBe('false');
+    expect(host.querySelector('[role="option"]')).toBeNull();
+
+    disabled.value = false;
+    await nextTick();
+    const enabledOption = host.querySelector<HTMLElement>('[role="option"]')!;
+    enabledOption.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    expect(value.value).toBe('apple');
+
     app.unmount();
   });
 
