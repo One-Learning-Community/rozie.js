@@ -571,11 +571,11 @@ let holdFallbackWarned = false;
 let lastPageGrouping: unknown = null;
 // The column-set signature fed last time (see columnSetSignature / reFeed).
 let lastColumnSig = '';
-// A signature of the column set as table-core's sort / filter stages see it: each column's id
+// A signature of the column set as table-core's sort / filter / grouping stages see it: each column's id
 // and whether it can sort / filter (groups flattened, iteratively — no self-recursive const,
 // which React lowers to a useCallback). table-core memoizes those stages on the sorting /
-// columnFilters references and the upstream model only, NOT on the column defs; a stage that
-// first ran before a sorted/filtered column existed (a <Column> child registering after the
+// columnFilters / grouping references and the upstream model only, NOT on the column defs; a
+// stage that first ran before a sorted/filtered/grouped column existed (a <Column> child registering after the
 // first pull, the norm on React/Solid/Lit) silently skipped that sort/filter and stays cached.
 const columnSetSignature = (defs: any) => {
   let sig = '';
@@ -2806,11 +2806,14 @@ const reFeed = () => {
     };
   }
   // The column set changed (a <Column> registered, a `columns` entry was added, a column became
-  // sortable/filterable): table-core's sort and filter stages do not key on column defs, so a
-  // sort or filter that referenced a column which did not exist yet stays skipped (an initial
-  // `sorting` was ignored on React/Solid/Lit). Feed shallow copies of both arrays — the same
-  // memo invalidation refreshView() uses — so they re-run against the new columns. Not a view
-  // change: the hold (if any) is kept and the page is not reset.
+  // sortable/filterable): table-core's sort, filter AND grouping stages do not key on column
+  // defs, so a sort, filter or grouping that referenced a column which did not exist yet stays
+  // skipped (an initial `sorting` was ignored, and an initial `grouping` rendered no group rows,
+  // on React/Solid/Lit). Feed shallow copies of all three arrays — the same memo invalidation
+  // refreshView() uses — so they re-run against the new columns. The grouping copy is needed on
+  // its own: with no filters the filter stage hands back its input model unchanged, so
+  // re-running it does not invalidate the grouping stage downstream. Not a view change: the
+  // hold (if any) is kept and the page is not reset (groupingChanged above reads st0, not st).
   const cols = tableColumns();
   const colSig = columnSetSignature(cols);
   if (colSig !== lastColumnSig) {
@@ -2818,7 +2821,8 @@ const reFeed = () => {
     st = {
       ...st,
       sorting: [...(st.sorting || [])],
-      columnFilters: [...(st.columnFilters || [])]
+      columnFilters: [...(st.columnFilters || [])],
+      grouping: [...(st.grouping || [])]
     };
   }
   // An external swap releases the hold BEFORE this re-feed's refresh, so the one

@@ -1,0 +1,91 @@
+<!--
+  DataTableGroupAtMountDemo.rozie — 1.0 surface freeze Task 7b fixture.
+
+  Every model slice is bound to a NON-EMPTY value from the FIRST render (no post-mount write).
+  data-table-group-at-mount.spec.ts asserts each one is applied at mount on all six targets:
+    - grouping bound two-way (r-model) and one-way (:grouping) to ['category']
+    - sorting, columnFilters, expanded (#detail), columnPinning, columnVisibility
+  Static data; no clock/random.
+-->
+
+<rozie name="DataTableGroupAtMountDemo">
+
+<components>
+{
+  DataTable: '../../packages/ui/data-table/src/DataTable.rozie',
+  Column: '../../packages/ui/data-table/src/Column.rozie',
+}
+</components>
+
+<data>
+{
+  rows: [
+    { id: 1, category: 'Fruit', name: 'Apple',  qty: 3 },
+    { id: 2, category: 'Fruit', name: 'Banana', qty: 5 },
+    { id: 3, category: 'Veg',   name: 'Carrot', qty: 2 },
+    { id: 4, category: 'Veg',   name: 'Pea',    qty: 7 },
+  ],
+  groupingTwoWay: ['category'],
+  groupingOneWay: ['category'],
+  sortingModel: [{ id: 'name', desc: true }],
+  filtersModel: [{ id: 'category', value: 'Veg' }],
+  expandedModel: { '0': true },
+  pinningModel: { left: ['qty'], right: [] },
+  visibilityModel: { qty: false },
+}
+</data>
+
+<template>
+<div class="dt-group-at-mount-demo">
+  <div data-testid="grouping-two-way">
+    <DataTable :data="$data.rows" r-model:grouping="$data.groupingTwoWay">
+      <Column field="category" header="Category" />
+      <Column field="name" header="Name" />
+    </DataTable>
+  </div>
+  <div data-testid="grouping-one-way">
+    <DataTable :data="$data.rows" :grouping="$data.groupingOneWay">
+      <Column field="category" header="Category" />
+      <Column field="name" header="Name" />
+    </DataTable>
+  </div>
+  <div data-testid="sorting-bound">
+    <DataTable :data="$data.rows" r-model:sorting="$data.sortingModel">
+      <Column field="name" header="Name" :sortable="true" />
+      <Column field="qty" header="Qty" />
+    </DataTable>
+  </div>
+  <div data-testid="filters-bound">
+    <DataTable :data="$data.rows" r-model:columnFilters="$data.filtersModel">
+      <Column field="category" header="Category" :filterable="true" />
+      <Column field="name" header="Name" />
+    </DataTable>
+  </div>
+  <div data-testid="expanded-bound">
+    <DataTable :data="$data.rows" :expandable="true" r-model:expanded="$data.expandedModel">
+      <Column field="name" header="Name" />
+      <template #detail="{ row }">
+        <div data-testid="at-mount-detail">Detail {{ row.name }}</div>
+      </template>
+    </DataTable>
+  </div>
+  <div data-testid="pinning-bound">
+    <DataTable :data="$data.rows" r-model:columnPinning="$data.pinningModel">
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+    </DataTable>
+  </div>
+  <div data-testid="visibility-bound">
+    <DataTable :data="$data.rows" r-model:columnVisibility="$data.visibilityModel">
+      <Column field="name" header="Name" />
+      <Column field="qty" header="Qty" />
+    </DataTable>
+  </div>
+</div>
+</template>
+
+<style>
+.dt-group-at-mount-demo { font-family: system-ui, sans-serif; padding: 1rem; width: 520px; }
+</style>
+
+</rozie>

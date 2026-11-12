@@ -110,7 +110,7 @@ for (const target of TARGETS) {
     const container = mount.getByTestId('placeholder-table');
     await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
 
-    // Multi-level grouping engages one frame after mount (post-mount write).
+    // Multi-level grouping is bound at mount.
     await expect
       .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
       .toBe('region,city');
@@ -159,7 +159,7 @@ for (const target of TARGETS) {
     const container = mount.getByTestId('grid-table');
     await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
 
-    // Single-level grouping by 'region' engages one frame after mount.
+    // Single-level grouping by 'region' is bound at mount.
     await expect
       .poll(async () => mount.getByTestId('grouping-readout').textContent(), { timeout: 15_000 })
       .toBe('region');

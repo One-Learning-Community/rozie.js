@@ -282,7 +282,7 @@ for (const target of TARGETS) {
     const container = mount.getByTestId('placeholder-table');
     await expect(container.locator('table')).toBeVisible({ timeout: 15_000 });
 
-    // Multi-level grouping engages one frame after mount → group-header rows render
+    // Multi-level grouping is bound at mount → group-header rows render
     // (2 top-level region groups + nested city subgroups). This demo is role="table" (NOT
     // grid mode), so wait on the group-header row locator directly rather than the
     // grid-only groupHeaderCount() probe.

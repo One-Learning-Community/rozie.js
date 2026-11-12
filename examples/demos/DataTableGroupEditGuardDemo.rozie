@@ -14,9 +14,7 @@
   C2 (Task 3) — paste/cut/Delete-clear/fill-drag anchored on or spanning a group-header row
   must never write through it.
 
-  Single-level grouping by `region` (applied POST-MOUNT, one frame after mount — the
-  DataTableVirtualGroupDemo pattern; an initial-bound grouping renders zero group rows on
-  React). The grouping model field is named `groupingModel` (NOT `grouping`) — the Angular
+  Single-level grouping by `region`, bound from the first render. The grouping model field is named `groupingModel` (NOT `grouping`) — the Angular
   slot-var/signal shadow footgun. `selectionMode="multiple"` injects the leading checkbox
   column so #selectCell has somewhere to render. `qty` uses `editor="custom"` (routed
   through EditorText, wrapped so this fixture can stamp its OWN probe attribute) so the
@@ -58,11 +56,9 @@
     { id: 5, region: 'South', product: 'Date',  qty: 5 },
     { id: 6, region: 'South', product: 'Lime',  qty: 6 },
   ],
-  // Controlled single-level grouping — seeded [] then APPLIED in $onMount (a post-mount
-  // write) so the grouped-model rebuild keys on the CHANGE (reliable on React; the
-  // DataTableVirtualGroupDemo / DataTableGroupPlaceholderDemo pattern). Named
-  // `groupingModel` (NOT `grouping`) — the Angular slot-var/signal shadow footgun.
-  groupingModel: [],
+  // Controlled single-level grouping, bound at mount. Named `groupingModel` (NOT
+  // `grouping`) — the Angular slot-var/signal shadow footgun.
+  groupingModel: ['region'],
   // Last cell-edit-commit counter — C1/C2 assert this NEVER moves on a group-row write.
   commitCount: 0,
   // C1 single-click-to-edit toggle (mirrors DataTableGridEditDemo's singleClickEdit idiom).
@@ -75,14 +71,6 @@
 </data>
 
 <script lang="ts">
-// Apply grouping AFTER mount (one frame later) so the grouped row-model rebuild keys on
-// the CHANGE (reliable on React).
-$onMount(() => {
-  const applyGrouping = (): void => { $data.groupingModel = ['region'] }
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
-  else applyGrouping()
-})
-
 // cell-edit-commit → counter only (the C1/C2 "nothing was written" assertions read this).
 const onCellEditCommit = (): void => {
   $data.commitCount = $data.commitCount + 1

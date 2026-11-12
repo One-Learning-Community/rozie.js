@@ -55,23 +55,14 @@
     { id: 3, region: 'North', city: 'Bergen', product: 'Carrot', qty: 2 },
     { id: 4, region: 'South', city: 'Rome',   product: 'Pea',    qty: 7 },
   ],
-  // Controlled MULTI-LEVEL grouping. Seeded [] then APPLIED in $onMount (a post-mount write)
-  // so the grouped-model rebuild keys on the CHANGE (reliable on React; the treegrid pattern).
-  groupingModel: [],
+  // Controlled MULTI-LEVEL grouping, bound at mount.
+  groupingModel: ['region', 'city'],
   // Large pageSize so every flattened row is on one page.
   pageConfig: { pageIndex: 0, pageSize: 50 },
 }
 </data>
 
 <script lang="ts">
-// Apply the two-level grouping AFTER mount (one frame later) — a post-mount grouping WRITE so
-// the grouped row-model rebuild keys on the CHANGE (reliable on React).
-$onMount(() => {
-  const applyGrouping = (): void => { $data.groupingModel = ['region', 'city'] }
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(applyGrouping)
-  else applyGrouping()
-})
-
 // B2 (quick 260906-afh) probe: reveals WHAT the #cell slot's `row` param actually is on a
 // group-header row. `NOROW` for a null row (defensive — should never happen); `GROUP:` +
 // groupingColumnId + `:` + groupingValue + `:` + leafCount for the locked group descriptor

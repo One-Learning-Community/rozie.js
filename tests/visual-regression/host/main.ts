@@ -1172,6 +1172,8 @@ export const EXAMPLES = [
   // [examplesRoot] + the examples tsconfig include + the glob-driven build-cells demos
   // sweep already cover it, importing the data-table source pkg already registered for
   // Angular cross-tree AOT in phase 48).
+  // Grouping (and every other model slice) bound non-empty at mount (data-table-group-at-mount.spec.ts).
+  'DataTableGroupAtMount',
   'DataTableGroupTreegrid',
   // Quick 260706-h2d — DataTableGroupPlaceholder is the multi-level-grouping
   // placeholder-blank behavioral fixture (loader → examples/demos/
@@ -1923,6 +1925,7 @@ export const LIT_TAGS: Record<Example, string> = {
   // Phase 63 wave-8 treegrid — '-demo' appended on Lit →
   // 'rozie-data-table-group-treegrid-demo' = kebab of DataTableGroupTreegridDemo.
   DataTableGroupTreegrid: 'rozie-data-table-group-treegrid',
+  DataTableGroupAtMount: 'rozie-data-table-group-at-mount',
   // Quick 260706-h2d — the lit entry appends '-demo' → tag
   // 'rozie-data-table-group-placeholder-demo' = kebab of DataTableGroupPlaceholderDemo.
   DataTableGroupPlaceholder: 'rozie-data-table-group-placeholder',
@@ -2479,6 +2482,8 @@ export const DEFAULT_PROPS: Record<Example, Record<string, unknown>> = {
   // Phase 63 wave-8 treegrid — self-contained ($data only: the rows + grouping model +
   // the readouts). The DataTable is mounted inline with its props.
   DataTableGroupTreegrid: {},
+  // Grouping-at-mount — self-contained ($data only). No parent-supplied props.
+  DataTableGroupAtMount: {},
   // Quick 260706-h2d placeholder-blank — self-contained ($data only: rows + grouping
   // model). The DataTable is mounted inline with its props. No parent-supplied props.
   DataTableGroupPlaceholder: {},
