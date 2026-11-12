@@ -1278,12 +1278,12 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   }
 
   // popupVisible() (hideEmpty, COMBOBOX-SPEC item 4): whether the popup is actually
-  // SHOWN — open AND (unless `hideEmpty`) something to render. With `hideEmpty` an
+  // SHOWN — enabled, open, and (unless `hideEmpty`) has something to render. With `hideEmpty` an
   // open popup with no option rows AND no create row counts as hidden: the list
   // branches do not render, aria-expanded reports false, and Escape is left to the
-  // host (B4). Without `hideEmpty` this is exactly `$data.isOpen` (byte-identical-off).
+  // host (B4).
   function popupVisible() {
-    if (!isOpen) return false;
+    if (props.disabled || !isOpen) return false;
     if (!props.hideEmpty) return true;
     return navRows().length > 0;
   }
@@ -1412,7 +1412,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
   // `e.option`). `effectiveCloseOnSelect()` gates the popup close.
   const { onChange: _rozieProp_onChange, onCreate: _rozieProp_onCreate } = props;
     const selectOption = useCallback((opt: any) => {
-    if (!opt) return;
+    if (props.disabled || !opt) return;
     if (opt.isMore) {
       expandGroup(opt.group);
       setActiveIndex(opt._i);
@@ -1478,7 +1478,7 @@ const Combobox = forwardRef<ComboboxHandle, ComboboxProps>(function Combobox(_pr
       option: opt.option,
       selected: true
     });
-  }, [_rozieProp_onChange, _rozieProp_onCreate, clearQuery, createdQuery, effectiveCloseOnSelect, expandGroup, inputText, normalizedQuery, props.multiple, selectedValues, setValue]);
+  }, [_rozieProp_onChange, _rozieProp_onCreate, clearQuery, createdQuery, effectiveCloseOnSelect, expandGroup, inputText, normalizedQuery, props.disabled, props.multiple, selectedValues, setValue]);
   // removeChipValue(v): routes chip removal through the EXACT SAME toggle path
   // selectOption() uses for a re-select — a synthetic wrapper row is enough,
   // since the `multiple` branch above only reads `opt.value`/`opt.option`/
